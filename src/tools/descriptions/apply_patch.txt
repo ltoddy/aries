@@ -1,0 +1,33 @@
+使用 `apply_patch` 工具编辑文件。您的补丁语言是一种简化的、面向文件的差异（diff）格式，旨在易于解析和安全应用。您可以将其视为一个高级的包装：
+
+*** Begin Patch
+[ 一个或多个文件部分 ]
+*** End Patch
+
+在该包装内，您将获得一系列文件操作。
+您必须包含一个标头来指定您正在执行的操作。
+每个操作以三个标头之一开始：
+
+*** Add File: <path> - 创建一个新文件。接下来的每一行都是一个 + 行（初始内容）。
+*** Delete File: <path> - 删除现有文件。后面没有任何内容。
+*** Update File: <path> - 就地修补现有文件（可选择重命名）。
+
+示例补丁：
+
+```
+*** Begin Patch
+*** Add File: hello.txt
++Hello world
+*** Update File: src/app.py
+*** Move to: src/main.py
+@@ def greet():
+-print("Hi")
++print("Hello, world!")
+*** Delete File: obsolete.txt
+*** End Patch
+```
+
+请务必记住：
+
+- 您必须包含带有您预期操作的标头（Add/Delete/Update）
+- 即使在创建新文件时，您也必须用 `+` 作为新行的前缀

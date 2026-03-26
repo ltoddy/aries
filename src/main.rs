@@ -12,15 +12,39 @@ use rustyline::Config;
 use rustyline::error::ReadlineError;
 
 mod completer;
+mod tools;
+
 use completer::CommandCompleter;
 use rig::agent::MultiTurnStreamItem;
+use tools::{
+    ApplyPatchTool, BatchTool, CodeSearchTool, EditTool, GlobTool, GrepTool, LsTool, LspTool, MultiEditTool,
+    QuestionTool, ReadFileTool, ShellCommand, TaskTool, WebFetchTool, WebSearchTool, WriteFileTool,
+};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let client = deepseek::Client::from_env();
 
-    let agent =
-        client.agent(deepseek::DEEPSEEK_CHAT).preamble("You are Aries, a helpful terminal AI assistant.").build();
+    let agent = client
+        .agent(deepseek::DEEPSEEK_CHAT)
+        .preamble("You are Aries, a helpful terminal AI assistant. You can use tools to execute shell commands and read/write files when requested by the user. Always explain what you are going to do before calling a tool.")
+        .tool(ShellCommand)
+        .tool(ReadFileTool)
+        .tool(WriteFileTool)
+        .tool(GlobTool)
+        .tool(GrepTool)
+        .tool(LsTool)
+        .tool(ApplyPatchTool)
+        .tool(MultiEditTool)
+        .tool(EditTool)
+        .tool(BatchTool)
+        .tool(QuestionTool)
+        .tool(TaskTool)
+        .tool(WebFetchTool)
+        .tool(WebSearchTool)
+        .tool(LspTool)
+        .tool(CodeSearchTool)
+        .build();
 
     let mut chat_history: Vec<Message> = vec![];
 
@@ -64,6 +88,14 @@ async fn main() -> Result<()> {
                             print!("{}", text);
                             std::io::stdout().flush().unwrap_or_default();
                             full_response.push_str(&text);
+                        },
+                        Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::ToolCall {
+                            tool_call,
+                            ..
+                        })) => {
+                            // tool calls are handled automatically by stream_prompt with_history for
+                            // subsequent turns
+                            println!("\n{}: Using tool {}...", "Aries".green().bold(), tool_call.function.name.cyan());
                         },
                         Ok(MultiTurnStreamItem::FinalResponse(res)) => {
                             if let Some(history) = res.history() {

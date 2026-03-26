@@ -1,0 +1,70 @@
+在一个持久化的 shell 会话中执行给定的 bash 命令，支持可选的超时设置，确保适当的处理和安全措施。
+
+默认情况下，所有命令都在 ${directory} 中运行。如果需要在不同目录中运行命令，请使用 `workdir` 参数。避免使用 `cd <directory> && <command>` 模式 - 请使用 `workdir` 替代。
+
+重要提示：此工具用于执行 git、npm、docker 等终端操作。请勿将其用于文件操作（读取、写入、编辑、搜索、查找文件）- 请改用专门的工具。
+
+在执行命令之前，请遵循以下步骤：
+
+1. 目录验证：
+   - 如果命令将创建新的目录或文件，请先使用 `ls` 验证父目录是否存在且位置正确
+   - 例如，在运行 "mkdir foo/bar" 之前，先使用 `ls foo` 检查 "foo" 是否存在并且是预期的父目录
+
+2. 命令执行：
+   - 始终使用双引号将包含空格的文件路径括起来（例如：rm "path with spaces/file.txt"）
+   - 正确引用的示例：
+     - mkdir "/Users/name/My Documents" (正确)
+     - mkdir /Users/name/My Documents (错误 - 将失败)
+     - python "/path/with spaces/script.py" (正确)
+     - python /path/with spaces/script.py (错误 - 将失败)
+   - 确保正确引用后，执行命令。
+   - 捕获命令的输出。
+
+使用说明：
+  - command 参数是必需的。
+  - 您可以指定可选的 timeout（毫秒）。如果未指定，命令将在 120000ms（2分钟）后超时。
+  - 如果您能用 5-10 个字清晰简洁地描述此命令的作用，将非常有帮助。
+  - 如果输出超过 ${maxLines} 行或 ${maxBytes} 字节，它将被截断，完整输出将被写入文件。您可以使用带有 offset/limit 的 Read 工具读取特定部分，或使用 Grep 搜索完整内容。不要使用 `head`、`tail` 或其他截断命令来限制输出；完整输出已被捕获到文件中以便进行更精确的搜索。
+
+  - 避免使用 Bash 执行 `find`、`grep`、`cat`、`head`、`tail`、`sed`、`awk` 或 `echo` 命令，除非明确要求或这些命令对于任务确实必要。相反，始终优先使用专用的工具：
+    - 文件搜索：使用 Glob (而不是 find 或 ls)
+    - 内容搜索：使用 Grep (而不是 grep 或 rg)
+    - 读取文件：使用 Read (而不是 cat/head/tail)
+    - 编辑文件：使用 Edit (而不是 sed/awk)
+    - 写入文件：使用 Write (而不是 echo >/cat <<EOF)
+    - 沟通：直接输出文本 (而不是 echo/printf)
+  - 发出多个命令时：
+    - 如果命令是独立的且可以并行运行，请在单个消息中并行进行多次 Bash 工具调用。例如，如果您需要运行 "git status" 和 "git diff"，请发送包含两个并行 Bash 工具调用的单个消息。
+    - 如果命令相互依赖且必须按顺序运行，请使用带有 '&&' 的单个 Bash 调用将它们链接在一起（例如，`git add . && git commit -m "message" && git push`）。例如，如果一个操作必须在另一个操作开始之前完成（如在 cp 之前 mkdir，在 git 操作的 Bash 之前 Write，或在 git commit 之前 git add），请按顺序运行这些操作。
+    - 仅在需要按顺序运行命令但不关心先前命令是否失败时使用 ';'
+    - 不要使用换行符分隔命令（引号字符串中可以有换行符）
+  - 避免使用 `cd <directory> && <command>`。请使用 `workdir` 参数更改目录。
+
+# 使用 git 提交更改
+
+仅在用户请求时创建提交。如果不清楚，请先询问。当用户要求您创建新的 git 提交时，请仔细遵循以下步骤：
+
+Git 安全协议：
+- 绝不更新 git config
+- 绝不运行破坏性/不可逆的 git 命令（如 push --force、hard reset 等），除非用户明确要求
+- 绝不跳过钩子（--no-verify、--no-gpg-sign 等），除非用户明确要求
+- 绝不强制推送到 main/master，如果用户请求，请警告用户
+- 避免使用 git commit --amend。仅在满足所有条件时使用 --amend：
+  (1) 用户明确要求 amend，或者提交成功但 pre-commit hook 自动修改了需要包含的文件
+  (2) HEAD 提交是您在此对话中创建的
+  (3) 提交尚未推送到远程
+- 关键：如果提交失败或被钩子拒绝，切勿 amend - 修复问题并创建一个新的提交
+- 关键：如果您已经推送到远程，切勿 amend，除非用户明确要求（需要强制推送）
+- 除非用户明确要求，否则切勿提交更改。只有在明确要求时才提交非常重要，否则用户会觉得您过于主动。
+
+1. 您可以在单个响应中调用多个工具。并行运行 git status、git diff 和 git log。
+2. 分析所有暂存的更改并起草提交消息。
+3. 顺序运行 git add 和 git commit。
+4. 如果因 pre-commit hook 失败，修复问题并创建新提交。
+
+重要提示：
+- 除了 git bash 命令外，切勿运行其他命令来读取或探索代码
+- 绝不使用 TodoWrite 或 Task 工具
+- 除非用户明确要求，否则不要推送到远程仓库
+- 重要：不要使用带有 -i 标志的 git 命令（如 git rebase -i 或 git add -i），因为它们需要不支持的交互式输入。
+- 如果没有更改可提交，不要创建空提交。
