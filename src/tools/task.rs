@@ -91,7 +91,8 @@ impl Tool for TaskTool {
             _ => AgentType::General, // fallback to general
         };
 
-        // In a real application, we would stream the output or manage nested conversation loops
+        // In a real application, we would stream the output or manage nested
+        // conversation loops
         let agent = agent_type.build_agent(&client, deepseek::DEEPSEEK_CHAT);
 
         // Execute sub-agent synchronously (or rather, await its completion)

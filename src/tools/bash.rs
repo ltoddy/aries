@@ -52,18 +52,6 @@ impl Tool for ShellCommand {
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         let command = args.command;
 
-        println!("\n{} Aries wants to run the following command:", "⚠️  WARNING".yellow().bold());
-        println!("  {}", command.cyan());
-        print!("Do you want to allow this? [y/N] ");
-        std::io::Write::flush(&mut std::io::stdout()).unwrap();
-
-        let mut input = String::new();
-        std::io::stdin().read_line(&mut input).unwrap();
-
-        if input.trim().to_lowercase() != "y" {
-            return Err(ShellCommandError::ExecutionFailed("User denied execution".to_string()));
-        }
-
         let output = Command::new("sh")
             .arg("-c")
             .arg(&command)

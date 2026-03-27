@@ -2,6 +2,7 @@ use std::path::Path;
 
 use anyhow::Result;
 use colored::Colorize;
+use diffy::{Patch, apply};
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
@@ -51,83 +52,71 @@ impl Tool for ApplyPatchTool {
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         let patch_text = args.patch.trim();
-        if !patch_text.starts_with("*** Begin Patch") || !patch_text.ends_with("*** End Patch") {
-            return Err(ApplyPatchError::PatchError(
-                "Patch must start with '*** Begin Patch' and end with '*** End Patch'".to_string(),
-            ));
+
+        if patch_text.starts_with("*** Begin Patch") {
+            return Err(ApplyPatchError::PatchError("Legacy simplified patch format is no longer supported. Please provide standard unified diff format starting with '--- a/file' and '+++ b/file'".to_string()));
         }
 
-        let lines: Vec<&str> = patch_text.lines().collect();
-        let mut current_file = String::new();
-        let mut action = String::new();
-        let mut new_content = String::new();
+        let patch = Patch::from_str(patch_text)
+            .map_err(|e| ApplyPatchError::PatchError(format!("Failed to parse unified diff: {}", e)))?;
 
-        let mut i = 1; // Skip "*** Begin Patch"
-        while i < lines.len() - 1 {
-            // Skip "*** End Patch"
-            let line = lines[i];
-
-            if line.starts_with("*** Add File: ") {
-                current_file = line.trim_start_matches("*** Add File: ").trim().to_string();
-                action = "Add".to_string();
-                new_content.clear();
-            } else if line.starts_with("*** Delete File: ") {
-                let file_to_delete = line.trim_start_matches("*** Delete File: ").trim();
-                if let Err(e) = fs::remove_file(file_to_delete).await {
-                    return Err(ApplyPatchError::PatchError(format!(
-                        "Failed to delete file {}: {}",
-                        file_to_delete, e
-                    )));
+        let mut old_file = String::new();
+        let mut new_file = String::new();
+        for line in patch_text.lines() {
+            if let Some(stripped) = line.strip_prefix("--- ") {
+                old_file = stripped.split('\t').next().unwrap_or("").trim().to_string();
+                if old_file.starts_with("a/") {
+                    old_file = old_file[2..].to_string();
                 }
-                println!("{} {}", "Deleted".red().bold(), file_to_delete);
-            } else if line.starts_with("*** Update File: ") {
-                current_file = line.trim_start_matches("*** Update File: ").trim().to_string();
-                action = "Update".to_string();
-
-                // For a simple MVP, if it's an update, we expect the LLM to just provide the
-                // full new content A full diff parser (like opencode's) is
-                // complex, so we simplify it here for the MVP. We'll just read
-                // the new lines until the next header.
-                new_content.clear();
-            } else if line.starts_with("@@") {
-                // Ignore context lines for this simplified MVP
-            } else if let Some(stripped) = line.strip_prefix("+") {
-                if action == "Add" || action == "Update" {
-                    new_content.push_str(stripped);
-                    new_content.push('\n');
+            } else if let Some(stripped) = line.strip_prefix("+++ ") {
+                new_file = stripped.split('\t').next().unwrap_or("").trim().to_string();
+                if new_file.starts_with("b/") {
+                    new_file = new_file[2..].to_string();
                 }
-            } else if line.starts_with("-") {
-                // For our simplified MVP, we just build the new file from +
-                // lines
-            } else if !line.starts_with("***") {
-                // Unchanged lines
-                if action == "Update" {
-                    new_content.push_str(line);
-                    new_content.push('\n');
-                }
+                break;
             }
-
-            // If we hit the next file header or end of patch, apply the previous one
-            if (i == lines.len() - 2 || lines[i + 1].starts_with("*** ")) && !current_file.is_empty() {
-                if action == "Add" || action == "Update" {
-                    if let Some(parent) = Path::new(&current_file).parent() {
-                        let _ = fs::create_dir_all(parent).await;
-                    }
-                    if let Err(e) = fs::write(&current_file, &new_content).await {
-                        return Err(ApplyPatchError::PatchError(format!("Failed to write to {}: {}", current_file, e)));
-                    }
-                    if action == "Add" {
-                        println!("{} {}", "Created".green().bold(), current_file);
-                    } else {
-                        println!("{} {}", "Updated".yellow().bold(), current_file);
-                    }
-                }
-                current_file.clear();
-                action.clear();
-            }
-            i += 1;
         }
 
-        Ok(ApplyPatchOutput { success: true, message: "Patch applied successfully".to_string() })
+        let old_path = Path::new(&old_file);
+        let new_path = Path::new(&new_file);
+
+        if new_file.is_empty() || new_file == "/dev/null" {
+            if old_path.exists() {
+                fs::remove_file(old_path)
+                    .await
+                    .map_err(|e| ApplyPatchError::PatchError(format!("Failed to delete file {}: {}", old_file, e)))?;
+                println!("{} {}", "Deleted".red().bold(), old_file);
+            }
+            return Ok(ApplyPatchOutput { success: true, message: format!("Deleted file {}", old_file) });
+        }
+
+        let original_content = if old_path.exists() && old_file != "/dev/null" {
+            fs::read_to_string(old_path)
+                .await
+                .map_err(|e| ApplyPatchError::PatchError(format!("Failed to read file {}: {}", old_file, e)))?
+        } else {
+            String::new()
+        };
+
+        let new_content = apply(&original_content, &patch)
+            .map_err(|e| ApplyPatchError::PatchError(format!("Failed to apply patch to {}: {}", new_file, e)))?;
+
+        if let Some(parent) = new_path.parent() {
+            fs::create_dir_all(parent).await.map_err(|e| {
+                ApplyPatchError::PatchError(format!("Failed to create directories for {}: {}", new_file, e))
+            })?;
+        }
+
+        fs::write(new_path, new_content)
+            .await
+            .map_err(|e| ApplyPatchError::PatchError(format!("Failed to write to {}: {}", new_file, e)))?;
+
+        if !original_content.is_empty() {
+            println!("{} {}", "Updated".yellow().bold(), new_file);
+        } else {
+            println!("{} {}", "Created".green().bold(), new_file);
+        }
+
+        Ok(ApplyPatchOutput { success: true, message: format!("Successfully applied patch to {}", new_file) })
     }
 }
