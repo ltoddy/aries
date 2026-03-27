@@ -4,7 +4,10 @@ use rig::agent::Agent;
 use rig::client::CompletionClient;
 use rig::providers::deepseek;
 
-use crate::tools::*;
+use crate::tools::{
+    ApplyPatchTool, CodeSearchTool, EditTool, GlobTool, GrepTool, LsTool, LspTool, MultiEditTool, QuestionTool,
+    ReadFileTool, ShellCommand, TaskTool, WebFetchTool, WebSearchTool, WriteFileTool,
+};
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,7 +80,6 @@ impl AgentType {
                 .tool(ApplyPatchTool)
                 .tool(MultiEditTool)
                 .tool(EditTool)
-                .tool(BatchTool)
                 .tool(QuestionTool)
                 .tool(TaskTool)
                 .tool(WebFetchTool)

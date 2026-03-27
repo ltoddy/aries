@@ -1,6 +1,5 @@
 pub mod apply_patch;
 pub mod bash;
-pub mod batch;
 pub mod codesearch;
 pub mod edit;
 pub mod glob;
@@ -17,7 +16,6 @@ pub mod write;
 
 pub use apply_patch::{ApplyPatchOutput, ApplyPatchTool};
 pub use bash::{ShellCommand, ShellCommandOutput};
-pub use batch::{BatchOutput, BatchTool};
 pub use codesearch::{CodeSearchOutput, CodeSearchTool};
 pub use edit::{EditOutput, EditTool};
 pub use glob::{GlobOutput, GlobTool};

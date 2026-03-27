@@ -12,12 +12,10 @@ use rig::tool::Tool;
 use serde_json::Value;
 
 use crate::tools::{
-    ApplyPatchOutput, ApplyPatchTool, BatchOutput, BatchTool, CodeSearchOutput,
-    CodeSearchTool, EditOutput, EditTool, GlobOutput, GlobTool, GrepOutput, GrepTool,
-    LsOutput, LsTool, LspOutput, LspTool, MultiEditOutput, MultiEditTool,
-    QuestionOutput, QuestionTool, ReadFileOutput, ReadFileTool, ShellCommand,
-    ShellCommandOutput, TaskOutput, TaskTool, WebFetchOutput, WebFetchTool,
-    WebSearchOutput, WebSearchTool, WriteFileOutput, WriteFileTool,
+    ApplyPatchOutput, ApplyPatchTool, CodeSearchOutput, CodeSearchTool, EditOutput, EditTool, GlobOutput, GlobTool,
+    GrepOutput, GrepTool, LsOutput, LsTool, LspOutput, LspTool, MultiEditOutput, MultiEditTool, QuestionOutput,
+    QuestionTool, ReadFileOutput, ReadFileTool, ShellCommand, ShellCommandOutput, TaskOutput, TaskTool, WebFetchOutput,
+    WebFetchTool, WebSearchOutput, WebSearchTool, WriteFileOutput, WriteFileTool,
 };
 
 fn format_tool_args(tool_name: &str, args: &Value) -> String {
@@ -73,9 +71,6 @@ fn format_tool_args(tool_name: &str, args: &Value) -> String {
             let path = args.get("filePath").and_then(|v| v.as_str()).unwrap_or("?");
             format!("{} {} on {}", tool_name.cyan(), operation.yellow(), path.yellow())
         },
-        BatchTool::NAME => {
-            format!("{} multiple tools", tool_name.cyan())
-        },
         _ => {
             let args_str = serde_json::to_string_pretty(args).unwrap_or_default();
             format!("{} with arguments:\n{}", tool_name.cyan(), args_str.blue())
@@ -110,7 +105,7 @@ pub async fn run_agent_turn(
                 let tool_name = active_tools.get(&tool_result.id).cloned().unwrap_or_default();
                 let mut raw_text = String::new();
                 let json_str = serde_json::to_string(&tool_result).unwrap_or_default();
-                
+
                 if let Ok(obj) = serde_json::from_str::<Value>(&json_str) {
                     let results_arr = obj.get("content").and_then(|v| v.as_array());
                     if let Some(arr) = results_arr {
@@ -133,7 +128,7 @@ pub async fn run_agent_turn(
                 }
 
                 let mut output_str = String::new();
-                
+
                 match tool_name.as_str() {
                     ReadFileTool::NAME => {
                         if let Ok(output) = serde_json::from_str::<ReadFileOutput>(&raw_text) {
@@ -144,7 +139,11 @@ pub async fn run_agent_turn(
                     },
                     WriteFileTool::NAME => {
                         if let Ok(output) = serde_json::from_str::<WriteFileOutput>(&raw_text) {
-                            output_str = if output.success { "File written successfully".to_string() } else { "Failed to write file".to_string() };
+                            output_str = if output.success {
+                                "File written successfully".to_string()
+                            } else {
+                                "Failed to write file".to_string()
+                            };
                         } else {
                             output_str = raw_text;
                         }
@@ -241,53 +240,6 @@ pub async fn run_agent_turn(
                             output_str = raw_text;
                         }
                     },
-                    BatchTool::NAME => {
-                        if let Ok(output) = serde_json::from_str::<BatchOutput>(&raw_text) {
-                            output_str = format!("Executed {} tools in batch\n", output.results.len());
-                            for (i, res) in output.results.iter().enumerate() {
-                                output_str.push_str(&format!("  [Tool {}]:\n", i + 1));
-                                
-                                if let Some(success) = res.get("success").and_then(|v| v.as_bool()) {
-                                    if success {
-                                        if let Some(result_val) = res.get("result") {
-                                            // Format based on inner result content
-                                            if let Some(obj) = result_val.as_object() {
-                                                if let (Some(stdout), Some(stderr)) = (obj.get("stdout"), obj.get("stderr")) {
-                                                    if let Some(out_str) = stdout.as_str() {
-                                                        if !out_str.is_empty() {
-                                                            output_str.push_str(&format!("    stdout: {}\n", out_str.trim()));
-                                                        }
-                                                    }
-                                                    if let Some(err_str) = stderr.as_str() {
-                                                        if !err_str.is_empty() {
-                                                            output_str.push_str(&format!("    stderr: {}\n", err_str.trim()));
-                                                        }
-                                                    }
-                                                } else if let Some(content) = obj.get("content").and_then(|v| v.as_str()) {
-                                                    let preview: String = content.lines().take(5).collect::<Vec<_>>().join("\n    ");
-                                                    if content.lines().count() > 5 {
-                                                        output_str.push_str(&format!("    {}\n    ...\n", preview));
-                                                    } else {
-                                                        output_str.push_str(&format!("    {}\n", preview));
-                                                    }
-                                                } else {
-                                                    output_str.push_str(&format!("    Success\n"));
-                                                }
-                                            } else {
-                                                output_str.push_str(&format!("    {}\n", result_val));
-                                            }
-                                        }
-                                    } else if let Some(err_val) = res.get("error") {
-                                        output_str.push_str(&format!("    Error: {}\n", err_val));
-                                    }
-                                } else {
-                                    output_str.push_str(&format!("    {}\n", res));
-                                }
-                            }
-                        } else {
-                            output_str = raw_text;
-                        }
-                    },
                     LspTool::NAME => {
                         if let Ok(output) = serde_json::from_str::<LspOutput>(&raw_text) {
                             output_str = if output.result.is_null() {
@@ -303,7 +255,7 @@ pub async fn run_agent_turn(
                     },
                     _ => {
                         output_str = raw_text;
-                    }
+                    },
                 }
 
                 if output_str.is_empty() {
@@ -317,10 +269,7 @@ pub async fn run_agent_turn(
                     for line in lines.iter().take(max_lines) {
                         println!("  {}", line.dimmed());
                     }
-                    println!(
-                        "  ... ({} more lines truncated)",
-                        lines.len() - max_lines
-                    );
+                    println!("  ... ({} more lines truncated)", lines.len() - max_lines);
                 } else {
                     for line in lines {
                         println!("  {}", line.dimmed());
