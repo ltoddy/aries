@@ -3,7 +3,7 @@ use colored::Colorize;
 use directories::ProjectDirs;
 use rig::client::ProviderClient;
 use rig::completion::Message;
-use rig::providers::deepseek;
+use rig::providers::openai;
 use rustyline::Config;
 use rustyline::error::ReadlineError;
 
@@ -17,9 +17,9 @@ use completer::CommandCompleter;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let client = deepseek::Client::from_env();
+    let client = openai::Client::from_env().completions_api();
 
-    let agent = AgentType::Build.build_agent(&client, deepseek::DEEPSEEK_CHAT);
+    let agent = AgentType::Build.build_agent(&client, "glm-4.7-flash");
 
     let mut chat_history: Vec<Message> = vec![];
 
@@ -39,7 +39,7 @@ async fn main() -> Result<()> {
     }
 
     println!("Welcome to {}! Type '/exit' to quit.", "Aries".green().bold());
-    println!("Using model: {}", deepseek::DEEPSEEK_CHAT.cyan());
+    println!("Using model: {}", "glm-4.7-flash".cyan());
 
     loop {
         let readline = rl.readline(">> ");

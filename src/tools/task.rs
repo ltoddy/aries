@@ -1,7 +1,7 @@
 use anyhow::Result;
 use rig::client::ProviderClient;
 use rig::completion::{Prompt, ToolDefinition};
-use rig::providers::deepseek;
+use rig::providers::openai;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -83,7 +83,7 @@ impl Tool for TaskTool {
         // For a full implementation, we need to pass down the API key and state.
         // Since Tool trait doesn't easily capture external references without state,
         // we'll fetch the client directly here for the MVP subagent execution.
-        let client = deepseek::Client::from_env();
+        let client = openai::Client::from_env().completions_api();
 
         let agent_type = match args.subagent_type.as_str() {
             "explore" => AgentType::Explore,
@@ -93,7 +93,7 @@ impl Tool for TaskTool {
 
         // In a real application, we would stream the output or manage nested
         // conversation loops
-        let agent = agent_type.build_agent(&client, deepseek::DEEPSEEK_CHAT);
+        let agent = agent_type.build_agent(&client, "glm-4.7-flash");
 
         // Execute sub-agent synchronously (or rather, await its completion)
         let response = agent
