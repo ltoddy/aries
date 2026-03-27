@@ -12,9 +12,9 @@ pub struct WriteFileArgs {
     content: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct WriteFileOutput {
-    success: bool,
+    pub success: bool,
 }
 
 #[derive(thiserror::Error, Debug)]

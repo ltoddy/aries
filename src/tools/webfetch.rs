@@ -10,9 +10,9 @@ pub struct WebFetchArgs {
     format: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct WebFetchOutput {
-    content: String,
+    pub content: String,
 }
 
 #[derive(thiserror::Error, Debug)]

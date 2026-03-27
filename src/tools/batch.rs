@@ -20,9 +20,9 @@ pub struct BatchArgs {
     calls: Vec<BatchCall>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct BatchOutput {
-    results: Vec<Value>,
+    pub results: Vec<Value>,
 }
 
 #[derive(thiserror::Error, Debug)]

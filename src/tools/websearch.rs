@@ -10,9 +10,9 @@ pub struct WebSearchArgs {
     num: Option<i32>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct WebSearchOutput {
-    results: String,
+    pub results: String,
 }
 
 #[derive(thiserror::Error, Debug)]

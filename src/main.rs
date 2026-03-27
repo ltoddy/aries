@@ -1,5 +1,6 @@
 use anyhow::Result;
 use colored::Colorize;
+use directories::ProjectDirs;
 use rig::client::ProviderClient;
 use rig::completion::Message;
 use rig::providers::deepseek;
@@ -26,7 +27,14 @@ async fn main() -> Result<()> {
     let mut rl = rustyline::Editor::with_config(config)?;
     rl.set_helper(Some(CommandCompleter::new()));
 
-    if rl.load_history("history.txt").is_err() {
+    let proj_dirs = ProjectDirs::from("", "", "aries").expect("Failed to determine project directories");
+    let config_dir = proj_dirs.config_dir();
+    if !config_dir.exists() {
+        std::fs::create_dir_all(config_dir).expect("Failed to create config directory");
+    }
+    let history_file = config_dir.join("history.txt");
+
+    if rl.load_history(&history_file).is_err() {
         println!("No previous history.");
     }
 
@@ -68,6 +76,7 @@ async fn main() -> Result<()> {
             },
         }
     }
-    rl.save_history("history.txt")?;
+    rl.save_history(&history_file)?;
+
     Ok(())
 }

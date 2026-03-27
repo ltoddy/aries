@@ -25,9 +25,9 @@ fn default_custom() -> bool {
     true
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct QuestionOutput {
-    answers: Vec<String>,
+    pub answers: Vec<String>,
 }
 
 #[derive(thiserror::Error, Debug)]

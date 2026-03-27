@@ -10,9 +10,9 @@ pub struct CodeSearchArgs {
     tokens_num: Option<i32>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct CodeSearchOutput {
-    results: String,
+    pub results: String,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -23,20 +23,20 @@ pub enum CodeSearchError {
 
 pub struct CodeSearchTool;
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct McpCodeRequestArgs {
     query: String,
     #[serde(rename = "tokensNum")]
     tokens_num: i32,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct McpCodeRequestParams {
     name: String,
     arguments: McpCodeRequestArgs,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct McpCodeRequest {
     jsonrpc: String,
     id: i32,

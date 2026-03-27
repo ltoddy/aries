@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use anyhow::Result;
-use colored::Colorize;
 use diffy::{Patch, apply};
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
@@ -13,10 +12,10 @@ pub struct ApplyPatchArgs {
     patch: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ApplyPatchOutput {
-    success: bool,
-    message: String,
+    pub success: bool,
+    pub message: String,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -85,7 +84,6 @@ impl Tool for ApplyPatchTool {
                 fs::remove_file(old_path)
                     .await
                     .map_err(|e| ApplyPatchError::PatchError(format!("Failed to delete file {}: {}", old_file, e)))?;
-                println!("{} {}", "Deleted".red().bold(), old_file);
             }
             return Ok(ApplyPatchOutput { success: true, message: format!("Deleted file {}", old_file) });
         }
@@ -111,12 +109,12 @@ impl Tool for ApplyPatchTool {
             .await
             .map_err(|e| ApplyPatchError::PatchError(format!("Failed to write to {}: {}", new_file, e)))?;
 
-        if !original_content.is_empty() {
-            println!("{} {}", "Updated".yellow().bold(), new_file);
+        let message = if !original_content.is_empty() {
+            format!("Successfully updated file {}", new_file)
         } else {
-            println!("{} {}", "Created".green().bold(), new_file);
-        }
+            format!("Successfully created file {}", new_file)
+        };
 
-        Ok(ApplyPatchOutput { success: true, message: format!("Successfully applied patch to {}", new_file) })
+        Ok(ApplyPatchOutput { success: true, message })
     }
 }

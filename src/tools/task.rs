@@ -17,10 +17,10 @@ pub struct TaskArgs {
     task_id: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct TaskOutput {
-    task_id: String,
-    result: String,
+    pub task_id: String,
+    pub result: String,
 }
 
 #[derive(thiserror::Error, Debug)]

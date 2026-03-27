@@ -1,6 +1,6 @@
 use std::process::Stdio;
 
-use colored::Colorize;
+use anyhow::Result;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
@@ -11,11 +11,11 @@ pub struct ShellCommandArgs {
     command: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ShellCommandOutput {
-    stdout: String,
-    stderr: String,
-    exit_code: i32,
+    pub stdout: String,
+    pub stderr: String,
+    pub exit_code: i32,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -74,16 +74,8 @@ impl Tool for ShellCommand {
         }
 
         // Limit the number of lines returned to the LLM and printed to terminal
-        truncate_lines(&mut stdout, 10);
-        truncate_lines(&mut stderr, 10);
-
-        // Also print output to terminal so user can see what happened
-        if !stdout.is_empty() {
-            println!("{}", stdout.dimmed());
-        }
-        if !stderr.is_empty() {
-            eprintln!("{}", stderr.red());
-        }
+        truncate_lines(&mut stdout, 200);
+        truncate_lines(&mut stderr, 200);
 
         Ok(ShellCommandOutput { stdout, stderr, exit_code: output.status.code().unwrap_or(-1) })
     }

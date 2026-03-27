@@ -22,10 +22,10 @@ pub struct MultiEditArgs {
     edits: Vec<EditOperation>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct MultiEditOutput {
-    success: bool,
-    message: String,
+    pub success: bool,
+    pub message: String,
 }
 
 #[derive(thiserror::Error, Debug)]

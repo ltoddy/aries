@@ -15,9 +15,9 @@ pub struct LsArgs {
     ignore: Option<Vec<String>>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct LsOutput {
-    entries: Vec<String>,
+    pub entries: Vec<String>,
 }
 
 #[derive(thiserror::Error, Debug)]

@@ -17,9 +17,9 @@ pub struct LspArgs {
     query: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct LspOutput {
-    result: Value,
+    pub result: Value,
 }
 
 #[derive(thiserror::Error, Debug)]

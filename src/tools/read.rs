@@ -12,9 +12,9 @@ pub struct ReadFileArgs {
     offset: Option<usize>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ReadFileOutput {
-    content: String,
+    pub content: String,
 }
 
 #[derive(thiserror::Error, Debug)]

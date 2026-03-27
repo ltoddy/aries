@@ -11,9 +11,9 @@ pub struct GrepArgs {
     include: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct GrepOutput {
-    matches: Vec<String>,
+    pub matches: Vec<String>,
 }
 
 #[derive(thiserror::Error, Debug)]

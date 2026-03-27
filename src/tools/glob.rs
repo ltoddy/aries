@@ -8,9 +8,9 @@ pub struct GlobArgs {
     pattern: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct GlobOutput {
-    files: Vec<String>,
+    pub files: Vec<String>,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -47,11 +47,8 @@ impl Tool for GlobTool {
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         let mut files = Vec::new();
 
-        for entry in glob::glob(&args.pattern)? {
-            match entry {
-                Ok(path) => files.push(path.display().to_string()),
-                Err(e) => eprintln!("Glob warning: {:?}", e),
-            }
+        for path in glob::glob(&args.pattern)?.flatten() {
+            files.push(path.display().to_string());
         }
 
         Ok(GlobOutput { files })
