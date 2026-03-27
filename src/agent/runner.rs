@@ -6,7 +6,6 @@ use futures::StreamExt;
 use rig::agent::{Agent, MultiTurnStreamItem};
 use rig::completion::Message;
 use rig::message::Text;
-use rig::providers::deepseek;
 use rig::streaming::{StreamedAssistantContent, StreamedUserContent, StreamingPrompt};
 use rig::tool::Tool;
 use serde_json::Value;
@@ -78,8 +77,8 @@ fn format_tool_args(tool_name: &str, args: &Value) -> String {
     }
 }
 
-pub async fn run_agent_turn(
-    agent: &Agent<deepseek::CompletionModel>,
+pub async fn run_agent_turn<M: rig::completion::CompletionModel + 'static>(
+    agent: &Agent<M>,
     input: &str,
     chat_history: &mut Vec<Message>,
 ) -> Result<()> {

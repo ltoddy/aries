@@ -2,7 +2,6 @@ pub mod runner;
 
 use rig::agent::Agent;
 use rig::client::CompletionClient;
-use rig::providers::deepseek;
 
 use crate::tools::{
     ApplyPatchTool, CodeSearchTool, EditTool, GlobTool, GrepTool, LsTool, LspTool, MultiEditTool, QuestionTool,
@@ -66,7 +65,11 @@ impl AgentType {
         }
     }
 
-    pub fn build_agent(&self, client: &deepseek::Client, model: &str) -> Agent<deepseek::CompletionModel> {
+    pub fn build_agent<M: rig::completion::CompletionModel>(
+        &self,
+        client: &impl CompletionClient<CompletionModel = M>,
+        model: &str,
+    ) -> Agent<M> {
         let builder = client.agent(model).preamble(self.prompt()).default_max_turns(200);
 
         match self {
