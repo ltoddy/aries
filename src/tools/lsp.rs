@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use anyhow::Result;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
@@ -9,7 +11,7 @@ use serde_json::Value;
 pub struct LspArgs {
     operation: String,
     #[serde(rename = "filePath")]
-    file_path: Option<String>,
+    file_path: Option<PathBuf>,
     line: Option<u32>,
     character: Option<u32>,
     query: Option<String>,

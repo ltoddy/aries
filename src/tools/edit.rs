@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::PathBuf;
 
 use anyhow::Result;
 use rig::completion::ToolDefinition;
@@ -8,7 +8,7 @@ use tokio::fs;
 
 #[derive(Deserialize)]
 pub struct EditArgs {
-    file_path: String,
+    file_path: PathBuf,
     #[serde(rename = "oldString")]
     old_string: String,
     #[serde(rename = "newString")]
@@ -67,7 +67,7 @@ impl Tool for EditTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        if !Path::new(&args.file_path).exists() {
+        if !args.file_path.exists() {
             return Err(EditError::EditError("File does not exist. Use write_file to create new files.".to_string()));
         }
 

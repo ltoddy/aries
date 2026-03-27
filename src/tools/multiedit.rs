@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::PathBuf;
 
 use anyhow::Result;
 use rig::completion::ToolDefinition;
@@ -18,7 +18,7 @@ pub struct EditOperation {
 
 #[derive(Deserialize)]
 pub struct MultiEditArgs {
-    file_path: String,
+    file_path: PathBuf,
     edits: Vec<EditOperation>,
 }
 
@@ -81,7 +81,7 @@ impl Tool for MultiEditTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        let mut content = if Path::new(&args.file_path).exists() {
+        let mut content = if args.file_path.exists() {
             fs::read_to_string(&args.file_path)
                 .await
                 .map_err(|e| MultiEditError::EditError(format!("Failed to read file: {}", e)))?
@@ -114,7 +114,7 @@ impl Tool for MultiEditTool {
             }
         }
 
-        if let Some(parent) = Path::new(&args.file_path).parent() {
+        if let Some(parent) = args.file_path.parent() {
             let _ = fs::create_dir_all(parent).await;
         }
 

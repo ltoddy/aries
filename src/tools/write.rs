@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::PathBuf;
 
 use anyhow::Result;
 use rig::completion::ToolDefinition;
@@ -8,7 +8,7 @@ use tokio::fs;
 
 #[derive(Deserialize)]
 pub struct WriteFileArgs {
-    file_path: String,
+    file_path: PathBuf,
     content: String,
 }
 
@@ -53,7 +53,7 @@ impl Tool for WriteFileTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        if let Some(parent) = Path::new(&args.file_path).parent() {
+        if let Some(parent) = args.file_path.parent() {
             fs::create_dir_all(parent).await?;
         }
 

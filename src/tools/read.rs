@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use anyhow::Result;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
@@ -6,7 +8,7 @@ use tokio::fs;
 
 #[derive(Deserialize)]
 pub struct ReadFileArgs {
-    file_path: String,
+    file_path: PathBuf,
     offset: Option<usize>,
 }
 

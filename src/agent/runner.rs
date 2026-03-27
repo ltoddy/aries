@@ -69,7 +69,7 @@ fn format_tool_args(tool_name: &str, args: &Value) -> String {
         _ => {
             let args_str = serde_json::to_string_pretty(args).unwrap_or_default();
             format!("{} with arguments:\n{}", tool_name.cyan(), args_str.blue())
-        }
+        },
     }
 }
 
@@ -92,11 +92,7 @@ pub async fn run_agent_turn(
             },
             Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::ToolCall { tool_call, .. })) => {
                 let formatted_tool = format_tool_args(&tool_call.function.name, &tool_call.function.arguments);
-                println!(
-                    "\n{}: Using tool {}",
-                    "Aries".green().bold(),
-                    formatted_tool
-                );
+                println!("\n{}: Using tool {}", "Aries".green().bold(), formatted_tool);
             },
             Ok(MultiTurnStreamItem::FinalResponse(res)) => {
                 if let Some(history) = res.history() {
