@@ -1,13 +1,8 @@
-use std::io::Write;
-
 use anyhow::Result;
 use colored::Colorize;
-use futures::StreamExt;
 use rig::client::ProviderClient;
 use rig::completion::Message;
-use rig::message::Text;
 use rig::providers::deepseek;
-use rig::streaming::{StreamedAssistantContent, StreamingPrompt};
 use rustyline::Config;
 use rustyline::error::ReadlineError;
 
@@ -16,8 +11,8 @@ mod completer;
 mod tools;
 
 use agent::AgentType;
+use agent::runner::run_agent_turn;
 use completer::CommandCompleter;
-use rig::agent::MultiTurnStreamItem;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -55,38 +50,9 @@ async fn main() -> Result<()> {
                     break;
                 }
 
-                // Call LLM using rig-core streaming
-                let mut stream = agent.stream_prompt(input).with_history(chat_history.clone()).await;
-
-                print!("{}: ", "Aries".green().bold());
-                let mut full_response = String::new();
-
-                while let Some(chunk) = stream.next().await {
-                    // Try to parse command output to detect nested tool calls from subagents
-                    match chunk {
-                        Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Text(Text { text }))) => {
-                            print!("{}", text);
-                            std::io::stdout().flush().unwrap_or_default();
-                            full_response.push_str(&text);
-                        },
-                        Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::ToolCall {
-                            tool_call,
-                            ..
-                        })) => {
-                            // tool calls are handled automatically by stream_prompt with_history for
-                            // subsequent turns
-                            println!("\n{}: Using tool {}...", "Aries".green().bold(), tool_call.function.name.cyan());
-                        },
-                        Ok(MultiTurnStreamItem::FinalResponse(res)) => {
-                            if let Some(history) = res.history() {
-                                chat_history = history.to_vec();
-                            }
-                        },
-                        Err(e) => eprintln!("\n{}: {}", "Error streaming chunk".red(), e),
-                        _ => {},
-                    }
+                if let Err(e) = run_agent_turn(&agent, input, &mut chat_history).await {
+                    eprintln!("Error: {}", e);
                 }
-                println!();
             },
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");

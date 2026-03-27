@@ -1,3 +1,5 @@
+pub mod runner;
+
 use rig::agent::Agent;
 use rig::client::CompletionClient;
 use rig::providers::deepseek;
@@ -53,16 +55,16 @@ impl AgentType {
             AgentType::Plan => {
                 "You are a planning agent. You can explore and read, but you cannot edit. Create a plan and ask the user for approval."
             },
-            AgentType::General => include_str!("descriptions/generate.txt"),
-            AgentType::Explore => include_str!("descriptions/explore.txt"),
-            AgentType::Compaction => include_str!("descriptions/compaction.txt"),
-            AgentType::Title => include_str!("descriptions/title.txt"),
-            AgentType::Summary => include_str!("descriptions/summary.txt"),
+            AgentType::General => include_str!("prompts/generate.txt"),
+            AgentType::Explore => include_str!("prompts/explore.txt"),
+            AgentType::Compaction => include_str!("prompts/compaction.txt"),
+            AgentType::Title => include_str!("prompts/title.txt"),
+            AgentType::Summary => include_str!("prompts/summary.txt"),
         }
     }
 
     pub fn build_agent(&self, client: &deepseek::Client, model: &str) -> Agent<deepseek::CompletionModel> {
-        let builder = client.agent(model).preamble(self.prompt());
+        let builder = client.agent(model).preamble(self.prompt()).default_max_turns(200);
 
         match self {
             AgentType::Build | AgentType::General => builder

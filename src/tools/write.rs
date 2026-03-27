@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use anyhow::Result;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
@@ -51,6 +53,10 @@ impl Tool for WriteFileTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
+        if let Some(parent) = Path::new(&args.file_path).parent() {
+            fs::create_dir_all(parent).await?;
+        }
+
         fs::write(&args.file_path, args.content).await?;
 
         Ok(WriteFileOutput { success: true })
