@@ -1,9 +1,8 @@
-use std::fs;
-
 use anyhow::Result;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
+use tokio::fs;
 
 #[derive(Deserialize)]
 pub struct WriteFileArgs {
@@ -52,7 +51,7 @@ impl Tool for WriteFileTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        fs::write(&args.file_path, args.content)?;
+        fs::write(&args.file_path, args.content).await?;
 
         Ok(WriteFileOutput { success: true })
     }

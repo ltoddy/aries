@@ -1,10 +1,10 @@
-use std::fs;
 use std::path::Path;
 
 use anyhow::Result;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
+use tokio::fs;
 
 #[derive(Deserialize)]
 pub struct EditArgs {
@@ -72,6 +72,7 @@ impl Tool for EditTool {
         }
 
         let content = fs::read_to_string(&args.file_path)
+            .await
             .map_err(|e| EditError::EditError(format!("Failed to read file: {}", e)))?;
 
         if args.old_string == args.new_string {
@@ -94,6 +95,7 @@ impl Tool for EditTool {
         };
 
         fs::write(&args.file_path, new_content)
+            .await
             .map_err(|e| EditError::EditError(format!("Failed to write file: {}", e)))?;
 
         Ok(EditOutput { success: true, message: "Edit applied successfully".to_string() })

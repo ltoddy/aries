@@ -1,9 +1,8 @@
-use std::fs;
-
 use anyhow::Result;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
+use tokio::fs;
 
 #[derive(Deserialize)]
 pub struct ReadFileArgs {
@@ -52,7 +51,7 @@ impl Tool for ReadFileTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        let content = fs::read_to_string(&args.file_path)?;
+        let content = fs::read_to_string(&args.file_path).await?;
 
         let lines = content.lines().enumerate();
         let offset = args.offset.unwrap_or(1).saturating_sub(1);

@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 pub struct LspArgs {
     operation: String,
     #[serde(rename = "filePath")]
@@ -20,6 +21,7 @@ pub struct LspOutput {
 }
 
 #[derive(thiserror::Error, Debug)]
+#[allow(dead_code)]
 pub enum LspError {
     #[error("LSP Error: {0}")]
     OperationFailed(String),

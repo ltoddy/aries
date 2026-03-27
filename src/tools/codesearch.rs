@@ -4,6 +4,7 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 pub struct CodeSearchArgs {
     query: String,
     tokens: Option<i32>,
@@ -15,6 +16,7 @@ pub struct CodeSearchOutput {
 }
 
 #[derive(thiserror::Error, Debug)]
+#[allow(dead_code)]
 pub enum CodeSearchError {
     #[error("Failed to perform code search: {0}")]
     SearchError(String),

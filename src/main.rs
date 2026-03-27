@@ -3,7 +3,7 @@ use std::io::Write;
 use anyhow::Result;
 use colored::Colorize;
 use futures::StreamExt;
-use rig::client::{CompletionClient, ProviderClient};
+use rig::client::ProviderClient;
 use rig::completion::Message;
 use rig::message::Text;
 use rig::providers::deepseek;
@@ -11,40 +11,19 @@ use rig::streaming::{StreamedAssistantContent, StreamingPrompt};
 use rustyline::Config;
 use rustyline::error::ReadlineError;
 
+mod agent;
 mod completer;
 mod tools;
 
+use agent::AgentType;
 use completer::CommandCompleter;
 use rig::agent::MultiTurnStreamItem;
-use tools::{
-    ApplyPatchTool, BatchTool, CodeSearchTool, EditTool, GlobTool, GrepTool, LsTool, LspTool, MultiEditTool,
-    QuestionTool, ReadFileTool, ShellCommand, TaskTool, WebFetchTool, WebSearchTool, WriteFileTool,
-};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let client = deepseek::Client::from_env();
 
-    let agent = client
-        .agent(deepseek::DEEPSEEK_CHAT)
-        .preamble("You are Aries, a helpful terminal AI assistant. You can use tools to execute shell commands and read/write files when requested by the user. Always explain what you are going to do before calling a tool.")
-        .tool(ShellCommand)
-        .tool(ReadFileTool)
-        .tool(WriteFileTool)
-        .tool(GlobTool)
-        .tool(GrepTool)
-        .tool(LsTool)
-        .tool(ApplyPatchTool)
-        .tool(MultiEditTool)
-        .tool(EditTool)
-        .tool(BatchTool)
-        .tool(QuestionTool)
-        .tool(TaskTool)
-        .tool(WebFetchTool)
-        .tool(WebSearchTool)
-        .tool(LspTool)
-        .tool(CodeSearchTool)
-        .build();
+    let agent = AgentType::Build.build_agent(&client, deepseek::DEEPSEEK_CHAT);
 
     let mut chat_history: Vec<Message> = vec![];
 
@@ -83,6 +62,7 @@ async fn main() -> Result<()> {
                 let mut full_response = String::new();
 
                 while let Some(chunk) = stream.next().await {
+                    // Try to parse command output to detect nested tool calls from subagents
                     match chunk {
                         Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Text(Text { text }))) => {
                             print!("{}", text);

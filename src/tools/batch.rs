@@ -5,12 +5,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 pub struct BatchCall {
     tool: String,
     parameters: Value,
 }
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 pub struct BatchArgs {
     calls: Vec<BatchCall>,
 }
@@ -21,6 +23,7 @@ pub struct BatchOutput {
 }
 
 #[derive(thiserror::Error, Debug)]
+#[allow(dead_code)]
 pub enum BatchError {
     #[error("Batch execution failed: {0}")]
     ExecutionError(String),

@@ -1,10 +1,10 @@
-use std::fs;
 use std::path::Path;
 
 use anyhow::Result;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
+use tokio::fs;
 
 #[derive(Deserialize)]
 pub struct EditOperation {
@@ -83,6 +83,7 @@ impl Tool for MultiEditTool {
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         let mut content = if Path::new(&args.file_path).exists() {
             fs::read_to_string(&args.file_path)
+                .await
                 .map_err(|e| MultiEditError::EditError(format!("Failed to read file: {}", e)))?
         } else {
             String::new()
@@ -114,10 +115,11 @@ impl Tool for MultiEditTool {
         }
 
         if let Some(parent) = Path::new(&args.file_path).parent() {
-            let _ = fs::create_dir_all(parent);
+            let _ = fs::create_dir_all(parent).await;
         }
 
         fs::write(&args.file_path, content)
+            .await
             .map_err(|e| MultiEditError::EditError(format!("Failed to write file: {}", e)))?;
 
         Ok(MultiEditOutput { success: true, message: "Edits applied successfully".to_string() })

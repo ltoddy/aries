@@ -1,4 +1,3 @@
-use std::fs;
 use std::path::Path;
 
 use anyhow::Result;
@@ -6,6 +5,7 @@ use colored::Colorize;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
+use tokio::fs;
 
 #[derive(Deserialize)]
 pub struct ApplyPatchArgs {
@@ -73,7 +73,7 @@ impl Tool for ApplyPatchTool {
                 new_content.clear();
             } else if line.starts_with("*** Delete File: ") {
                 let file_to_delete = line.trim_start_matches("*** Delete File: ").trim();
-                if let Err(e) = fs::remove_file(file_to_delete) {
+                if let Err(e) = fs::remove_file(file_to_delete).await {
                     return Err(ApplyPatchError::PatchError(format!(
                         "Failed to delete file {}: {}",
                         file_to_delete, e
@@ -91,9 +91,9 @@ impl Tool for ApplyPatchTool {
                 new_content.clear();
             } else if line.starts_with("@@") {
                 // Ignore context lines for this simplified MVP
-            } else if line.starts_with("+") {
+            } else if let Some(stripped) = line.strip_prefix("+") {
                 if action == "Add" || action == "Update" {
-                    new_content.push_str(&line[1..]);
+                    new_content.push_str(stripped);
                     new_content.push('\n');
                 }
             } else if line.starts_with("-") {
@@ -111,9 +111,9 @@ impl Tool for ApplyPatchTool {
             if (i == lines.len() - 2 || lines[i + 1].starts_with("*** ")) && !current_file.is_empty() {
                 if action == "Add" || action == "Update" {
                     if let Some(parent) = Path::new(&current_file).parent() {
-                        let _ = fs::create_dir_all(parent);
+                        let _ = fs::create_dir_all(parent).await;
                     }
-                    if let Err(e) = fs::write(&current_file, &new_content) {
+                    if let Err(e) = fs::write(&current_file, &new_content).await {
                         return Err(ApplyPatchError::PatchError(format!("Failed to write to {}: {}", current_file, e)));
                     }
                     if action == "Add" {

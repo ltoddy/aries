@@ -4,6 +4,7 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 pub struct WebSearchArgs {
     query: String,
     num: Option<i32>,
@@ -15,6 +16,7 @@ pub struct WebSearchOutput {
 }
 
 #[derive(thiserror::Error, Debug)]
+#[allow(dead_code)]
 pub enum WebSearchError {
     #[error("Failed to perform web search: {0}")]
     SearchError(String),

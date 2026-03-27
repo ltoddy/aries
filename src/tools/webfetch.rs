@@ -4,6 +4,7 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 pub struct WebFetchArgs {
     url: String,
     format: Option<String>,

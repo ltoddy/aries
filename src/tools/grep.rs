@@ -1,10 +1,9 @@
-use std::fs;
-
 use anyhow::Result;
 use regex::Regex;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
+use tokio::fs;
 
 #[derive(Deserialize)]
 pub struct GrepArgs {
@@ -61,13 +60,14 @@ impl Tool for GrepTool {
         let glob_pattern = args.include.unwrap_or_else(|| "**/*".to_string());
 
         for entry in glob::glob(&glob_pattern)? {
-            if let Ok(path) = entry
-                && path.is_file()
-                && let Ok(content) = fs::read_to_string(&path)
-            {
-                for (i, line) in content.lines().enumerate() {
-                    if re.is_match(line) {
-                        matches.push(format!("{}:{}: {}", path.display(), i + 1, line));
+            if let Ok(path) = entry {
+                if path.is_file() {
+                    if let Ok(content) = fs::read_to_string(&path).await {
+                        for (i, line) in content.lines().enumerate() {
+                            if re.is_match(line) {
+                                matches.push(format!("{}:{}: {}", path.display(), i + 1, line));
+                            }
+                        }
                     }
                 }
             }

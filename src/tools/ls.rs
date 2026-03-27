@@ -1,13 +1,17 @@
-use std::{env, fs};
+use std::env;
+use std::path::PathBuf;
 
 use anyhow::Result;
+use globset::{Glob, GlobSetBuilder};
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
+use tokio::fs;
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 pub struct LsArgs {
-    path: Option<String>,
+    path: Option<PathBuf>,
     ignore: Option<Vec<String>>,
 }
 
@@ -54,21 +58,36 @@ impl Tool for LsTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        let dir_path = args.path.unwrap_or_else(|| env::current_dir().unwrap().display().to_string());
+        let dir_path = args.path.unwrap_or_else(|| env::current_dir().unwrap());
+
+        let mut builder = GlobSetBuilder::new();
+        if let Some(ignores) = &args.ignore {
+            for pattern in ignores {
+                if let Ok(glob) = Glob::new(pattern) {
+                    builder.add(glob);
+                }
+            }
+        }
+        let globset = builder.build().unwrap_or_default();
+
         let mut entries = Vec::new();
 
-        for entry in fs::read_dir(&dir_path)? {
-            let entry = entry?;
-            let path = entry.path();
-            let mut file_name = path.file_name().unwrap().to_string_lossy().into_owned();
+        let mut dir_entries = fs::read_dir(&dir_path).await?;
 
-            if path.is_dir() {
-                file_name.push('/');
+        while let Some(entry) = dir_entries.next_entry().await? {
+            let path = entry.path();
+            let file_name = path.file_name().unwrap().to_string_lossy().into_owned();
+
+            if globset.is_match(&file_name) || globset.is_match(&path) {
+                continue;
             }
 
-            // Note: ignore logic could be implemented here using globset or similar if
-            // needed For MVP, we just return all entries
-            entries.push(file_name);
+            let mut formatted_name = file_name;
+            if path.is_dir() {
+                formatted_name.push('/');
+            }
+
+            entries.push(formatted_name);
         }
 
         entries.sort();
