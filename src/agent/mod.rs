@@ -84,7 +84,7 @@ impl AgentType {
                 .tool(MultiEditTool)
                 .tool(EditTool)
                 .tool(QuestionTool)
-                .tool(TaskTool)
+                .tool(TaskTool { model: model.to_string() })
                 .tool(WebFetchTool)
                 .tool(WebSearchTool)
                 .tool(LspTool)

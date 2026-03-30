@@ -1,12 +1,14 @@
 use anyhow::Result;
+use colored::Colorize;
 use rig::client::ProviderClient;
-use rig::completion::{Prompt, ToolDefinition};
+use rig::completion::{Message, ToolDefinition};
 use rig::providers::openai;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::agent::AgentType;
+use crate::agent::runner::run_agent_turn;
 
 #[derive(Deserialize)]
 #[allow(dead_code)]
@@ -30,7 +32,9 @@ pub enum TaskError {
     ExecutionError(String),
 }
 
-pub struct TaskTool;
+pub struct TaskTool {
+    pub model: String,
+}
 
 impl Tool for TaskTool {
     const NAME: &'static str = "task";
@@ -79,10 +83,6 @@ impl Tool for TaskTool {
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         let task_id = args.task_id.unwrap_or_else(|| Uuid::new_v4().to_string());
 
-        // Execute the subagent logic here by spinning up a new agent instance.
-        // For a full implementation, we need to pass down the API key and state.
-        // Since Tool trait doesn't easily capture external references without state,
-        // we'll fetch the client directly here for the MVP subagent execution.
         let client = openai::Client::from_env().completions_api();
 
         let agent_type = match args.subagent_type.as_str() {
@@ -91,13 +91,13 @@ impl Tool for TaskTool {
             _ => AgentType::General, // fallback to general
         };
 
-        // In a real application, we would stream the output or manage nested
-        // conversation loops
-        let agent = agent_type.build_agent(&client, "glm-4.7-flash");
+        let agent = agent_type.build_agent(&client, &self.model);
+        let agent_name = format!("Subagent [{}]", args.subagent_type);
 
-        // Execute sub-agent synchronously (or rather, await its completion)
-        let response = agent
-            .prompt(&args.prompt)
+        println!("\n{} Starting {} task...", "▶".cyan().bold(), agent_name.cyan());
+
+        let mut chat_history: Vec<Message> = vec![];
+        let response = run_agent_turn(&agent, &args.prompt, &mut chat_history, &agent_name)
             .await
             .map_err(|e| TaskError::ExecutionError(format!("Subagent failed: {}", e)))?;
 

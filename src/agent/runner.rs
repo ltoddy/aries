@@ -81,10 +81,11 @@ pub async fn run_agent_turn<M: rig::completion::CompletionModel + 'static>(
     agent: &Agent<M>,
     input: &str,
     chat_history: &mut Vec<Message>,
-) -> Result<()> {
+    agent_name: &str,
+) -> Result<String> {
     let mut stream = agent.stream_prompt(input).with_history(chat_history.clone()).await;
 
-    print!("{}: ", "Aries".green().bold());
+    print!("{}: ", agent_name.green().bold());
     let mut full_response = String::new();
     let mut active_tools: std::collections::HashMap<String, String> = std::collections::HashMap::new();
 
@@ -285,5 +286,5 @@ pub async fn run_agent_turn<M: rig::completion::CompletionModel + 'static>(
         }
     }
     println!();
-    Ok(())
+    Ok(full_response)
 }

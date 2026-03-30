@@ -19,7 +19,7 @@ use completer::CommandCompleter;
 async fn main() -> Result<()> {
     let client = openai::Client::from_env().completions_api();
 
-    let agent = AgentType::Build.build_agent(&client, "glm-4.7-flash");
+    let agent = AgentType::Build.build_agent(&client, "glm-4.7");
 
     let mut chat_history: Vec<Message> = vec![];
 
@@ -30,16 +30,14 @@ async fn main() -> Result<()> {
     let proj_dirs = ProjectDirs::from("", "", "aries").expect("Failed to determine project directories");
     let config_dir = proj_dirs.config_dir();
     if !config_dir.exists() {
-        std::fs::create_dir_all(config_dir).expect("Failed to create config directory");
+        tokio::fs::create_dir_all(config_dir).await.expect("Failed to create config directory");
     }
     let history_file = config_dir.join("history.txt");
 
-    if rl.load_history(&history_file).is_err() {
-        println!("No previous history.");
-    }
+    let _ = rl.load_history(&history_file);
 
     println!("Welcome to {}! Type '/exit' to quit.", "Aries".green().bold());
-    println!("Using model: {}", "glm-4.7-flash".cyan());
+    println!("Using model: {}", "glm-4.7".cyan());
 
     loop {
         let readline = rl.readline(">> ");
@@ -58,7 +56,7 @@ async fn main() -> Result<()> {
                     break;
                 }
 
-                if let Err(e) = run_agent_turn(&agent, input, &mut chat_history).await {
+                if let Err(e) = run_agent_turn(&agent, input, &mut chat_history, "Aries").await {
                     eprintln!("Error: {}", e);
                 }
             },
