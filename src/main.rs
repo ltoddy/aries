@@ -2,7 +2,6 @@ use anyhow::Result;
 use colored::Colorize;
 use directories::ProjectDirs;
 use rig::client::ProviderClient;
-use rig::completion::Message;
 use rig::providers::openai;
 use rustyline::Config;
 use rustyline::error::ReadlineError;
@@ -12,7 +11,7 @@ mod completer;
 mod tools;
 
 use agent::AgentType;
-use agent::runner::run_agent_turn;
+use agent::session::Session;
 use completer::CommandCompleter;
 
 #[tokio::main]
@@ -20,13 +19,8 @@ async fn main() -> Result<()> {
     let client = openai::Client::from_env().completions_api();
 
     let agent = AgentType::Build.build_agent(&client, "glm-4.7");
-
-    let mut chat_history: Vec<Message> = vec![];
-
-    if let Ok(current_dir) = std::env::current_dir() {
-        let prompt = format!("System info: The current working directory is {}.", current_dir.display());
-        chat_history.push(Message::user(prompt));
-    }
+    let mut session = Session::new(agent, "Aries");
+    session.set_current_dir();
 
     let config = Config::builder().auto_add_history(true).build();
     let mut rl = rustyline::Editor::with_config(config)?;
@@ -62,14 +56,12 @@ async fn main() -> Result<()> {
                 }
 
                 if input == "/clear" {
-                    if !chat_history.is_empty() {
-                        chat_history.truncate(1);
-                    }
+                    session.clear_history();
                     println!("{}", "Chat history cleared.".green());
                     continue;
                 }
 
-                if let Err(e) = run_agent_turn(&agent, input, &mut chat_history, "Aries").await {
+                if let Err(e) = session.completion(input).await {
                     eprintln!("Error: {}", e);
                 }
             },

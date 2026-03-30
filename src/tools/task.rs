@@ -1,14 +1,14 @@
 use anyhow::Result;
 use colored::Colorize;
 use rig::client::ProviderClient;
-use rig::completion::{Message, ToolDefinition};
+use rig::completion::ToolDefinition;
 use rig::providers::openai;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::agent::AgentType;
-use crate::agent::runner::run_agent_turn;
+use crate::agent::session::Session;
 
 #[derive(Deserialize)]
 #[allow(dead_code)]
@@ -34,6 +34,12 @@ pub enum TaskError {
 
 pub struct TaskTool {
     pub model: String,
+}
+
+impl TaskTool {
+    pub fn new(model: impl Into<String>) -> Self {
+        Self { model: model.into() }
+    }
 }
 
 impl Tool for TaskTool {
@@ -93,11 +99,12 @@ impl Tool for TaskTool {
 
         let agent = agent_type.build_agent(&client, &self.model);
         let agent_name = format!("Subagent [{}]", args.subagent_type);
+        let mut session = Session::new(agent, &agent_name);
 
         println!("\n{} Starting {} task...", "▶".cyan().bold(), agent_name.cyan());
 
-        let mut chat_history: Vec<Message> = vec![];
-        let response = run_agent_turn(&agent, &args.prompt, &mut chat_history, &agent_name)
+        let response = session
+            .completion(&args.prompt)
             .await
             .map_err(|e| TaskError::ExecutionError(format!("Subagent failed: {}", e)))?;
 

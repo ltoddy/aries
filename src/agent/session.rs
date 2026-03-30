@@ -1,0 +1,76 @@
+use std::io::Write;
+
+use anyhow::Result;
+use colored::Colorize;
+use futures::StreamExt;
+use rig::agent::{Agent, MultiTurnStreamItem};
+use rig::completion::Message;
+use rig::message::Text;
+use rig::streaming::{StreamedAssistantContent, StreamedUserContent, StreamingPrompt};
+
+use crate::agent::display::{display_token_usage, display_tool_call, display_tool_result};
+
+pub struct Session<M: rig::completion::CompletionModel + 'static> {
+    agent: Agent<M>,
+    chat_history: Vec<Message>,
+    agent_name: String,
+}
+
+impl<M: rig::completion::CompletionModel + 'static> Session<M> {
+    pub fn new(agent: Agent<M>, agent_name: impl Into<String>) -> Self {
+        Self { agent, chat_history: Vec::new(), agent_name: agent_name.into() }
+    }
+
+    pub fn set_current_dir(&mut self) {
+        if let Ok(current_dir) = std::env::current_dir() {
+            let prompt = format!("System info: The current working directory is {}.", current_dir.display());
+            self.chat_history.push(Message::user(prompt));
+        }
+    }
+
+    pub fn clear_history(&mut self) {
+        if !self.chat_history.is_empty() {
+            self.chat_history.truncate(1);
+        }
+    }
+
+    pub async fn completion(&mut self, input: &str) -> Result<String> {
+        let mut stream = self.agent.stream_prompt(input).with_history(self.chat_history.clone()).await;
+
+        print!("{}: ", self.agent_name.green().bold());
+        let mut full_response = String::new();
+        let mut active_tools: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+
+        while let Some(chunk) = stream.next().await {
+            match chunk {
+                Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Text(Text { text }))) => {
+                    print!("{}", text);
+                    std::io::stdout().flush().unwrap_or_default();
+                    full_response.push_str(&text);
+                },
+                Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::ToolCall {
+                    tool_call, ..
+                })) => {
+                    active_tools.insert(tool_call.id.clone(), tool_call.function.name.clone());
+                    display_tool_call(&tool_call.function.name, &tool_call.function.arguments);
+                },
+                Ok(MultiTurnStreamItem::StreamUserItem(StreamedUserContent::ToolResult { tool_result, .. })) => {
+                    let tool_name = active_tools.get(&tool_result.id).cloned().unwrap_or_default();
+                    let json_str = serde_json::to_string(&tool_result).unwrap_or_default();
+
+                    display_tool_result(&tool_name, &json_str);
+                },
+                Ok(MultiTurnStreamItem::FinalResponse(res)) => {
+                    if let Some(history) = res.history() {
+                        self.chat_history = history.to_vec();
+                    }
+                    display_token_usage(&res.usage());
+                },
+                Err(e) => eprintln!("\n{}: {}", "Error streaming chunk".red(), e),
+                _ => {},
+            }
+        }
+        println!();
+        Ok(full_response)
+    }
+}
