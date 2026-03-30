@@ -23,6 +23,11 @@ async fn main() -> Result<()> {
 
     let mut chat_history: Vec<Message> = vec![];
 
+    if let Ok(current_dir) = std::env::current_dir() {
+        let prompt = format!("System info: The current working directory is {}.", current_dir.display());
+        chat_history.push(Message::user(prompt));
+    }
+
     let config = Config::builder().auto_add_history(true).build();
     let mut rl = rustyline::Editor::with_config(config)?;
     rl.set_helper(Some(CommandCompleter::new()));
@@ -54,6 +59,14 @@ async fn main() -> Result<()> {
                 if input == "/exit" || input == "/quit" {
                     println!("Goodbye!");
                     break;
+                }
+
+                if input == "/clear" {
+                    if !chat_history.is_empty() {
+                        chat_history.truncate(1);
+                    }
+                    println!("{}", "Chat history cleared.".green());
+                    continue;
                 }
 
                 if let Err(e) = run_agent_turn(&agent, input, &mut chat_history, "Aries").await {

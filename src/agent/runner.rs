@@ -280,6 +280,17 @@ pub async fn run_agent_turn<M: rig::completion::CompletionModel + 'static>(
                 if let Some(history) = res.history() {
                     *chat_history = history.to_vec();
                 }
+
+                let usage = res.usage();
+
+                println!(
+                    "\n{} total={} input={} (cached={}) output={}",
+                    "Token usage:".dimmed(),
+                    usage.total_tokens.to_string().dimmed(),
+                    usage.input_tokens.to_string().dimmed(),
+                    usage.cached_input_tokens.to_string().dimmed(),
+                    usage.output_tokens.to_string().dimmed()
+                );
             },
             Err(e) => eprintln!("\n{}: {}", "Error streaming chunk".red(), e),
             _ => {},
