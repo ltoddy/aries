@@ -10,7 +10,14 @@ pub struct CommandCompleter {
 
 impl CommandCompleter {
     pub fn new() -> Self {
-        Self { commands: vec!["/exit".to_string(), "/quit".to_string(), "/clear".to_string(), "/help".to_string()] }
+        Self {
+            commands: vec![
+                crate::commands::exit::NAME.to_string(),
+                crate::commands::bash::NAME.to_string(),
+                "/clear".to_string(),
+                "/help".to_string(),
+            ],
+        }
     }
 }
 

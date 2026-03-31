@@ -7,6 +7,7 @@ use rustyline::Config;
 use rustyline::error::ReadlineError;
 
 mod agent;
+mod commands;
 mod completer;
 mod tools;
 
@@ -37,7 +38,7 @@ async fn main() -> Result<()> {
 
     let _ = rl.load_history(&history_file);
 
-    println!("Welcome to {}! Type '/exit' to quit.", "Aries".green().bold());
+    println!("Welcome to {}! Type '{}' to quit.", commands::exit::NAME, "Aries".green().bold());
     println!("Using model: {}", model_name.cyan());
 
     loop {
@@ -49,12 +50,13 @@ async fn main() -> Result<()> {
                     continue;
                 }
 
-                // We enabled auto_add_history, so we don't need this anymore
-                // rl.add_history_entry(input)?;
+                if input == commands::exit::NAME {
+                    commands::exit::exit();
+                }
 
-                if input == "/exit" || input == "/quit" {
-                    println!("Goodbye!");
-                    break;
+                if let Some(command) = input.strip_prefix(commands::bash::NAME) {
+                    commands::bash::execute(command).await;
+                    continue;
                 }
 
                 if input == "/clear" {
