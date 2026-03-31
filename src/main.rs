@@ -18,7 +18,9 @@ use completer::CommandCompleter;
 async fn main() -> Result<()> {
     let client = openai::Client::from_env().completions_api();
 
-    let agent = AgentType::Build.build_agent(&client, "glm-4.7");
+    let model_name = std::env::var("MODEL_NAME")
+        .unwrap_or_else(|_| panic!("The environment variable {} must be set.", "`MODEL_NAME`".cyan()));
+    let agent = AgentType::Build.build_agent(&client, &model_name);
     let mut session = Session::new(agent, "Aries");
     session.set_current_dir();
 
@@ -36,7 +38,7 @@ async fn main() -> Result<()> {
     let _ = rl.load_history(&history_file);
 
     println!("Welcome to {}! Type '/exit' to quit.", "Aries".green().bold());
-    println!("Using model: {}", "glm-4.7".cyan());
+    println!("Using model: {}", model_name.cyan());
 
     loop {
         let readline = rl.readline(">> ");
