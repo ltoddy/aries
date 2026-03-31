@@ -79,8 +79,8 @@ impl<M: rig::completion::CompletionModel + 'static> Orchestrate<M> {
                     display_tool_call(&tool_call.function.name, &tool_call.function.arguments);
                 },
                 Ok(MultiTurnStreamItem::StreamUserItem(StreamedUserContent::ToolResult { tool_result, .. })) => {
-                    let tool_name = active_tools.get(&tool_result.id).cloned().unwrap_or_default();
-                    let json_str = serde_json::to_string(&tool_result).unwrap_or_default();
+                    let tool_name = active_tools.get(&tool_result.id).cloned().unwrap_or_else(String::new);
+                    let json_str = serde_json::to_string(&tool_result).unwrap_or_else(|_| String::new());
 
                     display_tool_result(&tool_name, &json_str);
                 },

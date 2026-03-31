@@ -58,7 +58,10 @@ impl Tool for LsTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        let dir_path = args.path.unwrap_or_else(|| env::current_dir().unwrap());
+        let dir_path = match args.path {
+            Some(p) => p,
+            None => env::current_dir()?,
+        };
 
         let mut builder = GlobSetBuilder::new();
         if let Some(ignores) = &args.ignore {
@@ -76,7 +79,10 @@ impl Tool for LsTool {
 
         while let Some(entry) = dir_entries.next_entry().await? {
             let path = entry.path();
-            let file_name = path.file_name().unwrap().to_string_lossy().into_owned();
+            let file_name = match path.file_name() {
+                Some(name) => name.to_string_lossy().into_owned(),
+                None => continue,
+            };
 
             if globset.is_match(&file_name) || globset.is_match(&path) {
                 continue;

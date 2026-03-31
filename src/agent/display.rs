@@ -88,7 +88,7 @@ pub fn format_tool_call_args(tool_name: &str, args: &Value) -> String {
             format!("{} {} on {}", tool_name.cyan(), operation.yellow(), path.yellow())
         },
         _ => {
-            let args_str = serde_json::to_string_pretty(args).unwrap_or_default();
+            let args_str = serde_json::to_string_pretty(args).unwrap_or_else(|_| String::new());
             format!("{} with arguments:\n{}", tool_name.cyan(), args_str.blue())
         },
     }
