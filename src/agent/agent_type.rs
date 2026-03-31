@@ -6,8 +6,8 @@ use crate::tools::{
     ReadFileTool, ShellCommand, TaskTool, WebFetchTool, WebSearchTool, WriteFileTool,
 };
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum AgentType {
     Build,
     Plan,
@@ -18,9 +18,9 @@ pub enum AgentType {
     Summary,
 }
 
+#[allow(dead_code)]
 impl AgentType {
-    #[allow(dead_code)]
-    pub fn name(&self) -> &'static str {
+    pub const fn name(&self) -> &'static str {
         match self {
             AgentType::Build => "build",
             AgentType::Plan => "plan",
@@ -32,8 +32,7 @@ impl AgentType {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn description(&self) -> &'static str {
+    pub const fn description(&self) -> &'static str {
         match self {
             AgentType::Build => "默认智能体。根据配置的权限执行工具。",
             AgentType::Plan => "计划模式。不允许使用所有编辑工具。",
@@ -47,14 +46,10 @@ impl AgentType {
         }
     }
 
-    pub fn prompt(&self) -> &'static str {
+    pub const fn system_prompt(&self) -> &'static str {
         match self {
-            AgentType::Build => {
-                "You are Aries, a helpful terminal AI assistant. You can use tools to execute shell commands and read/write files when requested by the user. Always explain what you are going to do before calling a tool."
-            },
-            AgentType::Plan => {
-                "You are a planning agent. You can explore and read, but you cannot edit. Create a plan and ask the user for approval."
-            },
+            AgentType::Build => include_str!("prompts/build.txt"),
+            AgentType::Plan => include_str!("prompts/plan.txt"),
             AgentType::General => include_str!("prompts/generate.txt"),
             AgentType::Explore => include_str!("prompts/explore.txt"),
             AgentType::Compaction => include_str!("prompts/compaction.txt"),
@@ -63,13 +58,43 @@ impl AgentType {
         }
     }
 
+    pub const fn max_turns(&self) -> usize {
+        match self {
+            AgentType::Build | AgentType::Plan | AgentType::General => 200,
+            AgentType::Explore => 50,
+            AgentType::Compaction | AgentType::Title | AgentType::Summary => 10,
+        }
+    }
+
+    pub const fn temperature(&self) -> Option<f64> {
+        match self {
+            AgentType::Title => Some(0.5),
+            _ => None,
+        }
+    }
+
     pub fn build_agent<M: rig::completion::CompletionModel>(
         &self,
         client: &impl CompletionClient<CompletionModel = M>,
         model: &str,
     ) -> Agent<M> {
-        let builder = client.agent(model).preamble(self.prompt()).default_max_turns(200);
+        let preamble = self.system_prompt();
+        let max_turns = self.max_turns();
+        let temp = self.temperature();
 
+        let builder = client.agent(model).preamble(preamble).default_max_turns(max_turns);
+
+        match temp {
+            Some(t) => self.build_with_tools_and_temp(builder, model, t),
+            None => self.build_with_tools(builder, model),
+        }
+    }
+
+    fn build_with_tools<M: rig::completion::CompletionModel>(
+        &self,
+        builder: rig::agent::AgentBuilder<M>,
+        model: &str,
+    ) -> Agent<M> {
         match self {
             AgentType::Build | AgentType::General => builder
                 .tool(ShellCommand)
@@ -109,10 +134,19 @@ impl AgentType {
                 .tool(WebSearchTool)
                 .tool(CodeSearchTool)
                 .build(),
-            AgentType::Compaction | AgentType::Title | AgentType::Summary => {
-                // Pure LLM tasks
-                builder.build()
-            },
+            AgentType::Compaction | AgentType::Title | AgentType::Summary => builder.build(),
+        }
+    }
+
+    fn build_with_tools_and_temp<M: rig::completion::CompletionModel>(
+        &self,
+        builder: rig::agent::AgentBuilder<M>,
+        model: &str,
+        temperature: f64,
+    ) -> Agent<M> {
+        match self {
+            AgentType::Title => builder.temperature(temperature).build(),
+            _ => self.build_with_tools(builder, model),
         }
     }
 }

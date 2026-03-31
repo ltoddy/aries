@@ -10,13 +10,13 @@ use rig::streaming::{StreamedAssistantContent, StreamedUserContent, StreamingPro
 
 use crate::agent::display::{display_token_usage, display_tool_call, display_tool_result};
 
-pub struct Session<M: rig::completion::CompletionModel + 'static> {
+pub struct Orchestrate<M: rig::completion::CompletionModel + 'static> {
     agent: Agent<M>,
     chat_history: Vec<Message>,
     agent_name: String,
 }
 
-impl<M: rig::completion::CompletionModel + 'static> Session<M> {
+impl<M: rig::completion::CompletionModel + 'static> Orchestrate<M> {
     pub fn new(agent: Agent<M>, agent_name: impl Into<String>) -> Self {
         Self { agent, chat_history: Vec::new(), agent_name: agent_name.into() }
     }
@@ -45,8 +45,32 @@ impl<M: rig::completion::CompletionModel + 'static> Session<M> {
             match chunk {
                 Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Text(Text { text }))) => {
                     print!("{}", text);
-                    std::io::stdout().flush().unwrap_or_default();
+                    let _ = std::io::stdout().flush();
                     full_response.push_str(&text);
+                },
+                Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Reasoning(reasoning))) => {
+                    let text = reasoning
+                        .content
+                        .iter()
+                        .map(|c| match c {
+                            rig::message::ReasoningContent::Text { text, .. } => text.clone(),
+                            rig::message::ReasoningContent::Encrypted(s) => s.clone(),
+                            rig::message::ReasoningContent::Redacted { data } => data.clone(),
+                            rig::message::ReasoningContent::Summary(s) => s.clone(),
+                            _ => String::new(),
+                        })
+                        .collect::<String>();
+                    print!("{}", text.dimmed());
+                    let _ = std::io::stdout().flush();
+                    full_response.push_str(&text);
+                },
+                Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::ReasoningDelta {
+                    id: _,
+                    reasoning,
+                })) => {
+                    print!("{}", reasoning.dimmed());
+                    let _ = std::io::stdout().flush();
+                    full_response.push_str(&reasoning);
                 },
                 Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::ToolCall {
                     tool_call, ..

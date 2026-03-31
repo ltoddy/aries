@@ -12,7 +12,7 @@ mod completer;
 mod tools;
 
 use agent::AgentType;
-use agent::session::Session;
+use agent::orchestrate::Orchestrate;
 use completer::CommandCompleter;
 
 #[tokio::main]
@@ -22,7 +22,7 @@ async fn main() -> Result<()> {
     let model_name = std::env::var("MODEL_NAME")
         .unwrap_or_else(|_| panic!("The environment variable {} must be set.", "`MODEL_NAME`".cyan()));
     let agent = AgentType::Build.build_agent(&client, &model_name);
-    let mut session = Session::new(agent, "Aries");
+    let mut session = Orchestrate::new(agent, "Aries");
     session.set_current_dir();
 
     let config = Config::builder().auto_add_history(true).build();

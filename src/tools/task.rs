@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::agent::AgentType;
-use crate::agent::session::Session;
+use crate::agent::orchestrate::Orchestrate;
 
 #[derive(Deserialize)]
 #[allow(dead_code)]
@@ -99,7 +99,7 @@ impl Tool for TaskTool {
 
         let agent = agent_type.build_agent(&client, &self.model);
         let agent_name = format!("Subagent [{}]", args.subagent_type);
-        let mut session = Session::new(agent, &agent_name);
+        let mut session = Orchestrate::new(agent, &agent_name);
 
         println!("\n{} Starting {} task...", "▶".cyan().bold(), agent_name.cyan());
 
