@@ -1,9 +1,10 @@
 use rig::agent::Agent;
 use rig::client::CompletionClient;
 
+use crate::context::GlobalContext;
 use crate::tools::{
-    ApplyPatchTool, CodeSearchTool, EditTool, GlobTool, GrepTool, LsTool, LspTool, MultiEditTool, QuestionTool,
-    ReadFileTool, ShellCommand, TaskTool, WebFetchTool, WebSearchTool, WriteFileTool,
+    ApplyPatchTool, BatchTool, CodeSearchTool, EditTool, GlobTool, GrepTool, LsTool, LspTool, MultiEditTool,
+    QuestionTool, ReadFileTool, ShellCommand, TaskTool, WebFetchTool, WebSearchTool, WriteFileTool,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -75,6 +76,7 @@ impl AgentType {
 
     pub fn build_agent<M: rig::completion::CompletionModel>(
         &self,
+        context: &GlobalContext,
         client: &impl CompletionClient<CompletionModel = M>,
         model: &str,
     ) -> Agent<M> {
@@ -85,15 +87,16 @@ impl AgentType {
         let builder = client.agent(model).preamble(preamble).default_max_turns(max_turns);
 
         match temp {
-            Some(t) => self.build_with_tools_and_temp(builder, model, t),
-            None => self.build_with_tools(builder, model),
+            Some(t) => self.build_with_tools_and_temp(context, builder, model, t),
+            None => self.build_with_tools(context, builder, model),
         }
     }
 
     fn build_with_tools<M: rig::completion::CompletionModel>(
         &self,
+        context: &GlobalContext,
         builder: rig::agent::AgentBuilder<M>,
-        model: &str,
+        _model: &str,
     ) -> Agent<M> {
         match self {
             AgentType::Build | AgentType::General => builder
@@ -106,8 +109,9 @@ impl AgentType {
                 .tool(ApplyPatchTool)
                 .tool(MultiEditTool)
                 .tool(EditTool)
+                .tool(BatchTool::new(context.clone()))
                 .tool(QuestionTool)
-                .tool(TaskTool::new(model))
+                .tool(TaskTool::new(context.clone()))
                 .tool(WebFetchTool)
                 .tool(WebSearchTool)
                 .tool(LspTool)
@@ -140,13 +144,14 @@ impl AgentType {
 
     fn build_with_tools_and_temp<M: rig::completion::CompletionModel>(
         &self,
+        context: &GlobalContext,
         builder: rig::agent::AgentBuilder<M>,
         model: &str,
         temperature: f64,
     ) -> Agent<M> {
         match self {
             AgentType::Title => builder.temperature(temperature).build(),
-            _ => self.build_with_tools(builder, model),
+            _ => self.build_with_tools(context, builder, model),
         }
     }
 }

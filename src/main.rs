@@ -1,6 +1,5 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use colored::Colorize;
-use rig::providers::openai;
 use rustyline::Config;
 use rustyline::error::ReadlineError;
 
@@ -8,34 +7,35 @@ mod agent;
 mod commands;
 mod completer;
 mod config;
+mod context;
 mod tools;
 
 use agent::AgentType;
 use agent::orchestrate::Orchestrate;
 use completer::CommandCompleter;
-use config::AppConfig;
+use context::GlobalContext;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let dir = AppConfig::dir().await?;
-    let app_config = AppConfig::load_or_setup().await?;
+    let current_dir = std::env::current_dir().with_context(|| "无法识别当前目录")?;
 
-    let mut client_builder = openai::Client::builder().api_key(&app_config.api_key);
-    if let Some(base_url) = &app_config.base_url {
-        client_builder = client_builder.base_url(base_url);
-    }
-    let client = client_builder.build()?.completions_api();
+    let loader = config::AppConfigLoader::new().await?;
+    let app_config = loader.load_or_setup().await?;
+
+    let client = agent::create_client(&app_config)?;
+
+    let context = GlobalContext::new(app_config.clone(), current_dir, loader.config_dir())?;
 
     let model_name = app_config.model_name.clone();
-    let agent = AgentType::Build.build_agent(&client, &model_name);
-    let mut session = Orchestrate::new(agent, "Aries");
+    let agent = AgentType::Build.build_agent(&context, &client, &model_name);
+    let mut session = Orchestrate::new(agent, "Aries", context.clone());
     session.set_current_dir();
 
     let config = Config::builder().auto_add_history(true).build();
     let mut rl = rustyline::Editor::with_config(config)?;
     rl.set_helper(Some(CommandCompleter::new()));
 
-    let history_file = dir.join("history.txt");
+    let history_file = context.config_dir.join("history.txt");
     let _ = rl.load_history(&history_file);
 
     println!("Welcome to {}! Type '{}' to quit.", commands::exit::NAME, "Aries".green().bold());

@@ -9,23 +9,23 @@ use rig::message::Text;
 use rig::streaming::{StreamedAssistantContent, StreamedUserContent, StreamingPrompt};
 
 use crate::agent::display::{display_token_usage, display_tool_call, display_tool_result};
+use crate::context::GlobalContext;
 
 pub struct Orchestrate<M: rig::completion::CompletionModel + 'static> {
     agent: Agent<M>,
     chat_history: Vec<Message>,
     agent_name: String,
+    context: GlobalContext,
 }
 
 impl<M: rig::completion::CompletionModel + 'static> Orchestrate<M> {
-    pub fn new(agent: Agent<M>, agent_name: impl Into<String>) -> Self {
-        Self { agent, chat_history: Vec::new(), agent_name: agent_name.into() }
+    pub fn new(agent: Agent<M>, agent_name: impl Into<String>, context: GlobalContext) -> Self {
+        Self { agent, chat_history: Vec::new(), agent_name: agent_name.into(), context }
     }
 
     pub fn set_current_dir(&mut self) {
-        if let Ok(current_dir) = std::env::current_dir() {
-            let prompt = format!("System info: The current working directory is {}.", current_dir.display());
-            self.chat_history.push(Message::user(prompt));
-        }
+        let prompt = format!("System info: The current working directory is {}.", self.context.current_dir.display());
+        self.chat_history.push(Message::user(prompt));
     }
 
     pub fn clear_history(&mut self) {
