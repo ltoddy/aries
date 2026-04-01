@@ -1,6 +1,5 @@
 use anyhow::Result;
 use colored::Colorize;
-use rig::client::ProviderClient;
 use rig::completion::ToolDefinition;
 use rig::providers::openai;
 use rig::tool::Tool;
@@ -9,6 +8,7 @@ use uuid::Uuid;
 
 use crate::agent::AgentType;
 use crate::agent::orchestrate::Orchestrate;
+use crate::config::AppConfig;
 
 #[derive(Deserialize)]
 #[allow(dead_code)]
@@ -89,7 +89,13 @@ impl Tool for TaskTool {
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         let task_id = args.task_id.unwrap_or_else(|| Uuid::new_v4().to_string());
 
-        let client = openai::Client::from_env().completions_api();
+        let app_config = AppConfig::load_or_setup().await.map_err(|e| TaskError::ExecutionError(e.to_string()))?;
+
+        let mut client_builder = openai::Client::builder().api_key(&app_config.api_key);
+        if let Some(base_url) = &app_config.base_url {
+            client_builder = client_builder.base_url(base_url);
+        }
+        let client = client_builder.build().map_err(|e| TaskError::ExecutionError(e.to_string()))?.completions_api();
 
         let agent_type = match args.subagent_type.as_str() {
             "explore" => AgentType::Explore,

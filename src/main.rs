@@ -1,7 +1,5 @@
 use anyhow::Result;
 use colored::Colorize;
-use directories::ProjectDirs;
-use rig::client::ProviderClient;
 use rig::providers::openai;
 use rustyline::Config;
 use rustyline::error::ReadlineError;
@@ -9,18 +7,26 @@ use rustyline::error::ReadlineError;
 mod agent;
 mod commands;
 mod completer;
+mod config;
 mod tools;
 
 use agent::AgentType;
 use agent::orchestrate::Orchestrate;
 use completer::CommandCompleter;
+use config::AppConfig;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let client = openai::Client::from_env().completions_api();
+    let dir = AppConfig::dir().await?;
+    let app_config = AppConfig::load_or_setup().await?;
 
-    let model_name = std::env::var("MODEL_NAME")
-        .unwrap_or_else(|_| panic!("The environment variable {} must be set.", "`MODEL_NAME`".cyan()));
+    let mut client_builder = openai::Client::builder().api_key(&app_config.api_key);
+    if let Some(base_url) = &app_config.base_url {
+        client_builder = client_builder.base_url(base_url);
+    }
+    let client = client_builder.build()?.completions_api();
+
+    let model_name = app_config.model_name.clone();
     let agent = AgentType::Build.build_agent(&client, &model_name);
     let mut session = Orchestrate::new(agent, "Aries");
     session.set_current_dir();
@@ -29,13 +35,7 @@ async fn main() -> Result<()> {
     let mut rl = rustyline::Editor::with_config(config)?;
     rl.set_helper(Some(CommandCompleter::new()));
 
-    let proj_dirs = ProjectDirs::from("", "", "aries").expect("Failed to determine project directories");
-    let config_dir = proj_dirs.config_dir();
-    if !config_dir.exists() {
-        tokio::fs::create_dir_all(config_dir).await.expect("Failed to create config directory");
-    }
-    let history_file = config_dir.join("history.txt");
-
+    let history_file = dir.join("history.txt");
     let _ = rl.load_history(&history_file);
 
     println!("Welcome to {}! Type '{}' to quit.", commands::exit::NAME, "Aries".green().bold());
