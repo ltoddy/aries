@@ -1,6 +1,5 @@
 use dialoguer::Input;
 use dialoguer::theme::ColorfulTheme;
-use futures::StreamExt;
 
 use crate::config::AppConfig;
 
