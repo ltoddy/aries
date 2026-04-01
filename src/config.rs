@@ -94,7 +94,7 @@ impl AppConfig {
         println!("Welcome to Aries! Let's set up your AI model configuration.");
         let theme = ColorfulTheme::default();
 
-        let providers = vec![Provider::OpenAI, Provider::DeepSeek, Provider::Ollama, Provider::OpenAICompatible];
+        let providers = [Provider::OpenAI, Provider::DeepSeek, Provider::Ollama, Provider::OpenAICompatible];
         let provider_idx =
             Select::with_theme(&theme).with_prompt("Select a provider").default(0).items(&providers[..]).interact()?;
         let provider = providers[provider_idx].clone();
@@ -118,7 +118,7 @@ impl AppConfig {
 
         let model_name: String = match provider {
             Provider::OpenAI => {
-                let models = vec![
+                let models = [
                     openai::GPT_5_2,
                     openai::GPT_5_1,
                     openai::GPT_5,
@@ -146,7 +146,7 @@ impl AppConfig {
                 }
             },
             Provider::DeepSeek => {
-                let models = vec![deepseek::DEEPSEEK_CHAT, deepseek::DEEPSEEK_REASONER, "Other (Custom Input)"];
+                let models = [deepseek::DEEPSEEK_CHAT, deepseek::DEEPSEEK_REASONER, "Other (Custom Input)"];
                 let model_idx = Select::with_theme(&theme)
                     .with_prompt("Select DeepSeek Model")
                     .default(0)

@@ -26,7 +26,19 @@ pub async fn execute(command: &str) {
         return;
     }
 
-    wait_for_marker(&mut session, false).await;
+    tokio::select! {
+        _ = wait_for_marker(&mut session, false) => {},
+        _ = tokio::signal::ctrl_c() => {
+            // Send Ctrl-C (SIGINT, \x03) to the PTY
+            if let Err(e) = session.writer.write_all(&[0x03]) {
+                eprintln!("{}", format!("Failed to send Ctrl-C to bash session: {}", e).red());
+            } else {
+                println!("\n{}", "Command interrupted by user.".yellow());
+            }
+            // Need to still wait for the prompt marker to show up so we consume the remaining output and prompt
+            wait_for_marker(&mut session, false).await;
+        }
+    }
 }
 
 const PROMPT_MARKER: &str = "ARIES_DONE_MARKER_8F3A2B1C";
