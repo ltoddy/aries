@@ -8,7 +8,7 @@ authors = ["ltoddy <taoliu0509@gmail.com>"]
 anyhow = "1"
 colored = "3"
 dark-light = "2.0"
-dialoguer = "0.12"
+dialoguer = { version = "0.12", features = ["fuzzy-select"] }
 diffy = "0.4"
 directories = "6.0"
 ferris-says = "0.3"

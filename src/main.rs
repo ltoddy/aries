@@ -60,7 +60,7 @@ async fn main() -> Result<()> {
                     continue;
                 }
 
-                if input == "/clear-history" {
+                if input == commands::clear_history::NAME {
                     session.clear_history();
                     println!("{}", context.theme.green_text("Chat history cleared."));
                     continue;

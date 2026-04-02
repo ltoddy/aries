@@ -1,52 +1,62 @@
-use rustyline::Context;
-use rustyline::completion::{Completer, extract_word};
-use rustyline::hint::Hinter;
-use rustyline_derive::{Helper, Highlighter, Validator};
+use dialoguer::Select;
+use dialoguer::theme::ColorfulTheme;
+use rustyline::completion::{Completer, Pair};
+use rustyline::hint::HistoryHinter;
+use rustyline::{Context, Result};
+use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
 
-#[derive(Helper, Highlighter, Validator)]
+use crate::commands::{bash, clear_history, exit, save_history, setup};
+
+#[derive(Helper, Highlighter, Hinter, Validator)]
 pub struct CommandCompleter {
-    commands: Vec<String>,
+    #[rustyline(Hinter)]
+    hinter: HistoryHinter,
 }
 
 impl CommandCompleter {
     pub fn new() -> Self {
-        Self {
-            commands: vec![
-                crate::commands::exit::NAME.to_string(),
-                crate::commands::bash::NAME.to_string(),
-                crate::commands::setup::NAME.to_string(),
-                crate::commands::save_history::NAME.to_string(),
-                "/clear-history".to_string(),
-                "/help".to_string(),
-            ],
-        }
-    }
-}
-
-impl Hinter for CommandCompleter {
-    type Hint = String;
-
-    fn hint(&self, line: &str, pos: usize, _ctx: &Context<'_>) -> Option<String> {
-        if line.is_empty() || pos < line.len() {
-            return None;
-        }
-
-        if !line.starts_with('/') {
-            return None;
-        }
-
-        self.commands.iter().find(|cmd| cmd.starts_with(line)).map(|cmd| cmd[line.len()..].to_string())
+        Self { hinter: HistoryHinter {} }
     }
 }
 
 impl Completer for CommandCompleter {
-    type Candidate = String;
+    type Candidate = Pair;
 
-    fn complete(&self, line: &str, pos: usize, _ctx: &Context<'_>) -> rustyline::Result<(usize, Vec<String>)> {
-        let (start, word) = extract_word(line, pos, None, |c| c == ' ');
+    fn complete(&self, line: &str, _pos: usize, _ctx: &Context<'_>) -> Result<(usize, Vec<Pair>)> {
+        if line.starts_with('/')
+            && let Some(selected) = show(line)
+        {
+            return Ok((0, vec![Pair { display: selected.clone(), replacement: selected }]));
+        }
 
-        let matches: Vec<String> = self.commands.iter().filter(|cmd| cmd.starts_with(word)).cloned().collect();
-
-        Ok((start, matches))
+        Ok((0, vec![]))
     }
+}
+
+const COMMANDS: &[(&str, &str)] = &[
+    (exit::NAME, "Exit Aries"),
+    (bash::NAME, "Run a bash command"),
+    (setup::NAME, "Open configuration setup"),
+    (save_history::NAME, "Save chat history to file"),
+    (clear_history::NAME, "Clear chat history"),
+];
+
+pub fn show(prefix: &str) -> Option<String> {
+    let filtered: Vec<(&str, &str)> = COMMANDS.iter().filter(|(cmd, _)| cmd.starts_with(prefix)).copied().collect();
+
+    if filtered.is_empty() {
+        return None;
+    }
+
+    let items: Vec<String> = filtered.iter().map(|(cmd, desc)| format!("{cmd}  {desc}")).collect();
+
+    let selection = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Select a command")
+        .default(0)
+        .items(&items)
+        .interact_opt()
+        .ok()
+        .flatten()?;
+
+    Some(filtered[selection].0.to_string())
 }
