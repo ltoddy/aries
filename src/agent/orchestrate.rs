@@ -20,18 +20,19 @@ pub struct Orchestrate<M: rig::completion::CompletionModel + 'static> {
 
 impl<M: rig::completion::CompletionModel + 'static> Orchestrate<M> {
     pub fn new(agent: Agent<M>, agent_name: impl Into<String>, context: GlobalContext) -> Self {
-        Self { agent, chat_history: Vec::new(), agent_name: agent_name.into(), context }
-    }
+        let chat_history = vec![Message::user(format!("环境信息：当前工作目录是 {} ", context.current_dir.display()))];
 
-    pub fn set_current_dir(&mut self) {
-        let prompt = format!("System info: The current working directory is {}.", self.context.current_dir.display());
-        self.chat_history.push(Message::user(prompt));
+        Self { agent, chat_history, agent_name: agent_name.into(), context }
     }
 
     pub fn clear_history(&mut self) {
         if !self.chat_history.is_empty() {
             self.chat_history.truncate(1);
         }
+    }
+
+    pub fn chat_history(&self) -> &[Message] {
+        &self.chat_history
     }
 
     pub async fn completion(&mut self, input: &str) -> Result<String> {

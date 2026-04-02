@@ -28,7 +28,6 @@ async fn main() -> Result<()> {
     let model_name = app_config.model_name.clone();
     let agent = AgentType::Build.build_agent(&context, &client, &model_name);
     let mut session = Orchestrate::new(agent, "Aries", context.clone());
-    session.set_current_dir();
 
     let config = Config::builder().auto_add_history(true).build();
     let mut rl = rustyline::Editor::with_config(config)?;
@@ -55,6 +54,11 @@ async fn main() -> Result<()> {
 
                 if let Some(command) = input.strip_prefix(commands::bash::NAME) {
                     commands::bash::execute(command).await;
+                    continue;
+                }
+
+                if input == commands::save_history::NAME {
+                    commands::save_history::execute(session.chat_history()).await;
                     continue;
                 }
 

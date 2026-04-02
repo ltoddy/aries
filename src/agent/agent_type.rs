@@ -1,5 +1,6 @@
 use rig::agent::Agent;
 use rig::client::CompletionClient;
+use rig::tool::ToolDyn;
 
 use crate::context::GlobalContext;
 use crate::tools::{
@@ -21,6 +22,18 @@ pub enum AgentType {
 
 #[allow(dead_code)]
 impl AgentType {
+    pub fn build_agent<M: rig::completion::CompletionModel>(
+        &self,
+        context: &GlobalContext,
+        client: &impl CompletionClient<CompletionModel = M>,
+        model: &str,
+    ) -> Agent<M> {
+        let preamble = self.system_prompt();
+
+        let tools = self.tools(context);
+        client.agent(model).preamble(preamble).tools(tools).default_max_turns(200).build()
+    }
+
     pub const fn name(&self) -> &'static str {
         match self {
             AgentType::Build => "build",
@@ -59,99 +72,48 @@ impl AgentType {
         }
     }
 
-    pub const fn max_turns(&self) -> usize {
+    fn tools(&self, context: &GlobalContext) -> Vec<Box<dyn ToolDyn>> {
         match self {
-            AgentType::Build | AgentType::Plan | AgentType::General => 200,
-            AgentType::Explore => 50,
-            AgentType::Compaction | AgentType::Title | AgentType::Summary => 10,
-        }
-    }
-
-    pub const fn temperature(&self) -> Option<f64> {
-        match self {
-            AgentType::Title => Some(0.5),
-            _ => None,
-        }
-    }
-
-    pub fn build_agent<M: rig::completion::CompletionModel>(
-        &self,
-        context: &GlobalContext,
-        client: &impl CompletionClient<CompletionModel = M>,
-        model: &str,
-    ) -> Agent<M> {
-        let preamble = self.system_prompt();
-        let max_turns = self.max_turns();
-        let temp = self.temperature();
-
-        let builder = client.agent(model).preamble(preamble).default_max_turns(max_turns);
-
-        match temp {
-            Some(t) => self.build_with_tools_and_temp(context, builder, model, t),
-            None => self.build_with_tools(context, builder, model),
-        }
-    }
-
-    fn build_with_tools<M: rig::completion::CompletionModel>(
-        &self,
-        context: &GlobalContext,
-        builder: rig::agent::AgentBuilder<M>,
-        _model: &str,
-    ) -> Agent<M> {
-        match self {
-            AgentType::Build | AgentType::General => builder
-                .tool(ShellCommand)
-                .tool(ReadFileTool)
-                .tool(WriteFileTool)
-                .tool(GlobTool)
-                .tool(GrepTool)
-                .tool(LsTool)
-                .tool(ApplyPatchTool)
-                .tool(MultiEditTool)
-                .tool(EditTool)
-                .tool(BatchTool::new(context.clone()))
-                .tool(QuestionTool)
-                .tool(TaskTool::new(context.clone()))
-                .tool(WebFetchTool)
-                .tool(WebSearchTool)
-                .tool(LspTool)
-                .tool(CodeSearchTool)
-                .build(),
-            AgentType::Plan => builder
-                .tool(ShellCommand)
-                .tool(ReadFileTool)
-                .tool(GlobTool)
-                .tool(GrepTool)
-                .tool(LsTool)
-                .tool(QuestionTool)
-                .tool(WebFetchTool)
-                .tool(WebSearchTool)
-                .tool(LspTool)
-                .tool(CodeSearchTool)
-                .build(),
-            AgentType::Explore => builder
-                .tool(ReadFileTool)
-                .tool(GlobTool)
-                .tool(GrepTool)
-                .tool(LsTool)
-                .tool(WebFetchTool)
-                .tool(WebSearchTool)
-                .tool(CodeSearchTool)
-                .build(),
-            AgentType::Compaction | AgentType::Title | AgentType::Summary => builder.build(),
-        }
-    }
-
-    fn build_with_tools_and_temp<M: rig::completion::CompletionModel>(
-        &self,
-        context: &GlobalContext,
-        builder: rig::agent::AgentBuilder<M>,
-        model: &str,
-        temperature: f64,
-    ) -> Agent<M> {
-        match self {
-            AgentType::Title => builder.temperature(temperature).build(),
-            _ => self.build_with_tools(context, builder, model),
+            AgentType::Build | AgentType::General => vec![
+                Box::new(ShellCommand),
+                Box::new(ReadFileTool),
+                Box::new(WriteFileTool),
+                Box::new(GlobTool),
+                Box::new(GrepTool),
+                Box::new(LsTool),
+                Box::new(ApplyPatchTool),
+                Box::new(MultiEditTool),
+                Box::new(EditTool),
+                Box::new(BatchTool::new(context.clone())),
+                Box::new(QuestionTool),
+                Box::new(TaskTool::new(context.clone())),
+                Box::new(WebFetchTool),
+                Box::new(WebSearchTool),
+                Box::new(LspTool),
+                Box::new(CodeSearchTool),
+            ],
+            AgentType::Plan => vec![
+                Box::new(ShellCommand),
+                Box::new(ReadFileTool),
+                Box::new(GlobTool),
+                Box::new(GrepTool),
+                Box::new(LsTool),
+                Box::new(QuestionTool),
+                Box::new(WebFetchTool),
+                Box::new(WebSearchTool),
+                Box::new(LspTool),
+                Box::new(CodeSearchTool),
+            ],
+            AgentType::Explore => vec![
+                Box::new(ReadFileTool),
+                Box::new(GlobTool),
+                Box::new(GrepTool),
+                Box::new(LsTool),
+                Box::new(WebFetchTool),
+                Box::new(WebSearchTool),
+                Box::new(CodeSearchTool),
+            ],
+            AgentType::Compaction | AgentType::Title | AgentType::Summary => vec![],
         }
     }
 }

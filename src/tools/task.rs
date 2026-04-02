@@ -100,7 +100,6 @@ impl Tool for TaskTool {
         let agent = agent_type.build_agent(&self.context, &client, &self.context.config.model_name);
         let agent_name = format!("Subagent [{}]", args.subagent_type);
         let mut session = Orchestrate::new(agent, &agent_name, self.context.clone());
-        session.set_current_dir();
 
         println!("\n{} Starting {} task...", "▶".cyan().bold(), agent_name.cyan());
 
