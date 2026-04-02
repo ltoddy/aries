@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 use directories::ProjectDirs;
@@ -7,6 +7,7 @@ use crate::config::{AppConfig, setup};
 
 pub struct AppConfigLoader {
     dir: PathBuf,
+    file_path: PathBuf,
 }
 
 impl AppConfigLoader {
@@ -23,19 +24,20 @@ impl AppConfigLoader {
                 .with_context(|| format!("failed create directory: {}", parent.display()))?;
         }
 
-        Ok(Self { dir: config_dir.to_path_buf() })
+        let file_path = config_dir.join(Self::FILE_NAME);
+        Ok(Self { dir: config_dir.to_path_buf(), file_path })
     }
 
-    pub fn config_dir(&self) -> PathBuf {
-        self.dir.clone()
+    pub fn config_dir(&self) -> &Path {
+        &self.dir
     }
 
-    pub fn file_path(&self) -> PathBuf {
-        self.dir.join(Self::FILE_NAME)
+    pub fn file_path(&self) -> &Path {
+        &self.file_path
     }
 
     pub async fn load_or_setup(&self) -> anyhow::Result<AppConfig> {
-        match self.try_load().await {
+        match self.load().await {
             Ok(config) => Ok(config),
             Err(_) => {
                 let config = setup()?;
@@ -45,7 +47,7 @@ impl AppConfigLoader {
         }
     }
 
-    async fn try_load(&self) -> anyhow::Result<AppConfig> {
+    async fn load(&self) -> anyhow::Result<AppConfig> {
         let file_path = self.file_path();
 
         let config = tokio::fs::read_to_string(file_path)

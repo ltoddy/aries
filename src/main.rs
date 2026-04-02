@@ -24,7 +24,7 @@ async fn main() -> Result<()> {
 
     let client = agent::create_client(&app_config)?;
 
-    let context = GlobalContext::new(app_config.clone(), current_dir, loader.config_dir())?;
+    let context = GlobalContext::new(app_config.clone(), current_dir, loader.config_dir().to_path_buf())?;
 
     let model_name = app_config.model_name.clone();
     let agent = AgentType::Build.build_agent(&context, &client, &model_name);
