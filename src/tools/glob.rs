@@ -1,4 +1,6 @@
 use anyhow::Result;
+use globset::GlobBuilder;
+use ignore::WalkBuilder;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
@@ -17,6 +19,8 @@ pub struct GlobOutput {
 pub enum GlobError {
     #[error("Glob pattern error: {0}")]
     PatternError(#[from] glob::PatternError),
+    #[error("Globset error: {0}")]
+    GlobsetError(#[from] globset::Error),
 }
 
 pub struct GlobTool;
@@ -47,8 +51,22 @@ impl Tool for GlobTool {
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         let mut files = Vec::new();
 
-        for path in glob::glob(&args.pattern)?.flatten() {
-            files.push(path.display().to_string());
+        // WalkBuilder automatically respects .gitignore files
+        let mut builder = WalkBuilder::new(".");
+        builder.hidden(false);
+
+        let glob = GlobBuilder::new(&args.pattern).literal_separator(true).build()?;
+        let glob = glob.compile_matcher();
+
+        for result in builder.build() {
+            if let Ok(entry) = result
+                && entry.file_type().is_some_and(|ft| ft.is_file())
+            {
+                let path = entry.path();
+                if glob.is_match(path) {
+                    files.push(path.display().to_string());
+                }
+            }
         }
 
         Ok(GlobOutput { files })

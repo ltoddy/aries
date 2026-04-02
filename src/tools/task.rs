@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::agent::orchestrate::Orchestrate;
-use crate::agent::{AgentType, create_client};
+use crate::agent::{AgentType, create};
 use crate::context::GlobalContext;
 
 #[derive(Deserialize)]
@@ -94,10 +94,8 @@ impl Tool for TaskTool {
             _ => AgentType::General, // fallback to general
         };
 
-        let client = create_client(&self.context.config)
-            .map_err(|e| TaskError::ExecutionError(format!("Failed to create client: {}", e)))?;
-
-        let agent = agent_type.build_agent(&self.context, &client, &self.context.config.model_name);
+        let agent = create(&self.context, agent_type)
+            .map_err(|e| TaskError::ExecutionError(format!("Failed to create agent: {}", e)))?;
         let agent_name = format!("Subagent [{}]", args.subagent_type);
         let mut session = Orchestrate::new(agent, &agent_name, self.context.clone());
 

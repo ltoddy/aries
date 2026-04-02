@@ -1,4 +1,6 @@
 use anyhow::Result;
+use globset::GlobBuilder;
+use ignore::WalkBuilder;
 use regex::Regex;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
@@ -22,6 +24,8 @@ pub enum GrepError {
     RegexError(#[from] regex::Error),
     #[error("Glob error: {0}")]
     GlobError(#[from] glob::PatternError),
+    #[error("Globset error: {0}")]
+    GlobsetError(#[from] globset::Error),
 }
 
 pub struct GrepTool;
@@ -57,15 +61,27 @@ impl Tool for GrepTool {
         let re = Regex::new(&args.pattern)?;
         let mut matches = Vec::new();
 
-        let glob_pattern = args.include.unwrap_or_else(|| "**/*".to_string());
+        // WalkBuilder automatically respects .gitignore files
+        let mut builder = WalkBuilder::new(".");
+        builder.hidden(false); // Don't skip hidden files by default
 
-        for path in glob::glob(&glob_pattern)?.flatten() {
-            if path.is_file()
-                && let Ok(content) = fs::read_to_string(&path).await
+        // Add glob filter if specified
+        if let Some(include) = &args.include {
+            let glob = GlobBuilder::new(include).literal_separator(true).build()?;
+            let glob = glob.compile_matcher();
+            builder.filter_entry(move |entry| glob.is_match(entry.path()));
+        }
+
+        for result in builder.build() {
+            if let Ok(entry) = result
+                && entry.file_type().is_some_and(|ft| ft.is_file())
             {
-                for (i, line) in content.lines().enumerate() {
-                    if re.is_match(line) {
-                        matches.push(format!("{}:{}: {}", path.display(), i + 1, line));
+                let path = entry.path();
+                if let Ok(content) = fs::read_to_string(path).await {
+                    for (i, line) in content.lines().enumerate() {
+                        if re.is_match(line) {
+                            matches.push(format!("{}:{}: {}", path.display(), i + 1, line));
+                        }
                     }
                 }
             }

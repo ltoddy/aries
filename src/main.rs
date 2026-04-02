@@ -21,12 +21,10 @@ async fn main() -> Result<()> {
     let loader = config::AppConfigLoader::new().await?;
     let app_config = loader.load_or_setup().await?;
 
-    let client = agent::create_client(&app_config)?;
-
     let context = GlobalContext::new(app_config.clone(), current_dir, loader.config_dir().to_path_buf())?;
 
     let model_name = app_config.model_name.clone();
-    let agent = AgentType::Build.build_agent(&context, &client, &model_name);
+    let agent = agent::create(&context, AgentType::Build)?;
     let mut session = Orchestrate::new(agent, "Aries", context.clone());
 
     let config = Config::builder().auto_add_history(true).build();

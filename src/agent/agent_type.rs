@@ -1,5 +1,3 @@
-use rig::agent::Agent;
-use rig::client::CompletionClient;
 use rig::tool::ToolDyn;
 
 use crate::context::GlobalContext;
@@ -22,18 +20,6 @@ pub enum AgentType {
 
 #[allow(dead_code)]
 impl AgentType {
-    pub fn build_agent<M: rig::completion::CompletionModel>(
-        &self,
-        context: &GlobalContext,
-        client: &impl CompletionClient<CompletionModel = M>,
-        model: &str,
-    ) -> Agent<M> {
-        let preamble = self.system_prompt();
-
-        let tools = self.tools(context);
-        client.agent(model).preamble(preamble).tools(tools).default_max_turns(200).build()
-    }
-
     pub const fn name(&self) -> &'static str {
         match self {
             AgentType::Build => "build",
@@ -72,7 +58,7 @@ impl AgentType {
         }
     }
 
-    fn tools(&self, context: &GlobalContext) -> Vec<Box<dyn ToolDyn>> {
+    pub fn tools(&self, context: &GlobalContext) -> Vec<Box<dyn ToolDyn>> {
         match self {
             AgentType::Build | AgentType::General => vec![
                 Box::new(ShellCommand),
