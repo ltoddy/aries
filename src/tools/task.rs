@@ -49,7 +49,6 @@ impl Tool for TaskTool {
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         let mut desc = include_str!("descriptions/task.txt").to_string();
-        // Support specific agents
         desc = desc.replace(
             "{agents}",
             "- default/build: The standard Aries agent with all standard tools\n\
@@ -91,7 +90,7 @@ impl Tool for TaskTool {
         let agent_type = match args.subagent_type.as_str() {
             "explore" => AgentType::Explore,
             "plan" => AgentType::Plan,
-            _ => AgentType::General, // fallback to general
+            _ => AgentType::General,
         };
 
         let agent = create(&self.context, agent_type)
@@ -99,7 +98,8 @@ impl Tool for TaskTool {
         let agent_name = format!("Subagent [{}]", args.subagent_type);
         let mut session = Orchestrate::new(agent, &agent_name, self.context.clone());
 
-        println!("\n{} Starting {} task...", "▶".cyan().bold(), agent_name.cyan());
+        let theme = self.context.theme;
+        println!("\n{} Starting {} task...", theme.cyan_text("▶").bold(), theme.cyan_text(&agent_name));
 
         let response = session
             .completion(&args.prompt)

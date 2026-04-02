@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use colored::Colorize;
 use rustyline::Config;
 use rustyline::error::ReadlineError;
 
@@ -7,7 +6,9 @@ mod agent;
 mod commands;
 mod config;
 mod context;
+mod theme;
 mod tools;
+mod welcome;
 
 use agent::AgentType;
 use agent::orchestrate::Orchestrate;
@@ -34,8 +35,7 @@ async fn main() -> Result<()> {
     let history_file = context.config_dir.join("history.txt");
     let _ = rl.load_history(&history_file);
 
-    println!("Welcome to {}! Type '{}' to quit.", commands::exit::NAME, "Aries".green().bold());
-    println!("Using model: {}", model_name.cyan());
+    welcome::welcome(&model_name, &context);
 
     loop {
         let readline = rl.readline(">> ");
@@ -51,23 +51,23 @@ async fn main() -> Result<()> {
                 }
 
                 if let Some(command) = input.strip_prefix(commands::bash::NAME) {
-                    commands::bash::execute(command).await;
+                    commands::bash::execute(command, &context.theme).await;
                     continue;
                 }
 
                 if input == commands::save_history::NAME {
-                    commands::save_history::execute(session.chat_history()).await;
+                    commands::save_history::execute(session.chat_history(), &context.theme).await;
                     continue;
                 }
 
-                if input == "/clear" {
+                if input == "/clear-history" {
                     session.clear_history();
-                    println!("{}", "Chat history cleared.".green());
+                    println!("{}", context.theme.green_text("Chat history cleared."));
                     continue;
                 }
 
                 if input == commands::setup::NAME {
-                    if let Err(e) = commands::setup::execute().await {
+                    if let Err(e) = commands::setup::execute(&context.theme).await {
                         eprintln!("Error: {}", e);
                     }
                     continue;
@@ -77,14 +77,7 @@ async fn main() -> Result<()> {
                     eprintln!("Error: {}", e);
                 }
             },
-            Err(ReadlineError::Interrupted) => {
-                println!("CTRL-C");
-                break;
-            },
-            Err(ReadlineError::Eof) => {
-                println!("CTRL-D");
-                break;
-            },
+            Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => commands::exit::exit(),
             Err(err) => {
                 println!("Error: {:?}", err);
                 break;

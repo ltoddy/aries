@@ -16,7 +16,7 @@ impl CommandCompleter {
                 crate::commands::bash::NAME.to_string(),
                 crate::commands::setup::NAME.to_string(),
                 crate::commands::save_history::NAME.to_string(),
-                "/clear".to_string(),
+                "/clear-history".to_string(),
                 "/help".to_string(),
             ],
         }

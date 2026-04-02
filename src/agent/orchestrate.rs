@@ -36,9 +36,10 @@ impl<M: rig::completion::CompletionModel + 'static> Orchestrate<M> {
     }
 
     pub async fn completion(&mut self, input: &str) -> Result<String> {
+        let theme = self.context.theme;
         let mut stream = self.agent.stream_prompt(input).with_history(self.chat_history.clone()).await;
 
-        print!("{}: ", self.agent_name.green().bold());
+        print!("{}: ", theme.green_text(&self.agent_name).bold());
         let mut full_response = String::new();
         let mut active_tools: std::collections::HashMap<String, String> = std::collections::HashMap::new();
 
@@ -61,7 +62,7 @@ impl<M: rig::completion::CompletionModel + 'static> Orchestrate<M> {
                             _ => String::new(),
                         })
                         .collect::<String>();
-                    print!("{}", text.dimmed());
+                    print!("{}", theme.dimmed(&text));
                     let _ = std::io::stdout().flush();
                     full_response.push_str(&text);
                 },
@@ -69,7 +70,7 @@ impl<M: rig::completion::CompletionModel + 'static> Orchestrate<M> {
                     id: _,
                     reasoning,
                 })) => {
-                    print!("{}", reasoning.dimmed());
+                    print!("{}", theme.dimmed(&reasoning));
                     let _ = std::io::stdout().flush();
                     full_response.push_str(&reasoning);
                 },
@@ -77,21 +78,21 @@ impl<M: rig::completion::CompletionModel + 'static> Orchestrate<M> {
                     tool_call, ..
                 })) => {
                     active_tools.insert(tool_call.id.clone(), tool_call.function.name.clone());
-                    display_tool_call(&tool_call.function.name, &tool_call.function.arguments);
+                    display_tool_call(&tool_call.function.name, &tool_call.function.arguments, &theme);
                 },
                 Ok(MultiTurnStreamItem::StreamUserItem(StreamedUserContent::ToolResult { tool_result, .. })) => {
                     let tool_name = active_tools.get(&tool_result.id).cloned().unwrap_or_else(String::new);
                     let json_str = serde_json::to_string(&tool_result).unwrap_or_else(|_| String::new());
 
-                    display_tool_result(&tool_name, &json_str);
+                    display_tool_result(&tool_name, &json_str, &theme);
                 },
                 Ok(MultiTurnStreamItem::FinalResponse(res)) => {
                     if let Some(history) = res.history() {
                         self.chat_history = history.to_vec();
                     }
-                    display_token_usage(&res.usage());
+                    display_token_usage(&res.usage(), &theme);
                 },
-                Err(e) => eprintln!("\n{}: {}", "Error streaming chunk".red(), e),
+                Err(e) => eprintln!("\n{}: {}", theme.red_text("Error streaming_chunk"), e),
                 _ => {},
             }
         }

@@ -21,11 +21,11 @@ pub struct GrepOutput {
 #[derive(thiserror::Error, Debug)]
 pub enum GrepError {
     #[error("Regex error: {0}")]
-    RegexError(#[from] regex::Error),
+    Regex(#[from] regex::Error),
     #[error("Glob error: {0}")]
-    GlobError(#[from] glob::PatternError),
+    Glob(#[from] glob::PatternError),
     #[error("Globset error: {0}")]
-    GlobsetError(#[from] globset::Error),
+    Globset(#[from] globset::Error),
 }
 
 pub struct GrepTool;

@@ -2,6 +2,7 @@ use colored::Colorize;
 use rig::tool::Tool;
 use serde_json::Value;
 
+use crate::theme::Theme;
 use crate::tools::{
     ApplyPatchOutput, ApplyPatchTool, CodeSearchOutput, CodeSearchTool, EditOutput, EditTool, GlobOutput, GlobTool,
     GrepOutput, GrepTool, LsOutput, LsTool, LspOutput, LspTool, MultiEditOutput, MultiEditTool, QuestionOutput,
@@ -34,62 +35,62 @@ pub fn extract_tool_result_raw_text(json_str: &str) -> String {
     raw_text
 }
 
-pub fn format_tool_call_args(tool_name: &str, args: &Value) -> String {
+pub fn format_tool_call_args(tool_name: &str, args: &Value, theme: &Theme) -> String {
     match tool_name {
         ReadFileTool::NAME => {
             let path = args.get("file_path").and_then(|v| v.as_str()).unwrap_or("?");
-            format!("{} {}", tool_name.cyan(), path.yellow())
+            format!("{} {}", theme.cyan_text(tool_name), theme.yellow_text(path))
         },
         WriteFileTool::NAME => {
             let path = args.get("file_path").and_then(|v| v.as_str()).unwrap_or("?");
-            format!("{} {}", tool_name.cyan(), path.yellow())
+            format!("{} {}", theme.cyan_text(tool_name), theme.yellow_text(path))
         },
         ShellCommand::NAME => {
             let cmd = args.get("command").and_then(|v| v.as_str()).unwrap_or("?");
-            format!("{} {}", tool_name.cyan(), cmd.yellow())
+            format!("{} {}", theme.cyan_text(tool_name), theme.yellow_text(cmd))
         },
         GlobTool::NAME => {
             let pattern = args.get("pattern").and_then(|v| v.as_str()).unwrap_or("?");
             let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
-            format!("{} {} in {}", tool_name.cyan(), pattern.yellow(), path.yellow())
+            format!("{} {} in {}", theme.cyan_text(tool_name), theme.yellow_text(pattern), theme.yellow_text(path))
         },
         GrepTool::NAME => {
             let pattern = args.get("pattern").and_then(|v| v.as_str()).unwrap_or("?");
             let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
-            format!("{} {} in {}", tool_name.cyan(), pattern.yellow(), path.yellow())
+            format!("{} {} in {}", theme.cyan_text(tool_name), theme.yellow_text(pattern), theme.yellow_text(path))
         },
         LsTool::NAME => {
             let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
-            format!("{} {}", tool_name.cyan(), path.yellow())
+            format!("{} {}", theme.cyan_text(tool_name), theme.yellow_text(path))
         },
         ApplyPatchTool::NAME | MultiEditTool::NAME | EditTool::NAME => {
             let path = args.get("file_path").and_then(|v| v.as_str()).unwrap_or("?");
-            format!("{} {}", tool_name.cyan(), path.yellow())
+            format!("{} {}", theme.cyan_text(tool_name), theme.yellow_text(path))
         },
         QuestionTool::NAME => {
             let question = args.get("question").and_then(|v| v.as_str()).unwrap_or("?");
-            format!("{} {}", tool_name.cyan(), question.yellow())
+            format!("{} {}", theme.cyan_text(tool_name), theme.yellow_text(question))
         },
         TaskTool::NAME => {
             let desc = args.get("description").and_then(|v| v.as_str()).unwrap_or("?");
-            format!("{} {}", tool_name.cyan(), desc.yellow())
+            format!("{} {}", theme.cyan_text(tool_name), theme.yellow_text(desc))
         },
         WebFetchTool::NAME => {
             let url = args.get("url").and_then(|v| v.as_str()).unwrap_or("?");
-            format!("{} {}", tool_name.cyan(), url.yellow())
+            format!("{} {}", theme.cyan_text(tool_name), theme.yellow_text(url))
         },
         WebSearchTool::NAME | CodeSearchTool::NAME => {
             let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("?");
-            format!("{} {}", tool_name.cyan(), query.yellow())
+            format!("{} {}", theme.cyan_text(tool_name), theme.yellow_text(query))
         },
         LspTool::NAME => {
             let operation = args.get("operation").and_then(|v| v.as_str()).unwrap_or("?");
             let path = args.get("filePath").and_then(|v| v.as_str()).unwrap_or("?");
-            format!("{} {} on {}", tool_name.cyan(), operation.yellow(), path.yellow())
+            format!("{} {} on {}", theme.cyan_text(tool_name), theme.yellow_text(operation), theme.yellow_text(path))
         },
         _ => {
             let args_str = serde_json::to_string_pretty(args).unwrap_or_else(|_| String::new());
-            format!("{} with arguments:\n{}", tool_name.cyan(), args_str.blue())
+            format!("{} with arguments:\n{}", theme.cyan_text(tool_name), theme.blue_text(&args_str))
         },
     }
 }
@@ -233,12 +234,12 @@ pub fn format_tool_result_output(tool_name: &str, raw_text: &str) -> String {
     output_str
 }
 
-pub fn display_tool_call(tool_name: &str, args: &Value) {
-    let formatted_tool = format_tool_call_args(tool_name, args);
-    println!("\n{} {}", "•".cyan().bold(), formatted_tool);
+pub fn display_tool_call(tool_name: &str, args: &Value, theme: &Theme) {
+    let formatted_tool = format_tool_call_args(tool_name, args, theme);
+    println!("\n{} {}", theme.cyan_text("•").bold(), formatted_tool);
 }
 
-pub fn display_tool_result(tool_name: &str, json_str: &str) {
+pub fn display_tool_result(tool_name: &str, json_str: &str, theme: &Theme) {
     let raw_text = extract_tool_result_raw_text(json_str);
     let output_str = format_tool_result_output(tool_name, &raw_text);
 
@@ -247,23 +248,23 @@ pub fn display_tool_result(tool_name: &str, json_str: &str) {
 
     if lines.len() > max_lines {
         for line in lines.iter().take(max_lines) {
-            println!("  {}", line.dimmed());
+            println!("  {}", theme.dimmed(line));
         }
         println!("  ... ({} more lines truncated)", lines.len() - max_lines);
     } else {
         for line in lines {
-            println!("  {}", line.dimmed());
+            println!("  {}", theme.dimmed(line));
         }
     }
 }
 
-pub fn display_token_usage(usage: &rig::completion::Usage) {
+pub fn display_token_usage(usage: &rig::completion::Usage, theme: &Theme) {
     println!(
         "\n\n{} total={} input={} (cached={}) output={}",
-        "Token usage:".dimmed(),
-        usage.total_tokens.to_string().dimmed(),
-        usage.input_tokens.to_string().dimmed(),
-        usage.cached_input_tokens.to_string().dimmed(),
-        usage.output_tokens.to_string().dimmed()
+        theme.dimmed("Token usage:"),
+        theme.dimmed(&usage.total_tokens.to_string()),
+        theme.dimmed(&usage.input_tokens.to_string()),
+        theme.dimmed(&usage.cached_input_tokens.to_string()),
+        theme.dimmed(&usage.output_tokens.to_string())
     );
 }
