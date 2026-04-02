@@ -14,6 +14,7 @@ impl CommandCompleter {
             commands: vec![
                 crate::commands::exit::NAME.to_string(),
                 crate::commands::bash::NAME.to_string(),
+                crate::commands::setup::NAME.to_string(),
                 "/clear".to_string(),
                 "/help".to_string(),
             ],

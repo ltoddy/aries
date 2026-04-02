@@ -56,7 +56,7 @@ impl AppConfigLoader {
         Ok(config)
     }
 
-    async fn save(&self, config: &AppConfig) -> anyhow::Result<()> {
+    pub async fn save(&self, config: &AppConfig) -> anyhow::Result<()> {
         let file_path = self.file_path();
 
         let content = serde_json::to_string_pretty(config)?;

@@ -5,14 +5,13 @@ use rustyline::error::ReadlineError;
 
 mod agent;
 mod commands;
-mod completer;
 mod config;
 mod context;
 mod tools;
 
 use agent::AgentType;
 use agent::orchestrate::Orchestrate;
-use completer::CommandCompleter;
+use commands::completer::CommandCompleter;
 use context::GlobalContext;
 
 #[tokio::main]
@@ -62,6 +61,13 @@ async fn main() -> Result<()> {
                 if input == "/clear" {
                     session.clear_history();
                     println!("{}", "Chat history cleared.".green());
+                    continue;
+                }
+
+                if input == commands::setup::NAME {
+                    if let Err(e) = commands::setup::execute().await {
+                        eprintln!("Error: {}", e);
+                    }
                     continue;
                 }
 
