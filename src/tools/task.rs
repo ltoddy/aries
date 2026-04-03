@@ -48,17 +48,9 @@ impl Tool for TaskTool {
     type Output = TaskOutput;
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
-        let mut desc = include_str!("descriptions/task.txt").to_string();
-        desc = desc.replace(
-            "{agents}",
-            "- default/build: The standard Aries agent with all standard tools\n\
-             - explore: Fast agent specialized for exploring codebases\n\
-             - plan: Planning agent that can read but not edit",
-        );
-
         ToolDefinition {
             name: Self::NAME.to_string(),
-            description: desc,
+            description: include_str!("descriptions/task.txt").to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {

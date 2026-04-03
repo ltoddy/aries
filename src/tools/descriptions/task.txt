@@ -1,7 +1,9 @@
 启动一个新的智能体 (Agent) 来自主处理复杂的多步任务。
 
 可用的智能体类型及其可以访问的工具：
-{agents}
+- default/build: The standard Aries agent with all standard tools
+- explore: Fast agent specialized for exploring codebases
+- plan: Planning agent that can read but not edit
 
 使用 Task 工具时，您必须指定一个 `subagent_type` 参数来选择要使用的智能体类型。
 
