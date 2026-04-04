@@ -34,8 +34,9 @@ async fn main() -> Result<()> {
 
     welcome::welcome(&app_config.model, &context);
 
+    let user = whoami::realname().unwrap_or_default();
     loop {
-        let readline = rl.readline(">> ");
+        let readline = rl.readline(format!("{user} >> ").as_str());
         match readline {
             Ok(line) => {
                 let input = line.trim();

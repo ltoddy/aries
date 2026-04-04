@@ -30,6 +30,7 @@ serde_json = "1.0"
 thiserror = "2.0"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "io-std", "signal"] }
 uuid = { version = "1.23", features = ["v4"] }
+whoami = "2.1"
 
 [profile.dev]
 debug = 0
