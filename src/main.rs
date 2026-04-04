@@ -1,7 +1,3 @@
-use anyhow::{Context, Result};
-use rustyline::Config;
-use rustyline::error::ReadlineError;
-
 mod agent;
 mod commands;
 mod config;
@@ -10,10 +6,13 @@ mod theme;
 mod tools;
 mod welcome;
 
-use agent::AgentType;
-use agent::orchestrate::Orchestrate;
+use anyhow::{Context, Result};
 use commands::completer::CommandCompleter;
-use context::GlobalContext;
+use rustyline::Config;
+use rustyline::error::ReadlineError;
+
+use crate::agent::orchestrate::OrchestrateAgent;
+use crate::context::GlobalContext;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -24,9 +23,7 @@ async fn main() -> Result<()> {
 
     let context = GlobalContext::new(app_config.clone(), current_dir, loader.config_dir().to_path_buf())?;
 
-    let model_name = app_config.model_name.clone();
-    let agent = agent::create(&context, AgentType::Build)?;
-    let mut session = Orchestrate::new(agent, "Aries", context.clone());
+    let mut orchestrate = OrchestrateAgent::new(context.clone())?;
 
     let config = Config::builder().auto_add_history(true).build();
     let mut rl = rustyline::Editor::with_config(config)?;
@@ -35,7 +32,7 @@ async fn main() -> Result<()> {
     let history_file = context.config_dir.join("history.txt");
     let _ = rl.load_history(&history_file);
 
-    welcome::welcome(&model_name, &context);
+    welcome::welcome(&app_config.model, &context);
 
     loop {
         let readline = rl.readline(">> ");
@@ -56,12 +53,12 @@ async fn main() -> Result<()> {
                 }
 
                 if input == commands::save_history::NAME {
-                    commands::save_history::execute(session.chat_history(), &context.theme).await;
+                    commands::save_history::execute(orchestrate.chat_history(), &context.theme).await;
                     continue;
                 }
 
                 if input == commands::clear_history::NAME {
-                    session.clear_history();
+                    orchestrate.clear_history();
                     println!("{}", context.theme.green_text("Chat history cleared."));
                     continue;
                 }
@@ -73,7 +70,7 @@ async fn main() -> Result<()> {
                     continue;
                 }
 
-                if let Err(e) = session.completion(input).await {
+                if let Err(e) = orchestrate.completion(input).await {
                     eprintln!("Error: {}", e);
                 }
             },

@@ -15,7 +15,7 @@ impl AppConfigLoader {
 
     pub async fn new() -> anyhow::Result<Self> {
         let proj_dirs =
-            ProjectDirs::from("", "", "aries").with_context(|| "Failed to determine project directories")?;
+            ProjectDirs::from("", "", env!("CARGO_PKG_NAME")).with_context(|| "Failed to determine project directories")?;
         let config_dir = proj_dirs.config_dir();
 
         if let Some(parent) = config_dir.parent() {

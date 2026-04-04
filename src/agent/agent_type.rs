@@ -58,7 +58,7 @@ impl AgentType {
         }
     }
 
-    pub fn tools(&self, context: &GlobalContext) -> Vec<Box<dyn ToolDyn>> {
+    pub fn tools(&self, context: GlobalContext) -> Vec<Box<dyn ToolDyn>> {
         match self {
             AgentType::Build | AgentType::General => vec![
                 Box::new(ShellCommand),
@@ -72,7 +72,7 @@ impl AgentType {
                 Box::new(EditTool),
                 Box::new(BatchTool::new(context.clone())),
                 Box::new(QuestionTool),
-                Box::new(TaskTool::new(context.clone())),
+                Box::new(TaskTool::new(context)),
                 Box::new(WebFetchTool),
                 Box::new(WebSearchTool),
                 Box::new(LspTool),

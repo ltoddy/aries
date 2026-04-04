@@ -1,8 +1,12 @@
 [package]
-name = "aries"
+name = "Aries"
 version = "0.1.0"
 edition = "2024"
 authors = ["ltoddy <taoliu0509@gmail.com>"]
+
+[[bin]]
+name = "aries"
+path = "src/main.rs"
 
 [dependencies]
 anyhow = "1"

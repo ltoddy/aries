@@ -5,8 +5,7 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::agent::orchestrate::Orchestrate;
-use crate::agent::{AgentType, create};
+use crate::agent::{AgentType, AgentWrapper};
 use crate::context::GlobalContext;
 
 #[derive(Deserialize)]
@@ -85,19 +84,20 @@ impl Tool for TaskTool {
             _ => AgentType::General,
         };
 
-        let agent = create(&self.context, agent_type)
+        let agent = crate::agent::create(self.context.clone(), agent_type)
             .map_err(|e| TaskError::ExecutionError(format!("Failed to create agent: {}", e)))?;
         let agent_name = format!("Subagent [{}]", args.subagent_type);
-        let mut session = Orchestrate::new(agent, &agent_name, self.context.clone());
+
+        let mut agent = AgentWrapper::new(agent_name.clone(), agent, self.context.clone());
 
         let theme = self.context.theme;
         println!("\n{} Starting {} task...", theme.cyan_text("▶").bold(), theme.cyan_text(&agent_name));
 
-        let response = session
-            .completion(&args.prompt)
+        let final_res = agent
+            .completion(&args.prompt, vec![])
             .await
             .map_err(|e| TaskError::ExecutionError(format!("Subagent failed: {}", e)))?;
 
-        Ok(TaskOutput { task_id, result: response })
+        Ok(TaskOutput { task_id, result: final_res.response().to_owned() })
     }
 }
