@@ -1,9 +1,10 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::Context;
+use aries_context::AppConfig;
 use directories::ProjectDirs;
 
-use crate::config::{AppConfig, setup};
+use crate::config::setup;
 
 pub struct AppConfigLoader {
     dir: PathBuf,
@@ -32,10 +33,6 @@ impl AppConfigLoader {
         &self.dir
     }
 
-    pub fn file_path(&self) -> &Path {
-        &self.file_path
-    }
-
     pub async fn load_or_setup(&self) -> anyhow::Result<AppConfig> {
         match self.load().await {
             Ok(config) => Ok(config),
@@ -48,19 +45,15 @@ impl AppConfigLoader {
     }
 
     async fn load(&self) -> anyhow::Result<AppConfig> {
-        let file_path = self.file_path();
-
-        let config = tokio::fs::read_to_string(file_path)
+        let config = tokio::fs::read_to_string(&self.file_path)
             .await
             .and_then(|content| serde_json::from_str::<AppConfig>(&content).map_err(Into::into))?;
         Ok(config)
     }
 
     pub async fn save(&self, config: &AppConfig) -> anyhow::Result<()> {
-        let file_path = self.file_path();
-
         let content = serde_json::to_string_pretty(config)?;
-        tokio::fs::write(&file_path, &content).await?;
+        tokio::fs::write(&self.file_path, &content).await?;
         Ok(())
     }
 }

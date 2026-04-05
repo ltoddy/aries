@@ -1,0 +1,11 @@
+[package]
+name = "aries-context"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+colored.workspace = true
+serde.workspace = true
+tokio = { workspace = true, features = ["fs"] }
+
+dark-light = "2.0"

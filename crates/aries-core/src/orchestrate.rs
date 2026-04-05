@@ -1,11 +1,11 @@
 use std::time::Instant;
 
+use aries_context::GlobalContext;
 use rig::completion::Message;
 use rig::providers::openai;
 
-use crate::agent::compaction::CompactionAgent;
-use crate::agent::{AgentType, AgentWrapper, create};
-use crate::context::GlobalContext;
+use crate::compaction::CompactionAgent;
+use crate::{AgentType, AgentWrapper, create};
 
 pub struct OrchestrateAgent {
     inner: AgentWrapper<openai::CompletionModel>,

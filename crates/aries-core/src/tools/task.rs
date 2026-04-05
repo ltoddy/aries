@@ -1,12 +1,12 @@
 use anyhow::Result;
+use aries_context::GlobalContext;
 use colored::Colorize;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
-use crate::agent::{AgentType, AgentWrapper};
-use crate::context::GlobalContext;
+use crate::AgentWrapper;
+use crate::agent_type::AgentType;
 
 #[derive(Deserialize)]
 #[allow(dead_code)]
@@ -76,7 +76,7 @@ impl Tool for TaskTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        let task_id = args.task_id.unwrap_or_else(|| Uuid::new_v4().to_string());
+        let task_id = args.task_id.unwrap_or_else(|| nanoid::nanoid!());
 
         let agent_type = match args.subagent_type.as_str() {
             "explore" => AgentType::Explore,
@@ -84,7 +84,7 @@ impl Tool for TaskTool {
             _ => AgentType::General,
         };
 
-        let agent = crate::agent::create(self.context.clone(), agent_type)
+        let agent = crate::create(self.context.clone(), agent_type)
             .map_err(|e| TaskError::ExecutionError(format!("Failed to create agent: {}", e)))?;
         let agent_name = format!("Subagent [{}]", args.subagent_type);
 

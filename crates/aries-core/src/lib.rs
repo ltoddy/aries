@@ -2,9 +2,11 @@ pub mod agent_type;
 pub mod compaction;
 pub mod display;
 pub mod orchestrate;
+pub mod tools;
 
 use std::io::Write;
 
+use aries_context::GlobalContext;
 use colored::Colorize;
 use futures::StreamExt;
 use rig::agent::{Agent, FinalResponse, MultiTurnStreamItem, Text};
@@ -15,19 +17,18 @@ use rig::providers::openai::completion::CompletionModel;
 use rig::streaming::{StreamedAssistantContent, StreamedUserContent, StreamingPrompt};
 
 pub use self::agent_type::AgentType;
-use crate::agent::display::{display_token_usage, display_tool_call, display_tool_result};
-use crate::context::GlobalContext;
+use crate::display::{display_token_usage, display_tool_call, display_tool_result};
 
-pub fn create(context: GlobalContext, agent_type: AgentType) -> anyhow::Result<Agent<CompletionModel>> {
-    let api_key = &context.config.api_key;
-    let base_url = &context.config.base_url;
-    let model = &context.config.model;
+pub fn create(gctx: GlobalContext, agent_type: AgentType) -> anyhow::Result<Agent<CompletionModel>> {
+    let api_key = &gctx.config.api_key;
+    let base_url = &gctx.config.base_url;
+    let model = &gctx.config.model;
 
     let client =
         CompletionsClient::builder().api_key(api_key).base_url(base_url).build().map_err(|e| anyhow::anyhow!(e))?;
 
     let preamble = agent_type.system_prompt();
-    let tools = agent_type.tools(context.clone());
+    let tools = agent_type.tools(gctx.clone());
 
     Ok(client.agent(model).preamble(preamble).tools(tools).default_max_turns(200).build())
 }

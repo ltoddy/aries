@@ -1,17 +1,10 @@
 mod loader;
 
+use aries_context::AppConfig;
 use dialoguer::Input;
 use dialoguer::theme::ColorfulTheme;
-use serde::{Deserialize, Serialize};
 
 pub use self::loader::AppConfigLoader;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppConfig {
-    pub api_key: String,
-    pub base_url: String,
-    pub model: String,
-}
 
 pub fn setup() -> anyhow::Result<AppConfig> {
     println!("Welcome to Aries! Let's set up your AI model configuration.");

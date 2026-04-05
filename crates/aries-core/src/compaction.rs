@@ -1,11 +1,11 @@
+use aries_context::GlobalContext;
 use colored::Colorize;
 use rig::agent::Agent;
 use rig::completion::Message;
 use rig::message;
 use rig::message::{AssistantContent, ReasoningContent, UserContent};
 
-use crate::agent::AgentWrapper;
-use crate::context::GlobalContext;
+use crate::AgentWrapper;
 
 pub struct CompactionAgent<M: rig::completion::CompletionModel + 'static> {
     inner: AgentWrapper<M>,

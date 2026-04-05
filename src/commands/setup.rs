@@ -1,5 +1,6 @@
+use aries_context::Theme;
+
 use crate::config::{AppConfigLoader, setup};
-use crate::theme::Theme;
 
 pub const NAME: &str = "/setup";
 

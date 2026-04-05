@@ -1,11 +1,11 @@
 use anyhow::Result;
+use aries_context::GlobalContext;
 use futures::future::join_all;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::context::GlobalContext;
 use crate::tools::*;
 
 #[derive(Deserialize)]

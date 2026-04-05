@@ -1,6 +1,6 @@
+use aries_context::GlobalContext;
 use rig::tool::ToolDyn;
 
-use crate::context::GlobalContext;
 use crate::tools::{
     ApplyPatchTool, BatchTool, CodeSearchTool, EditTool, GlobTool, GrepTool, LsTool, LspTool, MultiEditTool,
     QuestionTool, ReadFileTool, ShellCommand, TaskTool, WebFetchTool, WebSearchTool, WriteFileTool,

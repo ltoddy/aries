@@ -1,6 +1,5 @@
+use aries_context::GlobalContext;
 use colored::Colorize;
-
-use crate::context::GlobalContext;
 
 pub fn welcome(model_name: &str, context: &GlobalContext) {
     let theme = context.theme;

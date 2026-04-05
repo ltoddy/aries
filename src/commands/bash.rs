@@ -1,8 +1,7 @@
 use std::process::Stdio;
 
+use aries_context::Theme;
 use tokio::process::Command;
-
-use crate::theme::Theme;
 
 pub const NAME: &str = "/bash";
 

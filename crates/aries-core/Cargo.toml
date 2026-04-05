@@ -1,0 +1,25 @@
+[package]
+name = "aries-core"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+aries-context = { path = "../aries-context" }
+
+anyhow.workspace = true
+colored.workspace = true
+dialoguer.workspace = true
+futures.workspace = true
+glob.workspace = true
+globset.workspace = true
+ignore.workspace = true
+nanoid.workspace = true
+rig-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["fs", "process"] }
+
+diffy = "0.4"
+regex = "1"
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
+thiserror = "2.0"

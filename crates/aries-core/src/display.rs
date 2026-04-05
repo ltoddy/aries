@@ -1,8 +1,8 @@
+use aries_context::Theme;
 use colored::Colorize;
 use rig::tool::Tool;
 use serde_json::Value;
 
-use crate::theme::Theme;
 use crate::tools::{
     ApplyPatchOutput, ApplyPatchTool, CodeSearchOutput, CodeSearchTool, EditOutput, EditTool, GlobOutput, GlobTool,
     GrepOutput, GrepTool, LsOutput, LsTool, LspOutput, LspTool, MultiEditOutput, MultiEditTool, QuestionOutput,
