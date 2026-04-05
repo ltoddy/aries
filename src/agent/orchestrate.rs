@@ -16,7 +16,7 @@ pub struct OrchestrateAgent {
 
 impl OrchestrateAgent {
     pub fn new(context: GlobalContext) -> anyhow::Result<Self> {
-        let agent = create(context.clone(), AgentType::Build)?;
+        let agent = create(context.clone(), AgentType::Orchestrate)?;
         let name = env!("CARGO_PKG_NAME").to_owned();
         let history = vec![Message::user(format!("当前目录：{}", context.current_dir.display()))];
         let inner = AgentWrapper::new(name, agent, context.clone());

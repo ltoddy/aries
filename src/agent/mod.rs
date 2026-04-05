@@ -48,7 +48,7 @@ where
 
     pub async fn completion(&mut self, input: &str, history: Vec<Message>) -> anyhow::Result<FinalResponse> {
         let theme = self.context.theme;
-        print!("{}: ", theme.green_text(&self.name).bold());
+        println!("{}:", theme.green_text(&self.name).bold());
 
         let mut stream = self.agent.stream_prompt(input).with_history(history).await;
         let mut active_tools: std::collections::HashMap<String, String> = std::collections::HashMap::new();

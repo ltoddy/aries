@@ -260,7 +260,7 @@ pub fn display_tool_result(tool_name: &str, json_str: &str, theme: &Theme) {
 
 pub fn display_token_usage(usage: &rig::completion::Usage, theme: &Theme) {
     println!(
-        "\n\n{} total={} input={} (cached={}) output={}",
+        "\n{} total={} input={} (cached={}) output={}",
         theme.dimmed("Token usage:"),
         theme.dimmed(&usage.total_tokens.to_string()),
         theme.dimmed(&usage.input_tokens.to_string()),

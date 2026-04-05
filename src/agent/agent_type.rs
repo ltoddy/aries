@@ -9,6 +9,7 @@ use crate::tools::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum AgentType {
+    Orchestrate,
     Build,
     Plan,
     General,
@@ -22,6 +23,7 @@ pub enum AgentType {
 impl AgentType {
     pub const fn name(&self) -> &'static str {
         match self {
+            AgentType::Orchestrate => "orchestrate",
             AgentType::Build => "build",
             AgentType::Plan => "plan",
             AgentType::General => "general",
@@ -34,6 +36,7 @@ impl AgentType {
 
     pub const fn description(&self) -> &'static str {
         match self {
+            AgentType::Orchestrate => "编排智能体。负责任务分解和委托，不直接执行操作。",
             AgentType::Build => "默认智能体。根据配置的权限执行工具。",
             AgentType::Plan => "计划模式。不允许使用所有编辑工具。",
             AgentType::General => "用于研究复杂问题和执行多步任务的通用智能体。使用此智能体并行执行多个工作单元。",
@@ -48,6 +51,7 @@ impl AgentType {
 
     pub const fn system_prompt(&self) -> &'static str {
         match self {
+            AgentType::Orchestrate => include_str!("prompts/orchestrate.txt"),
             AgentType::Build => include_str!("prompts/build.txt"),
             AgentType::Plan => include_str!("prompts/plan.txt"),
             AgentType::General => include_str!("prompts/generate.txt"),
@@ -60,6 +64,7 @@ impl AgentType {
 
     pub fn tools(&self, context: GlobalContext) -> Vec<Box<dyn ToolDyn>> {
         match self {
+            AgentType::Orchestrate => vec![Box::new(QuestionTool), Box::new(TaskTool::new(context))],
             AgentType::Build | AgentType::General => vec![
                 Box::new(ShellCommand),
                 Box::new(ReadFileTool),
