@@ -1,4 +1,3 @@
-use aries_context::GlobalContext;
 use colored::Colorize;
 use rig::agent::Agent;
 use rig::completion::Message;
@@ -9,7 +8,6 @@ use crate::AgentWrapper;
 
 pub struct CompactionAgent<M: rig::completion::CompletionModel + 'static> {
     inner: AgentWrapper<M>,
-    context: GlobalContext,
 }
 
 impl<M: rig::completion::CompletionModel + 'static> CompactionAgent<M> {
@@ -19,10 +17,10 @@ impl<M: rig::completion::CompletionModel + 'static> CompactionAgent<M> {
     /// 默认触发压缩的 token 阈值（粗略估算：1 token ≈ 4 个字符）
     pub const TOKEN_THRESHOLD: usize = 80_000;
 
-    pub fn new(agent: Agent<M>, context: GlobalContext) -> Self {
+    pub fn new(agent: Agent<M>) -> Self {
         let name = String::from("Complaction Agent");
-        let inner = AgentWrapper::new(name, agent, context.clone());
-        Self { inner, context }
+        let inner = AgentWrapper::new(name, agent);
+        Self { inner }
     }
 
     pub async fn compact(&mut self, messages: Vec<Message>) -> anyhow::Result<Option<String>> {
@@ -30,7 +28,7 @@ impl<M: rig::completion::CompletionModel + 'static> CompactionAgent<M> {
             return Ok(None);
         }
 
-        let theme = self.context.theme;
+        let theme = aries_context::Theme::default();
         println!("\n{}", theme.yellow_text("🔄 触发自动上下文压缩...").bold());
 
         let compacted = self.compress(&messages);

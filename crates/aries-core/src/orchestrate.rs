@@ -9,7 +9,6 @@ use crate::{AgentType, AgentWrapper, create};
 
 pub struct OrchestrateAgent {
     inner: AgentWrapper<openai::CompletionModel>,
-    context: GlobalContext,
     history: Vec<Message>,
     compaction_agent: CompactionAgent<openai::CompletionModel>,
 }
@@ -19,10 +18,10 @@ impl OrchestrateAgent {
         let agent = create(context.clone(), AgentType::Orchestrate)?;
         let name = env!("CARGO_PKG_NAME").to_owned();
         let history = vec![Message::user(format!("当前目录：{}", context.current_dir.display()))];
-        let inner = AgentWrapper::new(name, agent, context.clone());
-        let compaction_agent = CompactionAgent::new(create(context.clone(), AgentType::Compaction)?, context.clone());
+        let inner = AgentWrapper::new(name, agent);
+        let compaction_agent = CompactionAgent::new(create(context.clone(), AgentType::Compaction)?);
 
-        Ok(Self { inner, context, history, compaction_agent })
+        Ok(Self { inner, history, compaction_agent })
     }
 
     #[inline]
@@ -37,7 +36,7 @@ impl OrchestrateAgent {
 
     pub async fn completion(&mut self, input: &str) -> anyhow::Result<()> {
         let start = Instant::now();
-        let theme = self.context.theme;
+        let theme = aries_context::Theme::default();
 
         let final_res = self.inner.completion(input, self.history.clone()).await?;
         if let Some(history) = final_res.history() {

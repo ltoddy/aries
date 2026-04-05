@@ -42,6 +42,7 @@ async fn main() -> anyhow::Result<()> {
 
     let user = whoami::realname().unwrap_or_default();
     loop {
+        let theme = aries_context::Theme::default();
         let readline = rl.readline(format!("{user} >> ").as_str());
         match readline {
             Ok(line) => {
@@ -55,23 +56,23 @@ async fn main() -> anyhow::Result<()> {
                 }
 
                 if let Some(command) = input.strip_prefix(commands::bash::NAME) {
-                    commands::bash::execute(command, &gctx.theme).await;
+                    commands::bash::execute(command, &theme).await;
                     continue;
                 }
 
                 if input == commands::save_history::NAME {
-                    commands::save_history::execute(orchestrate.chat_history(), &gctx.theme).await;
+                    commands::save_history::execute(orchestrate.chat_history(), &theme).await;
                     continue;
                 }
 
                 if input == commands::clear_history::NAME {
                     orchestrate.clear_history();
-                    println!("{}", gctx.theme.green_text("Chat history cleared."));
+                    println!("{}", theme.green_text("Chat history cleared."));
                     continue;
                 }
 
                 if input == commands::setup::NAME {
-                    if let Err(e) = commands::setup::execute(&gctx.theme).await {
+                    if let Err(e) = commands::setup::execute(&theme).await {
                         eprintln!("Error: {}", e);
                     }
                     continue;

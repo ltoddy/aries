@@ -73,7 +73,9 @@ pub fn format_tool_call_args(tool_name: &str, args: &Value, theme: &Theme) -> St
         },
         TaskTool::NAME => {
             let desc = args.get("description").and_then(|v| v.as_str()).unwrap_or("?");
-            format!("{} {}", theme.cyan_text(tool_name), theme.yellow_text(desc))
+            let subagent_type = args.get("subagent_type").and_then(|v| v.as_str()).unwrap_or("unknown");
+            let agent_name = format!("Subagent [{}]", subagent_type);
+            format!("Starting {} task: {}", theme.cyan_text(&agent_name), theme.yellow_text(desc))
         },
         WebFetchTool::NAME => {
             let url = args.get("url").and_then(|v| v.as_str()).unwrap_or("?");

@@ -10,7 +10,6 @@ pub struct GlobalContext {
     pub current_dir: PathBuf,
     pub home_dir: PathBuf,
     pub config_dir: PathBuf,
-    pub theme: Theme,
     pub config: AppConfig,
 }
 
@@ -24,9 +23,7 @@ impl GlobalContext {
             create_dir_all(parent).await?;
         }
 
-        let theme = Theme::default();
-
-        Ok(Self { current_dir, home_dir, config_dir, theme, config })
+        Ok(Self { current_dir, home_dir, config_dir, config })
     }
 }
 

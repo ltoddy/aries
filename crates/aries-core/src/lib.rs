@@ -16,7 +16,7 @@ use rig::providers::openai::CompletionsClient;
 use rig::providers::openai::completion::CompletionModel;
 use rig::streaming::{StreamedAssistantContent, StreamedUserContent, StreamingPrompt};
 
-pub use self::agent_type::AgentType;
+pub use crate::agent_type::AgentType;
 use crate::display::{display_token_usage, display_tool_call, display_tool_result};
 
 pub fn create(gctx: GlobalContext, agent_type: AgentType) -> anyhow::Result<Agent<CompletionModel>> {
@@ -36,19 +36,18 @@ pub fn create(gctx: GlobalContext, agent_type: AgentType) -> anyhow::Result<Agen
 pub struct AgentWrapper<M: rig::completion::CompletionModel + 'static> {
     name: String,
     agent: Agent<M>,
-    context: GlobalContext,
 }
 
 impl<M> AgentWrapper<M>
 where
     M: rig::completion::CompletionModel + 'static,
 {
-    pub fn new(name: String, agent: Agent<M>, context: GlobalContext) -> Self {
-        Self { name, agent, context }
+    pub fn new(name: String, agent: Agent<M>) -> Self {
+        Self { name, agent }
     }
 
     pub async fn completion(&mut self, input: &str, history: Vec<Message>) -> anyhow::Result<FinalResponse> {
-        let theme = self.context.theme;
+        let theme = aries_context::Theme::default();
         println!("{}:", theme.green_text(&self.name).bold());
 
         let mut stream = self.agent.stream_prompt(input).with_history(history).await;

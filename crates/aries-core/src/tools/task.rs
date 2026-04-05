@@ -1,6 +1,5 @@
 use anyhow::Result;
 use aries_context::GlobalContext;
-use colored::Colorize;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
@@ -88,10 +87,7 @@ impl Tool for TaskTool {
             .map_err(|e| TaskError::ExecutionError(format!("Failed to create agent: {}", e)))?;
         let agent_name = format!("Subagent [{}]", args.subagent_type);
 
-        let mut agent = AgentWrapper::new(agent_name.clone(), agent, self.context.clone());
-
-        let theme = self.context.theme;
-        println!("\n{} Starting {} task...", theme.cyan_text("▶").bold(), theme.cyan_text(&agent_name));
+        let mut agent = AgentWrapper::new(agent_name.clone(), agent);
 
         let final_res = agent
             .completion(&args.prompt, vec![])

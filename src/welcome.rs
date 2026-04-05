@@ -2,7 +2,7 @@ use aries_context::GlobalContext;
 use colored::Colorize;
 
 pub fn welcome(model_name: &str, context: &GlobalContext) {
-    let theme = context.theme;
+    let theme = aries_context::Theme::default();
     let pkg_name = {
         let name = env!("CARGO_PKG_NAME");
         let mut chars = name.chars();
