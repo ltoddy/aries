@@ -1,25 +1,38 @@
+mod acp;
 mod agent;
+mod args;
 mod commands;
 mod config;
 mod context;
+mod logger;
 mod theme;
 mod tools;
 mod welcome;
 
 use anyhow::{Context, Result};
+use clap::Parser;
 use commands::completer::CommandCompleter;
 use rustyline::Config;
 use rustyline::error::ReadlineError;
 
 use crate::agent::orchestrate::OrchestrateAgent;
+use crate::args::{Args, Subcommands};
 use crate::context::GlobalContext;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let current_dir = std::env::current_dir().with_context(|| "无法识别当前目录")?;
-
     let loader = config::AppConfigLoader::new().await?;
     let app_config = loader.load_or_setup().await?;
+
+    logger::init(loader.config_dir());
+
+    let args = Args::parse();
+
+    match args.command {
+        Some(Subcommands::Acp) => return acp::execute().await,
+        None => {},
+    };
 
     let context = GlobalContext::new(app_config.clone(), current_dir, loader.config_dir().to_path_buf())?;
 
