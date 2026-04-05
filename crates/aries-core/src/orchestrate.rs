@@ -1,5 +1,6 @@
 use std::time::Instant;
 
+use aries_config::AriesConfig;
 use aries_context::GlobalContext;
 use rig::completion::Message;
 use rig::providers::openai;
@@ -14,12 +15,12 @@ pub struct OrchestrateAgent {
 }
 
 impl OrchestrateAgent {
-    pub fn new(context: GlobalContext) -> anyhow::Result<Self> {
-        let agent = create(context.clone(), AgentType::Orchestrate)?;
+    pub fn new(context: GlobalContext, config: AriesConfig) -> anyhow::Result<Self> {
+        let agent = create(config.clone(), AgentType::Orchestrate)?;
         let name = env!("CARGO_PKG_NAME").to_owned();
         let history = vec![Message::user(format!("当前目录：{}", context.current_dir.display()))];
         let inner = AgentWrapper::new(name, agent);
-        let compaction_agent = CompactionAgent::new(create(context.clone(), AgentType::Compaction)?);
+        let compaction_agent = CompactionAgent::new(create(config.clone(), AgentType::Compaction)?);
 
         Ok(Self { inner, history, compaction_agent })
     }
@@ -36,7 +37,7 @@ impl OrchestrateAgent {
 
     pub async fn completion(&mut self, input: &str) -> anyhow::Result<()> {
         let start = Instant::now();
-        let theme = aries_context::Theme::default();
+        let theme = aries_theme::Theme::default();
 
         let final_res = self.inner.completion(input, self.history.clone()).await?;
         if let Some(history) = final_res.history() {

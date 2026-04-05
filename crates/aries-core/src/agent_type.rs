@@ -1,4 +1,4 @@
-use aries_context::GlobalContext;
+use aries_config::AriesConfig;
 use rig::tool::ToolDyn;
 
 use crate::tools::{
@@ -62,9 +62,9 @@ impl AgentType {
         }
     }
 
-    pub fn tools(&self, context: GlobalContext) -> Vec<Box<dyn ToolDyn>> {
+    pub fn tools(&self, config: AriesConfig) -> Vec<Box<dyn ToolDyn>> {
         match self {
-            AgentType::Orchestrate => vec![Box::new(QuestionTool), Box::new(TaskTool::new(context))],
+            AgentType::Orchestrate => vec![Box::new(QuestionTool), Box::new(TaskTool::new(config))],
             AgentType::Build | AgentType::General => vec![
                 Box::new(ShellCommand),
                 Box::new(ReadFileTool),
@@ -75,9 +75,9 @@ impl AgentType {
                 Box::new(ApplyPatchTool),
                 Box::new(MultiEditTool),
                 Box::new(EditTool),
-                Box::new(BatchTool::new(context.clone())),
+                Box::new(BatchTool::new(config.clone())),
                 Box::new(QuestionTool),
-                Box::new(TaskTool::new(context)),
+                Box::new(TaskTool::new(config.clone())),
                 Box::new(WebFetchTool),
                 Box::new(WebSearchTool),
                 Box::new(LspTool),

@@ -1,4 +1,4 @@
-use aries_context::Theme;
+use aries_theme::Theme;
 use rig::completion::Message;
 
 pub const NAME: &str = "/save-history";

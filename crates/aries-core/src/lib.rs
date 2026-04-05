@@ -6,7 +6,7 @@ pub mod tools;
 
 use std::io::Write;
 
-use aries_context::GlobalContext;
+use aries_config::AriesConfig;
 use colored::Colorize;
 use futures::StreamExt;
 use rig::agent::{Agent, FinalResponse, MultiTurnStreamItem, Text};
@@ -19,16 +19,16 @@ use rig::streaming::{StreamedAssistantContent, StreamedUserContent, StreamingPro
 pub use crate::agent_type::AgentType;
 use crate::display::{display_token_usage, display_tool_call, display_tool_result};
 
-pub fn create(gctx: GlobalContext, agent_type: AgentType) -> anyhow::Result<Agent<CompletionModel>> {
-    let api_key = &gctx.config.api_key;
-    let base_url = &gctx.config.base_url;
-    let model = &gctx.config.model;
+pub fn create(config: AriesConfig, agent_type: AgentType) -> anyhow::Result<Agent<CompletionModel>> {
+    let api_key = &config.api_key;
+    let base_url = &config.base_url;
+    let model = &config.model;
 
     let client =
         CompletionsClient::builder().api_key(api_key).base_url(base_url).build().map_err(|e| anyhow::anyhow!(e))?;
 
     let preamble = agent_type.system_prompt();
-    let tools = agent_type.tools(gctx.clone());
+    let tools = agent_type.tools(config.clone());
 
     Ok(client.agent(model).preamble(preamble).tools(tools).default_max_turns(200).build())
 }
@@ -47,7 +47,7 @@ where
     }
 
     pub async fn completion(&mut self, input: &str, history: Vec<Message>) -> anyhow::Result<FinalResponse> {
-        let theme = aries_context::Theme::default();
+        let theme = aries_theme::Theme::default();
         println!("{}:", theme.green_text(&self.name).bold());
 
         let mut stream = self.agent.stream_prompt(input).with_history(history).await;

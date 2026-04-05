@@ -1,5 +1,5 @@
 use anyhow::Result;
-use aries_context::GlobalContext;
+use aries_config::AriesConfig;
 use futures::future::join_all;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
@@ -34,12 +34,12 @@ pub enum BatchError {
 }
 
 pub struct BatchTool {
-    pub context: GlobalContext,
+    pub config: AriesConfig,
 }
 
 impl BatchTool {
-    pub fn new(context: GlobalContext) -> Self {
-        Self { context }
+    pub fn new(config: AriesConfig) -> Self {
+        Self { config }
     }
 }
 
@@ -157,7 +157,7 @@ impl Tool for BatchTool {
                         .map_err(|e| e.to_string())
                 } else if tool_name == TaskTool::NAME {
                     let parsed_args = serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
-                    TaskTool::new(self.context.clone())
+                    TaskTool::new(self.config.clone())
                         .call(parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())

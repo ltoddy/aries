@@ -28,7 +28,7 @@ impl<M: rig::completion::CompletionModel + 'static> CompactionAgent<M> {
             return Ok(None);
         }
 
-        let theme = aries_context::Theme::default();
+        let theme = aries_theme::Theme::default();
         println!("\n{}", theme.yellow_text("🔄 触发自动上下文压缩...").bold());
 
         let compacted = self.compress(&messages);
@@ -47,9 +47,6 @@ impl<M: rig::completion::CompletionModel + 'static> CompactionAgent<M> {
 
         for message in messages {
             match message {
-                Message::System { content } => {
-                    prompt.push_str(&format!("[系统]: {content}\n"));
-                },
                 Message::User { content } => prompt.push_str(
                     content
                         .iter()
@@ -84,6 +81,7 @@ impl<M: rig::completion::CompletionModel + 'static> CompactionAgent<M> {
                         .collect::<Vec<_>>()
                         .join("\n");
                 },
+                _ => {},
             }
         }
 

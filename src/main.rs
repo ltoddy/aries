@@ -1,11 +1,12 @@
 mod args;
 mod commands;
-mod config;
 mod logger;
 mod welcome;
 
+use aries_config::AriesConfigLoader;
 use aries_context::GlobalContext;
 use aries_core::orchestrate::OrchestrateAgent;
+use aries_theme::Theme;
 use clap::Parser;
 use commands::completer::CommandCompleter;
 use rustyline::Config;
@@ -15,21 +16,20 @@ use crate::args::{Args, Subcommands};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let loader = config::AppConfigLoader::new().await?;
-    let app_config = loader.load_or_setup().await?;
+    let gctx = GlobalContext::new()?;
+    logger::init(&gctx.config_dir);
 
-    logger::init(loader.config_dir());
+    let loader = AriesConfigLoader::new(&gctx.config_dir);
+    let app_config = loader.load_or_setup().await?;
 
     let args = Args::parse();
 
+    let mut orchestrate = OrchestrateAgent::new(gctx.clone(), app_config.clone())?;
+
     match args.command {
-        Some(Subcommands::Acp) => return aries_acp::execute().await,
+        Some(Subcommands::Acp) => return aries_acp::run(gctx, orchestrate).await,
         None => {},
     };
-
-    let gctx = GlobalContext::new(app_config).await?;
-
-    let mut orchestrate = OrchestrateAgent::new(gctx.clone())?;
 
     let config = Config::builder().auto_add_history(true).build();
     let mut rl = rustyline::Editor::with_config(config)?;
@@ -38,11 +38,11 @@ async fn main() -> anyhow::Result<()> {
     let history_file = gctx.config_dir.join("history.txt");
     let _ = rl.load_history(&history_file);
 
-    welcome::welcome(&gctx.config.model, &gctx);
+    welcome::welcome(&app_config.model, &gctx);
 
     let user = whoami::realname().unwrap_or_default();
     loop {
-        let theme = aries_context::Theme::default();
+        let theme = Theme::default();
         let readline = rl.readline(format!("{user} >> ").as_str());
         match readline {
             Ok(line) => {
@@ -72,7 +72,7 @@ async fn main() -> anyhow::Result<()> {
                 }
 
                 if input == commands::setup::NAME {
-                    if let Err(e) = commands::setup::execute(&theme).await {
+                    if let Err(e) = commands::setup::execute(&theme, &gctx.config_dir).await {
                         eprintln!("Error: {}", e);
                     }
                     continue;

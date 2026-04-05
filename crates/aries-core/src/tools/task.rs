@@ -1,5 +1,5 @@
 use anyhow::Result;
-use aries_context::GlobalContext;
+use aries_config::AriesConfig;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
@@ -30,12 +30,12 @@ pub enum TaskError {
 }
 
 pub struct TaskTool {
-    pub context: GlobalContext,
+    pub config: AriesConfig,
 }
 
 impl TaskTool {
-    pub fn new(context: GlobalContext) -> Self {
-        Self { context }
+    pub fn new(config: AriesConfig) -> Self {
+        Self { config }
     }
 }
 
@@ -83,7 +83,7 @@ impl Tool for TaskTool {
             _ => AgentType::General,
         };
 
-        let agent = crate::create(self.context.clone(), agent_type)
+        let agent = crate::create(self.config.clone(), agent_type)
             .map_err(|e| TaskError::ExecutionError(format!("Failed to create agent: {}", e)))?;
         let agent_name = format!("Subagent [{}]", args.subagent_type);
 

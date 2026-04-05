@@ -1,4 +1,4 @@
-use aries_context::Theme;
+use aries_theme::Theme;
 use colored::Colorize;
 use rig::tool::Tool;
 use serde_json::Value;
