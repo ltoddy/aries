@@ -69,7 +69,11 @@ impl Tool for ShellCommand {
             let line_count = s.lines().count();
             if line_count > max_lines {
                 let truncated: Vec<&str> = s.lines().take(max_lines).collect();
-                *s = format!("{}\n\n... ({} more lines truncated)", truncated.join("\n"), line_count - max_lines);
+                *s = format!(
+                    "{}\n\n... ({} more lines truncated)",
+                    truncated.join("\n"),
+                    line_count - max_lines
+                );
             }
         }
 

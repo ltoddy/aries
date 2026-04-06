@@ -2,8 +2,9 @@ use aries_config::AriesConfig;
 use rig::tool::ToolDyn;
 
 use crate::tools::{
-    ApplyPatchTool, BatchTool, CodeSearchTool, EditTool, GlobTool, GrepTool, LsTool, LspTool, MultiEditTool,
-    QuestionTool, ReadFileTool, ShellCommand, TaskTool, WebFetchTool, WebSearchTool, WriteFileTool,
+    ApplyPatchTool, BatchTool, CodeSearchTool, EditTool, GlobTool, GrepTool, LsTool, LspTool,
+    MultiEditTool, QuestionTool, ReadFileTool, ShellCommand, TaskTool, WebFetchTool, WebSearchTool,
+    WriteFileTool,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,7 +40,9 @@ impl AgentType {
             AgentType::Orchestrate => "编排智能体。负责任务分解和委托，不直接执行操作。",
             AgentType::Build => "默认智能体。根据配置的权限执行工具。",
             AgentType::Plan => "计划模式。不允许使用所有编辑工具。",
-            AgentType::General => "用于研究复杂问题和执行多步任务的通用智能体。使用此智能体并行执行多个工作单元。",
+            AgentType::General => {
+                "用于研究复杂问题和执行多步任务的通用智能体。使用此智能体并行执行多个工作单元。"
+            },
             AgentType::Explore => {
                 "专门用于探索代码库的快速智能体。当您需要通过模式快速查找文件、搜索关键字或回答有关代码库的问题时使用。"
             },

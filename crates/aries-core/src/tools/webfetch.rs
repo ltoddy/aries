@@ -52,12 +52,17 @@ impl Tool for WebFetchTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        let url =
-            if args.url.starts_with("http://") { args.url.replace("http://", "https://") } else { args.url.clone() };
+        let url = if args.url.starts_with("http://") {
+            args.url.replace("http://", "https://")
+        } else {
+            args.url.clone()
+        };
 
-        let response = reqwest::get(&url).await.map_err(|e| WebFetchError::FetchError(e.to_string()))?;
+        let response =
+            reqwest::get(&url).await.map_err(|e| WebFetchError::FetchError(e.to_string()))?;
 
-        let content = response.text().await.map_err(|e| WebFetchError::FetchError(e.to_string()))?;
+        let content =
+            response.text().await.map_err(|e| WebFetchError::FetchError(e.to_string()))?;
 
         // For MVP, we just return raw HTML.
         // A full implementation would use a library like `html2md` to convert it.

@@ -12,7 +12,8 @@ pub struct GlobalContext {
 impl GlobalContext {
     pub fn new() -> io::Result<Self> {
         let current_dir = env::current_dir()?;
-        let home_dir = env::home_dir().ok_or(io::Error::new(io::ErrorKind::NotADirectory, "无法识别 home 目录"))?;
+        let home_dir = env::home_dir()
+            .ok_or(io::Error::new(io::ErrorKind::NotADirectory, "无法识别 home 目录"))?;
         let config_dir = home_dir.join(".local").join("share").join("aries");
 
         if let Some(parent) = config_dir.parent() {

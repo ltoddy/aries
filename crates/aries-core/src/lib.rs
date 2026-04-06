@@ -6,61 +6,119 @@ pub mod tools;
 
 use std::io::Write;
 
+use anyhow::Context;
 use aries_config::AriesConfig;
 use colored::Colorize;
 use futures::StreamExt;
-use rig::agent::{Agent, FinalResponse, MultiTurnStreamItem, Text};
+use rig::agent::{Agent, FinalResponse, MultiTurnStreamItem, StreamingError, Text};
 use rig::client::CompletionClient;
-use rig::completion::Message;
-use rig::providers::openai::CompletionsClient;
-use rig::providers::openai::completion::CompletionModel;
+use rig::completion::{self, Message, Prompt};
+use rig::providers::openai;
 use rig::streaming::{StreamedAssistantContent, StreamedUserContent, StreamingPrompt};
 
-pub use crate::agent_type::AgentType;
+use crate::agent_type::AgentType;
 use crate::display::{display_token_usage, display_tool_call, display_tool_result};
 
-pub fn create(config: AriesConfig, agent_type: AgentType) -> anyhow::Result<Agent<CompletionModel>> {
-    let api_key = &config.api_key;
-    let base_url = &config.base_url;
-    let model = &config.model;
+pub const AGENT_LOOP_MAX_TURNS: usize = 200;
 
-    let client =
-        CompletionsClient::builder().api_key(api_key).base_url(base_url).build().map_err(|e| anyhow::anyhow!(e))?;
-
-    let preamble = agent_type.system_prompt();
-    let tools = agent_type.tools(config.clone());
-
-    Ok(client.agent(model).preamble(preamble).tools(tools).default_max_turns(200).build())
+pub struct AgentWrapper {
+    pub name: String,
+    pub history: Vec<Message>,
+    pub inner: Agent<openai::CompletionModel>,
 }
 
-pub struct AgentWrapper<M: rig::completion::CompletionModel + 'static> {
-    name: String,
-    agent: Agent<M>,
-}
+impl AgentWrapper {
+    pub fn new(
+        name: String,
+        config: AriesConfig,
+        agent_type: AgentType,
+        history: Vec<Message>,
+    ) -> anyhow::Result<Self> {
+        let client = openai::CompletionsClient::builder()
+            .base_url(&config.base_url)
+            .api_key(&config.api_key)
+            .build()
+            .with_context(|| "Failed to create llm client")?;
 
-impl<M> AgentWrapper<M>
-where
-    M: rig::completion::CompletionModel + 'static,
-{
-    pub fn new(name: String, agent: Agent<M>) -> Self {
-        Self { name, agent }
+        let preamble = agent_type.system_prompt();
+        let tools = agent_type.tools(config.clone());
+
+        let inner = client
+            .agent(&config.model)
+            .preamble(preamble)
+            .tools(tools)
+            .default_max_turns(AGENT_LOOP_MAX_TURNS)
+            .build();
+
+        Ok(Self { name, inner, history })
     }
 
-    pub async fn completion(&mut self, input: &str, history: Vec<Message>) -> anyhow::Result<FinalResponse> {
+    #[inline]
+    pub async fn stream_prompt(
+        &mut self,
+        prompt: &str,
+    ) -> impl futures::Stream<
+        Item = Result<
+            MultiTurnStreamItem<
+                <openai::CompletionModel as completion::CompletionModel>::StreamingResponse,
+            >,
+            StreamingError,
+        >,
+    > {
+        let mut stream = self.inner.stream_prompt(prompt).with_history(self.history.clone()).await;
+        async_stream::try_stream! {
+            while let Some(chunk) = stream.next().await {
+                if let Ok(MultiTurnStreamItem::FinalResponse(ref res)) = chunk {
+                    if let Some(history) = res.history() {
+                        self.history = history.to_vec();
+                    }
+                }
+                yield chunk?;
+            }
+        }
+    }
+
+    pub async fn prompt(&mut self, prompt: &str) -> anyhow::Result<String> {
+        let res = self.inner.prompt(prompt).await?;
+        Ok(res)
+    }
+
+    #[inline]
+    pub fn chat_history(&self) -> Vec<Message> {
+        self.history.clone()
+    }
+
+    #[inline]
+    pub fn chat_history_ref(&self) -> &[Message] {
+        &self.history
+    }
+
+    #[inline]
+    pub fn clear_history(&mut self, len: usize) {
+        self.history.truncate(len)
+    }
+
+    pub async fn completion(&mut self, input: &str) -> anyhow::Result<FinalResponse> {
         let theme = aries_theme::Theme::default();
         println!("{}:", theme.green_text(&self.name).bold());
 
-        let mut stream = self.agent.stream_prompt(input).with_history(history).await;
-        let mut active_tools: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        let stream = self.stream_prompt(input).await;
+        tokio::pin!(stream);
+        let mut active_tools: std::collections::HashMap<String, String> =
+            std::collections::HashMap::new();
         let mut final_res = FinalResponse::empty();
 
         while let Some(chunk) = stream.next().await {
             match chunk {
-                Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Text(Text { text }))) => {
+                Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Text(
+                    Text { text },
+                ))) => {
                     print!("{}", text);
                     let _ = std::io::stdout().flush();
                 },
-                Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Reasoning(reasoning))) => {
+                Ok(MultiTurnStreamItem::StreamAssistantItem(
+                    StreamedAssistantContent::Reasoning(reasoning),
+                )) => {
                     let text = reasoning
                         .content
                         .iter()
@@ -75,22 +133,30 @@ where
                     print!("{}", theme.dimmed(&text));
                     let _ = std::io::stdout().flush();
                 },
-                Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::ReasoningDelta {
-                    id: _,
-                    reasoning,
-                })) => {
+                Ok(MultiTurnStreamItem::StreamAssistantItem(
+                    StreamedAssistantContent::ReasoningDelta { id: _, reasoning },
+                )) => {
                     print!("{}", theme.dimmed(&reasoning));
                     let _ = std::io::stdout().flush();
                 },
-                Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::ToolCall {
-                    tool_call, ..
-                })) => {
+                Ok(MultiTurnStreamItem::StreamAssistantItem(
+                    StreamedAssistantContent::ToolCall { tool_call, .. },
+                )) => {
                     active_tools.insert(tool_call.id.clone(), tool_call.function.name.clone());
-                    display_tool_call(&tool_call.function.name, &tool_call.function.arguments, &theme);
+                    display_tool_call(
+                        &tool_call.function.name,
+                        &tool_call.function.arguments,
+                        &theme,
+                    );
                 },
-                Ok(MultiTurnStreamItem::StreamUserItem(StreamedUserContent::ToolResult { tool_result, .. })) => {
-                    let tool_name = active_tools.get(&tool_result.id).cloned().unwrap_or_else(String::new);
-                    let json_str = serde_json::to_string(&tool_result).unwrap_or_else(|_| String::new());
+                Ok(MultiTurnStreamItem::StreamUserItem(StreamedUserContent::ToolResult {
+                    tool_result,
+                    ..
+                })) => {
+                    let tool_name =
+                        active_tools.get(&tool_result.id).cloned().unwrap_or_else(String::new);
+                    let json_str =
+                        serde_json::to_string(&tool_result).unwrap_or_else(|_| String::new());
 
                     display_tool_result(&tool_name, &json_str, &theme);
                 },

@@ -56,8 +56,9 @@ impl Tool for ApplyPatchTool {
             return Err(ApplyPatchError::PatchError("Legacy simplified patch format is no longer supported. Please provide standard unified diff format starting with '--- a/file' and '+++ b/file'".to_string()));
         }
 
-        let patch = Patch::from_str(patch_text)
-            .map_err(|e| ApplyPatchError::PatchError(format!("Failed to parse unified diff: {}", e)))?;
+        let patch = Patch::from_str(patch_text).map_err(|e| {
+            ApplyPatchError::PatchError(format!("Failed to parse unified diff: {}", e))
+        })?;
 
         let mut old_file = String::new();
         let mut new_file = String::new();
@@ -81,33 +82,43 @@ impl Tool for ApplyPatchTool {
 
         if new_file.is_empty() || new_file == "/dev/null" {
             if old_path.exists() {
-                fs::remove_file(old_path)
-                    .await
-                    .map_err(|e| ApplyPatchError::PatchError(format!("Failed to delete file {}: {}", old_file, e)))?;
+                fs::remove_file(old_path).await.map_err(|e| {
+                    ApplyPatchError::PatchError(format!(
+                        "Failed to delete file {}: {}",
+                        old_file, e
+                    ))
+                })?;
             }
-            return Ok(ApplyPatchOutput { success: true, message: format!("Deleted file {}", old_file) });
+            return Ok(ApplyPatchOutput {
+                success: true,
+                message: format!("Deleted file {}", old_file),
+            });
         }
 
         let original_content = if old_path.exists() && old_file != "/dev/null" {
-            fs::read_to_string(old_path)
-                .await
-                .map_err(|e| ApplyPatchError::PatchError(format!("Failed to read file {}: {}", old_file, e)))?
+            fs::read_to_string(old_path).await.map_err(|e| {
+                ApplyPatchError::PatchError(format!("Failed to read file {}: {}", old_file, e))
+            })?
         } else {
             String::new()
         };
 
-        let new_content = apply(&original_content, &patch)
-            .map_err(|e| ApplyPatchError::PatchError(format!("Failed to apply patch to {}: {}", new_file, e)))?;
+        let new_content = apply(&original_content, &patch).map_err(|e| {
+            ApplyPatchError::PatchError(format!("Failed to apply patch to {}: {}", new_file, e))
+        })?;
 
         if let Some(parent) = new_path.parent() {
             fs::create_dir_all(parent).await.map_err(|e| {
-                ApplyPatchError::PatchError(format!("Failed to create directories for {}: {}", new_file, e))
+                ApplyPatchError::PatchError(format!(
+                    "Failed to create directories for {}: {}",
+                    new_file, e
+                ))
             })?;
         }
 
-        fs::write(new_path, new_content)
-            .await
-            .map_err(|e| ApplyPatchError::PatchError(format!("Failed to write to {}: {}", new_file, e)))?;
+        fs::write(new_path, new_content).await.map_err(|e| {
+            ApplyPatchError::PatchError(format!("Failed to write to {}: {}", new_file, e))
+        })?;
 
         let message = if !original_content.is_empty() {
             format!("Successfully updated file {}", new_file)

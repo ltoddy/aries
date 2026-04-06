@@ -1,9 +1,10 @@
 use std::cell::Cell;
 
 use agent_client_protocol::{
-    AuthenticateRequest, AuthenticateResponse, CancelNotification, ContentBlock, ContentChunk, Implementation,
-    InitializeRequest, InitializeResponse, NewSessionRequest, NewSessionResponse, PromptRequest, PromptResponse,
-    ProtocolVersion, SessionNotification, SessionUpdate, StopReason, TextContent,
+    AuthenticateRequest, AuthenticateResponse, CancelNotification, ContentBlock, ContentChunk,
+    Implementation, InitializeRequest, InitializeResponse, NewSessionRequest, NewSessionResponse,
+    PromptRequest, PromptResponse, ProtocolVersion, SessionNotification, SessionUpdate, StopReason,
+    TextContent,
 };
 use aries_core::orchestrate::OrchestrateAgent;
 use async_trait::async_trait;
@@ -29,7 +30,10 @@ impl Agent {
 
 #[async_trait(?Send)]
 impl agent_client_protocol::Agent for Agent {
-    async fn initialize(&self, args: InitializeRequest) -> agent_client_protocol::Result<InitializeResponse> {
+    async fn initialize(
+        &self,
+        args: InitializeRequest,
+    ) -> agent_client_protocol::Result<InitializeResponse> {
         info!("Received initialize request {args:?}");
 
         let info = Implementation::new("aries", "0.1.0").title("Aries Agent");
@@ -37,14 +41,20 @@ impl agent_client_protocol::Agent for Agent {
         Ok(resp)
     }
 
-    async fn authenticate(&self, args: AuthenticateRequest) -> agent_client_protocol::Result<AuthenticateResponse> {
+    async fn authenticate(
+        &self,
+        args: AuthenticateRequest,
+    ) -> agent_client_protocol::Result<AuthenticateResponse> {
         info!("Received authenticate request {args:?}");
 
         let resp = AuthenticateResponse::new();
         Ok(resp)
     }
 
-    async fn new_session(&self, args: NewSessionRequest) -> agent_client_protocol::Result<NewSessionResponse> {
+    async fn new_session(
+        &self,
+        args: NewSessionRequest,
+    ) -> agent_client_protocol::Result<NewSessionResponse> {
         info!("Received new session request {args:?}");
 
         let session_id = self.next_session_id.take();
@@ -60,44 +70,37 @@ impl agent_client_protocol::Agent for Agent {
         let prompt_text = args
             .prompt
             .iter()
-            .filter_map(|block| if let ContentBlock::Text(text) = block { Some(text.text.clone()) } else { None })
+            .filter_map(|block| {
+                if let ContentBlock::Text(text) = block { Some(text.text.clone()) } else { None }
+            })
             .collect::<Vec<_>>()
             .join("\n");
 
         let mut orchestrate = self.orchestrate.lock().await;
-        if let Err(e) = orchestrate.completion(&prompt_text).await {
-            tracing::error!("Orchestrate agent failed: {}", e);
-        }
+        let stream = orchestrate.stream_prompt_v2(&prompt_text);
 
-        let mut response_text = String::new();
-        if let Some(rig::completion::Message::Assistant { content, .. }) = orchestrate.chat_history().last() {
-            response_text = content
-                .iter()
-                .filter_map(|c| match c {
-                    rig::message::AssistantContent::Text(rig::message::Text { text }) => Some(text.clone()),
-                    _ => None,
-                })
-                .collect::<Vec<_>>()
-                .join("\n");
+        tokio::pin!(stream);
+        use futures::StreamExt;
+        while let Some(chunk_res) = stream.next().await {
+            if let Ok(chunk) = chunk_res {
+                let (tx, rx) = oneshot::channel();
+                if self
+                    .sender
+                    .send((
+                        SessionNotification::new(
+                            args.session_id.clone(),
+                            SessionUpdate::AgentMessageChunk(ContentChunk::new(
+                                ContentBlock::Text(TextContent::new(chunk)),
+                            )),
+                        ),
+                        tx,
+                    ))
+                    .is_ok()
+                {
+                    let _ = rx.await;
+                }
+            }
         }
-
-        if response_text.is_empty() {
-            response_text = "Completed".to_string();
-        }
-
-        let (tx, rx) = oneshot::channel();
-        self.sender
-            .send((
-                SessionNotification::new(
-                    args.session_id.clone(),
-                    SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::Text(TextContent::new(
-                        response_text,
-                    )))),
-                ),
-                tx,
-            ))
-            .map_err(|_| agent_client_protocol::Error::internal_error())?;
-        rx.await.map_err(|_| agent_client_protocol::Error::internal_error())?;
 
         let resp = PromptResponse::new(StopReason::EndTurn);
         Ok(resp)

@@ -1,9 +1,10 @@
 use std::path::Path;
 
+use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{EnvFilter, fmt};
 
-pub fn init(dir: &Path) {
+pub fn init(dir: &Path) -> WorkerGuard {
     let log_dir = dir.join("logs");
     let file_appender = tracing_appender::rolling::Builder::new()
         .rotation(tracing_appender::rolling::Rotation::DAILY)
@@ -20,7 +21,5 @@ pub fn init(dir: &Path) {
         .with(fmt::layer())
         .init();
 
-    // Store the guard globally to prevent it from being dropped,
-    // which would stop the background logging thread.
-    Box::leak(Box::new(guard));
+    guard
 }

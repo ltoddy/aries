@@ -86,105 +86,120 @@ impl Tool for BatchTool {
             let future = async move {
                 let tool_name = call.tool.as_str();
                 if tool_name == ShellCommand::NAME {
-                    let parsed_args = serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
+                    let parsed_args =
+                        serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
                     ShellCommand
                         .call(parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
                 } else if tool_name == ReadFileTool::NAME {
-                    let parsed_args = serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
+                    let parsed_args =
+                        serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
                     ReadFileTool
                         .call(parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
                 } else if tool_name == WriteFileTool::NAME {
-                    let parsed_args = serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
+                    let parsed_args =
+                        serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
                     WriteFileTool
                         .call(parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
                 } else if tool_name == GlobTool::NAME {
-                    let parsed_args = serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
+                    let parsed_args =
+                        serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
                     GlobTool
                         .call(parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
                 } else if tool_name == GrepTool::NAME {
-                    let parsed_args = serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
+                    let parsed_args =
+                        serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
                     GrepTool
                         .call(parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
                 } else if tool_name == LsTool::NAME {
-                    let parsed_args = serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
+                    let parsed_args =
+                        serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
                     LsTool
                         .call(parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
                 } else if tool_name == ApplyPatchTool::NAME {
-                    let parsed_args = serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
+                    let parsed_args =
+                        serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
                     ApplyPatchTool
                         .call(parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
                 } else if tool_name == MultiEditTool::NAME {
-                    let parsed_args = serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
+                    let parsed_args =
+                        serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
                     MultiEditTool
                         .call(parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
                 } else if tool_name == EditTool::NAME {
-                    let parsed_args = serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
+                    let parsed_args =
+                        serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
                     EditTool
                         .call(parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
                 } else if tool_name == QuestionTool::NAME {
-                    let parsed_args = serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
+                    let parsed_args =
+                        serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
                     QuestionTool
                         .call(parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
                 } else if tool_name == TaskTool::NAME {
-                    let parsed_args = serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
+                    let parsed_args =
+                        serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
                     TaskTool::new(self.config.clone())
                         .call(parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
                 } else if tool_name == WebFetchTool::NAME {
-                    let parsed_args = serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
+                    let parsed_args =
+                        serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
                     WebFetchTool
                         .call(parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
                 } else if tool_name == WebSearchTool::NAME {
-                    let parsed_args = serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
+                    let parsed_args =
+                        serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
                     WebSearchTool
                         .call(parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
                 } else if tool_name == LspTool::NAME {
-                    let parsed_args = serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
+                    let parsed_args =
+                        serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
                     LspTool
                         .call(parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
                 } else if tool_name == CodeSearchTool::NAME {
-                    let parsed_args = serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
+                    let parsed_args =
+                        serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
                     CodeSearchTool
                         .call(parsed_args)
                         .await

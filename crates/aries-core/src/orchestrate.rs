@@ -1,58 +1,74 @@
-use std::time::Instant;
+use std::ops::{Deref, DerefMut};
 
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
+use aries_theme::Theme;
+use futures::StreamExt;
+use rig::agent::{MultiTurnStreamItem, Text};
 use rig::completion::Message;
-use rig::providers::openai;
+use rig::streaming::StreamedAssistantContent;
 
 use crate::compaction::CompactionAgent;
-use crate::{AgentType, AgentWrapper, create};
+use crate::{AgentType, AgentWrapper};
 
 pub struct OrchestrateAgent {
-    inner: AgentWrapper<openai::CompletionModel>,
-    history: Vec<Message>,
-    compaction_agent: CompactionAgent<openai::CompletionModel>,
+    inner: AgentWrapper,
+    pub compaction_agent: CompactionAgent,
 }
 
 impl OrchestrateAgent {
     pub fn new(context: GlobalContext, config: AriesConfig) -> anyhow::Result<Self> {
-        let agent = create(config.clone(), AgentType::Orchestrate)?;
-        let name = env!("CARGO_PKG_NAME").to_owned();
+        let name = String::from("Aries");
         let history = vec![Message::user(format!("当前目录：{}", context.current_dir.display()))];
-        let inner = AgentWrapper::new(name, agent);
-        let compaction_agent = CompactionAgent::new(create(config.clone(), AgentType::Compaction)?);
 
-        Ok(Self { inner, history, compaction_agent })
+        let inner = AgentWrapper::new(name, config.clone(), AgentType::Orchestrate, history)?;
+        let compaction_agent = CompactionAgent::new(config.clone())?;
+
+        Ok(Self { inner, compaction_agent })
     }
 
-    #[inline]
-    pub fn clear_history(&mut self) {
-        self.history.truncate(1)
-    }
+    pub fn stream_prompt_v2<'a>(
+        &mut self,
+        input: &str,
+    ) -> impl futures::Stream<Item = anyhow::Result<String>> {
+        async_stream::try_stream! {
+            let theme = Theme::default();
 
-    #[inline]
-    pub fn chat_history(&self) -> &[Message] {
-        &self.history
-    }
+            {
+                let stream = self.inner.stream_prompt(input).await;
+                tokio::pin!(stream);
 
-    pub async fn completion(&mut self, input: &str) -> anyhow::Result<()> {
-        let start = Instant::now();
-        let theme = aries_theme::Theme::default();
+                while let Some(chunk) = stream.next().await {
+                    match chunk {
+                        Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Text(Text { text }))) => {
+                            yield text;
+                        },
+                        Ok(MultiTurnStreamItem::FinalResponse(_res)) => { },
+                        Err(e) => eprintln!("\n{}: {}", theme.red_text("Error streaming_chunk"), e),
+                        Ok(_) => {},
+                    }
+                }
+            }
 
-        let final_res = self.inner.completion(input, self.history.clone()).await?;
-        if let Some(history) = final_res.history() {
-            self.history = history.to_vec()
+            let messages = self.inner.history.clone();
+            if let Ok(Some(summary)) = self.compaction_agent.compact(messages).await {
+                self.clear_history(1);
+                self.inner.history.push(Message::assistant(summary));
+            }
         }
+    }
+}
 
-        let elapsed = start.elapsed();
-        println!("{}", theme.dimmed(&format!("⏱️  耗时: {:.2}s", elapsed.as_secs_f64())));
+impl Deref for OrchestrateAgent {
+    type Target = AgentWrapper;
 
-        let messages = self.history.clone();
-        if let Ok(Some(summary)) = self.compaction_agent.compact(messages).await {
-            self.clear_history();
-            self.history.push(Message::assistant(summary));
-        }
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
 
-        Ok(())
+impl DerefMut for OrchestrateAgent {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }

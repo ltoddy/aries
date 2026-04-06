@@ -83,14 +83,13 @@ impl Tool for TaskTool {
             _ => AgentType::General,
         };
 
-        let agent = crate::create(self.config.clone(), agent_type)
-            .map_err(|e| TaskError::ExecutionError(format!("Failed to create agent: {}", e)))?;
-        let agent_name = format!("Subagent [{}]", args.subagent_type);
+        let name = format!("Subagent [{}]", args.subagent_type);
 
-        let mut agent = AgentWrapper::new(agent_name.clone(), agent);
+        let mut agent = AgentWrapper::new(name, self.config.clone(), agent_type, vec![])
+            .map_err(|e| TaskError::ExecutionError(format!("Failed to create agent: {}", e)))?;
 
         let final_res = agent
-            .completion(&args.prompt, vec![])
+            .completion(&args.prompt)
             .await
             .map_err(|e| TaskError::ExecutionError(format!("Subagent failed: {}", e)))?;
 

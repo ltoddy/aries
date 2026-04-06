@@ -1,13 +1,9 @@
 [package]
-name = "Aries"
+name = "aries"
 version = "0.1.0"
 edition = "2024"
 authors = ["ltoddy <taoliu0509@gmail.com>"]
 resolver = "3"
-
-[[bin]]
-name = "aries"
-path = "src/main.rs"
 
 [workspace]
 members = [
@@ -48,6 +44,7 @@ rustyline-derive = "0.12"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 whoami = "2.1"
 tracing-appender = "0.2"
+futures = "0.3.32"
 
 [profile.dev]
 debug = 0
