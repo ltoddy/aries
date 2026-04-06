@@ -41,7 +41,7 @@ clap = { version = "4", features = ["derive"] }
 ferris-says = "0.3.2"
 rustyline = "18.0"
 rustyline-derive = "0.12"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 whoami = "2.1"
 tracing-appender = "0.2"
 futures = "0.3.32"

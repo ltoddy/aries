@@ -17,7 +17,7 @@ pub fn init(dir: &Path) -> WorkerGuard {
 
     tracing_subscriber::registry()
         .with(EnvFilter::from_default_env())
-        .with(fmt::layer().with_writer(non_blocking))
+        .with(fmt::layer().json().with_writer(non_blocking))
         .with(fmt::layer())
         .init();
 

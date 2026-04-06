@@ -8,6 +8,9 @@ use agent_client_protocol::{
 };
 use aries_core::orchestrate::OrchestrateAgent;
 use async_trait::async_trait;
+use futures::StreamExt;
+use rig::agent::{MultiTurnStreamItem, Text};
+use rig::streaming::StreamedAssistantContent;
 use tokio::sync::{Mutex, mpsc, oneshot};
 use tracing::info;
 
@@ -77,28 +80,83 @@ impl agent_client_protocol::Agent for Agent {
             .join("\n");
 
         let mut orchestrate = self.orchestrate.lock().await;
-        let stream = orchestrate.stream_prompt_v2(&prompt_text);
-
+        let stream = orchestrate.stream_prompt(&prompt_text).await;
         tokio::pin!(stream);
-        use futures::StreamExt;
-        while let Some(chunk_res) = stream.next().await {
-            if let Ok(chunk) = chunk_res {
-                let (tx, rx) = oneshot::channel();
-                if self
-                    .sender
-                    .send((
-                        SessionNotification::new(
-                            args.session_id.clone(),
-                            SessionUpdate::AgentMessageChunk(ContentChunk::new(
-                                ContentBlock::Text(TextContent::new(chunk)),
-                            )),
-                        ),
-                        tx,
-                    ))
-                    .is_ok()
-                {
-                    let _ = rx.await;
-                }
+
+        while let Some(chunk) = stream.next().await {
+            match chunk {
+                Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Text(
+                    Text { text },
+                ))) => {
+                    let (tx, rx) = oneshot::channel();
+                    if self
+                        .sender
+                        .send((
+                            SessionNotification::new(
+                                args.session_id.clone(),
+                                SessionUpdate::AgentMessageChunk(ContentChunk::new(
+                                    ContentBlock::Text(TextContent::new(text)),
+                                )),
+                            ),
+                            tx,
+                        ))
+                        .is_ok()
+                    {
+                        let _ = rx.await;
+                    }
+                },
+                Ok(MultiTurnStreamItem::StreamAssistantItem(
+                    StreamedAssistantContent::ReasoningDelta { id: _, reasoning },
+                )) => {
+                    let (tx, rx) = oneshot::channel();
+                    if self
+                        .sender
+                        .send((
+                            SessionNotification::new(
+                                args.session_id.clone(),
+                                SessionUpdate::AgentThoughtChunk(ContentChunk::new(
+                                    ContentBlock::Text(TextContent::new(reasoning)),
+                                )),
+                            ),
+                            tx,
+                        ))
+                        .is_ok()
+                    {
+                        let _ = rx.await;
+                    }
+                },
+                Ok(MultiTurnStreamItem::StreamAssistantItem(
+                    StreamedAssistantContent::Reasoning(reasoning),
+                )) => {
+                    let text = reasoning
+                        .content
+                        .iter()
+                        .map(|c| match c {
+                            rig::message::ReasoningContent::Text { text, .. } => text.clone(),
+                            rig::message::ReasoningContent::Encrypted(s) => s.clone(),
+                            rig::message::ReasoningContent::Redacted { data } => data.clone(),
+                            rig::message::ReasoningContent::Summary(s) => s.clone(),
+                            _ => String::new(),
+                        })
+                        .collect::<String>();
+                    let (tx, rx) = oneshot::channel();
+                    if self
+                        .sender
+                        .send((
+                            SessionNotification::new(
+                                args.session_id.clone(),
+                                SessionUpdate::AgentThoughtChunk(ContentChunk::new(
+                                    ContentBlock::Text(TextContent::new(text)),
+                                )),
+                            ),
+                            tx,
+                        ))
+                        .is_ok()
+                    {
+                        let _ = rx.await;
+                    }
+                },
+                _ => {},
             }
         }
 
