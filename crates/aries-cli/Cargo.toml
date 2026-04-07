@@ -1,0 +1,31 @@
+[package]
+name = "aries"
+version = "0.1.0"
+edition = "2024"
+authors = ["ltoddy <taoliu0509@gmail.com>"]
+
+[[bin]]
+name = "aries"
+path = "main.rs"
+
+[dependencies]
+aries-acp = { path = "../aries-acp" }
+aries-context = { path = "../aries-context" }
+aries-config = { path = "../aries-config" }
+aries-core = { path = "../aries-core" }
+aries-session = { path = "../aries-session" }
+aries-theme = { path = "../aries-theme" }
+
+anyhow.workspace = true
+colored.workspace = true
+dialoguer.workspace = true
+futures.workspace = true
+rig-core.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "fs", "process"] }
+
+clap = { version = "4", features = ["derive"] }
+ferris-says = "0.3.2"
+rustyline = "18.0"
+rustyline-derive = "0.12"
+whoami = "2.1"

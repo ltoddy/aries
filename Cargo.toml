@@ -1,16 +1,6 @@
-[package]
-name = "aries"
-version = "0.1.0"
-edition = "2024"
-authors = ["ltoddy <taoliu0509@gmail.com>"]
-resolver = "3"
-
-[[bin]]
-name = "aries"
-path = "crates/aries-cli/main.rs"
-
 [workspace]
 members = [
+    "crates/aries-cli",
     "crates/aries-acp",
     "crates/aries-config",
     "crates/aries-context",
@@ -18,6 +8,8 @@ members = [
     "crates/aries-session",
     "crates/aries-theme",
 ]
+default-members = ["crates/aries-cli"]
+resolver = "3"
 
 [workspace.dependencies]
 anyhow = "1"
@@ -29,28 +21,6 @@ rig-core = "0.33"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1", default-features = false }
-
-[dependencies]
-aries-acp = { path = "crates/aries-acp" }
-aries-context = { path = "crates/aries-context" }
-aries-config = { path = "crates/aries-config" }
-aries-core = { path = "crates/aries-core" }
-aries-session = { path = "crates/aries-session" }
-aries-theme = { path = "crates/aries-theme" }
-
-anyhow.workspace = true
-colored.workspace = true
-dialoguer.workspace = true
-rig-core.workspace = true
-serde_json.workspace = true
-tokio = { workspace = true, features = ["rt-multi-thread", "macros", "fs", "process"] }
-
-clap = { version = "4", features = ["derive"] }
-ferris-says = "0.3.2"
-rustyline = "18.0"
-rustyline-derive = "0.12"
-whoami = "2.1"
-futures = "0.3.32"
 
 [profile.dev]
 debug = 0
