@@ -1,7 +1,6 @@
 pub mod agent_type;
 pub mod compaction;
 pub mod display;
-pub mod orchestrate;
 pub mod tools;
 
 use std::io::Write;
@@ -23,17 +22,11 @@ pub const AGENT_LOOP_MAX_TURNS: usize = 200;
 
 pub struct AgentWrapper {
     pub name: String,
-    pub history: Vec<Message>,
     pub inner: Agent<openai::CompletionModel>,
 }
 
 impl AgentWrapper {
-    pub fn new(
-        name: String,
-        config: AriesConfig,
-        agent_type: AgentType,
-        history: Vec<Message>,
-    ) -> anyhow::Result<Self> {
+    pub fn new(name: String, config: AriesConfig, agent_type: AgentType) -> anyhow::Result<Self> {
         let client = openai::CompletionsClient::builder()
             .base_url(&config.base_url)
             .api_key(&config.api_key)
@@ -50,13 +43,14 @@ impl AgentWrapper {
             .default_max_turns(AGENT_LOOP_MAX_TURNS)
             .build();
 
-        Ok(Self { name, inner, history })
+        Ok(Self { name, inner })
     }
 
     #[inline]
     pub async fn stream_prompt(
         &mut self,
         prompt: &str,
+        history: &[Message],
     ) -> impl futures::Stream<
         Item = Result<
             MultiTurnStreamItem<
@@ -64,45 +58,24 @@ impl AgentWrapper {
             >,
             StreamingError,
         >,
-    > {
-        let mut stream = self.inner.stream_prompt(prompt).with_history(self.history.clone()).await;
-        async_stream::try_stream! {
-            while let Some(chunk) = stream.next().await {
-                if let Ok(MultiTurnStreamItem::FinalResponse(ref res)) = chunk {
-                    if let Some(history) = res.history() {
-                        self.history = history.to_vec();
-                    }
-                }
-                yield chunk?;
-            }
-        }
+    > + use<> {
+        self.inner.stream_prompt(prompt).with_history(history.to_vec()).await
     }
 
-    pub async fn prompt(&mut self, prompt: &str) -> anyhow::Result<String> {
-        let res = self.inner.prompt(prompt).await?;
+    pub async fn prompt(&mut self, prompt: &str, history: &[Message]) -> anyhow::Result<String> {
+        let res = self.inner.prompt(prompt).with_history(&mut history.to_vec()).await?;
         Ok(res)
     }
 
-    #[inline]
-    pub fn chat_history(&self) -> Vec<Message> {
-        self.history.clone()
-    }
-
-    #[inline]
-    pub fn chat_history_ref(&self) -> &[Message] {
-        &self.history
-    }
-
-    #[inline]
-    pub fn clear_history(&mut self, len: usize) {
-        self.history.truncate(len)
-    }
-
-    pub async fn completion(&mut self, input: &str) -> anyhow::Result<FinalResponse> {
+    pub async fn completion(
+        &mut self,
+        input: &str,
+        history: &[Message],
+    ) -> anyhow::Result<FinalResponse> {
         let theme = aries_theme::Theme::default();
         println!("{}:", theme.green_text(&self.name).bold());
 
-        let stream = self.stream_prompt(input).await;
+        let stream = self.stream_prompt(input, history).await;
         tokio::pin!(stream);
         let mut active_tools: std::collections::HashMap<String, String> =
             std::collections::HashMap::new();
@@ -169,6 +142,7 @@ impl AgentWrapper {
             }
         }
         println!();
+
         Ok(final_res)
     }
 }

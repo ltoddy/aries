@@ -1,13 +1,13 @@
 pub mod agent;
 
 use agent_client_protocol::{AgentSideConnection, Client};
+use aries_config::AriesConfig;
 use aries_context::GlobalContext;
-use aries_core::orchestrate::OrchestrateAgent;
 use tokio::sync::mpsc;
 use tokio_util::compat::{TokioAsyncReadCompatExt as _, TokioAsyncWriteCompatExt as _};
 use tracing::{error, info};
 
-pub async fn run(gctx: GlobalContext, orchestrate: OrchestrateAgent) -> anyhow::Result<()> {
+pub async fn run(gctx: GlobalContext, config: AriesConfig) -> anyhow::Result<()> {
     info!("Current directori is: {}", gctx.current_dir.display());
     let outgoing = tokio::io::stdout().compat_write();
     let incoming = tokio::io::stdin().compat();
@@ -16,7 +16,7 @@ pub async fn run(gctx: GlobalContext, orchestrate: OrchestrateAgent) -> anyhow::
     local_set
         .run_until(async move {
             let (sender, mut receiver) = mpsc::unbounded_channel();
-            let agent = agent::Agent::new(orchestrate, sender);
+            let agent = agent::Agent::new(gctx, config, sender);
 
             let (conn, handle_io) = AgentSideConnection::new(agent, outgoing, incoming, |fut| {
                 tokio::task::spawn_local(fut);

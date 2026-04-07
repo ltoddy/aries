@@ -20,7 +20,7 @@ impl CompactionAgent {
 
     pub fn new(config: AriesConfig) -> anyhow::Result<Self> {
         let name = String::from("Complaction Agent");
-        let inner = AgentWrapper::new(name, config, AgentType::Compaction, vec![])?;
+        let inner = AgentWrapper::new(name, config, AgentType::Compaction)?;
         Ok(Self { inner })
     }
 
@@ -33,7 +33,7 @@ impl CompactionAgent {
         println!("\n{}", theme.yellow_text("🔄 触发自动上下文压缩...").bold());
 
         let compacted = self.compress(&messages);
-        let summary = self.inner.prompt(&compacted).await?;
+        let summary = self.inner.prompt(&compacted, &[]).await?;
 
         if summary.is_empty() {
             return Ok(None);

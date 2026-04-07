@@ -85,14 +85,15 @@ impl Tool for TaskTool {
 
         let name = format!("Subagent [{}]", args.subagent_type);
 
-        let mut agent = AgentWrapper::new(name, self.config.clone(), agent_type, vec![])
+        let mut agent = AgentWrapper::new(name, self.config.clone(), agent_type)
             .map_err(|e| TaskError::ExecutionError(format!("Failed to create agent: {}", e)))?;
 
         let final_res = agent
-            .completion(&args.prompt)
+            .completion(&args.prompt, &[])
             .await
             .map_err(|e| TaskError::ExecutionError(format!("Subagent failed: {}", e)))?;
 
-        Ok(TaskOutput { task_id, result: final_res.response().to_owned() })
+        let res = final_res.response();
+        Ok(TaskOutput { task_id, result: res.to_owned() })
     }
 }

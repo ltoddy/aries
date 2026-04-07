@@ -1,0 +1,14 @@
+[package]
+name = "aries-session"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+aries-context = { path = "../aries-context" }
+aries-config = { path = "../aries-config" }
+aries-core = { path = "../aries-core" }
+
+nanoid.workspace = true
+anyhow.workspace = true
+futures.workspace = true
+rig-core.workspace = true

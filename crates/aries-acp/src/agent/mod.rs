@@ -2,11 +2,13 @@ use std::cell::Cell;
 
 use agent_client_protocol::{
     AuthenticateRequest, AuthenticateResponse, CancelNotification, ContentBlock, ContentChunk,
-    Implementation, InitializeRequest, InitializeResponse, NewSessionRequest, NewSessionResponse,
-    PromptRequest, PromptResponse, ProtocolVersion, SessionNotification, SessionUpdate, StopReason,
-    TextContent,
+    Error, Implementation, InitializeRequest, InitializeResponse, NewSessionRequest,
+    NewSessionResponse, PromptRequest, PromptResponse, ProtocolVersion, SessionNotification,
+    SessionUpdate, StopReason, TextContent,
 };
-use aries_core::orchestrate::OrchestrateAgent;
+use aries_config::AriesConfig;
+use aries_context::GlobalContext;
+use aries_session::SessionManager;
 use async_trait::async_trait;
 use futures::StreamExt;
 use rig::agent::{MultiTurnStreamItem, Text};
@@ -15,19 +17,21 @@ use tokio::sync::{Mutex, mpsc, oneshot};
 use tracing::info;
 
 pub struct Agent {
-    orchestrate: Mutex<OrchestrateAgent>,
+    sessions: Mutex<SessionManager>,
     sender: mpsc::UnboundedSender<(SessionNotification, oneshot::Sender<()>)>,
     next_session_id: Cell<String>,
 }
 
 impl Agent {
     pub fn new(
-        orchestrate: OrchestrateAgent,
+        context: GlobalContext,
+        config: AriesConfig,
         sender: mpsc::UnboundedSender<(SessionNotification, oneshot::Sender<()>)>,
     ) -> Self {
         let next_session_id = Cell::new(nanoid::nanoid!());
+        let sessions = SessionManager::new(context, config);
 
-        Self { orchestrate: Mutex::new(orchestrate), sender, next_session_id }
+        Self { sessions: Mutex::new(sessions), sender, next_session_id }
     }
 }
 
@@ -60,7 +64,8 @@ impl agent_client_protocol::Agent for Agent {
     ) -> agent_client_protocol::Result<NewSessionResponse> {
         info!("Received new session request {args:?}");
 
-        let session_id = self.next_session_id.take();
+        let mut sessions = self.sessions.lock().await;
+        let session_id = sessions.create_session().map_err(|_| Error::internal_error())?;
         self.next_session_id.set(nanoid::nanoid!());
 
         let resp = NewSessionResponse::new(session_id);
@@ -79,8 +84,10 @@ impl agent_client_protocol::Agent for Agent {
             .collect::<Vec<_>>()
             .join("\n");
 
-        let mut orchestrate = self.orchestrate.lock().await;
-        let stream = orchestrate.stream_prompt(&prompt_text).await;
+        let mut sessions = self.sessions.lock().await;
+        let session_id = args.session_id.to_string();
+        let session = sessions.get_session_mut(&session_id).ok_or_else(Error::internal_error)?;
+        let stream = session.stream_prompt(&prompt_text).await;
         tokio::pin!(stream);
 
         while let Some(chunk) = stream.next().await {

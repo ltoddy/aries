@@ -7,9 +7,12 @@ resolver = "3"
 
 [workspace]
 members = [
-    "crates/aries-acp", "crates/aries-config",
+    "crates/aries-acp",
+    "crates/aries-config",
     "crates/aries-context",
-    "crates/aries-core", "crates/aries-theme",
+    "crates/aries-core",
+    "crates/aries-session",
+    "crates/aries-theme",
 ]
 
 [workspace.dependencies]
@@ -28,6 +31,7 @@ aries-acp = { path = "crates/aries-acp" }
 aries-context = { path = "crates/aries-context" }
 aries-config = { path = "crates/aries-config" }
 aries-core = { path = "crates/aries-core" }
+aries-session = { path = "crates/aries-session" }
 aries-theme = { path = "crates/aries-theme" }
 
 anyhow.workspace = true
