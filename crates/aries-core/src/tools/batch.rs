@@ -1,7 +1,9 @@
 use anyhow::Result;
 use aries_config::AriesConfig;
 use futures::future::join_all;
+use rig::agent::PromptHook;
 use rig::completion::ToolDefinition;
+use rig::providers::openai;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -33,17 +35,21 @@ pub enum BatchError {
     ExecutionError(String),
 }
 
-pub struct BatchTool {
+pub struct BatchTool<H = ()> {
     pub config: AriesConfig,
+    pub task_hook: H,
 }
 
-impl BatchTool {
-    pub fn new(config: AriesConfig) -> Self {
-        Self { config }
+impl<H> BatchTool<H> {
+    pub fn new(config: AriesConfig, task_hook: H) -> Self {
+        Self { config, task_hook }
     }
 }
 
-impl Tool for BatchTool {
+impl<H> Tool for BatchTool<H>
+where
+    H: PromptHook<openai::CompletionModel> + Clone + 'static,
+{
     const NAME: &'static str = "batch";
     type Error = BatchError;
     type Args = BatchArgs;
@@ -165,10 +171,10 @@ impl Tool for BatchTool {
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
-                } else if tool_name == TaskTool::NAME {
+                } else if tool_name == TaskTool::<()>::NAME {
                     let parsed_args =
                         serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
-                    TaskTool::new(self.config.clone())
+                    TaskTool::new(self.config.clone(), self.task_hook.clone())
                         .call(parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
@@ -205,7 +211,7 @@ impl Tool for BatchTool {
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
-                } else if tool_name == BatchTool::NAME {
+                } else if tool_name == BatchTool::<()>::NAME {
                     Err("Nested batch calls are not allowed".to_string())
                 } else {
                     Err(format!("Tool '{}' not found or not supported in batch", tool_name))

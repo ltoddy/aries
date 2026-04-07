@@ -1,4 +1,6 @@
 use aries_config::AriesConfig;
+use rig::agent::PromptHook;
+use rig::providers::openai;
 use rig::tool::ToolDyn;
 
 use crate::tools::{
@@ -65,9 +67,14 @@ impl AgentType {
         }
     }
 
-    pub fn tools(&self, config: AriesConfig) -> Vec<Box<dyn ToolDyn>> {
+    pub fn tools<P>(&self, config: AriesConfig, hook: P) -> Vec<Box<dyn ToolDyn>>
+    where
+        P: PromptHook<openai::CompletionModel> + Clone + 'static,
+    {
         match self {
-            AgentType::Orchestrate => vec![Box::new(QuestionTool), Box::new(TaskTool::new(config))],
+            AgentType::Orchestrate => {
+                vec![Box::new(QuestionTool), Box::new(TaskTool::new(config, hook))]
+            },
             AgentType::Build | AgentType::General => vec![
                 Box::new(ShellCommand),
                 Box::new(ReadFileTool),
@@ -78,9 +85,9 @@ impl AgentType {
                 Box::new(ApplyPatchTool),
                 Box::new(MultiEditTool),
                 Box::new(EditTool),
-                Box::new(BatchTool::new(config.clone())),
+                Box::new(BatchTool::new(config.clone(), hook.clone())),
                 Box::new(QuestionTool),
-                Box::new(TaskTool::new(config.clone())),
+                Box::new(TaskTool::new(config.clone(), hook.clone())),
                 Box::new(WebFetchTool),
                 Box::new(WebSearchTool),
                 Box::new(LspTool),

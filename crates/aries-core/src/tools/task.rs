@@ -1,6 +1,9 @@
 use anyhow::Result;
 use aries_config::AriesConfig;
+use futures::StreamExt;
+use rig::agent::PromptHook;
 use rig::completion::ToolDefinition;
+use rig::providers::openai;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 
@@ -29,17 +32,21 @@ pub enum TaskError {
     ExecutionError(String),
 }
 
-pub struct TaskTool {
+pub struct TaskTool<H = ()> {
     pub config: AriesConfig,
+    pub hook: H,
 }
 
-impl TaskTool {
-    pub fn new(config: AriesConfig) -> Self {
-        Self { config }
+impl<H> TaskTool<H> {
+    pub fn new(config: AriesConfig, hook: H) -> Self {
+        Self { config, hook }
     }
 }
 
-impl Tool for TaskTool {
+impl<H> Tool for TaskTool<H>
+where
+    H: PromptHook<openai::CompletionModel> + Clone + 'static,
+{
     const NAME: &'static str = "task";
     type Error = TaskError;
     type Args = TaskArgs;
@@ -85,13 +92,20 @@ impl Tool for TaskTool {
 
         let name = format!("Subagent [{}]", args.subagent_type);
 
-        let mut agent = AgentWrapper::new(name, self.config.clone(), agent_type)
+        let mut agent = AgentWrapper::new(name, self.config.clone(), agent_type, self.hook.clone())
             .map_err(|e| TaskError::ExecutionError(format!("Failed to create agent: {}", e)))?;
 
-        let final_res = agent
-            .completion(&args.prompt, &[])
-            .await
-            .map_err(|e| TaskError::ExecutionError(format!("Subagent failed: {}", e)))?;
+        let stream = agent.stream_prompt(&args.prompt, &[]).await;
+        tokio::pin!(stream);
+        let mut final_res = rig::agent::FinalResponse::empty();
+
+        while let Some(chunk) = stream.next().await {
+            match chunk {
+                Ok(rig::agent::MultiTurnStreamItem::FinalResponse(res)) => final_res = res,
+                Err(e) => return Err(TaskError::ExecutionError(format!("Subagent failed: {}", e))),
+                Ok(_) => {},
+            }
+        }
 
         let res = final_res.response();
         Ok(TaskOutput { task_id, result: res.to_owned() })

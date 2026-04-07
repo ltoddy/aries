@@ -2,49 +2,71 @@ use std::collections::HashMap;
 
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
+use rig::agent::PromptHook;
+use rig::providers::openai;
 
 use crate::Session;
 
-pub struct SessionManager {
-    sessions: HashMap<String, Session>,
+pub struct SessionManager<H = ()> {
+    sessions: HashMap<String, Session<H>>,
     active_session_id: Option<String>,
     context: GlobalContext,
     config: AriesConfig,
+    hook: H,
 }
 
-impl SessionManager {
+impl SessionManager<()> {
     pub fn new(context: GlobalContext, config: AriesConfig) -> Self {
-        Self { sessions: HashMap::new(), active_session_id: None, context, config }
+        Self { sessions: HashMap::new(), active_session_id: None, context, config, hook: () }
+    }
+}
+
+impl<H> SessionManager<H>
+where
+    H: PromptHook<openai::CompletionModel> + Clone + 'static,
+{
+    pub fn new_with_task_hook(context: GlobalContext, config: AriesConfig, hook: H) -> Self {
+        Self { sessions: HashMap::new(), active_session_id: None, context, config, hook }
     }
 
     pub fn create_session(&mut self) -> anyhow::Result<String> {
         let session_id = nanoid::nanoid!();
-        let session = Session::new(session_id.clone(), &self.context, self.config.clone())?;
+        let session = Session::new_with_task_hook(
+            session_id.clone(),
+            &self.context,
+            self.config.clone(),
+            self.hook.clone(),
+        )?;
         self.sessions.insert(session_id.clone(), session);
         self.active_session_id = Some(session_id.clone());
         Ok(session_id)
     }
 
     pub fn insert_session(&mut self, session_id: String) -> anyhow::Result<()> {
-        let session = Session::new(session_id.clone(), &self.context, self.config.clone())?;
+        let session = Session::new_with_task_hook(
+            session_id.clone(),
+            &self.context,
+            self.config.clone(),
+            self.hook.clone(),
+        )?;
         self.sessions.insert(session_id.clone(), session);
         self.active_session_id = Some(session_id);
         Ok(())
     }
 
-    pub fn get_session(&self, session_id: &str) -> Option<&Session> {
+    pub fn get_session(&self, session_id: &str) -> Option<&Session<H>> {
         self.sessions.get(session_id)
     }
 
-    pub fn get_session_mut(&mut self, session_id: &str) -> Option<&mut Session> {
+    pub fn get_session_mut(&mut self, session_id: &str) -> Option<&mut Session<H>> {
         self.sessions.get_mut(session_id)
     }
 
-    pub fn get_active_session(&self) -> Option<&Session> {
+    pub fn get_active_session(&self) -> Option<&Session<H>> {
         self.active_session_id.as_ref().and_then(|id| self.sessions.get(id))
     }
 
-    pub fn get_active_session_mut(&mut self) -> Option<&mut Session> {
+    pub fn get_active_session_mut(&mut self) -> Option<&mut Session<H>> {
         self.active_session_id.as_ref().and_then(|id| self.sessions.get_mut(id))
     }
 
@@ -68,7 +90,7 @@ impl SessionManager {
         }
     }
 
-    pub fn list_sessions(&self) -> Vec<&Session> {
+    pub fn list_sessions(&self) -> Vec<&Session<H>> {
         self.sessions.values().collect()
     }
 

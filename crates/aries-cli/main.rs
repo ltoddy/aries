@@ -1,6 +1,6 @@
 mod args;
 mod commands;
-mod display;
+mod hook;
 mod logger;
 mod welcome;
 
@@ -13,13 +13,13 @@ use aries_theme::Theme;
 use clap::Parser;
 use commands::completer::CommandCompleter;
 use futures::StreamExt;
-use rig::agent::{MultiTurnStreamItem, Text};
-use rig::streaming::{StreamedAssistantContent, StreamedUserContent};
+use rig::agent::MultiTurnStreamItem;
+use rig::streaming::StreamedAssistantContent;
 use rustyline::Config;
 use rustyline::error::ReadlineError;
 
 use crate::args::{Args, Subcommands};
-use crate::display::{display_token_usage, display_tool_call, display_tool_result};
+use crate::hook::{DisplayPromptHook, display_token_usage};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -36,7 +36,13 @@ async fn main() -> anyhow::Result<()> {
         None => {},
     };
 
-    let mut session = Session::new(String::from("main"), &gctx, app_config.clone())?;
+    let init_theme = Theme::default();
+    let mut session = Session::new_with_task_hook(
+        String::from("main"),
+        &gctx,
+        app_config.clone(),
+        DisplayPromptHook::new(init_theme),
+    )?;
 
     let config = Config::builder().auto_add_history(true).build();
     let mut rl = rustyline::Editor::with_config(config)?;
@@ -50,7 +56,7 @@ async fn main() -> anyhow::Result<()> {
     let user = whoami::realname().unwrap_or_default();
     loop {
         let theme = Theme::default();
-        let readline = rl.readline(format!("{user} >> ").as_str());
+        let readline = rl.readline(format!("{user} › ").as_str());
         match readline {
             Ok(line) => {
                 let input = line.trim();
@@ -101,73 +107,49 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn completion(session: &mut Session, input: &str) -> anyhow::Result<()> {
+async fn completion(session: &mut Session<DisplayPromptHook>, input: &str) -> anyhow::Result<()> {
     let start = Instant::now();
     let theme = Theme::default();
     let stream = session.stream_prompt(input).await;
     tokio::pin!(stream);
-    let mut active_tools: std::collections::HashMap<String, String> =
-        std::collections::HashMap::new();
 
     while let Some(chunk) = stream.next().await {
         match chunk {
-            Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Text(
-                Text { text },
-            ))) => {
-                print!("{}", text);
-                let _ = std::io::Write::flush(&mut std::io::stdout());
-            },
             Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Reasoning(
                 reasoning,
-            ))) => {
-                let text = reasoning
-                    .content
-                    .iter()
-                    .map(|c| match c {
-                        rig::message::ReasoningContent::Text { text, .. } => text.clone(),
-                        rig::message::ReasoningContent::Encrypted(s) => s.clone(),
-                        rig::message::ReasoningContent::Redacted { data } => data.clone(),
-                        rig::message::ReasoningContent::Summary(s) => s.clone(),
-                        _ => String::new(),
-                    })
-                    .collect::<String>();
-                print!("{}", theme.dimmed(&text));
-                let _ = std::io::Write::flush(&mut std::io::stdout());
-            },
+            ))) => display_reasoning(&theme, &reasoning.content),
             Ok(MultiTurnStreamItem::StreamAssistantItem(
                 StreamedAssistantContent::ReasoningDelta { id: _, reasoning },
-            )) => {
-                print!("{}", theme.dimmed(&reasoning));
-                let _ = std::io::Write::flush(&mut std::io::stdout());
-            },
-            Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::ToolCall {
-                tool_call,
-                ..
-            })) => {
-                active_tools.insert(tool_call.id.clone(), tool_call.function.name.clone());
-                display_tool_call(&tool_call.function.name, &tool_call.function.arguments, &theme);
-            },
-            Ok(MultiTurnStreamItem::StreamUserItem(StreamedUserContent::ToolResult {
-                tool_result,
-                ..
-            })) => {
-                let tool_name =
-                    active_tools.get(&tool_result.id).cloned().unwrap_or_else(String::new);
-                let json_str =
-                    serde_json::to_string(&tool_result).unwrap_or_else(|_| String::new());
-                display_tool_result(&tool_name, &json_str, &theme);
-            },
+            )) => display_dimmed_text(&theme, &reasoning),
             Ok(MultiTurnStreamItem::FinalResponse(res)) => {
-                display_token_usage(&res.usage(), &theme);
+                display_token_usage(&res.usage(), &theme)
             },
             Err(e) => eprintln!("\n{}: {}", theme.red_text("Error streaming_chunk"), e),
             Ok(_) => {},
         }
     }
-    println!();
 
     let elapsed = start.elapsed();
     println!("{}", theme.dimmed(&format!("⏱️  耗时: {:.2}s", elapsed.as_secs_f64())));
 
     Ok(())
+}
+
+fn display_reasoning(theme: &Theme, content: &[rig::message::ReasoningContent]) {
+    let text = content
+        .iter()
+        .map(|c| match c {
+            rig::message::ReasoningContent::Text { text, .. } => text.clone(),
+            rig::message::ReasoningContent::Encrypted(s) => s.clone(),
+            rig::message::ReasoningContent::Redacted { data } => data.clone(),
+            rig::message::ReasoningContent::Summary(s) => s.clone(),
+            _ => String::new(),
+        })
+        .collect::<String>();
+    display_dimmed_text(theme, &text);
+}
+
+fn display_dimmed_text(theme: &Theme, text: &str) {
+    print!("{}", theme.dimmed(text));
+    let _ = std::io::Write::flush(&mut std::io::stdout());
 }
