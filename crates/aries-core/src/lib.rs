@@ -9,7 +9,7 @@ use anyhow::Context;
 use aries_config::AriesConfig;
 use colored::Colorize;
 use futures::StreamExt;
-use rig::agent::{Agent, FinalResponse, MultiTurnStreamItem, StreamingError, Text};
+use rig::agent::{Agent, FinalResponse, MultiTurnStreamItem, PromptHook, StreamingResult, Text};
 use rig::client::CompletionClient;
 use rig::completion::{self, Message, Prompt};
 use rig::providers::openai;
@@ -17,7 +17,6 @@ use rig::streaming::{StreamedAssistantContent, StreamedUserContent, StreamingPro
 
 use crate::agent_type::AgentType;
 use crate::display::{display_token_usage, display_tool_call, display_tool_result};
-
 pub const AGENT_LOOP_MAX_TURNS: usize = 200;
 
 pub struct AgentWrapper {
@@ -47,23 +46,29 @@ impl AgentWrapper {
     }
 
     #[inline]
-    pub async fn stream_prompt(
+    pub async fn stream_prompt<P>(
         &mut self,
         prompt: &str,
         history: &[Message],
-    ) -> impl futures::Stream<
-        Item = Result<
-            MultiTurnStreamItem<
-                <openai::CompletionModel as completion::CompletionModel>::StreamingResponse,
-            >,
-            StreamingError,
-        >,
-    > + use<> {
-        self.inner.stream_prompt(prompt).with_history(history.to_vec()).await
+        hook: P,
+    ) -> StreamingResult<<openai::CompletionModel as completion::CompletionModel>::StreamingResponse>
+    where
+        P: PromptHook<openai::CompletionModel> + 'static,
+    {
+        self.inner.stream_prompt(prompt).with_history(history.to_vec()).with_hook(hook).await
     }
 
-    pub async fn prompt(&mut self, prompt: &str, history: &[Message]) -> anyhow::Result<String> {
-        let res = self.inner.prompt(prompt).with_history(&mut history.to_vec()).await?;
+    pub async fn prompt<P>(
+        &mut self,
+        prompt: &str,
+        history: &[Message],
+        hook: P,
+    ) -> anyhow::Result<String>
+    where
+        P: PromptHook<openai::CompletionModel> + 'static,
+    {
+        let res =
+            self.inner.prompt(prompt).with_history(&mut history.to_vec()).with_hook(hook).await?;
         Ok(res)
     }
 
@@ -75,7 +80,7 @@ impl AgentWrapper {
         let theme = aries_theme::Theme::default();
         println!("{}:", theme.green_text(&self.name).bold());
 
-        let stream = self.stream_prompt(input, history).await;
+        let stream = self.stream_prompt(input, history, ()).await;
         tokio::pin!(stream);
         let mut active_tools: std::collections::HashMap<String, String> =
             std::collections::HashMap::new();

@@ -61,7 +61,7 @@ impl Session {
     pub async fn stream_prompt(&mut self, prompt: &str) -> SessionPromptStream<'_> {
         let _ = self.compact_if_needed().await;
         let history = self.history.clone();
-        let stream = Box::pin(self.agent.stream_prompt(prompt, &history).await);
+        let stream = Box::pin(self.agent.stream_prompt(prompt, &history, ()).await);
         SessionPromptStream { session: self, stream }
     }
 
