@@ -10,6 +10,7 @@ use aries_theme::Theme;
 use colored::Colorize;
 use rig::agent::{HookAction, PromptHook, ToolCallHookAction};
 use rig::completion::{CompletionModel, CompletionResponse, GetTokenUsage, Message};
+use rig::providers::openai;
 use rig::tool::Tool;
 use serde_json::Value;
 
@@ -112,7 +113,7 @@ pub fn format_tool_call_args(tool_name: &str, args: &Value, theme: &Theme) -> St
             let question = args.get("question").and_then(|v| v.as_str()).unwrap_or("?");
             format!("{} {}", theme.cyan_text(tool_name), theme.yellow_text(question))
         },
-        TaskTool::<()>::NAME => {
+        TaskTool::<openai::CompletionModel, ()>::NAME => {
             let desc = args.get("description").and_then(|v| v.as_str()).unwrap_or("?");
             let subagent_type = args.get("subagent_type").and_then(|v| v.as_str()).unwrap_or("unknown");
             let agent_name = format!("Subagent [{}]", subagent_type);
@@ -224,7 +225,7 @@ pub fn format_tool_result_output(tool_name: &str, raw_text: &str) -> String {
                 output_str = raw_text.to_string();
             }
         },
-        TaskTool::<()>::NAME => {
+        TaskTool::<openai::CompletionModel, ()>::NAME => {
             if let Ok(output) = serde_json::from_str::<TaskOutput>(raw_text) {
                 output_str = output.result;
             } else {

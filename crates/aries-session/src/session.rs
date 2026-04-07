@@ -1,47 +1,19 @@
-use std::pin::Pin;
-use std::task::{Context, Poll};
-
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
 use aries_core::AgentWrapper;
 use aries_core::agent_type::AgentType;
 use aries_core::compaction::CompactionAgent;
-use futures::Stream;
-use rig::agent::{FinalResponse, MultiTurnStreamItem, PromptHook, StreamingError, StreamingResult};
+use rig::agent::{FinalResponse, PromptHook, StreamingResult};
 use rig::completion::{self, Message};
 use rig::providers::openai;
 
-type SessionStreamingResponse = <openai::CompletionModel as completion::CompletionModel>::StreamingResponse;
-
-pub struct SessionPromptStream<'a, H> {
-    session: &'a mut Session<H>,
-    stream: StreamingResult<SessionStreamingResponse>,
-}
-
-impl<H> Unpin for SessionPromptStream<'_, H> {}
-
-impl<H> Stream for SessionPromptStream<'_, H>
+pub struct Session<P = ()>
 where
-    H: PromptHook<openai::CompletionModel> + Clone + 'static,
+    P: PromptHook<openai::CompletionModel>,
 {
-    type Item = Result<MultiTurnStreamItem<SessionStreamingResponse>, StreamingError>;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = self.as_mut().get_mut();
-        match this.stream.as_mut().poll_next(cx) {
-            Poll::Ready(Some(Ok(MultiTurnStreamItem::FinalResponse(response)))) => {
-                this.session.update_history_from_response(&response);
-                Poll::Ready(Some(Ok(MultiTurnStreamItem::FinalResponse(response))))
-            },
-            other => other,
-        }
-    }
-}
-
-pub struct Session<H = ()> {
     id: String,
-    agent: AgentWrapper<H>,
-    compaction_agent: CompactionAgent,
+    agent: AgentWrapper<openai::CompletionModel, P>,
+    compaction_agent: CompactionAgent<openai::CompletionModel>,
     history: Vec<Message>,
     base_history_len: usize,
 }
@@ -50,37 +22,52 @@ impl Session<()> {
     pub fn new(id: String, context: &GlobalContext, config: AriesConfig) -> anyhow::Result<Self> {
         let history = vec![Message::user(format!("当前目录：{}", context.current_dir.display()))];
         let base_history_len = history.len();
-        let agent = AgentWrapper::new(format!("Session Agent {}", id), config.clone(), AgentType::Orchestrate, ())?;
-        let compaction_agent = CompactionAgent::new(config.clone())?;
+        let agent = AgentWrapper::<openai::CompletionModel, ()>::new(
+            format!("Session Agent {}", id),
+            config.clone(),
+            AgentType::Orchestrate,
+            (),
+        )?;
+        let compaction_agent = CompactionAgent::<openai::CompletionModel>::new(config.clone())?;
 
         Ok(Self { id, agent, compaction_agent, history, base_history_len })
     }
 }
 
-impl<H> Session<H>
+impl<P> Session<P>
 where
-    H: PromptHook<openai::CompletionModel> + Clone + 'static,
+    P: PromptHook<openai::CompletionModel> + Clone + 'static,
 {
     pub fn new_with_task_hook(
         id: String,
         context: &GlobalContext,
         config: AriesConfig,
-        task_hook: H,
+        task_hook: P,
     ) -> anyhow::Result<Self> {
         let history = vec![Message::user(format!("当前目录：{}", context.current_dir.display()))];
         let base_history_len = history.len();
-        let agent =
-            AgentWrapper::new(format!("Session Agent {}", id), config.clone(), AgentType::Orchestrate, task_hook)?;
-        let compaction_agent = CompactionAgent::new(config.clone())?;
+        let agent = AgentWrapper::<openai::CompletionModel, P>::new(
+            format!("Session Agent {}", id),
+            config.clone(),
+            AgentType::Orchestrate,
+            task_hook,
+        )?;
+        let compaction_agent = CompactionAgent::<openai::CompletionModel>::new(config.clone())?;
 
         Ok(Self { id, agent, compaction_agent, history, base_history_len })
     }
 
-    pub async fn stream_prompt(&mut self, prompt: &str) -> SessionPromptStream<'_, H> {
+    pub async fn stream_prompt(
+        &mut self,
+        prompt: &str,
+    ) -> StreamingResult<<openai::CompletionModel as completion::CompletionModel>::StreamingResponse> {
         let _ = self.compact_if_needed().await;
         let history = self.history.clone();
-        let stream = Box::pin(self.agent.stream_prompt(prompt, &history).await);
-        SessionPromptStream { session: self, stream }
+        self.agent.stream_prompt(prompt, &history).await
+    }
+
+    pub fn update_history_from_stream(&mut self, response: &FinalResponse) {
+        self.update_history_from_response(response);
     }
 
     pub async fn compact_if_needed(&mut self) -> anyhow::Result<Option<String>> {

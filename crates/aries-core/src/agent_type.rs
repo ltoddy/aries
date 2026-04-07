@@ -1,13 +1,3 @@
-use aries_config::AriesConfig;
-use rig::agent::PromptHook;
-use rig::providers::openai;
-use rig::tool::ToolDyn;
-
-use crate::tools::{
-    ApplyPatchTool, BatchTool, CodeSearchTool, EditTool, GlobTool, GrepTool, LsTool, LspTool, MultiEditTool,
-    QuestionTool, ReadFileTool, ShellCommand, TaskTool, WebFetchTool, WebSearchTool, WriteFileTool,
-};
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum AgentType {
@@ -51,7 +41,7 @@ impl AgentType {
         }
     }
 
-    pub const fn system_prompt(&self) -> &'static str {
+    pub const fn preamble(&self) -> &'static str {
         match self {
             AgentType::Orchestrate => include_str!("prompts/orchestrate.txt"),
             AgentType::Build => include_str!("prompts/build.txt"),
@@ -61,57 +51,6 @@ impl AgentType {
             AgentType::Compaction => include_str!("prompts/compaction.txt"),
             AgentType::Title => include_str!("prompts/title.txt"),
             AgentType::Summary => include_str!("prompts/summary.txt"),
-        }
-    }
-
-    pub fn tools<P>(&self, config: AriesConfig, hook: P) -> Vec<Box<dyn ToolDyn>>
-    where
-        P: PromptHook<openai::CompletionModel> + Clone + 'static,
-    {
-        match self {
-            AgentType::Orchestrate => {
-                vec![Box::new(QuestionTool), Box::new(TaskTool::new(config, hook))]
-            },
-            AgentType::Build | AgentType::General => vec![
-                Box::new(ShellCommand),
-                Box::new(ReadFileTool),
-                Box::new(WriteFileTool),
-                Box::new(GlobTool),
-                Box::new(GrepTool),
-                Box::new(LsTool),
-                Box::new(ApplyPatchTool),
-                Box::new(MultiEditTool),
-                Box::new(EditTool),
-                Box::new(BatchTool::new(config.clone(), hook.clone())),
-                Box::new(QuestionTool),
-                Box::new(TaskTool::new(config.clone(), hook.clone())),
-                Box::new(WebFetchTool),
-                Box::new(WebSearchTool),
-                Box::new(LspTool),
-                Box::new(CodeSearchTool),
-            ],
-            AgentType::Plan => vec![
-                Box::new(ShellCommand),
-                Box::new(ReadFileTool),
-                Box::new(GlobTool),
-                Box::new(GrepTool),
-                Box::new(LsTool),
-                Box::new(QuestionTool),
-                Box::new(WebFetchTool),
-                Box::new(WebSearchTool),
-                Box::new(LspTool),
-                Box::new(CodeSearchTool),
-            ],
-            AgentType::Explore => vec![
-                Box::new(ReadFileTool),
-                Box::new(GlobTool),
-                Box::new(GrepTool),
-                Box::new(LsTool),
-                Box::new(WebFetchTool),
-                Box::new(WebSearchTool),
-                Box::new(CodeSearchTool),
-            ],
-            AgentType::Compaction | AgentType::Title | AgentType::Summary => vec![],
         }
     }
 }

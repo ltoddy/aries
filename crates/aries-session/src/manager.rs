@@ -7,7 +7,10 @@ use rig::providers::openai;
 
 use crate::Session;
 
-pub struct SessionManager<H = ()> {
+pub struct SessionManager<H = ()>
+where
+    H: PromptHook<openai::CompletionModel>,
+{
     sessions: HashMap<String, Session<H>>,
     active_session_id: Option<String>,
     context: GlobalContext,
