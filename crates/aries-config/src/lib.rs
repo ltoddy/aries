@@ -36,9 +36,9 @@ impl AriesConfigLoader {
     }
 
     async fn load(&self) -> anyhow::Result<AriesConfig> {
-        let config = tokio::fs::read_to_string(&self.file_path).await.and_then(|content| {
-            serde_json::from_str::<AriesConfig>(&content).map_err(Into::into)
-        })?;
+        let config = tokio::fs::read_to_string(&self.file_path)
+            .await
+            .and_then(|content| serde_json::from_str::<AriesConfig>(&content).map_err(Into::into))?;
         Ok(config)
     }
 
@@ -61,12 +61,10 @@ pub fn setup() -> anyhow::Result<AriesConfig> {
         Input::with_theme(&theme).with_prompt("base url").allow_empty(false).interact_text()?;
     let base_url = base_url_input.trim().to_owned();
 
-    let api_key_input: String =
-        Input::with_theme(&theme).with_prompt("api key").allow_empty(false).interact_text()?;
+    let api_key_input: String = Input::with_theme(&theme).with_prompt("api key").allow_empty(false).interact_text()?;
     let api_key = api_key_input.trim().to_owned();
 
-    let model_input: String =
-        Input::with_theme(&theme).with_prompt("model").allow_empty(false).interact_text()?;
+    let model_input: String = Input::with_theme(&theme).with_prompt("model").allow_empty(false).interact_text()?;
     let model = model_input.trim().to_owned();
 
     Ok(AriesConfig { api_key, base_url, model })

@@ -11,8 +11,7 @@ use rig::agent::{FinalResponse, MultiTurnStreamItem, PromptHook, StreamingError,
 use rig::completion::{self, Message};
 use rig::providers::openai;
 
-type SessionStreamingResponse =
-    <openai::CompletionModel as completion::CompletionModel>::StreamingResponse;
+type SessionStreamingResponse = <openai::CompletionModel as completion::CompletionModel>::StreamingResponse;
 
 pub struct SessionPromptStream<'a, H> {
     session: &'a mut Session<H>,
@@ -51,12 +50,7 @@ impl Session<()> {
     pub fn new(id: String, context: &GlobalContext, config: AriesConfig) -> anyhow::Result<Self> {
         let history = vec![Message::user(format!("当前目录：{}", context.current_dir.display()))];
         let base_history_len = history.len();
-        let agent = AgentWrapper::new(
-            format!("Session Agent {}", id),
-            config.clone(),
-            AgentType::Orchestrate,
-            (),
-        )?;
+        let agent = AgentWrapper::new(format!("Session Agent {}", id), config.clone(), AgentType::Orchestrate, ())?;
         let compaction_agent = CompactionAgent::new(config.clone())?;
 
         Ok(Self { id, agent, compaction_agent, history, base_history_len })
@@ -75,12 +69,8 @@ where
     ) -> anyhow::Result<Self> {
         let history = vec![Message::user(format!("当前目录：{}", context.current_dir.display()))];
         let base_history_len = history.len();
-        let agent = AgentWrapper::new(
-            format!("Session Agent {}", id),
-            config.clone(),
-            AgentType::Orchestrate,
-            task_hook,
-        )?;
+        let agent =
+            AgentWrapper::new(format!("Session Agent {}", id), config.clone(), AgentType::Orchestrate, task_hook)?;
         let compaction_agent = CompactionAgent::new(config.clone())?;
 
         Ok(Self { id, agent, compaction_agent, history, base_history_len })

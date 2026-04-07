@@ -63,25 +63,19 @@ impl CompactionAgent {
                         .iter()
                         .filter_map(|c| match c {
                             AssistantContent::Text(message::Text { text }) => Some(text.clone()),
-                            AssistantContent::Reasoning(message::Reasoning { content, .. }) => {
-                                Some(
-                                    content
-                                        .iter()
-                                        .filter_map(|rc| match rc {
-                                            ReasoningContent::Text { text, .. } => {
-                                                Some(text.clone())
-                                            },
-                                            ReasoningContent::Encrypted(s) => Some(s.clone()),
-                                            ReasoningContent::Redacted { data } => {
-                                                Some(data.clone())
-                                            },
-                                            ReasoningContent::Summary(s) => Some(s.clone()),
-                                            _ => None,
-                                        })
-                                        .collect::<Vec<_>>()
-                                        .join("\n"),
-                                )
-                            },
+                            AssistantContent::Reasoning(message::Reasoning { content, .. }) => Some(
+                                content
+                                    .iter()
+                                    .filter_map(|rc| match rc {
+                                        ReasoningContent::Text { text, .. } => Some(text.clone()),
+                                        ReasoningContent::Encrypted(s) => Some(s.clone()),
+                                        ReasoningContent::Redacted { data } => Some(data.clone()),
+                                        ReasoningContent::Summary(s) => Some(s.clone()),
+                                        _ => None,
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join("\n"),
+                            ),
                             _ => None,
                         })
                         .collect::<Vec<_>>()

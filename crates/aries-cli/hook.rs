@@ -1,16 +1,15 @@
 use std::io::Write;
 
 use aries_core::tools::{
-    ApplyPatchOutput, ApplyPatchTool, CodeSearchOutput, CodeSearchTool, EditOutput, EditTool,
-    GlobOutput, GlobTool, GrepOutput, GrepTool, LsOutput, LsTool, LspOutput, LspTool,
-    MultiEditOutput, MultiEditTool, QuestionOutput, QuestionTool, ReadFileOutput, ReadFileTool,
-    ShellCommand, ShellCommandOutput, TaskOutput, TaskTool, WebFetchOutput, WebFetchTool,
-    WebSearchOutput, WebSearchTool, WriteFileOutput, WriteFileTool,
+    ApplyPatchOutput, ApplyPatchTool, CodeSearchOutput, CodeSearchTool, EditOutput, EditTool, GlobOutput, GlobTool,
+    GrepOutput, GrepTool, LsOutput, LsTool, LspOutput, LspTool, MultiEditOutput, MultiEditTool, QuestionOutput,
+    QuestionTool, ReadFileOutput, ReadFileTool, ShellCommand, ShellCommandOutput, TaskOutput, TaskTool, WebFetchOutput,
+    WebFetchTool, WebSearchOutput, WebSearchTool, WriteFileOutput, WriteFileTool,
 };
 use aries_theme::Theme;
 use colored::Colorize;
 use rig::agent::{HookAction, PromptHook, ToolCallHookAction};
-use rig::completion::{CompletionModel, CompletionResponse, Message};
+use rig::completion::{CompletionModel, CompletionResponse, GetTokenUsage, Message};
 use rig::tool::Tool;
 use serde_json::Value;
 
@@ -22,6 +21,58 @@ pub struct DisplayPromptHook {
 impl DisplayPromptHook {
     pub fn new(theme: Theme) -> Self {
         Self { theme }
+    }
+}
+
+impl<M: CompletionModel> PromptHook<M> for DisplayPromptHook {
+    async fn on_completion_response(
+        &self,
+        _prompt: &Message,
+        response: &CompletionResponse<M::Response>,
+    ) -> HookAction {
+        display_token_usage(&response.usage, &self.theme);
+        HookAction::cont()
+    }
+
+    async fn on_tool_call(
+        &self,
+        tool_name: &str,
+        _tool_call_id: Option<String>,
+        _internal_call_id: &str,
+        args: &str,
+    ) -> ToolCallHookAction {
+        let args = serde_json::from_str::<Value>(args).unwrap_or_else(|_| Value::String(args.to_string()));
+        display_tool_call(tool_name, &args, &self.theme);
+        ToolCallHookAction::cont()
+    }
+
+    async fn on_tool_result(
+        &self,
+        tool_name: &str,
+        _tool_call_id: Option<String>,
+        _internal_call_id: &str,
+        _args: &str,
+        result: &str,
+    ) -> HookAction {
+        display_tool_result_output(tool_name, result, &self.theme);
+        HookAction::cont()
+    }
+
+    async fn on_text_delta(&self, text_delta: &str, _aggregated_text: &str) -> HookAction {
+        print!("{}", text_delta);
+        let _ = std::io::stdout().flush();
+        HookAction::cont()
+    }
+
+    async fn on_stream_completion_response_finish(
+        &self,
+        _prompt: &Message,
+        response: &<M as CompletionModel>::StreamingResponse,
+    ) -> HookAction {
+        if let Some(usage) = response.token_usage() {
+            display_token_usage(&usage, &self.theme);
+        }
+        HookAction::cont()
     }
 }
 
@@ -42,22 +93,12 @@ pub fn format_tool_call_args(tool_name: &str, args: &Value, theme: &Theme) -> St
         GlobTool::NAME => {
             let pattern = args.get("pattern").and_then(|v| v.as_str()).unwrap_or("?");
             let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
-            format!(
-                "{} {} in {}",
-                theme.cyan_text(tool_name),
-                theme.yellow_text(pattern),
-                theme.yellow_text(path)
-            )
+            format!("{} {} in {}", theme.cyan_text(tool_name), theme.yellow_text(pattern), theme.yellow_text(path))
         },
         GrepTool::NAME => {
             let pattern = args.get("pattern").and_then(|v| v.as_str()).unwrap_or("?");
             let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
-            format!(
-                "{} {} in {}",
-                theme.cyan_text(tool_name),
-                theme.yellow_text(pattern),
-                theme.yellow_text(path)
-            )
+            format!("{} {} in {}", theme.cyan_text(tool_name), theme.yellow_text(pattern), theme.yellow_text(path))
         },
         LsTool::NAME => {
             let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
@@ -73,8 +114,7 @@ pub fn format_tool_call_args(tool_name: &str, args: &Value, theme: &Theme) -> St
         },
         TaskTool::<()>::NAME => {
             let desc = args.get("description").and_then(|v| v.as_str()).unwrap_or("?");
-            let subagent_type =
-                args.get("subagent_type").and_then(|v| v.as_str()).unwrap_or("unknown");
+            let subagent_type = args.get("subagent_type").and_then(|v| v.as_str()).unwrap_or("unknown");
             let agent_name = format!("Subagent [{}]", subagent_type);
             format!("Starting {} task: {}", theme.cyan_text(&agent_name), theme.yellow_text(desc))
         },
@@ -89,20 +129,11 @@ pub fn format_tool_call_args(tool_name: &str, args: &Value, theme: &Theme) -> St
         LspTool::NAME => {
             let operation = args.get("operation").and_then(|v| v.as_str()).unwrap_or("?");
             let path = args.get("filePath").and_then(|v| v.as_str()).unwrap_or("?");
-            format!(
-                "{} {} on {}",
-                theme.cyan_text(tool_name),
-                theme.yellow_text(operation),
-                theme.yellow_text(path)
-            )
+            format!("{} {} on {}", theme.cyan_text(tool_name), theme.yellow_text(operation), theme.yellow_text(path))
         },
         _ => {
             let args_str = serde_json::to_string_pretty(args).unwrap_or_else(|_| String::new());
-            format!(
-                "{} with arguments:\n{}",
-                theme.cyan_text(tool_name),
-                theme.blue_text(&args_str)
-            )
+            format!("{} with arguments:\n{}", theme.cyan_text(tool_name), theme.blue_text(&args_str))
         },
     }
 }
@@ -278,55 +309,4 @@ pub fn display_token_usage(usage: &rig::completion::Usage, theme: &Theme) {
         theme.dimmed(&usage.cached_input_tokens.to_string()),
         theme.dimmed(&usage.output_tokens.to_string())
     );
-}
-
-impl<M: CompletionModel> PromptHook<M> for DisplayPromptHook {
-    async fn on_completion_response(
-        &self,
-        _prompt: &Message,
-        response: &CompletionResponse<M::Response>,
-    ) -> HookAction {
-        display_token_usage(&response.usage, &self.theme);
-        HookAction::cont()
-    }
-
-    async fn on_tool_call(
-        &self,
-        tool_name: &str,
-        _tool_call_id: Option<String>,
-        _internal_call_id: &str,
-        args: &str,
-    ) -> ToolCallHookAction {
-        let args =
-            serde_json::from_str::<Value>(args).unwrap_or_else(|_| Value::String(args.to_string()));
-        display_tool_call(tool_name, &args, &self.theme);
-        ToolCallHookAction::cont()
-    }
-
-    async fn on_tool_result(
-        &self,
-        tool_name: &str,
-        _tool_call_id: Option<String>,
-        _internal_call_id: &str,
-        _args: &str,
-        result: &str,
-    ) -> HookAction {
-        display_tool_result_output(tool_name, result, &self.theme);
-        HookAction::cont()
-    }
-
-    async fn on_text_delta(&self, text_delta: &str, _aggregated_text: &str) -> HookAction {
-        print!("{}", text_delta);
-        let _ = std::io::stdout().flush();
-        HookAction::cont()
-    }
-
-    async fn on_stream_completion_response_finish(
-        &self,
-        _prompt: &Message,
-        _response: &<M as CompletionModel>::StreamingResponse,
-    ) -> HookAction {
-        println!();
-        HookAction::cont()
-    }
 }

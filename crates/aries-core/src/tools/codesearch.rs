@@ -118,14 +118,10 @@ impl Tool for CodeSearchTool {
         if !response.status().is_success() {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            return Err(CodeSearchError::SearchError(format!(
-                "Code search error ({}): {}",
-                status, text
-            )));
+            return Err(CodeSearchError::SearchError(format!("Code search error ({}): {}", status, text)));
         }
 
-        let response_text =
-            response.text().await.map_err(|e| CodeSearchError::SearchError(e.to_string()))?;
+        let response_text = response.text().await.map_err(|e| CodeSearchError::SearchError(e.to_string()))?;
 
         // Parse SSE response
         for line in response_text.lines() {

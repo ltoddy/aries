@@ -62,11 +62,8 @@ impl Tool for ReadFileTool {
             .skip(offset)
             .take(2000) // Default limit as per prompt
             .map(|(i, line)| {
-                let truncated_line = if line.len() > 2000 {
-                    format!("{}... (truncated)", &line[..2000])
-                } else {
-                    line.to_string()
-                };
+                let truncated_line =
+                    if line.len() > 2000 { format!("{}... (truncated)", &line[..2000]) } else { line.to_string() };
                 format!("{}: {}\n", i + 1, truncated_line)
             })
             .collect();

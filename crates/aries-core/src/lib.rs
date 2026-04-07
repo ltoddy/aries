@@ -24,12 +24,7 @@ impl<P> AgentWrapper<P>
 where
     P: PromptHook<openai::CompletionModel> + Clone + 'static,
 {
-    pub fn new(
-        name: String,
-        config: AriesConfig,
-        agent_type: AgentType,
-        hook: P,
-    ) -> anyhow::Result<Self> {
+    pub fn new(name: String, config: AriesConfig, agent_type: AgentType, hook: P) -> anyhow::Result<Self> {
         let client = openai::CompletionsClient::builder()
             .base_url(&config.base_url)
             .api_key(&config.api_key)
@@ -39,12 +34,8 @@ where
         let preamble = agent_type.system_prompt();
         let tools = agent_type.tools(config.clone(), hook.clone());
 
-        let inner = client
-            .agent(&config.model)
-            .preamble(preamble)
-            .tools(tools)
-            .default_max_turns(AGENT_LOOP_MAX_TURNS)
-            .build();
+        let inner =
+            client.agent(&config.model).preamble(preamble).tools(tools).default_max_turns(AGENT_LOOP_MAX_TURNS).build();
 
         Ok(Self { name, inner, hook })
     }
@@ -54,22 +45,12 @@ where
         &mut self,
         prompt: &str,
         history: &[Message],
-    ) -> StreamingResult<<openai::CompletionModel as completion::CompletionModel>::StreamingResponse>
-    {
-        self.inner
-            .stream_prompt(prompt)
-            .with_history(history.to_vec())
-            .with_hook(self.hook.clone())
-            .await
+    ) -> StreamingResult<<openai::CompletionModel as completion::CompletionModel>::StreamingResponse> {
+        self.inner.stream_prompt(prompt).with_history(history.to_vec()).with_hook(self.hook.clone()).await
     }
 
     pub async fn prompt(&mut self, prompt: &str, history: &[Message]) -> anyhow::Result<String> {
-        let res = self
-            .inner
-            .prompt(prompt)
-            .with_history(&mut history.to_vec())
-            .with_hook(self.hook.clone())
-            .await?;
+        let res = self.inner.prompt(prompt).with_history(&mut history.to_vec()).with_hook(self.hook.clone()).await?;
         Ok(res)
     }
 }

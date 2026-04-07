@@ -5,7 +5,6 @@ edition = "2024"
 
 [dependencies]
 aries-config = { path = "../aries-config" }
-aries-context = { path = "../aries-context" }
 aries-theme = { path = "../aries-theme" }
 
 anyhow.workspace = true
@@ -25,4 +24,3 @@ ignore = "0.4"
 regex = "1"
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
 thiserror = "2.0"
-async-stream = "0.3.6"

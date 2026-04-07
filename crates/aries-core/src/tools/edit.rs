@@ -68,9 +68,7 @@ impl Tool for EditTool {
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         if !args.file_path.exists() {
-            return Err(EditError::EditError(
-                "File does not exist. Use write_file to create new files.".to_string(),
-            ));
+            return Err(EditError::EditError("File does not exist. Use write_file to create new files.".to_string()));
         }
 
         let content = fs::read_to_string(&args.file_path)
@@ -78,9 +76,7 @@ impl Tool for EditTool {
             .map_err(|e| EditError::EditError(format!("Failed to read file: {}", e)))?;
 
         if args.old_string == args.new_string {
-            return Err(EditError::EditError(
-                "oldString and newString cannot be identical".to_string(),
-            ));
+            return Err(EditError::EditError("oldString and newString cannot be identical".to_string()));
         }
 
         if !content.contains(&args.old_string) {
