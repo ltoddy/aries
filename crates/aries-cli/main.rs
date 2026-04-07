@@ -11,7 +11,6 @@ use aries_context::GlobalContext;
 use aries_session::Session;
 use aries_theme::Theme;
 use clap::Parser;
-use futures::StreamExt;
 use rustyline::error::ReadlineError;
 
 use crate::args::{Args, Subcommands};
@@ -41,7 +40,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut rl = InputReader::new(&gctx.config_dir)?;
 
-    welcome::welcome(&app_config.model, &gctx);
+    welcome::welcome(app_config.provider(), app_config.model(), &gctx);
 
     let user = whoami::realname().unwrap_or_default();
     loop {
@@ -83,12 +82,9 @@ async fn main() -> anyhow::Result<()> {
 
                 let start = Instant::now();
                 let theme = Theme::default();
-                let stream = session.stream_prompt(input).await;
-                tokio::pin!(stream);
-                while let Some(chunk) = stream.next().await {
-                    if let Err(err) = chunk {
-                        eprintln!("\n{}: {}", theme.red_text("Error streaming_chunk"), err)
-                    }
+                if let Err(err) = session.prompt(input, |_| async { Ok(()) }).await {
+                    eprintln!("\n{}: {}", theme.red_text("Error streaming_chunk"), err);
+                    continue;
                 }
 
                 let elapsed = start.elapsed();

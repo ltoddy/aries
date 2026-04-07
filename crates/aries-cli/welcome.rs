@@ -2,7 +2,7 @@ use aries_context::GlobalContext;
 use aries_theme::Theme;
 use colored::Colorize;
 
-pub fn welcome(model_name: &str, context: &GlobalContext) {
+pub fn welcome(provider: &str, model: &str, context: &GlobalContext) {
     let theme = Theme::default();
     let pkg_name = {
         let name = env!("CARGO_PKG_NAME");
@@ -14,10 +14,11 @@ pub fn welcome(model_name: &str, context: &GlobalContext) {
     };
 
     let message = format!(
-        "{} {}  model {}  dir {}",
+        "{} {}  provider {}  model {}  dir {}",
         pkg_name,
         env!("CARGO_PKG_VERSION"),
-        model_name,
+        provider,
+        model,
         context.current_dir.display()
     );
 
@@ -26,10 +27,11 @@ pub fn welcome(model_name: &str, context: &GlobalContext) {
     if let Err(e) = ferris_says::say(&message, width, &mut output) {
         eprintln!("ferris_says error: {}", e);
         println!(
-            "{} {} | model {} | dir {}",
+            "{} {} | provider {} | model {} | dir {}",
             env!("CARGO_PKG_NAME"),
             env!("CARGO_PKG_VERSION"),
-            model_name,
+            provider,
+            model,
             context.current_dir.display()
         );
         return;

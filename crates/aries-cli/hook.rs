@@ -280,7 +280,7 @@ pub fn format_tool_result_output(tool_name: &str, raw_text: &str) -> String {
 
 pub fn display_tool_call(tool_name: &str, args: &Value, theme: &Theme) {
     let formatted_tool = format_tool_call_args(tool_name, args, theme);
-    println!("\n{} {}", theme.cyan_text("•").bold(), formatted_tool);
+    println!("{} {}", theme.cyan_text("•").bold(), formatted_tool);
 }
 
 pub fn display_tool_result_output(tool_name: &str, raw_text: &str, theme: &Theme) {

@@ -1,14 +1,45 @@
 use std::path::{Path, PathBuf};
 
-use dialoguer::Input;
 use dialoguer::theme::ColorfulTheme;
+use dialoguer::{Input, Select};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct AriesConfig {
+#[serde(untagged)]
+pub enum AriesConfig {
+    OpenAICompatible(OpenAICompatibleConfig),
+    Azure(AzureConfig),
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct OpenAICompatibleConfig {
     pub api_key: String,
     pub base_url: String,
     pub model: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AzureConfig {
+    pub api_key: String,
+    pub azure_endpoint: String,
+    pub api_version: String,
+    pub mode: String,
+}
+
+impl AriesConfig {
+    pub fn provider(&self) -> &'static str {
+        match self {
+            Self::OpenAICompatible(_) => "OpenAI Compatible",
+            Self::Azure(_) => "Azure OpenAI",
+        }
+    }
+
+    pub fn model(&self) -> &str {
+        match self {
+            Self::OpenAICompatible(config) => &config.model,
+            Self::Azure(config) => &config.mode,
+        }
+    }
 }
 
 pub struct AriesConfigLoader {
@@ -57,15 +88,46 @@ pub fn setup() -> anyhow::Result<AriesConfig> {
     println!("Welcome to Aries! Let's set up your AI model configuration.");
     let theme = ColorfulTheme::default();
 
-    let base_url_input: String =
-        Input::with_theme(&theme).with_prompt("base url").allow_empty(false).interact_text()?;
-    let base_url = base_url_input.trim().to_owned();
+    let provider = Select::with_theme(&theme)
+        .with_prompt("provider")
+        .items(["OpenAI Compatible", "Azure OpenAI"])
+        .default(0)
+        .interact()?;
 
-    let api_key_input: String = Input::with_theme(&theme).with_prompt("api key").allow_empty(false).interact_text()?;
-    let api_key = api_key_input.trim().to_owned();
+    match provider {
+        0 => {
+            let base_url_input: String =
+                Input::with_theme(&theme).with_prompt("base url").allow_empty(false).interact_text()?;
+            let base_url = base_url_input.trim().to_owned();
 
-    let model_input: String = Input::with_theme(&theme).with_prompt("model").allow_empty(false).interact_text()?;
-    let model = model_input.trim().to_owned();
+            let api_key_input: String =
+                Input::with_theme(&theme).with_prompt("api key").allow_empty(false).interact_text()?;
+            let api_key = api_key_input.trim().to_owned();
 
-    Ok(AriesConfig { api_key, base_url, model })
+            let model_input: String =
+                Input::with_theme(&theme).with_prompt("model").allow_empty(false).interact_text()?;
+            let model = model_input.trim().to_owned();
+
+            Ok(AriesConfig::OpenAICompatible(OpenAICompatibleConfig { api_key, base_url, model }))
+        },
+        _ => {
+            let azure_endpoint_input: String =
+                Input::with_theme(&theme).with_prompt("azure endpoint").allow_empty(false).interact_text()?;
+            let azure_endpoint = azure_endpoint_input.trim().to_owned();
+
+            let api_key_input: String =
+                Input::with_theme(&theme).with_prompt("api key").allow_empty(false).interact_text()?;
+            let api_key = api_key_input.trim().to_owned();
+
+            let api_version_input: String =
+                Input::with_theme(&theme).with_prompt("api version").allow_empty(false).interact_text()?;
+            let api_version = api_version_input.trim().to_owned();
+
+            let mode_input: String =
+                Input::with_theme(&theme).with_prompt("mode").allow_empty(false).interact_text()?;
+            let mode = mode_input.trim().to_owned();
+
+            Ok(AriesConfig::Azure(AzureConfig { api_key, azure_endpoint, api_version, mode }))
+        },
+    }
 }

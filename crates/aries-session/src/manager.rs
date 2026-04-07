@@ -3,13 +3,13 @@ use std::collections::HashMap;
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
 use rig::agent::PromptHook;
-use rig::providers::openai;
+use rig::providers::{azure, openai};
 
 use crate::Session;
 
 pub struct SessionManager<H = ()>
 where
-    H: PromptHook<openai::CompletionModel>,
+    H: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel>,
 {
     sessions: HashMap<String, Session<H>>,
     active_session_id: Option<String>,
@@ -26,7 +26,7 @@ impl SessionManager<()> {
 
 impl<H> SessionManager<H>
 where
-    H: PromptHook<openai::CompletionModel> + Clone + 'static,
+    H: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel> + Clone + 'static,
 {
     pub fn new_with_task_hook(context: GlobalContext, config: AriesConfig, hook: H) -> Self {
         Self { sessions: HashMap::new(), active_session_id: None, context, config, hook }

@@ -1,4 +1,3 @@
-use std::fs::create_dir_all;
 use std::path::PathBuf;
 use std::{env, io};
 
@@ -15,8 +14,8 @@ impl GlobalContext {
         let home_dir = env::home_dir().ok_or(io::Error::new(io::ErrorKind::NotADirectory, "无法识别 home 目录"))?;
         let config_dir = home_dir.join(".local").join("share").join("aries");
 
-        if let Some(parent) = config_dir.parent() {
-            create_dir_all(parent)?;
+        if !config_dir.exists() {
+            std::fs::create_dir_all(&config_dir)?;
         }
 
         Ok(Self { current_dir, home_dir, config_dir })

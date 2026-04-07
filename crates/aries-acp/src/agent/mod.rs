@@ -9,9 +9,6 @@ use aries_config::AriesConfig;
 use aries_context::GlobalContext;
 use aries_session::SessionManager;
 use async_trait::async_trait;
-use futures::StreamExt;
-use rig::agent::{MultiTurnStreamItem, Text};
-use rig::streaming::StreamedAssistantContent;
 use tokio::sync::{Mutex, mpsc, oneshot};
 use tracing::info;
 
@@ -75,29 +72,32 @@ impl agent_client_protocol::Agent for Agent {
         let mut sessions = self.sessions.lock().await;
         let session_id = args.session_id.to_string();
         let session = sessions.get_session_mut(&session_id).ok_or_else(Error::internal_error)?;
-        let stream = session.stream_prompt(&prompt_text).await;
-        tokio::pin!(stream);
+        session
+            .prompt(&prompt_text, |text| {
+                let sender = self.sender.clone();
+                let session_id = args.session_id.clone();
+                async move {
+                    let (tx, rx) = oneshot::channel();
+                    if sender
+                        .send((
+                            SessionNotification::new(
+                                session_id,
+                                SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::Text(
+                                    TextContent::new(text),
+                                ))),
+                            ),
+                            tx,
+                        ))
+                        .is_ok()
+                    {
+                        let _ = rx.await;
+                    }
 
-        while let Some(chunk) = stream.next().await {
-            if let Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Text(Text { text }))) = chunk {
-                let (tx, rx) = oneshot::channel();
-                if self
-                    .sender
-                    .send((
-                        SessionNotification::new(
-                            args.session_id.clone(),
-                            SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::Text(TextContent::new(
-                                text,
-                            )))),
-                        ),
-                        tx,
-                    ))
-                    .is_ok()
-                {
-                    let _ = rx.await;
+                    Ok(())
                 }
-            }
-        }
+            })
+            .await
+            .map_err(|_| Error::internal_error())?;
 
         let resp = PromptResponse::new(StopReason::EndTurn);
         Ok(resp)

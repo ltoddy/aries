@@ -4,7 +4,7 @@ pub mod tools;
 
 use std::marker::PhantomData;
 
-use anyhow::Context;
+use anyhow::{Context, bail};
 use aries_config::AriesConfig;
 use rig::agent::{Agent, PromptHook, StreamingResult};
 use rig::client::CompletionClient;
@@ -47,6 +47,11 @@ where
     P: PromptHook<openai::CompletionModel> + 'static,
 {
     pub fn new(name: String, config: AriesConfig, agent_type: AgentType, hook: P) -> anyhow::Result<Self> {
+        let AriesConfig::OpenAICompatible(config) = config else {
+            bail!("OpenAI compatible agent requires an OpenAI compatible config");
+        };
+        let tool_config = AriesConfig::OpenAICompatible(config.clone());
+
         let client = openai::CompletionsClient::builder()
             .base_url(&config.base_url)
             .api_key(&config.api_key)
@@ -58,7 +63,7 @@ where
             AgentType::Orchestrate => {
                 vec![
                     Box::new(QuestionTool),
-                    Box::new(TaskTool::<openai::CompletionModel, P>::new(config.clone(), hook.clone())),
+                    Box::new(TaskTool::<openai::CompletionModel, P>::new(tool_config.clone(), hook.clone())),
                 ]
             },
             AgentType::Build | AgentType::General => vec![
@@ -71,9 +76,9 @@ where
                 Box::new(ApplyPatchTool),
                 Box::new(MultiEditTool),
                 Box::new(EditTool),
-                Box::new(BatchTool::<openai::CompletionModel, P>::new(config.clone(), hook.clone())),
+                Box::new(BatchTool::<openai::CompletionModel, P>::new(tool_config.clone(), hook.clone())),
                 Box::new(QuestionTool),
-                Box::new(TaskTool::<openai::CompletionModel, P>::new(config.clone(), hook.clone())),
+                Box::new(TaskTool::<openai::CompletionModel, P>::new(tool_config.clone(), hook.clone())),
                 Box::new(WebFetchTool),
                 Box::new(WebSearchTool),
                 Box::new(LspTool),
@@ -135,10 +140,15 @@ where
     P: PromptHook<azure::CompletionModel> + 'static,
 {
     pub fn new(name: String, config: AriesConfig, agent_type: AgentType, hook: P) -> anyhow::Result<Self> {
+        let AriesConfig::Azure(config) = config else {
+            bail!("Azure agent requires an Azure config");
+        };
+        let tool_config = AriesConfig::Azure(config.clone());
+
         let client = azure::Client::builder()
             .api_key(&config.api_key)
-            .azure_endpoint(config.base_url.clone())
-            .api_version("2024-03-01-preview")
+            .azure_endpoint(config.azure_endpoint)
+            .api_version(&config.api_version)
             .build()
             .with_context(|| "Failed to create llm client")?;
 
@@ -148,7 +158,7 @@ where
             AgentType::Orchestrate => {
                 vec![
                     Box::new(QuestionTool),
-                    Box::new(TaskTool::<azure::CompletionModel, P>::new(config.clone(), hook.clone())),
+                    Box::new(TaskTool::<azure::CompletionModel, P>::new(tool_config.clone(), hook.clone())),
                 ]
             },
             AgentType::Build | AgentType::General => vec![
@@ -161,9 +171,9 @@ where
                 Box::new(ApplyPatchTool),
                 Box::new(MultiEditTool),
                 Box::new(EditTool),
-                Box::new(BatchTool::<azure::CompletionModel, P>::new(config.clone(), hook.clone())),
+                Box::new(BatchTool::<azure::CompletionModel, P>::new(tool_config.clone(), hook.clone())),
                 Box::new(QuestionTool),
-                Box::new(TaskTool::<azure::CompletionModel, P>::new(config.clone(), hook.clone())),
+                Box::new(TaskTool::<azure::CompletionModel, P>::new(tool_config.clone(), hook.clone())),
                 Box::new(WebFetchTool),
                 Box::new(WebSearchTool),
                 Box::new(LspTool),
@@ -194,7 +204,7 @@ where
         };
 
         let inner = client
-            .agent(&config.model)
+            .agent(&config.mode)
             .name(agent_type.name())
             .description(agent_type.description())
             .preamble(preamble)
