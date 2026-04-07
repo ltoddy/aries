@@ -5,6 +5,10 @@ edition = "2024"
 authors = ["ltoddy <taoliu0509@gmail.com>"]
 resolver = "3"
 
+[[bin]]
+name = "aries"
+path = "crates/aries-cli/main.rs"
+
 [workspace]
 members = [
     "crates/aries-acp",
