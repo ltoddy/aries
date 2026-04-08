@@ -9,4 +9,4 @@ dialoguer.workspace = true
 serde.workspace = true
 tokio = { workspace = true, features = ["fs"] }
 
-toml = "1.1"
+toml.workspace = true

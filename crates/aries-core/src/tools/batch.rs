@@ -13,20 +13,20 @@ use serde_json::Value;
 
 use crate::tools::*;
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct BatchCall {
     tool: String,
     parameters: Value,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct BatchArgs {
     calls: Vec<BatchCall>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct BatchOutput {
     pub results: Vec<Value>,
 }

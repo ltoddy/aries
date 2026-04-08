@@ -1,6 +1,9 @@
 default_toolchain := "stable"
 nightly_toolchain := "nightly"
 
+install:
+    @cargo +{{default_toolchain}} install --path crates/aries-cli
+
 build:
     @cargo +{{default_toolchain}} build
 

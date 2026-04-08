@@ -4,23 +4,21 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+anyhow.workspace = true
 aries-config = { path = "../aries-config" }
 aries-theme = { path = "../aries-theme" }
-
-anyhow.workspace = true
 colored.workspace = true
 dialoguer.workspace = true
+diffy.workspace = true
 futures.workspace = true
+glob.workspace = true
+globset.workspace = true
+ignore.workspace = true
 nanoid.workspace = true
+regex.workspace = true
+reqwest.workspace = true
 rig-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+thiserror.workspace = true
 tokio = { workspace = true, features = ["fs", "process"] }
-
-diffy = "0.4"
-glob = "0.3"
-globset = "0.4"
-ignore = "0.4"
-regex = "1"
-reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
-thiserror = "2.0"

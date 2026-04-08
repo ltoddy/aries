@@ -6,7 +6,7 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct EditOperation {
     #[serde(rename = "oldString")]
     old_string: String,
@@ -16,13 +16,13 @@ pub struct EditOperation {
     replace_all: bool,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct MultiEditArgs {
     file_path: PathBuf,
     edits: Vec<EditOperation>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MultiEditOutput {
     pub success: bool,
     pub message: String,

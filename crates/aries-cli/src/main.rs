@@ -12,6 +12,7 @@ use aries_session::Session;
 use aries_theme::Theme;
 use clap::Parser;
 use rustyline::error::ReadlineError;
+use terminal_size::{Width, terminal_size};
 
 use crate::args::{Args, Subcommands};
 use crate::hook::DisplayPromptHook;
@@ -63,7 +64,13 @@ async fn main() -> anyhow::Result<()> {
                 }
 
                 let elapsed = start.elapsed();
-                println!("{}", theme.dimmed(&format!("⏱️  耗时: {:.2}s", elapsed.as_secs_f64())));
+                let terminal_width = terminal_size().map(|(Width(w), _)| w as usize).unwrap_or(80);
+
+                let prefix = "─".repeat(5);
+                let time = format!("⏱️  耗时: {:.2}s", elapsed.as_secs_f64());
+                let remining_width = terminal_width.saturating_sub(prefix.len() + time.len());
+                let line = format!("{}{}{}", "─".repeat(5), time, "─".repeat(remining_width));
+                println!("{}", theme.dimmed(&line));
             },
             Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => commands::exit::exit(),
             Err(err) => {

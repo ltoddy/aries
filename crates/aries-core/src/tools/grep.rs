@@ -7,13 +7,13 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct GrepArgs {
     pattern: String,
     include: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GrepOutput {
     pub matches: Vec<String>,
 }

@@ -1,45 +1,32 @@
+use std::io::{BufWriter, stdout};
+
 use aries_context::GlobalContext;
 use aries_theme::Theme;
-use colored::Colorize;
 
 pub fn welcome(provider: &str, model: &str, context: &GlobalContext) {
     let theme = Theme::default();
-    let pkg_name = {
-        let name = env!("CARGO_PKG_NAME");
-        let mut chars = name.chars();
-        match chars.next() {
-            None => String::new(),
-            Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
-        }
-    };
 
-    let message = format!(
-        "{} {}  provider {}  model {}  dir {}",
-        pkg_name,
-        env!("CARGO_PKG_VERSION"),
-        provider,
-        model,
-        context.current_dir.display()
-    );
+    let name = env!("CARGO_PKG_NAME");
+    let version = env!("CARGO_PKG_VERSION");
 
-    let mut output = Vec::new();
+    let input = [
+        format!("{} {}", name, version),
+        format!("provider {provider}"),
+        format!("model {model}"),
+        format!("dir {}", context.current_dir.display()),
+    ]
+    .join("\n");
+
+    let stdout = stdout();
     let width = 80;
-    if let Err(e) = ferris_says::say(&message, width, &mut output) {
+
+    let writer = BufWriter::new(stdout.lock());
+
+    if let Err(e) = ferris_says::say(&input, width, writer) {
         eprintln!("ferris_says error: {}", e);
-        println!(
-            "{} {} | provider {} | model {} | dir {}",
-            env!("CARGO_PKG_NAME"),
-            env!("CARGO_PKG_VERSION"),
-            provider,
-            model,
-            context.current_dir.display()
-        );
         return;
     }
 
-    let output_str = String::from_utf8_lossy(&output);
-    println!("{}", output_str.to_string().color(theme.black()));
     println!();
-    let help_text = "  /help for help  /exit to exit".to_string();
-    println!("{}", theme.dimmed(&help_text));
+    println!("{}", theme.dimmed("  /help for help  /exit to exit"));
 }

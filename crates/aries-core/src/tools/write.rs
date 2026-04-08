@@ -6,13 +6,13 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct WriteFileArgs {
     file_path: PathBuf,
     content: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct WriteFileOutput {
     pub success: bool,
 }

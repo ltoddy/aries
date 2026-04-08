@@ -4,11 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-aries-context = { path = "../aries-context" }
-aries-config = { path = "../aries-config" }
-aries-core = { path = "../aries-core" }
-
-nanoid.workspace = true
 anyhow.workspace = true
+aries-config = { path = "../aries-config" }
+aries-context = { path = "../aries-context" }
+aries-core = { path = "../aries-core" }
 futures.workspace = true
+nanoid.workspace = true
 rig-core.workspace = true

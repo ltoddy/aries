@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::AgentWrapper;
 use crate::agent_type::AgentType;
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct TaskArgs {
     description: String,
@@ -22,7 +22,7 @@ pub struct TaskArgs {
     task_id: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TaskOutput {
     pub task_id: String,
     pub result: String,

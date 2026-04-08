@@ -6,7 +6,7 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct LspArgs {
     operation: String,
@@ -17,7 +17,7 @@ pub struct LspArgs {
     query: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct LspOutput {
     pub result: Value,
 }

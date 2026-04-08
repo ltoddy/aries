@@ -1,16 +1,19 @@
+use std::env::current_dir;
+use std::path::{Path, PathBuf};
+
 use anyhow::Result;
-use globset::GlobBuilder;
 use ignore::WalkBuilder;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct GlobArgs {
     pattern: String,
+    base_dir: Option<PathBuf>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GlobOutput {
     pub files: Vec<String>,
 }
@@ -21,6 +24,8 @@ pub enum GlobError {
     PatternError(#[from] glob::PatternError),
     #[error("Globset error: {0}")]
     GlobsetError(#[from] globset::Error),
+    #[error("Walk error: {0}")]
+    Walk(String),
 }
 
 pub struct GlobTool;
@@ -41,6 +46,10 @@ impl Tool for GlobTool {
                     "pattern": {
                         "type": "string",
                         "description": "The glob pattern to match against (e.g., src/**/*.rs)"
+                    },
+                    "base_dir": {
+                        "type": "string",
+                        "description": "Base directory for the glob pattern"
                     }
                 },
                 "required": ["pattern"]
@@ -49,25 +58,51 @@ impl Tool for GlobTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        let mut files = Vec::new();
+        let base_dir = args.base_dir.unwrap_or_else(|| current_dir().unwrap_or(PathBuf::from(".")));
 
-        // WalkBuilder automatically respects .gitignore files
-        let mut builder = WalkBuilder::new(".");
-        builder.hidden(false);
-
-        let glob = GlobBuilder::new(&args.pattern).literal_separator(true).build()?;
-        let glob = glob.compile_matcher();
-
-        for result in builder.build() {
-            if let Ok(entry) = result
-                && entry.file_type().is_some_and(|ft| ft.is_file())
-            {
-                let path = entry.path();
-                if glob.is_match(path) {
-                    files.push(path.display().to_string());
-                }
+        let pattern = if Path::new(&args.pattern).is_absolute() {
+            match Path::new(&args.pattern).strip_prefix(&base_dir) {
+                Ok(rel) => rel.to_string_lossy().to_string(),
+                Err(_) => args.pattern,
             }
-        }
+        } else {
+            args.pattern
+        };
+
+        let pattern = globset::Glob::new(&pattern)?;
+        let set = globset::GlobSetBuilder::new().add(pattern).build()?;
+
+        let mut walker = WalkBuilder::new(&base_dir);
+        walker.hidden(true).ignore(true);
+
+        let files = tokio::task::spawn_blocking(move || -> Vec<String> {
+            let mut matches = Vec::<_>::new();
+            for entry in walker.build() {
+                let entry = match entry {
+                    Ok(entry) => entry,
+                    Err(_) => continue,
+                };
+
+                let relative = match entry.path().strip_prefix(&base_dir) {
+                    Ok(relative) => relative,
+                    Err(_) => continue,
+                };
+
+                if !set.is_match(relative) {
+                    continue;
+                }
+
+                let filename = match relative.to_str().map(ToOwned::to_owned) {
+                    Some(r) => r,
+                    None => continue,
+                };
+
+                matches.push(filename);
+            }
+            matches
+        })
+        .await
+        .map_err(|err| GlobError::Walk(err.to_string()))?;
 
         Ok(GlobOutput { files })
     }

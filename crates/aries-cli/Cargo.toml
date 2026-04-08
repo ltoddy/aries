@@ -9,22 +9,20 @@ name = "aries"
 path = "src/main.rs"
 
 [dependencies]
+anyhow.workspace = true
 aries-acp = { path = "../aries-acp" }
-aries-context = { path = "../aries-context" }
 aries-config = { path = "../aries-config" }
+aries-context = { path = "../aries-context" }
 aries-core = { path = "../aries-core" }
 aries-session = { path = "../aries-session" }
 aries-theme = { path = "../aries-theme" }
-
-anyhow.workspace = true
+clap.workspace = true
 colored.workspace = true
 dialoguer.workspace = true
-futures.workspace = true
+ferris-says.workspace = true
 rig-core.workspace = true
+rustyline.workspace = true
+rustyline-derive.workspace = true
 serde_json.workspace = true
+terminal_size.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "fs", "process"] }
-
-clap = { version = "4", features = ["derive"] }
-ferris-says = "0.3.2"
-rustyline = "18.0"
-rustyline-derive = "0.12"

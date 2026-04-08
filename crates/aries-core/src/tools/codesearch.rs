@@ -3,14 +3,14 @@ use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct CodeSearchArgs {
     query: String,
     #[serde(rename = "tokensNum")]
     tokens_num: Option<i32>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CodeSearchOutput {
     pub results: String,
 }
@@ -23,7 +23,7 @@ pub enum CodeSearchError {
 
 pub struct CodeSearchTool;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct McpCodeRequestArgs {
     query: String,
     #[serde(rename = "tokensNum")]

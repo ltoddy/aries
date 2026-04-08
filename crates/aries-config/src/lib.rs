@@ -47,7 +47,7 @@ pub struct AriesConfigLoader {
 }
 
 impl AriesConfigLoader {
-    const FILE_NAME: &str = "config.json";
+    const FILE_NAME: &str = "config.toml";
 
     pub fn new(config_dir: &Path) -> Self {
         let file_path = config_dir.join(Self::FILE_NAME);

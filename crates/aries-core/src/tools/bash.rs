@@ -6,12 +6,12 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct ShellCommandArgs {
     command: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ShellCommandOutput {
     pub stdout: String,
     pub stderr: String,
