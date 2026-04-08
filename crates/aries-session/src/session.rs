@@ -170,7 +170,7 @@ where
                 let agent = AgentWrapper::<openai::CompletionModel, P>::new(
                     format!("Session Agent {}", id),
                     config.clone(),
-                    AgentType::Orchestrate,
+                    AgentType::Build,
                     task_hook,
                 )?;
                 let compaction_agent = CompactionAgent::<openai::CompletionModel>::new(config)?;
@@ -180,7 +180,7 @@ where
                 let agent = AgentWrapper::<azure::CompletionModel, P>::new(
                     format!("Session Agent {}", id),
                     config.clone(),
-                    AgentType::Orchestrate,
+                    AgentType::Build,
                     task_hook,
                 )?;
                 let compaction_agent = CompactionAgent::<azure::CompletionModel>::new(config)?;

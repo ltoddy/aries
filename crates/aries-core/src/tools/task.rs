@@ -97,8 +97,10 @@ where
         let task_id = args.task_id.unwrap_or_else(|| nanoid::nanoid!());
 
         let agent_type = match args.subagent_type.as_str() {
+            "default" | "build" => AgentType::Build,
             "explore" => AgentType::Explore,
             "plan" => AgentType::Plan,
+            "general" => AgentType::General,
             _ => AgentType::General,
         };
 
@@ -167,8 +169,10 @@ where
         let task_id = args.task_id.unwrap_or_else(|| nanoid::nanoid!());
 
         let agent_type = match args.subagent_type.as_str() {
+            "default" | "build" => AgentType::Build,
             "explore" => AgentType::Explore,
             "plan" => AgentType::Plan,
+            "general" => AgentType::General,
             _ => AgentType::General,
         };
 

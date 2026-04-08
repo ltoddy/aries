@@ -1,7 +1,5 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
 pub enum AgentType {
-    Orchestrate,
     Build,
     Plan,
     General,
@@ -11,11 +9,9 @@ pub enum AgentType {
     Summary,
 }
 
-#[allow(dead_code)]
 impl AgentType {
     pub const fn name(&self) -> &'static str {
         match self {
-            AgentType::Orchestrate => "orchestrate",
             AgentType::Build => "build",
             AgentType::Plan => "plan",
             AgentType::General => "general",
@@ -28,8 +24,7 @@ impl AgentType {
 
     pub const fn description(&self) -> &'static str {
         match self {
-            AgentType::Orchestrate => "编排智能体。负责任务分解和委托，不直接执行操作。",
-            AgentType::Build => "默认智能体。根据配置的权限执行工具。",
+            AgentType::Build => "默认主智能体。直接使用工具执行任务，并在需要时委托子智能体。",
             AgentType::Plan => "计划模式。不允许使用所有编辑工具。",
             AgentType::General => "用于研究复杂问题和执行多步任务的通用智能体。使用此智能体并行执行多个工作单元。",
             AgentType::Explore => {
@@ -43,7 +38,6 @@ impl AgentType {
 
     pub const fn preamble(&self) -> &'static str {
         match self {
-            AgentType::Orchestrate => include_str!("prompts/orchestrate.txt"),
             AgentType::Build => include_str!("prompts/build.txt"),
             AgentType::Plan => include_str!("prompts/plan.txt"),
             AgentType::General => include_str!("prompts/generate.txt"),

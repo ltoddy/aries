@@ -23,7 +23,7 @@ pub struct AzureConfig {
     pub api_key: String,
     pub azure_endpoint: String,
     pub api_version: String,
-    pub mode: String,
+    pub model: String,
 }
 
 impl AriesConfig {
@@ -37,7 +37,7 @@ impl AriesConfig {
     pub fn model(&self) -> &str {
         match self {
             Self::OpenAICompatible(config) => &config.model,
-            Self::Azure(config) => &config.mode,
+            Self::Azure(config) => &config.model,
         }
     }
 }
@@ -67,14 +67,13 @@ impl AriesConfigLoader {
     }
 
     async fn load(&self) -> anyhow::Result<AriesConfig> {
-        let config = tokio::fs::read_to_string(&self.file_path)
-            .await
-            .and_then(|content| serde_json::from_str::<AriesConfig>(&content).map_err(Into::into))?;
+        let content = tokio::fs::read_to_string(&self.file_path).await?;
+        let config = toml::from_str::<AriesConfig>(&content)?;
         Ok(config)
     }
 
     pub async fn save(&self, config: &AriesConfig) -> anyhow::Result<()> {
-        let content = serde_json::to_string_pretty(config)?;
+        let content = toml::to_string_pretty(config)?;
         tokio::fs::write(&self.file_path, &content).await?;
         Ok(())
     }
@@ -123,11 +122,11 @@ pub fn setup() -> anyhow::Result<AriesConfig> {
                 Input::with_theme(&theme).with_prompt("api version").allow_empty(false).interact_text()?;
             let api_version = api_version_input.trim().to_owned();
 
-            let mode_input: String =
-                Input::with_theme(&theme).with_prompt("mode").allow_empty(false).interact_text()?;
-            let mode = mode_input.trim().to_owned();
+            let model_input: String =
+                Input::with_theme(&theme).with_prompt("model").allow_empty(false).interact_text()?;
+            let model = model_input.trim().to_owned();
 
-            Ok(AriesConfig::Azure(AzureConfig { api_key, azure_endpoint, api_version, mode }))
+            Ok(AriesConfig::Azure(AzureConfig { api_key, azure_endpoint, api_version, model }))
         },
     }
 }

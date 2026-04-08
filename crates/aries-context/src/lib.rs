@@ -6,6 +6,7 @@ pub struct GlobalContext {
     pub current_dir: PathBuf,
     pub home_dir: PathBuf,
     pub config_dir: PathBuf,
+    pub user: String,
 }
 
 impl GlobalContext {
@@ -18,6 +19,8 @@ impl GlobalContext {
             std::fs::create_dir_all(&config_dir)?;
         }
 
-        Ok(Self { current_dir, home_dir, config_dir })
+        let user = whoami::realname().unwrap_or_default();
+
+        Ok(Self { current_dir, home_dir, config_dir, user })
     }
 }

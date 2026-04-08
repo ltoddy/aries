@@ -6,7 +6,7 @@ authors = ["ltoddy <taoliu0509@gmail.com>"]
 
 [[bin]]
 name = "aries"
-path = "main.rs"
+path = "src/main.rs"
 
 [dependencies]
 aries-acp = { path = "../aries-acp" }
@@ -28,4 +28,3 @@ clap = { version = "4", features = ["derive"] }
 ferris-says = "0.3.2"
 rustyline = "18.0"
 rustyline-derive = "0.12"
-whoami = "2.1"

@@ -38,14 +38,12 @@ async fn main() -> anyhow::Result<()> {
         DisplayPromptHook::new(Theme::default()),
     )?;
 
-    let mut rl = InputReader::new(&gctx.config_dir)?;
-
+    let mut reader = InputReader::new(&gctx.config_dir)?;
     welcome::welcome(app_config.provider(), app_config.model(), &gctx);
 
-    let user = whoami::realname().unwrap_or_default();
     loop {
         let theme = Theme::default();
-        let readline = rl.readline(format!("{user} › ").as_str());
+        let readline = reader.readline(format!("{} › ", gctx.user).as_str());
         match readline {
             Ok(line) => {
                 let input = line.trim();
@@ -53,35 +51,12 @@ async fn main() -> anyhow::Result<()> {
                     continue;
                 }
 
-                if input == commands::exit::NAME {
-                    commands::exit::exit();
-                }
-
-                if let Some(command) = input.strip_prefix(commands::bash::NAME) {
-                    commands::bash::execute(command, &theme).await;
-                    continue;
-                }
-
-                if input == commands::save_history::NAME {
-                    commands::save_history::execute(session.history(), &theme).await;
-                    continue;
-                }
-
-                if input == commands::clear_history::NAME {
-                    session.clear_history();
-                    println!("{}", theme.green_text("Chat history cleared."));
-                    continue;
-                }
-
-                if input == commands::setup::NAME {
-                    if let Err(e) = commands::setup::execute(&theme, &gctx.config_dir).await {
-                        eprintln!("Error: {}", e);
-                    }
+                if input.starts_with('/') {
+                    commands::execute(input, &theme, &gctx, &mut session).await;
                     continue;
                 }
 
                 let start = Instant::now();
-                let theme = Theme::default();
                 if let Err(err) = session.prompt(input, |_| async { Ok(()) }).await {
                     eprintln!("\n{}: {}", theme.red_text("Error streaming_chunk"), err);
                     continue;
@@ -93,10 +68,8 @@ async fn main() -> anyhow::Result<()> {
             Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => commands::exit::exit(),
             Err(err) => {
                 println!("Error: {:?}", err);
-                break;
+                continue;
             },
         }
     }
-
-    Ok(())
 }

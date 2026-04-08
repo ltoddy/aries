@@ -14,12 +14,32 @@ use rig::streaming::StreamingPrompt;
 use rig::tool::ToolDyn;
 
 use crate::agent_type::AgentType;
-use crate::tools::{
-    ApplyPatchTool, BatchTool, CodeSearchTool, EditTool, GlobTool, GrepTool, LsTool, LspTool, MultiEditTool,
-    QuestionTool, ReadFileTool, ShellCommand, TaskTool, WebFetchTool, WebSearchTool, WriteFileTool,
-};
 
 pub const AGENT_LOOP_MAX_TURNS: usize = 200;
+
+fn openai_tools_for_agent<P>(agent_type: AgentType, config: AriesConfig, hook: P) -> Vec<Box<dyn ToolDyn>>
+where
+    P: PromptHook<openai::CompletionModel> + 'static,
+{
+    match agent_type {
+        AgentType::Build | AgentType::General => tools::build_openai_tools(config, hook),
+        AgentType::Plan => tools::plan_tools(),
+        AgentType::Explore => tools::explore_tools(),
+        _ => vec![],
+    }
+}
+
+fn azure_tools_for_agent<P>(agent_type: AgentType, config: AriesConfig, hook: P) -> Vec<Box<dyn ToolDyn>>
+where
+    P: PromptHook<azure::CompletionModel> + 'static,
+{
+    match agent_type {
+        AgentType::Build | AgentType::General => tools::build_azure_tools(config, hook),
+        AgentType::Plan => tools::plan_tools(),
+        AgentType::Explore => tools::explore_tools(),
+        _ => vec![],
+    }
+}
 
 pub struct AgentWrapper<M, P = ()>
 where
@@ -59,54 +79,7 @@ where
             .with_context(|| "Failed to create llm client")?;
 
         let preamble = agent_type.preamble();
-        let tools: Vec<Box<dyn ToolDyn>> = match agent_type {
-            AgentType::Orchestrate => {
-                vec![
-                    Box::new(QuestionTool),
-                    Box::new(TaskTool::<openai::CompletionModel, P>::new(tool_config.clone(), hook.clone())),
-                ]
-            },
-            AgentType::Build | AgentType::General => vec![
-                Box::new(ShellCommand),
-                Box::new(ReadFileTool),
-                Box::new(WriteFileTool),
-                Box::new(GlobTool),
-                Box::new(GrepTool),
-                Box::new(LsTool),
-                Box::new(ApplyPatchTool),
-                Box::new(MultiEditTool),
-                Box::new(EditTool),
-                Box::new(BatchTool::<openai::CompletionModel, P>::new(tool_config.clone(), hook.clone())),
-                Box::new(QuestionTool),
-                Box::new(TaskTool::<openai::CompletionModel, P>::new(tool_config.clone(), hook.clone())),
-                Box::new(WebFetchTool),
-                Box::new(WebSearchTool),
-                Box::new(LspTool),
-                Box::new(CodeSearchTool),
-            ],
-            AgentType::Plan => vec![
-                Box::new(ShellCommand),
-                Box::new(ReadFileTool),
-                Box::new(GlobTool),
-                Box::new(GrepTool),
-                Box::new(LsTool),
-                Box::new(QuestionTool),
-                Box::new(WebFetchTool),
-                Box::new(WebSearchTool),
-                Box::new(LspTool),
-                Box::new(CodeSearchTool),
-            ],
-            AgentType::Explore => vec![
-                Box::new(ReadFileTool),
-                Box::new(GlobTool),
-                Box::new(GrepTool),
-                Box::new(LsTool),
-                Box::new(WebFetchTool),
-                Box::new(WebSearchTool),
-                Box::new(CodeSearchTool),
-            ],
-            AgentType::Compaction | AgentType::Title | AgentType::Summary => vec![],
-        };
+        let tools = openai_tools_for_agent(agent_type, tool_config, hook.clone());
 
         let inner = client
             .agent(&config.model)
@@ -153,58 +126,10 @@ where
             .with_context(|| "Failed to create llm client")?;
 
         let preamble = agent_type.preamble();
-
-        let tools: Vec<Box<dyn ToolDyn>> = match agent_type {
-            AgentType::Orchestrate => {
-                vec![
-                    Box::new(QuestionTool),
-                    Box::new(TaskTool::<azure::CompletionModel, P>::new(tool_config.clone(), hook.clone())),
-                ]
-            },
-            AgentType::Build | AgentType::General => vec![
-                Box::new(ShellCommand),
-                Box::new(ReadFileTool),
-                Box::new(WriteFileTool),
-                Box::new(GlobTool),
-                Box::new(GrepTool),
-                Box::new(LsTool),
-                Box::new(ApplyPatchTool),
-                Box::new(MultiEditTool),
-                Box::new(EditTool),
-                Box::new(BatchTool::<azure::CompletionModel, P>::new(tool_config.clone(), hook.clone())),
-                Box::new(QuestionTool),
-                Box::new(TaskTool::<azure::CompletionModel, P>::new(tool_config.clone(), hook.clone())),
-                Box::new(WebFetchTool),
-                Box::new(WebSearchTool),
-                Box::new(LspTool),
-                Box::new(CodeSearchTool),
-            ],
-            AgentType::Plan => vec![
-                Box::new(ShellCommand),
-                Box::new(ReadFileTool),
-                Box::new(GlobTool),
-                Box::new(GrepTool),
-                Box::new(LsTool),
-                Box::new(QuestionTool),
-                Box::new(WebFetchTool),
-                Box::new(WebSearchTool),
-                Box::new(LspTool),
-                Box::new(CodeSearchTool),
-            ],
-            AgentType::Explore => vec![
-                Box::new(ReadFileTool),
-                Box::new(GlobTool),
-                Box::new(GrepTool),
-                Box::new(LsTool),
-                Box::new(WebFetchTool),
-                Box::new(WebSearchTool),
-                Box::new(CodeSearchTool),
-            ],
-            AgentType::Compaction | AgentType::Title | AgentType::Summary => vec![],
-        };
+        let tools = azure_tools_for_agent(agent_type, tool_config, hook.clone());
 
         let inner = client
-            .agent(&config.mode)
+            .agent(&config.model)
             .name(agent_type.name())
             .description(agent_type.description())
             .preamble(preamble)
