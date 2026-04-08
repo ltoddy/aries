@@ -3,7 +3,7 @@ use std::process::Stdio;
 use aries_theme::Theme;
 use tokio::process::Command;
 
-pub const NAME: &str = "/bash";
+pub const NAME: &str = "/shell";
 
 pub async fn execute(command: &str, theme: &Theme) {
     let command = command.trim();
@@ -12,7 +12,8 @@ pub async fn execute(command: &str, theme: &Theme) {
         return;
     }
 
-    match Command::new("bash")
+    let shell = std::env::var("SHELL").unwrap_or(String::from("bash"));
+    match Command::new(shell)
         .arg("-c")
         .arg(command)
         .stdin(Stdio::inherit())

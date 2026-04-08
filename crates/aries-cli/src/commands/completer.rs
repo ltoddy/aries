@@ -5,7 +5,7 @@ use rustyline::hint::HistoryHinter;
 use rustyline::{Context, Result};
 use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
 
-use crate::commands::{bash, clear_history, exit, save_history, setup};
+use crate::commands::{clear_history, exit, save_history, setup, shell};
 
 #[derive(Helper, Highlighter, Hinter, Validator)]
 pub struct CommandCompleter {
@@ -35,7 +35,7 @@ impl Completer for CommandCompleter {
 
 const COMMANDS: &[(&str, &str)] = &[
     (exit::NAME, "Exit Aries"),
-    (bash::NAME, "Run a bash command"),
+    (shell::NAME, "Run a shell command"),
     (setup::NAME, "Open configuration setup"),
     (save_history::NAME, "Save chat history to file"),
     (clear_history::NAME, "Clear chat history"),
