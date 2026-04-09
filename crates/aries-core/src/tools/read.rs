@@ -8,8 +8,8 @@ use tokio::fs;
 
 #[derive(Debug, Deserialize)]
 pub struct ReadFileArgs {
-    file_path: PathBuf,
-    offset: Option<usize>,
+    pub file_path: PathBuf,
+    pub offset: Option<usize>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -40,7 +40,7 @@ impl Tool for ReadFileTool {
                 "properties": {
                     "file_path": {
                         "type": "string",
-                        "description": "The absolute path to the file to read"
+                        "description": "The path to the file to read"
                     },
                     "offset": {
                         "type": "number",
@@ -55,7 +55,8 @@ impl Tool for ReadFileTool {
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         let mut content = fs::read_to_string(&args.file_path).await?;
 
-        if let Some(offset) = args.offset {
+        let offset = args.offset.map(|offset| offset.saturating_sub(1));
+        if let Some(offset) = offset {
             content = content.lines().skip(offset).collect::<Vec<_>>().join("\n");
         }
 

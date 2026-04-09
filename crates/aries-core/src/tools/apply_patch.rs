@@ -9,7 +9,7 @@ use tokio::fs;
 
 #[derive(Debug, Deserialize)]
 pub struct ApplyPatchArgs {
-    patch: String,
+    pub patch: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

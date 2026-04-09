@@ -8,8 +8,8 @@ use tokio::fs;
 
 #[derive(Debug, Deserialize)]
 pub struct WriteFileArgs {
-    file_path: PathBuf,
-    content: String,
+    pub file_path: PathBuf,
+    pub content: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

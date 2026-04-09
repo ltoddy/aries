@@ -8,7 +8,7 @@ use tokio::process::Command;
 
 #[derive(Debug, Deserialize)]
 pub struct ShellCommandArgs {
-    command: String,
+    pub command: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

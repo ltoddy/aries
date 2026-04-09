@@ -16,10 +16,10 @@ use crate::agent_type::AgentType;
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct TaskArgs {
-    description: String,
-    prompt: String,
-    subagent_type: String,
-    task_id: Option<String>,
+    pub description: String,
+    pub prompt: String,
+    pub subagent_type: String,
+    pub task_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

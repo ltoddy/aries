@@ -7,18 +7,18 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]
 pub struct QuestionOption {
-    label: String,
-    description: Option<String>,
+    pub label: String,
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct QuestionArgs {
-    question: String,
-    options: Option<Vec<QuestionOption>>,
+    pub question: String,
+    pub options: Option<Vec<QuestionOption>>,
     #[serde(default)]
-    multiple: bool,
+    pub multiple: bool,
     #[serde(default = "default_custom")]
-    custom: bool,
+    pub custom: bool,
 }
 
 fn default_custom() -> bool {

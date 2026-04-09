@@ -8,13 +8,10 @@ use tokio::fs;
 
 #[derive(Debug, Deserialize)]
 pub struct EditArgs {
-    file_path: PathBuf,
-    #[serde(rename = "oldString")]
-    old_string: String,
-    #[serde(rename = "newString")]
-    new_string: String,
-    #[serde(rename = "replaceAll", default)]
-    replace_all: bool,
+    pub file_path: PathBuf,
+    pub old_string: String,
+    pub new_string: String,
+    pub replace_all: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -46,22 +43,22 @@ impl Tool for EditTool {
                 "properties": {
                     "file_path": {
                         "type": "string",
-                        "description": "The absolute path to the file to modify"
+                        "description": "The path to the file to modify"
                     },
-                    "oldString": {
+                    "old_string": {
                         "type": "string",
                         "description": "The text to replace"
                     },
-                    "newString": {
+                    "new_string": {
                         "type": "string",
-                        "description": "The edited text to replace the oldString"
+                        "description": "The edited text to replace the old_string"
                     },
-                    "replaceAll": {
+                    "replace_all": {
                         "type": "boolean",
-                        "description": "Replace all occurrences of oldString"
+                        "description": "Replace all occurrences of old_string"
                     }
                 },
-                "required": ["file_path", "oldString", "newString"]
+                "required": ["file_path", "old_string", "new_string"]
             }),
         }
     }

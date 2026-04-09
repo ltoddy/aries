@@ -9,8 +9,8 @@ use tokio::fs;
 
 #[derive(Debug, Deserialize)]
 pub struct GrepArgs {
-    pattern: String,
-    include: Option<String>,
+    pub pattern: String,
+    pub include: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -8,18 +8,15 @@ use tokio::fs;
 
 #[derive(Debug, Deserialize)]
 pub struct EditOperation {
-    #[serde(rename = "oldString")]
-    old_string: String,
-    #[serde(rename = "newString")]
-    new_string: String,
-    #[serde(rename = "replaceAll", default)]
-    replace_all: bool,
+    pub old_string: String,
+    pub new_string: String,
+    pub replace_all: bool,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct MultiEditArgs {
-    file_path: PathBuf,
-    edits: Vec<EditOperation>,
+    pub file_path: PathBuf,
+    pub edits: Vec<EditOperation>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -51,27 +48,27 @@ impl Tool for MultiEditTool {
                 "properties": {
                     "file_path": {
                         "type": "string",
-                        "description": "The absolute path to the file to modify"
+                        "description": "The path to the file to modify"
                     },
                     "edits": {
                         "type": "array",
                         "items": {
                             "type": "object",
                             "properties": {
-                                "oldString": {
+                                "old_string": {
                                     "type": "string",
                                     "description": "The text to replace"
                                 },
-                                "newString": {
+                                "new_string": {
                                     "type": "string",
-                                    "description": "The edited text to replace the oldString"
+                                    "description": "The edited text to replace the old_string"
                                 },
-                                "replaceAll": {
+                                "replace_all": {
                                     "type": "boolean",
-                                    "description": "Replace all occurrences of oldString"
+                                    "description": "Replace all occurrences of old_string"
                                 }
                             },
-                            "required": ["oldString", "newString"]
+                            "required": ["old_string", "new_string"]
                         }
                     }
                 },
@@ -91,18 +88,18 @@ impl Tool for MultiEditTool {
 
         for edit in args.edits {
             if edit.old_string == edit.new_string {
-                return Err(MultiEditError::EditError("oldString and newString cannot be identical".to_string()));
+                return Err(MultiEditError::EditError("old_string and new_string cannot be identical".to_string()));
             }
 
             if edit.old_string.is_empty() {
-                // If oldString is empty, we just append or initialize (simplified for MVP)
+                // If old_string is empty, we just append or initialize (simplified for MVP)
                 content = edit.new_string;
                 continue;
             }
 
             if !content.contains(&edit.old_string) {
                 return Err(MultiEditError::EditError(format!(
-                    "oldString not found in file (must match exactly including whitespace): {:?}",
+                    "old_string not found in file (must match exactly including whitespace): {:?}",
                     edit.old_string
                 )));
             }

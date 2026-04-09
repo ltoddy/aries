@@ -11,8 +11,8 @@ use tokio::fs;
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct LsArgs {
-    path: Option<PathBuf>,
-    ignore: Option<Vec<String>>,
+    pub path: Option<PathBuf>,
+    pub ignore: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -43,7 +43,7 @@ impl Tool for LsTool {
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "The absolute path to the directory to list (optional)"
+                        "description": "The path to the directory to list (optional)"
                     },
                     "ignore": {
                         "type": "array",

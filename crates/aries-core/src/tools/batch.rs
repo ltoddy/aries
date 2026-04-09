@@ -16,14 +16,14 @@ use crate::tools::*;
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct BatchCall {
-    tool: String,
-    parameters: Value,
+    pub tool: String,
+    pub parameters: Value,
 }
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct BatchArgs {
-    calls: Vec<BatchCall>,
+    pub calls: Vec<BatchCall>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

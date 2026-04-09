@@ -20,22 +20,22 @@ use rig::agent::PromptHook;
 use rig::providers::{azure, openai};
 use rig::tool::ToolDyn;
 
-pub use self::apply_patch::{ApplyPatchOutput, ApplyPatchTool};
-pub use self::bash::{ShellCommand, ShellCommandOutput};
+pub use self::apply_patch::{ApplyPatchArgs, ApplyPatchOutput, ApplyPatchTool};
+pub use self::bash::{ShellCommand, ShellCommandArgs, ShellCommandOutput};
 pub use self::batch::*;
-pub use self::codesearch::{CodeSearchOutput, CodeSearchTool};
-pub use self::edit::{EditOutput, EditTool};
-pub use self::glob::{GlobOutput, GlobTool};
-pub use self::grep::{GrepOutput, GrepTool};
-pub use self::ls::{LsOutput, LsTool};
-pub use self::lsp::{LspOutput, LspTool};
-pub use self::multiedit::{MultiEditOutput, MultiEditTool};
-pub use self::question::{QuestionOutput, QuestionTool};
-pub use self::read::{ReadFileOutput, ReadFileTool};
-pub use self::task::{TaskOutput, TaskTool};
-pub use self::webfetch::{WebFetchOutput, WebFetchTool};
-pub use self::websearch::{WebSearchOutput, WebSearchTool};
-pub use self::write::{WriteFileOutput, WriteFileTool};
+pub use self::codesearch::{CodeSearchArgs, CodeSearchOutput, CodeSearchTool};
+pub use self::edit::{EditArgs, EditOutput, EditTool};
+pub use self::glob::{GlobArgs, GlobOutput, GlobTool};
+pub use self::grep::{GrepArgs, GrepOutput, GrepTool};
+pub use self::ls::{LsArgs, LsOutput, LsTool};
+pub use self::lsp::{LspArgs, LspOutput, LspTool};
+pub use self::multiedit::{MultiEditArgs, MultiEditOutput, MultiEditTool};
+pub use self::question::{QuestionArgs, QuestionOutput, QuestionTool};
+pub use self::read::{ReadFileArgs, ReadFileOutput, ReadFileTool};
+pub use self::task::{TaskArgs, TaskOutput, TaskTool};
+pub use self::webfetch::{WebFetchArgs, WebFetchOutput, WebFetchTool};
+pub use self::websearch::{WebSearchArgs, WebSearchOutput, WebSearchTool};
+pub use self::write::{WriteFileArgs, WriteFileOutput, WriteFileTool};
 
 pub fn build_openai_tools<P>(config: AriesConfig, hook: P) -> Vec<Box<dyn ToolDyn>>
 where
@@ -54,10 +54,10 @@ where
         Box::new(BatchTool::<openai::CompletionModel, P>::new(config.clone(), hook.clone())),
         Box::new(QuestionTool),
         Box::new(TaskTool::<openai::CompletionModel, P>::new(config, hook)),
-        Box::new(WebFetchTool),
-        Box::new(WebSearchTool),
         Box::new(LspTool),
         Box::new(CodeSearchTool),
+        // Box::new(WebFetchTool),
+        // Box::new(WebSearchTool),
     ]
 }
 
@@ -78,8 +78,8 @@ where
         Box::new(BatchTool::<azure::CompletionModel, P>::new(config.clone(), hook.clone())),
         Box::new(QuestionTool),
         Box::new(TaskTool::<azure::CompletionModel, P>::new(config, hook)),
-        Box::new(WebFetchTool),
-        Box::new(WebSearchTool),
+        // Box::new(WebFetchTool),
+        // Box::new(WebSearchTool),
         Box::new(LspTool),
         Box::new(CodeSearchTool),
     ]
@@ -93,10 +93,10 @@ pub fn plan_tools() -> Vec<Box<dyn ToolDyn>> {
         Box::new(GrepTool),
         Box::new(LsTool),
         Box::new(QuestionTool),
-        Box::new(WebFetchTool),
-        Box::new(WebSearchTool),
         Box::new(LspTool),
         Box::new(CodeSearchTool),
+        // Box::new(WebFetchTool),
+        // Box::new(WebSearchTool),
     ]
 }
 
@@ -107,8 +107,8 @@ pub fn explore_tools() -> Vec<Box<dyn ToolDyn>> {
         Box::new(GlobTool),
         Box::new(GrepTool),
         Box::new(LsTool),
-        Box::new(WebFetchTool),
-        Box::new(WebSearchTool),
         Box::new(CodeSearchTool),
+        // Box::new(WebFetchTool),
+        // Box::new(WebSearchTool),
     ]
 }

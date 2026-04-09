@@ -1,12 +1,24 @@
-use aries_core::tools::{LspOutput, LspTool};
+use aries_core::tools::{LspArgs, LspOutput, LspTool};
 use aries_theme::Theme;
 use rig::tool::Tool;
-use serde_json::Value;
 
-pub fn format_call(args: &Value, theme: &Theme) -> String {
-    let operation = args.get("operation").and_then(|v| v.as_str()).unwrap_or("?");
-    let path = args.get("filePath").and_then(|v| v.as_str()).unwrap_or("?");
-    format!("{} {} on {}", theme.cyan_text(LspTool::NAME), theme.yellow_text(operation), theme.yellow_text(path))
+pub fn format_call(args: &str, theme: &Theme) -> String {
+    const NAME: &str = LspTool::NAME;
+
+    let args = serde_json::from_str::<LspArgs>(args);
+
+    let args = match args {
+        Ok(args) => {
+            let mut operation = args.operation;
+            if let Some(path) = args.file_path {
+                operation.push_str(&format!(", filePath = {}", path.display()));
+            }
+            operation
+        },
+        Err(_) => String::from("?"),
+    };
+
+    format!("{} {}", theme.cyan_text(NAME), theme.yellow_text(&args))
 }
 
 pub fn format_result(raw_text: &str) -> String {

@@ -4,8 +4,9 @@
 - default/build: The standard Aries agent with all standard tools
 - explore: Fast agent specialized for exploring codebases
 - plan: Planning agent that can read but not edit
+- general: Fallback general-purpose agent type used by the current implementation
 
-使用 Task 工具时，您必须指定一个 `subagent_type` 参数来选择要使用的智能体类型。
+使用 Task 工具时，您必须指定一个 `subagent_type` 参数来选择要使用的智能体类型。当前实现中，未知值会回退到 `general`。
 
 何时使用 Task 工具：
 - 当您被指示执行自定义斜杠命令时。将带有斜杠命令调用的 Task 工具作为整个提示。斜杠命令可以带参数。例如：Task(description="检查文件", prompt="/check-file path/to/file.py")

@@ -23,9 +23,8 @@ use aries_core::tools::{
 use aries_theme::Theme;
 use rig::providers::openai;
 use rig::tool::Tool;
-use serde_json::Value;
 
-pub fn format_tool_call_args(tool_name: &str, args: &Value, theme: &Theme) -> String {
+pub fn format_tool_call_args(tool_name: &str, args: &str, theme: &Theme) -> String {
     match tool_name {
         ReadFileTool::NAME => read_file::format_call(args, theme),
         WriteFileTool::NAME => write_file::format_call(args, theme),
@@ -69,29 +68,6 @@ pub fn format_tool_result_output(tool_name: &str, raw_text: &str) -> String {
     };
 
     if output.is_empty() { "No output".to_string() } else { output }
-}
-
-pub fn display_tool_call(tool_name: &str, args: &Value, theme: &Theme) {
-    let formatted_tool = format_tool_call_args(tool_name, args, theme);
-    println!("\n{} {}", theme.cyan_text("•"), formatted_tool);
-}
-
-pub fn display_tool_result_output(tool_name: &str, raw_text: &str, theme: &Theme) {
-    let output_str = format_tool_result_output(tool_name, raw_text);
-
-    let max_lines = 7;
-    let lines: Vec<&str> = output_str.lines().collect();
-
-    if lines.len() > max_lines {
-        for line in lines.iter().take(max_lines) {
-            println!("  {}", theme.dimmed(line));
-        }
-        println!("  ... ({} more lines truncated)", lines.len() - max_lines);
-    } else {
-        for line in lines {
-            println!("  {}", theme.dimmed(line));
-        }
-    }
 }
 
 pub fn display_token_usage(usage: &rig::completion::Usage, theme: &Theme) {

@@ -1,9 +1,19 @@
+use aries_core::tools::{BatchArgs, BatchTool};
 use aries_theme::Theme;
-use serde_json::Value;
+use rig::providers::openai;
+use rig::tool::Tool;
 
-pub fn format_call(args: &Value, theme: &Theme) -> String {
-    let tool_calls = args.get("calls").and_then(|v| v.as_array()).map(|v| v.len()).unwrap_or(0);
-    format!("{} {} tool calls", theme.cyan_text("batch"), theme.yellow_text(&tool_calls.to_string()))
+pub fn format_call(args: &str, theme: &Theme) -> String {
+    const NAME: &str = BatchTool::<openai::CompletionModel, ()>::NAME;
+
+    let args = serde_json::from_str::<BatchArgs>(args);
+
+    let args = match args {
+        Ok(args) => format!("{} tool calls", args.calls.len()),
+        Err(_) => String::from("?"),
+    };
+
+    format!("{} {}", theme.cyan_text(NAME), theme.yellow_text(&args))
 }
 
 pub fn format_result(raw_text: &str) -> String {

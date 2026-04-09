@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct WebSearchArgs {
-    query: String,
-    num: Option<i32>,
+    pub query: String,
+    pub num: Option<i32>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

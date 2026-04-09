@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]
 pub struct GlobArgs {
-    pattern: String,
-    base_dir: Option<PathBuf>,
+    pub pattern: String,
+    pub base_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

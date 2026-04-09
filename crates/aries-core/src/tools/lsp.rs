@@ -9,12 +9,11 @@ use serde_json::Value;
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct LspArgs {
-    operation: String,
-    #[serde(rename = "filePath")]
-    file_path: Option<PathBuf>,
-    line: Option<u32>,
-    character: Option<u32>,
-    query: Option<String>,
+    pub operation: String,
+    pub file_path: Option<PathBuf>,
+    pub line: Option<u32>,
+    pub character: Option<u32>,
+    pub query: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -52,7 +51,7 @@ impl Tool for LspTool {
                             "prepareCallHierarchy", "incomingCalls", "outgoingCalls"
                         ]
                     },
-                    "filePath": { "type": "string" },
+                    "file_path": { "type": "string" },
                     "line": { "type": "number" },
                     "character": { "type": "number" },
                     "query": { "type": "string" }

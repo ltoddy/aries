@@ -1,12 +1,24 @@
-use aries_core::tools::{GlobOutput, GlobTool};
+use aries_core::tools::{GlobArgs, GlobOutput, GlobTool};
 use aries_theme::Theme;
 use rig::tool::Tool;
-use serde_json::Value;
 
-pub fn format_call(args: &Value, theme: &Theme) -> String {
-    let pattern = args.get("pattern").and_then(|v| v.as_str()).unwrap_or("?");
-    let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
-    format!("{} {} in {}", theme.cyan_text(GlobTool::NAME), theme.yellow_text(pattern), theme.yellow_text(path))
+pub fn format_call(args: &str, theme: &Theme) -> String {
+    const NAME: &str = GlobTool::NAME;
+
+    let args = serde_json::from_str::<GlobArgs>(args);
+
+    let args = match args {
+        Ok(args) => {
+            let mut pattern = args.pattern;
+            if let Some(base_dir) = args.base_dir {
+                pattern.push_str(&format!(", base_dir = {}", base_dir.display()));
+            }
+            pattern
+        },
+        Err(_) => String::from("?"),
+    };
+
+    format!("{} {}", theme.cyan_text(NAME), theme.yellow_text(&args))
 }
 
 pub fn format_result(raw_text: &str) -> String {

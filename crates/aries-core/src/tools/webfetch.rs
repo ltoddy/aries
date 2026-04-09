@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct WebFetchArgs {
-    url: String,
-    format: Option<String>,
+    pub url: String,
+    pub format: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

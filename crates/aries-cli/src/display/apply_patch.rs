@@ -1,11 +1,22 @@
-use aries_core::tools::{ApplyPatchOutput, ApplyPatchTool};
+use aries_core::tools::{ApplyPatchArgs, ApplyPatchOutput, ApplyPatchTool};
 use aries_theme::Theme;
 use rig::tool::Tool;
-use serde_json::Value;
 
-pub fn format_call(args: &Value, theme: &Theme) -> String {
-    let path = args.get("file_path").and_then(|v| v.as_str()).unwrap_or("?");
-    format!("{} {}", theme.cyan_text(ApplyPatchTool::NAME), theme.yellow_text(path))
+pub fn format_call(args: &str, theme: &Theme) -> String {
+    const NAME: &str = ApplyPatchTool::NAME;
+    let args = serde_json::from_str::<ApplyPatchArgs>(args);
+
+    let args = match args {
+        Ok(args) => args
+            .patch
+            .lines()
+            .find_map(|line| line.strip_prefix("+++ b/").or_else(|| line.strip_prefix("--- a/")))
+            .map(ToString::to_string)
+            .unwrap_or(args.patch),
+        Err(_) => String::from("?"),
+    };
+
+    format!("{} {}", theme.cyan_text(NAME), theme.yellow_text(&args))
 }
 
 pub fn format_result(raw_text: &str) -> String {

@@ -5,9 +5,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]
 pub struct CodeSearchArgs {
-    query: String,
-    #[serde(rename = "tokensNum")]
-    tokens_num: Option<i32>,
+    pub query: String,
+    pub tokens_num: Option<i32>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -81,7 +80,7 @@ impl Tool for CodeSearchTool {
                         "type": "string",
                         "description": "Search query to find relevant context for APIs, Libraries, and SDKs. For example, 'React useState hook examples', 'Python pandas dataframe filtering'."
                     },
-                    "tokensNum": {
+                    "tokens_num": {
                         "type": "number",
                         "description": "Number of tokens to return (1000-50000). Default is 5000 tokens."
                     }
