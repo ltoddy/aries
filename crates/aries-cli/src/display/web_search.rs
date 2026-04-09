@@ -1,0 +1,15 @@
+use aries_core::tools::{WebSearchOutput, WebSearchTool};
+use aries_theme::Theme;
+use rig::tool::Tool;
+use serde_json::Value;
+
+pub fn format_call(args: &Value, theme: &Theme) -> String {
+    let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("?");
+    format!("{} {}", theme.cyan_text(WebSearchTool::NAME), theme.yellow_text(query))
+}
+
+pub fn format_result(raw_text: &str) -> String {
+    serde_json::from_str::<WebSearchOutput>(raw_text)
+        .map(|output| output.results)
+        .unwrap_or_else(|_| raw_text.to_string())
+}

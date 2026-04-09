@@ -1,5 +1,6 @@
 mod args;
 mod commands;
+mod display;
 mod hook;
 mod input;
 mod welcome;
@@ -70,7 +71,7 @@ async fn main() -> anyhow::Result<()> {
                 let time = format!("⏱️  耗时: {:.2}s", elapsed.as_secs_f64());
                 let remining_width = terminal_width.saturating_sub(prefix.len() + time.len());
                 let line = format!("{}{}{}", "─".repeat(5), time, "─".repeat(remining_width));
-                println!("{}", theme.dimmed(&line));
+                println!("{}\n", theme.dimmed(&line));
             },
             Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => commands::exit::exit(),
             Err(err) => {

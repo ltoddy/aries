@@ -20,7 +20,7 @@ pub struct ReadFileOutput {
 #[derive(thiserror::Error, Debug)]
 pub enum ReadFileError {
     #[error("Failed to read file: {0}")]
-    IoError(#[from] std::io::Error),
+    Io(#[from] std::io::Error),
 }
 
 pub struct ReadFileTool;
@@ -53,21 +53,12 @@ impl Tool for ReadFileTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        let content = fs::read_to_string(&args.file_path).await?;
+        let mut content = fs::read_to_string(&args.file_path).await?;
 
-        let lines = content.lines().enumerate();
-        let offset = args.offset.unwrap_or(1).saturating_sub(1);
+        if let Some(offset) = args.offset {
+            content = content.lines().skip(offset).collect::<Vec<_>>().join("\n");
+        }
 
-        let limited_content: String = lines
-            .skip(offset)
-            .take(2000) // Default limit as per prompt
-            .map(|(i, line)| {
-                let truncated_line =
-                    if line.len() > 2000 { format!("{}... (truncated)", &line[..2000]) } else { line.to_string() };
-                format!("{}: {}\n", i + 1, truncated_line)
-            })
-            .collect();
-
-        Ok(ReadFileOutput { content: limited_content })
+        Ok(ReadFileOutput { content })
     }
 }
