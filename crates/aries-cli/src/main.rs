@@ -15,10 +15,6 @@ use clap::Parser;
 use rustyline::error::ReadlineError;
 use terminal_size::{Width, terminal_size};
 
-use crate::args::{Args, Subcommands};
-use crate::hook::DisplayPromptHook;
-use crate::input::InputReader;
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let gctx = GlobalContext::new()?;
@@ -26,10 +22,10 @@ async fn main() -> anyhow::Result<()> {
     let loader = AriesConfigLoader::new(&gctx.config_dir);
     let app_config = loader.load_or_setup().await?;
 
-    let args = Args::parse();
+    let args = args::Args::parse();
 
     match args.command {
-        Some(Subcommands::Acp) => return aries_acp::run(gctx, app_config).await,
+        Some(args::Subcommands::Acp) => return aries_acp::run(gctx, app_config).await,
         None => {},
     };
 
@@ -37,10 +33,10 @@ async fn main() -> anyhow::Result<()> {
         String::from("main"),
         &gctx,
         app_config.clone(),
-        DisplayPromptHook::new(Theme::default()),
+        hook::DisplayPromptHook::new(Theme::default()),
     )?;
 
-    let mut reader = InputReader::new(&gctx.config_dir)?;
+    let mut reader = input::InputReader::new(&gctx.config_dir)?;
     welcome::welcome(app_config.provider(), app_config.model(), &gctx);
 
     loop {
@@ -75,7 +71,7 @@ async fn main() -> anyhow::Result<()> {
             },
             Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => commands::exit::exit(),
             Err(err) => {
-                println!("Error: {:?}", err);
+                eprintln!("Error: {:?}", err);
                 continue;
             },
         }

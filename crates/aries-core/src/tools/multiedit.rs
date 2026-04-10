@@ -10,6 +10,7 @@ use tokio::fs;
 pub struct EditOperation {
     pub old_string: String,
     pub new_string: String,
+    #[serde(default)]
     pub replace_all: bool,
 }
 

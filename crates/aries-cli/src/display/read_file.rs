@@ -2,12 +2,10 @@ use aries_core::tools::{ReadFileArgs, ReadFileOutput, ReadFileTool};
 use aries_theme::Theme;
 use rig::tool::Tool;
 
-use crate::display::preview;
-
-pub fn format_call(args: &str, theme: &Theme) -> String {
+pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
     let args = serde_json::from_str::<ReadFileArgs>(args);
 
-    let args = match args {
+    let first = match args {
         Ok(args) => {
             let mut path = format!("{}", args.file_path.display());
             if let Some(offset) = args.offset {
@@ -15,14 +13,18 @@ pub fn format_call(args: &str, theme: &Theme) -> String {
             }
             path
         },
-        Err(_) => String::from("?"),
+        Err(_) => return (String::from("?"), None),
     };
 
-    format!("{} {}", theme.cyan_text(ReadFileTool::NAME), theme.yellow_text(&args))
+    (format!("{}: {}", theme.cyan_text(ReadFileTool::NAME), theme.yellow_text(&first)), None)
 }
 
-pub fn format_result(raw_text: &str) -> String {
-    serde_json::from_str::<ReadFileOutput>(raw_text)
-        .map(|output| preview(&output.content))
-        .unwrap_or_else(|_| preview(raw_text))
+pub fn format_tool_result(result: &str, theme: Theme) -> String {
+    let output = serde_json::from_str::<ReadFileOutput>(result);
+
+    let output = match output {
+        Ok(output) => output.content,
+        Err(_) => result.to_owned(),
+    };
+    format!("{}", theme.dimmed(&output))
 }

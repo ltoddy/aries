@@ -2,23 +2,28 @@ use aries_core::tools::{TaskArgs, TaskOutput, TaskTool};
 use aries_theme::Theme;
 use rig::tool::Tool;
 
-pub fn format_call(args: &str, theme: &Theme) -> String {
+pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
     const NAME: &str = TaskTool::<rig::providers::openai::CompletionModel, ()>::NAME;
 
     let args = serde_json::from_str::<TaskArgs>(args);
 
-    let args = match args {
+    let (first, rest) = match args {
         Ok(args) => {
             let mut description = args.description;
             description.push_str(&format!(", subagent_type = {}", args.subagent_type));
-            description
+            if let Some(task_id) = &args.task_id {
+                description.push_str(&format!(", task_id = {}", task_id));
+            }
+            (description, Some(args.prompt))
         },
-        Err(_) => String::from("?"),
+        Err(_) => return (String::from("?"), None),
     };
 
-    format!("{} {}", theme.cyan_text(NAME), theme.yellow_text(&args))
+    (format!("{} {}", theme.cyan_text(NAME), theme.yellow_text(&first)), rest)
 }
 
-pub fn format_result(raw_text: &str) -> String {
-    serde_json::from_str::<TaskOutput>(raw_text).map(|output| output.result).unwrap_or_else(|_| raw_text.to_string())
+pub fn format_tool_result(raw_text: &str, theme: Theme) -> String {
+    serde_json::from_str::<TaskOutput>(raw_text)
+        .map(|output| theme.dimmed(&output.result).to_string())
+        .unwrap_or_else(|_| theme.dimmed(raw_text).to_string())
 }

@@ -12,13 +12,13 @@ use async_trait::async_trait;
 use tokio::sync::{Mutex, mpsc, oneshot};
 use tracing::info;
 
-pub struct Agent {
+pub struct AcpImpl {
     sessions: Mutex<SessionManager>,
     sender: mpsc::UnboundedSender<(SessionNotification, oneshot::Sender<()>)>,
     next_session_id: Cell<String>,
 }
 
-impl Agent {
+impl AcpImpl {
     pub fn new(
         context: GlobalContext,
         config: AriesConfig,
@@ -32,7 +32,7 @@ impl Agent {
 }
 
 #[async_trait(?Send)]
-impl agent_client_protocol::Agent for Agent {
+impl agent_client_protocol::Agent for AcpImpl {
     async fn initialize(&self, args: InitializeRequest) -> agent_client_protocol::Result<InitializeResponse> {
         info!("Received initialize request {args:?}");
 

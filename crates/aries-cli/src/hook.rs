@@ -34,8 +34,13 @@ impl<M: CompletionModel> PromptHook<M> for DisplayPromptHook {
         _internal_call_id: &str,
         args: &str,
     ) -> ToolCallHookAction {
-        let tool_call = format_tool_call_args(tool_name, args, &self.theme);
+        let (tool_call, rest) = format_tool_call_args(tool_name, args, &self.theme);
         println!("\n{} {}", self.theme.cyan_text("•"), tool_call);
+        if let Some(rest) = rest {
+            println!("{}", preview(&rest));
+        } else {
+            println!("{}", self.theme.dimmed("No output."));
+        }
 
         ToolCallHookAction::cont()
     }
@@ -48,10 +53,8 @@ impl<M: CompletionModel> PromptHook<M> for DisplayPromptHook {
         _args: &str,
         result: &str,
     ) -> HookAction {
-        let tool_result = format_tool_result_output(tool_name, result);
-        for line in preview(&tool_result).lines() {
-            println!("  {}", self.theme.dimmed(line));
-        }
+        let tool_result = format_tool_result_output(tool_name, result, self.theme);
+        println!("{}", preview(&tool_result));
 
         HookAction::cont()
     }
