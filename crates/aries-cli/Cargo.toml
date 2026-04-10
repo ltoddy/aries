@@ -17,9 +17,9 @@ aries-core = { path = "../aries-core" }
 aries-session = { path = "../aries-session" }
 aries-theme = { path = "../aries-theme" }
 clap.workspace = true
-colored.workspace = true
 dialoguer.workspace = true
 ferris-says.workspace = true
+itertools.workspace = true
 rig-core.workspace = true
 rustyline.workspace = true
 rustyline-derive.workspace = true

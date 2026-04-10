@@ -6,8 +6,7 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct LspArgs {
     pub operation: String,
     pub file_path: Option<PathBuf>,
@@ -16,13 +15,12 @@ pub struct LspArgs {
     pub query: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct LspOutput {
     pub result: Value,
 }
 
 #[derive(thiserror::Error, Debug)]
-#[allow(dead_code)]
 pub enum LspError {
     #[error("LSP Error: {0}")]
     OperationFailed(String),

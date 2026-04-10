@@ -13,8 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::AgentWrapper;
 use crate::agent_type::AgentType;
 
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct TaskArgs {
     pub description: String,
     pub prompt: String,
@@ -22,14 +21,13 @@ pub struct TaskArgs {
     pub task_id: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct TaskOutput {
     pub task_id: String,
     pub result: String,
 }
 
 #[derive(thiserror::Error, Debug)]
-#[allow(dead_code)]
 pub enum TaskError {
     #[error("Task execution failed: {0}")]
     ExecutionError(String),

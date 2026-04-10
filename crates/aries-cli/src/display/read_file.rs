@@ -2,9 +2,9 @@ use aries_core::tools::{ReadFileArgs, ReadFileOutput, ReadFileTool};
 use aries_theme::Theme;
 use rig::tool::Tool;
 
-pub fn format_call(args: &str, theme: &Theme) -> String {
-    const NAME: &str = ReadFileTool::NAME;
+use crate::display::preview;
 
+pub fn format_call(args: &str, theme: &Theme) -> String {
     let args = serde_json::from_str::<ReadFileArgs>(args);
 
     let args = match args {
@@ -18,11 +18,11 @@ pub fn format_call(args: &str, theme: &Theme) -> String {
         Err(_) => String::from("?"),
     };
 
-    format!("{} {}", theme.cyan_text(NAME), theme.yellow_text(&args))
+    format!("{} {}", theme.cyan_text(ReadFileTool::NAME), theme.yellow_text(&args))
 }
 
 pub fn format_result(raw_text: &str) -> String {
     serde_json::from_str::<ReadFileOutput>(raw_text)
-        .map(|output| output.content)
-        .unwrap_or_else(|_| raw_text.to_string())
+        .map(|output| preview(&output.content))
+        .unwrap_or_else(|_| preview(raw_text))
 }

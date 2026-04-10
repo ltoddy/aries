@@ -6,20 +6,20 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct EditOperation {
     pub old_string: String,
     pub new_string: String,
     pub replace_all: bool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct MultiEditArgs {
     pub file_path: PathBuf,
     pub edits: Vec<EditOperation>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct MultiEditOutput {
     pub success: bool,
     pub message: String,

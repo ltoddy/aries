@@ -3,20 +3,18 @@ use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct WebSearchArgs {
     pub query: String,
     pub num: Option<i32>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct WebSearchOutput {
     pub results: String,
 }
 
 #[derive(thiserror::Error, Debug)]
-#[allow(dead_code)]
 pub enum WebSearchError {
     #[error("Failed to perform web search: {0}")]
     SearchError(String),

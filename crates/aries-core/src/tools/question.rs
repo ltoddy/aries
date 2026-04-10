@@ -5,13 +5,13 @@ use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct QuestionOption {
     pub label: String,
     pub description: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct QuestionArgs {
     pub question: String,
     pub options: Option<Vec<QuestionOption>>,
@@ -25,7 +25,7 @@ fn default_custom() -> bool {
     true
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct QuestionOutput {
     pub answers: Vec<String>,
 }

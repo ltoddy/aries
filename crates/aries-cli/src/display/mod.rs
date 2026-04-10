@@ -21,6 +21,7 @@ use aries_core::tools::{
     QuestionTool, ReadFileTool, ShellCommand, TaskTool, WebFetchTool, WebSearchTool, WriteFileTool,
 };
 use aries_theme::Theme;
+use itertools::Itertools;
 use rig::providers::openai;
 use rig::tool::Tool;
 
@@ -42,7 +43,7 @@ pub fn format_tool_call_args(tool_name: &str, args: &str, theme: &Theme) -> Stri
         WebSearchTool::NAME => web_search::format_call(args, theme),
         CodeSearchTool::NAME => code_search::format_call(args, theme),
         LspTool::NAME => lsp::format_call(args, theme),
-        _ => common::format_unknown_call(tool_name, args, theme),
+        _ => format_unknown_call(tool_name, args, theme),
     }
 }
 
@@ -79,4 +80,25 @@ pub fn display_token_usage(usage: &rig::completion::Usage, theme: &Theme) {
         theme.dimmed(&usage.cached_input_tokens.to_string()),
         theme.dimmed(&usage.output_tokens.to_string())
     );
+}
+
+pub fn format_unknown_call(tool_name: &str, args: &str, theme: &Theme) -> String {
+    let args_str = serde_json::from_str::<serde_json::Value>(args)
+        .and_then(|value| serde_json::to_string_pretty(&value))
+        .unwrap_or_else(|_| args.to_string());
+    format!("{} with arguments:\n{}", theme.cyan_text(tool_name), theme.blue_text(&args_str))
+}
+
+const MAX_LINES: usize = 5;
+
+pub fn preview(content: &str) -> String {
+    let lines: Vec<_> = content.lines().map(|line| format!("| {line}")).collect();
+    let len = lines.len();
+
+    if len > MAX_LINES {
+        let preview = lines[..MAX_LINES].iter().join("\n");
+        format!("{}\n+ ... ({} more lines truncated)", preview, len - MAX_LINES)
+    } else {
+        content.to_string()
+    }
 }

@@ -8,14 +8,13 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct LsArgs {
     pub path: Option<PathBuf>,
     pub ignore: Option<Vec<String>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct LsOutput {
     pub entries: Vec<String>,
 }
@@ -23,7 +22,7 @@ pub struct LsOutput {
 #[derive(thiserror::Error, Debug)]
 pub enum LsError {
     #[error("Failed to read directory: {0}")]
-    IoError(#[from] std::io::Error),
+    Io(#[from] std::io::Error),
 }
 
 pub struct LsTool;

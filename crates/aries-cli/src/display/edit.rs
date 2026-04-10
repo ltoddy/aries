@@ -3,15 +3,30 @@ use aries_theme::Theme;
 use rig::tool::Tool;
 
 pub fn format_call(args: &str, theme: &Theme) -> String {
-    const NAME: &str = EditTool::NAME;
     let args = serde_json::from_str::<EditArgs>(args);
 
     let args = match args {
-        Ok(args) => args.file_path.display().to_string(),
+        Ok(args) => {
+            let mut content = format!("{}", args.file_path.display());
+            if args.replace_all {
+                content.push_str(" replace_all = true");
+            }
+
+            if !args.old_string.is_empty() || !args.new_string.is_empty() {
+                let old_lines = args.old_string.lines().map(|line| format!("- {}", line));
+                let new_lines = args.new_string.lines().map(|line| format!("+ {}", line));
+                let diff = old_lines.chain(new_lines).collect::<Vec<_>>().join("\n");
+
+                content.push('\n');
+                content.push_str(&diff);
+            }
+
+            content
+        },
         Err(_) => String::from("?"),
     };
 
-    format!("{} {}", theme.cyan_text(NAME), theme.yellow_text(&args))
+    format!("{} {}", theme.cyan_text(EditTool::NAME), theme.yellow_text(&args))
 }
 
 pub fn format_result(raw_text: &str) -> String {

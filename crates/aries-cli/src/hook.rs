@@ -4,7 +4,7 @@ use aries_theme::Theme;
 use rig::agent::{HookAction, PromptHook, ToolCallHookAction};
 use rig::completion::{CompletionModel, CompletionResponse, GetTokenUsage, Message};
 
-use crate::display::{display_token_usage, format_tool_call_args, format_tool_result_output};
+use crate::display::{display_token_usage, format_tool_call_args, format_tool_result_output, preview};
 
 #[derive(Debug, Clone)]
 pub struct DisplayPromptHook {
@@ -34,8 +34,9 @@ impl<M: CompletionModel> PromptHook<M> for DisplayPromptHook {
         _internal_call_id: &str,
         args: &str,
     ) -> ToolCallHookAction {
-        let formatted_tool = format_tool_call_args(tool_name, args, &self.theme);
-        println!("\n{} {}", self.theme.cyan_text("•"), formatted_tool);
+        let tool_call = format_tool_call_args(tool_name, args, &self.theme);
+        println!("\n{} {}", self.theme.cyan_text("•"), tool_call);
+
         ToolCallHookAction::cont()
     }
 
@@ -47,20 +48,9 @@ impl<M: CompletionModel> PromptHook<M> for DisplayPromptHook {
         _args: &str,
         result: &str,
     ) -> HookAction {
-        let output_str = format_tool_result_output(tool_name, result);
-
-        let max_lines = 7;
-        let lines: Vec<&str> = output_str.lines().collect();
-
-        if lines.len() > max_lines {
-            for line in lines.iter().take(max_lines) {
-                println!("  {}", self.theme.dimmed(line));
-            }
-            println!("  ... ({} more lines truncated)", lines.len() - max_lines);
-        } else {
-            for line in lines {
-                println!("  {}", self.theme.dimmed(line));
-            }
+        let tool_result = format_tool_result_output(tool_name, result);
+        for line in preview(&tool_result).lines() {
+            println!("  {}", self.theme.dimmed(line));
         }
 
         HookAction::cont()

@@ -3,13 +3,13 @@ use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct CodeSearchArgs {
     pub query: String,
     pub tokens_num: Option<i32>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct CodeSearchOutput {
     pub results: String,
 }
@@ -22,20 +22,20 @@ pub enum CodeSearchError {
 
 pub struct CodeSearchTool;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct McpCodeRequestArgs {
     query: String,
     #[serde(rename = "tokensNum")]
     tokens_num: i32,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct McpCodeRequestParams {
     name: String,
     arguments: McpCodeRequestArgs,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct McpCodeRequest {
     jsonrpc: String,
     id: i32,
@@ -43,22 +43,20 @@ struct McpCodeRequest {
     params: McpCodeRequestParams,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct McpCodeResponseContent {
-    #[allow(dead_code)]
     #[serde(rename = "type")]
     content_type: String,
     text: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct McpCodeResponseResult {
     content: Vec<McpCodeResponseContent>,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct McpCodeResponse {
-    #[allow(dead_code)]
     jsonrpc: String,
     result: Option<McpCodeResponseResult>,
 }

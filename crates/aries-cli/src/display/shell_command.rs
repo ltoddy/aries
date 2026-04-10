@@ -2,6 +2,8 @@ use aries_core::tools::{ShellCommand, ShellCommandArgs, ShellCommandOutput};
 use aries_theme::Theme;
 use rig::tool::Tool;
 
+use crate::display::preview;
+
 pub fn format_call(args: &str, theme: &Theme) -> String {
     const NAME: &str = ShellCommand::NAME;
     let args = serde_json::from_str::<ShellCommandArgs>(args);
@@ -27,7 +29,7 @@ pub fn format_result(raw_text: &str) -> String {
                 }
                 text.push_str(&output.stderr);
             }
-            text
+            preview(&text)
         })
-        .unwrap_or_else(|_| raw_text.to_string())
+        .unwrap_or_else(|_| preview(raw_text))
 }

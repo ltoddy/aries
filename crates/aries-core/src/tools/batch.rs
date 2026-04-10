@@ -13,26 +13,23 @@ use serde_json::Value;
 
 use crate::tools::*;
 
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct BatchCall {
     pub tool: String,
     pub parameters: Value,
 }
 
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct BatchArgs {
     pub calls: Vec<BatchCall>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct BatchOutput {
     pub results: Vec<Value>,
 }
 
 #[derive(thiserror::Error, Debug)]
-#[allow(dead_code)]
 pub enum BatchError {
     #[error("Batch execution failed: {0}")]
     ExecutionError(String),

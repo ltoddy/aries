@@ -6,7 +6,7 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct EditArgs {
     pub file_path: PathBuf,
     pub old_string: String,
@@ -14,7 +14,7 @@ pub struct EditArgs {
     pub replace_all: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct EditOutput {
     pub success: bool,
     pub message: String,
