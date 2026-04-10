@@ -10,26 +10,29 @@ pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
 
     let first = match args {
         Ok(args) => args.command,
-        Err(_) => return (String::from("?"), None),
+        Err(_) => String::from("?"),
     };
 
     (format!("{} {}", theme.cyan_text(NAME), theme.yellow_text(&first)), None)
 }
 
-pub fn format_tool_result(raw_text: &str, theme: Theme) -> String {
-    serde_json::from_str::<ShellCommandOutput>(raw_text)
-        .map(|output| {
-            let mut text = String::new();
+pub fn format_tool_result(result: &str, theme: Theme) -> String {
+    let output = serde_json::from_str::<ShellCommandOutput>(result);
+
+    match output {
+        Ok(output) => {
+            let mut out = String::new();
             if !output.stdout.is_empty() {
-                text.push_str(&output.stdout);
+                out.push_str(&output.stdout);
             }
             if !output.stderr.is_empty() {
-                if !text.is_empty() {
-                    text.push('\n');
+                if !out.is_empty() {
+                    out.push('\n');
                 }
-                text.push_str(&output.stderr);
+                out.push_str(&output.stderr);
             }
-            theme.dimmed(&preview(&text)).to_string()
-        })
-        .unwrap_or_else(|_| theme.dimmed(&preview(raw_text)).to_string())
+            theme.dimmed(&preview(&out)).to_string()
+        },
+        Err(err) => theme.red_text(&format!("Error as follow: {err}")).to_string(),
+    }
 }

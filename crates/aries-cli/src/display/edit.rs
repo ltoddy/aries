@@ -2,6 +2,8 @@ use aries_core::tools::{EditArgs, EditOutput, EditTool};
 use aries_theme::Theme;
 use rig::tool::Tool;
 
+use crate::display::preview;
+
 pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
     let args = serde_json::from_str::<EditArgs>(args);
 
@@ -34,8 +36,11 @@ pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
     (format!("{} {}", theme.cyan_text(EditTool::NAME), theme.yellow_text(&first)), rest)
 }
 
-pub fn format_tool_result(raw_text: &str, theme: Theme) -> String {
-    serde_json::from_str::<EditOutput>(raw_text)
-        .map(|output| theme.dimmed(&output.message).to_string())
-        .unwrap_or_else(|_| theme.dimmed(raw_text).to_string())
+pub fn format_tool_result(result: &str, theme: Theme) -> String {
+    let output = serde_json::from_str::<EditOutput>(result);
+
+    match output {
+        Ok(output) => theme.dimmed(&preview(&output.message)).to_string(),
+        Err(err) => theme.red_text(&format!("Error as follow: {err}")).to_string(),
+    }
 }

@@ -4,7 +4,7 @@ use aries_theme::Theme;
 use rig::agent::{HookAction, PromptHook, ToolCallHookAction};
 use rig::completion::{CompletionModel, CompletionResponse, GetTokenUsage, Message};
 
-use crate::display::{display_token_usage, format_tool_call_args, format_tool_result_output, preview};
+use crate::display::{display_token_usage, format_tool_call_args, format_tool_result_output};
 
 #[derive(Debug, Clone)]
 pub struct DisplayPromptHook {
@@ -37,9 +37,7 @@ impl<M: CompletionModel> PromptHook<M> for DisplayPromptHook {
         let (tool_call, rest) = format_tool_call_args(tool_name, args, &self.theme);
         println!("\n{} {}", self.theme.cyan_text("•"), tool_call);
         if let Some(rest) = rest {
-            println!("{}", preview(&rest));
-        } else {
-            println!("{}", self.theme.dimmed("No output."));
+            println!("{}", rest);
         }
 
         ToolCallHookAction::cont()
@@ -54,7 +52,7 @@ impl<M: CompletionModel> PromptHook<M> for DisplayPromptHook {
         result: &str,
     ) -> HookAction {
         let tool_result = format_tool_result_output(tool_name, result, self.theme);
-        println!("{}", preview(&tool_result));
+        println!("{}", tool_result);
 
         HookAction::cont()
     }

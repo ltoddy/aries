@@ -46,25 +46,25 @@ pub fn format_tool_call_args(tool_name: &str, args: &str, theme: &Theme) -> (Str
     }
 }
 
-pub fn format_tool_result_output(tool_name: &str, raw_text: &str, theme: Theme) -> String {
+pub fn format_tool_result_output(tool_name: &str, result: &str, theme: Theme) -> String {
     let output = match tool_name {
-        ReadFileTool::NAME => read_file::format_tool_result(raw_text, theme),
-        WriteFileTool::NAME => write_file::format_tool_result(raw_text, theme),
-        ShellCommand::NAME => shell_command::format_tool_result(raw_text, theme),
-        GlobTool::NAME => glob::format_tool_result(raw_text, theme),
-        GrepTool::NAME => grep::format_tool_result(raw_text, theme),
-        LsTool::NAME => ls::format_tool_result(raw_text, theme),
-        ApplyPatchTool::NAME => apply_patch::format_tool_result(raw_text, theme),
-        EditTool::NAME => edit::format_tool_result(raw_text, theme),
-        MultiEditTool::NAME => multi_edit::format_tool_result(raw_text, theme),
-        BatchTool::<openai::CompletionModel, ()>::NAME => batch::format_tool_result(raw_text, theme),
-        QuestionTool::NAME => question::format_tool_result(raw_text, theme),
-        TaskTool::<openai::CompletionModel, ()>::NAME => task::format_tool_result(raw_text, theme),
-        WebFetchTool::NAME => web_fetch::format_tool_result(raw_text, theme),
-        WebSearchTool::NAME => web_search::format_tool_result(raw_text, theme),
-        CodeSearchTool::NAME => code_search::format_tool_result(raw_text, theme),
-        LspTool::NAME => lsp::format_tool_result(raw_text, theme),
-        _ => raw_text.to_string(),
+        ReadFileTool::NAME => read_file::format_tool_result(result, theme),
+        WriteFileTool::NAME => write_file::format_tool_result(result, theme),
+        ShellCommand::NAME => shell_command::format_tool_result(result, theme),
+        GlobTool::NAME => glob::format_tool_result(result, theme),
+        GrepTool::NAME => grep::format_tool_result(result, theme),
+        LsTool::NAME => ls::format_tool_result(result, theme),
+        ApplyPatchTool::NAME => apply_patch::format_tool_result(result, theme),
+        EditTool::NAME => edit::format_tool_result(result, theme),
+        MultiEditTool::NAME => multi_edit::format_tool_result(result, theme),
+        BatchTool::<openai::CompletionModel, ()>::NAME => batch::format_tool_result(result, theme),
+        QuestionTool::NAME => question::format_tool_result(result, theme),
+        TaskTool::<openai::CompletionModel, ()>::NAME => task::format_tool_result(result, theme),
+        WebFetchTool::NAME => web_fetch::format_tool_result(result, theme),
+        WebSearchTool::NAME => web_search::format_tool_result(result, theme),
+        CodeSearchTool::NAME => code_search::format_tool_result(result, theme),
+        LspTool::NAME => lsp::format_tool_result(result, theme),
+        _ => result.to_string(),
     };
 
     if output.is_empty() { "No output".to_string() } else { output }
@@ -89,9 +89,9 @@ pub fn format_unknown_call(tool_name: &str, args: &str, theme: &Theme) -> (Strin
     (format!("{} {}", theme.cyan_text(tool_name), theme.yellow_text("(unknown tool)")), Some(args_str))
 }
 
-const MAX_LINES: usize = 5;
-
 pub fn preview(content: &str) -> String {
+    const MAX_LINES: usize = 5;
+
     let lines: Vec<_> = content.lines().map(|line| format!("| {line}")).collect();
     let len = lines.len();
 
