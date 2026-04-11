@@ -28,10 +28,12 @@ pub enum GlobError {
     Walk(String),
 }
 
+pub const NAME: &str = "glob";
+
 pub struct GlobTool;
 
 impl Tool for GlobTool {
-    const NAME: &'static str = "glob";
+    const NAME: &'static str = NAME;
     type Error = GlobError;
     type Args = GlobArgs;
     type Output = GlobOutput;

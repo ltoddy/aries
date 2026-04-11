@@ -25,10 +25,12 @@ pub enum LsError {
     Io(#[from] std::io::Error),
 }
 
+pub const NAME: &str = "ls";
+
 pub struct LsTool;
 
 impl Tool for LsTool {
-    const NAME: &'static str = "ls";
+    const NAME: &'static str = NAME;
     type Error = LsError;
     type Args = LsArgs;
     type Output = LsOutput;

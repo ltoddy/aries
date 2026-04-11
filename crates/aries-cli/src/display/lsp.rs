@@ -1,10 +1,7 @@
-use aries_core::tools::{LspArgs, LspOutput, LspTool};
+use aries_core::tools::lsp::{LspArgs, LspOutput, NAME};
 use aries_theme::Theme;
-use rig::tool::Tool;
 
 pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
-    const NAME: &str = LspTool::NAME;
-
     let args = serde_json::from_str::<LspArgs>(args);
 
     let first = match args {

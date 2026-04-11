@@ -1,55 +1,32 @@
-pub mod agent_type;
 pub mod compaction;
 pub mod tools;
 
-use std::marker::PhantomData;
-
-use anyhow::{Context, bail};
 use aries_config::AriesConfig;
 use rig::agent::{Agent, PromptHook, StreamingResult};
 use rig::client::CompletionClient;
 use rig::completion::{self, Message, Prompt};
-use rig::providers::{azure, openai};
 use rig::streaming::StreamingPrompt;
 use rig::tool::ToolDyn;
 
-use crate::agent_type::AgentType;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AgentType {
+    Build,
+    Plan,
+    General,
+    Explore,
+    Compaction,
+    Title,
+    Summary,
+}
 
 pub const AGENT_LOOP_MAX_TURNS: usize = 200;
-
-fn openai_tools_for_agent<P>(agent_type: AgentType, config: AriesConfig, hook: P) -> Vec<Box<dyn ToolDyn>>
-where
-    P: PromptHook<openai::CompletionModel> + 'static,
-{
-    match agent_type {
-        AgentType::Build | AgentType::General => tools::build_openai_tools(config, hook),
-        AgentType::Plan => tools::plan_tools(),
-        AgentType::Explore => tools::explore_tools(),
-        _ => vec![],
-    }
-}
-
-fn azure_tools_for_agent<P>(agent_type: AgentType, config: AriesConfig, hook: P) -> Vec<Box<dyn ToolDyn>>
-where
-    P: PromptHook<azure::CompletionModel> + 'static,
-{
-    match agent_type {
-        AgentType::Build | AgentType::General => tools::build_azure_tools(config, hook),
-        AgentType::Plan => tools::plan_tools(),
-        AgentType::Explore => tools::explore_tools(),
-        _ => vec![],
-    }
-}
 
 pub struct AgentWrapper<M, P = ()>
 where
     M: completion::CompletionModel,
     P: PromptHook<M>,
 {
-    name: String,
-    pub inner: Agent<M>,
-    hook: P,
-    _phantom: PhantomData<M>,
+    inner: Agent<M, P>,
 }
 
 impl<M, P> AgentWrapper<M, P>
@@ -57,100 +34,110 @@ where
     M: completion::CompletionModel + 'static,
     P: PromptHook<M> + 'static,
 {
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-}
-
-impl<P> AgentWrapper<openai::CompletionModel, P>
-where
-    P: PromptHook<openai::CompletionModel> + 'static,
-{
-    pub fn new(name: String, config: AriesConfig, agent_type: AgentType, hook: P) -> anyhow::Result<Self> {
-        let AriesConfig::OpenAICompatible(config) = config else {
-            bail!("OpenAI compatible agent requires an OpenAI compatible config");
-        };
-        let tool_config = AriesConfig::OpenAICompatible(config.clone());
-
-        let client = openai::CompletionsClient::builder()
-            .base_url(&config.base_url)
-            .api_key(&config.api_key)
-            .build()
-            .with_context(|| "Failed to create llm client")?;
-
-        let preamble = agent_type.preamble();
-        let tools = openai_tools_for_agent(agent_type, tool_config, hook.clone());
+    pub fn new<C: CompletionClient<CompletionModel = M> + Clone + Send + Sync + 'static>(
+        client: C,
+        name: String,
+        config: AriesConfig,
+        agent_type: AgentType,
+        hook: P,
+    ) -> Self {
+        let model = config.model().to_owned();
+        let preamble = Self::preamble(agent_type);
+        let tools = Self::tools::<C>(agent_type, config, &client);
 
         let inner = client
-            .agent(&config.model)
-            .name(agent_type.name())
-            .description(agent_type.description())
+            .agent(model)
+            .hook(hook)
+            .name(&name)
+            .description(Self::description(agent_type))
             .preamble(preamble)
             .tools(tools)
             .default_max_turns(AGENT_LOOP_MAX_TURNS)
             .build();
 
-        Ok(Self { name, inner, hook, _phantom: Default::default() })
+        Self { inner }
     }
 
-    #[inline]
     pub async fn stream_prompt(
         &mut self,
         prompt: &str,
         history: &[Message],
-    ) -> StreamingResult<<openai::CompletionModel as completion::CompletionModel>::StreamingResponse> {
-        self.inner.stream_prompt(prompt).with_history(history.to_vec()).with_hook(self.hook.clone()).await
+    ) -> StreamingResult<<M>::StreamingResponse> {
+        self.inner.stream_prompt(prompt).with_history(history.to_vec()).await
     }
 
     pub async fn prompt(&mut self, prompt: &str, history: &[Message]) -> anyhow::Result<String> {
-        let res = self.inner.prompt(prompt).with_history(&mut history.to_vec()).with_hook(self.hook.clone()).await?;
+        let res = self.inner.prompt(prompt).with_history(&mut history.to_vec()).await?;
         Ok(res)
     }
-}
 
-impl<P> AgentWrapper<azure::CompletionModel, P>
-where
-    P: PromptHook<azure::CompletionModel> + 'static,
-{
-    pub fn new(name: String, config: AriesConfig, agent_type: AgentType, hook: P) -> anyhow::Result<Self> {
-        let AriesConfig::Azure(config) = config else {
-            bail!("Azure agent requires an Azure config");
-        };
-        let tool_config = AriesConfig::Azure(config.clone());
-
-        let client = azure::Client::builder()
-            .api_key(&config.api_key)
-            .azure_endpoint(config.azure_endpoint)
-            .api_version(&config.api_version)
-            .build()
-            .with_context(|| "Failed to create llm client")?;
-
-        let preamble = agent_type.preamble();
-        let tools = azure_tools_for_agent(agent_type, tool_config, hook.clone());
-
-        let inner = client
-            .agent(&config.model)
-            .name(agent_type.name())
-            .description(agent_type.description())
-            .preamble(preamble)
-            .tools(tools)
-            .default_max_turns(AGENT_LOOP_MAX_TURNS)
-            .build();
-
-        Ok(Self { name, inner, hook, _phantom: Default::default() })
+    const fn preamble(agent_type: AgentType) -> &'static str {
+        match agent_type {
+            AgentType::Build => include_str!("prompts/build.txt"),
+            AgentType::Plan => include_str!("prompts/plan.txt"),
+            AgentType::General => include_str!("prompts/generate.txt"),
+            AgentType::Explore => include_str!("prompts/explore.txt"),
+            AgentType::Compaction => include_str!("prompts/compaction.txt"),
+            AgentType::Title => include_str!("prompts/title.txt"),
+            AgentType::Summary => include_str!("prompts/summary.txt"),
+        }
     }
 
-    #[inline]
-    pub async fn stream_prompt(
-        &mut self,
-        prompt: &str,
-        history: &[Message],
-    ) -> StreamingResult<<azure::CompletionModel as completion::CompletionModel>::StreamingResponse> {
-        self.inner.stream_prompt(prompt).with_history(history.to_vec()).with_hook(self.hook.clone()).await
+    const fn description(agent_type: AgentType) -> &'static str {
+        match agent_type {
+            AgentType::Build => "默认主智能体。直接使用工具执行任务，并在需要时委托子智能体。",
+            AgentType::Plan => "计划模式。不允许使用所有编辑工具。",
+            AgentType::General => "用于研究复杂问题和执行多步任务的通用智能体。使用此智能体并行执行多个工作单元。",
+            AgentType::Explore => {
+                "专门用于探索代码库的快速智能体。当您需要通过模式快速查找文件、搜索关键字或回答有关代码库的问题时使用。"
+            },
+            AgentType::Compaction => "用于压缩和总结对话上下文的智能体。",
+            AgentType::Title => "用于生成对话标题的智能体。",
+            AgentType::Summary => "用于生成对话摘要（类似于 PR 描述）的智能体。",
+        }
     }
 
-    pub async fn prompt(&mut self, prompt: &str, history: &[Message]) -> anyhow::Result<String> {
-        let res = self.inner.prompt(prompt).with_history(&mut history.to_vec()).with_hook(self.hook.clone()).await?;
-        Ok(res)
+    fn tools<C: CompletionClient<CompletionModel = M> + Clone + Send + Sync + 'static>(
+        agent_type: AgentType,
+        config: AriesConfig,
+        client: &C,
+    ) -> Vec<Box<dyn ToolDyn>> {
+        match agent_type {
+            AgentType::Build | AgentType::General => vec![
+                Box::new(tools::bash::ShellCommand),
+                Box::new(tools::read::ReadFileTool),
+                Box::new(tools::write::WriteFileTool),
+                Box::new(tools::glob::GlobTool),
+                Box::new(tools::grep::GrepTool),
+                Box::new(tools::ls::LsTool),
+                Box::new(tools::apply_patch::ApplyPatchTool),
+                Box::new(tools::multiedit::MultiEditTool),
+                Box::new(tools::edit::EditTool),
+                Box::new(tools::batch::BatchTool::<C>::new(client.clone(), config.clone())),
+                Box::new(tools::question::QuestionTool),
+                Box::new(tools::task::TaskTool::<C>::new(client.clone(), config.clone())),
+                Box::new(tools::lsp::LspTool),
+                Box::new(tools::codesearch::CodeSearchTool),
+            ],
+            AgentType::Plan => vec![
+                Box::new(tools::bash::ShellCommand),
+                Box::new(tools::read::ReadFileTool),
+                Box::new(tools::glob::GlobTool),
+                Box::new(tools::grep::GrepTool),
+                Box::new(tools::ls::LsTool),
+                Box::new(tools::question::QuestionTool),
+                Box::new(tools::lsp::LspTool),
+                Box::new(tools::codesearch::CodeSearchTool),
+            ],
+            AgentType::Explore => vec![
+                Box::new(tools::bash::ShellCommand),
+                Box::new(tools::read::ReadFileTool),
+                Box::new(tools::glob::GlobTool),
+                Box::new(tools::grep::GrepTool),
+                Box::new(tools::ls::LsTool),
+                Box::new(tools::codesearch::CodeSearchTool),
+            ],
+            _ => vec![],
+        }
     }
 }

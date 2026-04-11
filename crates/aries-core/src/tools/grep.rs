@@ -28,10 +28,12 @@ pub enum GrepError {
     Globset(#[from] globset::Error),
 }
 
+pub const NAME: &str = "grep";
+
 pub struct GrepTool;
 
 impl Tool for GrepTool {
-    const NAME: &'static str = "grep";
+    const NAME: &'static str = NAME;
     type Error = GrepError;
     type Args = GrepArgs;
     type Output = GrepOutput;

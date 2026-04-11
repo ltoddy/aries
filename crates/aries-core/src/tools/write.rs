@@ -23,10 +23,12 @@ pub enum WriteFileError {
     IoError(#[from] std::io::Error),
 }
 
+pub const NAME: &str = "write_file";
+
 pub struct WriteFileTool;
 
 impl Tool for WriteFileTool {
-    const NAME: &'static str = "write_file";
+    const NAME: &'static str = NAME;
     type Error = WriteFileError;
     type Args = WriteFileArgs;
     type Output = WriteFileOutput;

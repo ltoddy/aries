@@ -24,10 +24,12 @@ pub enum ShellCommandError {
     ExecutionFailed(String),
 }
 
+pub const NAME: &str = "shell_command";
+
 pub struct ShellCommand;
 
 impl Tool for ShellCommand {
-    const NAME: &'static str = "shell_command";
+    const NAME: &'static str = NAME;
     type Error = ShellCommandError;
     type Args = ShellCommandArgs;
     type Output = ShellCommandOutput;

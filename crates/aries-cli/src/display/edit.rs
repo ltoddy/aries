@@ -1,6 +1,5 @@
-use aries_core::tools::{EditArgs, EditOutput, EditTool};
+use aries_core::tools::edit::{EditArgs, EditOutput, NAME};
 use aries_theme::Theme;
-use rig::tool::Tool;
 
 use crate::display::preview;
 
@@ -33,7 +32,7 @@ pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
         Err(_) => return (String::from("?"), None),
     };
 
-    (format!("{} {}", theme.cyan_text(EditTool::NAME), theme.yellow_text(&first)), rest)
+    (format!("{} {}", theme.cyan_text(NAME), theme.yellow_text(&first)), rest)
 }
 
 pub fn format_tool_result(result: &str, theme: Theme) -> String {

@@ -32,10 +32,12 @@ pub enum MultiEditError {
     EditError(String),
 }
 
+pub const NAME: &str = "multiedit";
+
 pub struct MultiEditTool;
 
 impl Tool for MultiEditTool {
-    const NAME: &'static str = "multiedit";
+    const NAME: &'static str = NAME;
     type Error = MultiEditError;
     type Args = MultiEditArgs;
     type Output = MultiEditOutput;

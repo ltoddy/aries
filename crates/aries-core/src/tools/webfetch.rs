@@ -20,10 +20,12 @@ pub enum WebFetchError {
     FetchError(String),
 }
 
+pub const NAME: &str = "web_fetch";
+
 pub struct WebFetchTool;
 
 impl Tool for WebFetchTool {
-    const NAME: &'static str = "web_fetch";
+    const NAME: &'static str = NAME;
     type Error = WebFetchError;
     type Args = WebFetchArgs;
     type Output = WebFetchOutput;

@@ -15,55 +15,50 @@ pub mod web_fetch;
 pub mod web_search;
 pub mod write_file;
 
-use aries_core::tools::{
-    ApplyPatchTool, BatchTool, CodeSearchTool, EditTool, GlobTool, GrepTool, LsTool, LspTool, MultiEditTool,
-    QuestionTool, ReadFileTool, ShellCommand, TaskTool, WebFetchTool, WebSearchTool, WriteFileTool,
-};
+use aries_core::tools;
 use aries_theme::Theme;
 use itertools::Itertools;
-use rig::providers::openai;
-use rig::tool::Tool;
 
 pub fn format_tool_call_args(tool_name: &str, args: &str, theme: &Theme) -> (String, Option<String>) {
     match tool_name {
-        ReadFileTool::NAME => read_file::format_tool_call(args, theme),
-        WriteFileTool::NAME => write_file::format_tool_call(args, theme),
-        ShellCommand::NAME => shell_command::format_tool_call(args, theme),
-        GlobTool::NAME => glob::format_tool_call(args, theme),
-        GrepTool::NAME => grep::format_tool_call(args, theme),
-        LsTool::NAME => ls::format_tool_call(args, theme),
-        ApplyPatchTool::NAME => apply_patch::format_tool_call(args, theme),
-        EditTool::NAME => edit::format_tool_call(args, theme),
-        MultiEditTool::NAME => multi_edit::format_tool_call(args, theme),
-        BatchTool::<openai::CompletionModel, ()>::NAME => batch::format_tool_call(args, theme),
-        QuestionTool::NAME => question::format_tool_call(args, theme),
-        TaskTool::<openai::CompletionModel, ()>::NAME => task::format_tool_call(args, theme),
-        WebFetchTool::NAME => web_fetch::format_tool_call(args, theme),
-        WebSearchTool::NAME => web_search::format_tool_call(args, theme),
-        CodeSearchTool::NAME => code_search::format_tool_call(args, theme),
-        LspTool::NAME => lsp::format_tool_call(args, theme),
+        tools::read::NAME => read_file::format_tool_call(args, theme),
+        tools::write::NAME => write_file::format_tool_call(args, theme),
+        tools::bash::NAME => shell_command::format_tool_call(args, theme),
+        tools::glob::NAME => glob::format_tool_call(args, theme),
+        tools::grep::NAME => grep::format_tool_call(args, theme),
+        tools::ls::NAME => ls::format_tool_call(args, theme),
+        tools::apply_patch::NAME => apply_patch::format_tool_call(args, theme),
+        tools::edit::NAME => edit::format_tool_call(args, theme),
+        tools::multiedit::NAME => multi_edit::format_tool_call(args, theme),
+        tools::batch::NAME => batch::format_tool_call(args, theme),
+        tools::question::NAME => question::format_tool_call(args, theme),
+        tools::task::NAME => task::format_tool_call(args, theme),
+        tools::webfetch::NAME => web_fetch::format_tool_call(args, theme),
+        tools::websearch::NAME => web_search::format_tool_call(args, theme),
+        tools::codesearch::NAME => code_search::format_tool_call(args, theme),
+        tools::lsp::NAME => lsp::format_tool_call(args, theme),
         _ => format_unknown_call(tool_name, args, theme),
     }
 }
 
 pub fn format_tool_result_output(tool_name: &str, result: &str, theme: Theme) -> String {
     let output = match tool_name {
-        ReadFileTool::NAME => read_file::format_tool_result(result, theme),
-        WriteFileTool::NAME => write_file::format_tool_result(result, theme),
-        ShellCommand::NAME => shell_command::format_tool_result(result, theme),
-        GlobTool::NAME => glob::format_tool_result(result, theme),
-        GrepTool::NAME => grep::format_tool_result(result, theme),
-        LsTool::NAME => ls::format_tool_result(result, theme),
-        ApplyPatchTool::NAME => apply_patch::format_tool_result(result, theme),
-        EditTool::NAME => edit::format_tool_result(result, theme),
-        MultiEditTool::NAME => multi_edit::format_tool_result(result, theme),
-        BatchTool::<openai::CompletionModel, ()>::NAME => batch::format_tool_result(result, theme),
-        QuestionTool::NAME => question::format_tool_result(result, theme),
-        TaskTool::<openai::CompletionModel, ()>::NAME => task::format_tool_result(result, theme),
-        WebFetchTool::NAME => web_fetch::format_tool_result(result, theme),
-        WebSearchTool::NAME => web_search::format_tool_result(result, theme),
-        CodeSearchTool::NAME => code_search::format_tool_result(result, theme),
-        LspTool::NAME => lsp::format_tool_result(result, theme),
+        tools::read::NAME => read_file::format_tool_result(result, theme),
+        tools::write::NAME => write_file::format_tool_result(result, theme),
+        tools::bash::NAME => shell_command::format_tool_result(result, theme),
+        tools::glob::NAME => glob::format_tool_result(result, theme),
+        tools::grep::NAME => grep::format_tool_result(result, theme),
+        tools::ls::NAME => ls::format_tool_result(result, theme),
+        tools::apply_patch::NAME => apply_patch::format_tool_result(result, theme),
+        tools::edit::NAME => edit::format_tool_result(result, theme),
+        tools::multiedit::NAME => multi_edit::format_tool_result(result, theme),
+        tools::batch::NAME => batch::format_tool_result(result, theme),
+        tools::question::NAME => question::format_tool_result(result, theme),
+        tools::task::NAME => task::format_tool_result(result, theme),
+        tools::webfetch::NAME => web_fetch::format_tool_result(result, theme),
+        tools::websearch::NAME => web_search::format_tool_result(result, theme),
+        tools::codesearch::NAME => code_search::format_tool_result(result, theme),
+        tools::lsp::NAME => lsp::format_tool_result(result, theme),
         _ => result.to_string(),
     };
 

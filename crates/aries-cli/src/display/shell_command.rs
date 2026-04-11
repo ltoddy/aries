@@ -1,11 +1,9 @@
-use aries_core::tools::{ShellCommand, ShellCommandArgs, ShellCommandOutput};
+use aries_core::tools::bash::{NAME, ShellCommandArgs, ShellCommandOutput};
 use aries_theme::Theme;
-use rig::tool::Tool;
 
 use crate::display::preview;
 
 pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
-    const NAME: &str = ShellCommand::NAME;
     let args = serde_json::from_str::<ShellCommandArgs>(args);
 
     let first = match args {

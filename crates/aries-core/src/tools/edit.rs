@@ -26,10 +26,12 @@ pub enum EditError {
     EditError(String),
 }
 
+pub const NAME: &str = "edit";
+
 pub struct EditTool;
 
 impl Tool for EditTool {
-    const NAME: &'static str = "edit";
+    const NAME: &'static str = NAME;
     type Error = EditError;
     type Args = EditArgs;
     type Output = EditOutput;

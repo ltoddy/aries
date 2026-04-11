@@ -1,3 +1,4 @@
+use anyhow::Context;
 use aries_config::AriesConfig;
 use colored::Colorize;
 use rig::agent::PromptHook;
@@ -6,8 +7,7 @@ use rig::message::{AssistantContent, ReasoningContent, UserContent};
 use rig::providers::{azure, openai};
 use rig::{completion, message};
 
-use crate::AgentWrapper;
-use crate::agent_type::AgentType;
+use crate::{AgentType, AgentWrapper};
 
 pub struct CompactionAgent<M, P = ()>
 where
@@ -22,10 +22,8 @@ where
     M: completion::CompletionModel + 'static,
     P: PromptHook<M> + 'static,
 {
-    /// 默认滑动窗口大小：保留最近的消息数量
     pub const WINDOW_SIZE: usize = 20;
 
-    /// 默认触发压缩的 token 阈值（粗略估算：4 个字符 ≈ 1 token）
     pub const TOKEN_THRESHOLD: usize = 80_000;
 
     fn should_compress(&self, messages: &[Message]) -> bool {
@@ -44,8 +42,18 @@ where
 
 impl CompactionAgent<openai::CompletionModel, ()> {
     pub fn new(config: AriesConfig) -> anyhow::Result<Self> {
+        let AriesConfig::OpenAICompatible(ref conf) = config else {
+            anyhow::bail!("OpenAI compatible agent requires an OpenAI compatible config");
+        };
+
+        let client = openai::CompletionsClient::builder()
+            .base_url(&conf.base_url)
+            .api_key(&conf.api_key)
+            .build()
+            .with_context(|| "Failed to create llm client")?;
+
         let name = String::from("Compaction Agent");
-        let inner = AgentWrapper::<openai::CompletionModel, ()>::new(name, config, AgentType::Compaction, ())?;
+        let inner = AgentWrapper::new(client, name, config, AgentType::Compaction, ());
         Ok(Self { inner })
     }
 }
@@ -89,8 +97,19 @@ where
 
 impl CompactionAgent<azure::CompletionModel, ()> {
     pub fn new(config: AriesConfig) -> anyhow::Result<Self> {
+        let AriesConfig::Azure(ref conf) = config else {
+            anyhow::bail!("Azure agent requires an Azure config");
+        };
+
+        let client = azure::Client::builder()
+            .api_key(&conf.api_key)
+            .azure_endpoint(conf.azure_endpoint.to_owned())
+            .api_version(&conf.api_version)
+            .build()
+            .with_context(|| "Failed to create llm client")?;
+
         let name = String::from("Compaction Agent");
-        let inner = AgentWrapper::<azure::CompletionModel, ()>::new(name, config, AgentType::Compaction, ())?;
+        let inner = AgentWrapper::new(client, name, config, AgentType::Compaction, ());
         Ok(Self { inner })
     }
 }
@@ -100,8 +119,19 @@ where
     P: PromptHook<azure::CompletionModel> + 'static,
 {
     pub fn new_with_hook(config: AriesConfig, hook: P) -> anyhow::Result<Self> {
+        let AriesConfig::Azure(ref conf) = config else {
+            anyhow::bail!("Azure agent requires an Azure config");
+        };
+
+        let client = azure::Client::builder()
+            .api_key(&conf.api_key)
+            .azure_endpoint(conf.azure_endpoint.to_owned())
+            .api_version(&conf.api_version)
+            .build()
+            .with_context(|| "Failed to create llm client")?;
+
         let name = String::from("Compaction Agent");
-        let inner = AgentWrapper::<azure::CompletionModel, P>::new(name, config, AgentType::Compaction, hook)?;
+        let inner = AgentWrapper::new(client, name, config, AgentType::Compaction, hook);
         Ok(Self { inner })
     }
 
@@ -138,7 +168,6 @@ where
     }
 }
 
-/// 估算消息列表的 token 数量
 fn estimate_message_tokens(messages: &[Message]) -> usize {
     let content = format!("{:?}", messages);
     content.chars().count().div_ceil(4)

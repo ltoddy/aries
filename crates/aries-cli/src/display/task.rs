@@ -1,10 +1,7 @@
-use aries_core::tools::{TaskArgs, TaskOutput, TaskTool};
+use aries_core::tools::task::{NAME, TaskArgs, TaskOutput};
 use aries_theme::Theme;
-use rig::tool::Tool;
 
 pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
-    const NAME: &str = TaskTool::<rig::providers::openai::CompletionModel, ()>::NAME;
-
     let args = serde_json::from_str::<TaskArgs>(args);
 
     let (first, rest) = match args {

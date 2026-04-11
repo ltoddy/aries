@@ -62,7 +62,7 @@ impl agent_client_protocol::Agent for AcpImpl {
     async fn prompt(&self, args: PromptRequest) -> agent_client_protocol::Result<PromptResponse> {
         info!("Received prompt request {args:?}");
 
-        let prompt_text = args
+        let promot = args
             .prompt
             .iter()
             .filter_map(|block| if let ContentBlock::Text(text) = block { Some(text.text.clone()) } else { None })
@@ -73,7 +73,7 @@ impl agent_client_protocol::Agent for AcpImpl {
         let session_id = args.session_id.to_string();
         let session = sessions.get_session_mut(&session_id).ok_or_else(Error::internal_error)?;
         session
-            .prompt(&prompt_text, |text| {
+            .prompt(&promot, |text| {
                 let sender = self.sender.clone();
                 let session_id = args.session_id.clone();
                 async move {

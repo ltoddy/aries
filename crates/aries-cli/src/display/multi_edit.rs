@@ -1,11 +1,9 @@
-use aries_core::tools::{MultiEditArgs, MultiEditOutput, MultiEditTool};
+use aries_core::tools::multiedit::{MultiEditArgs, MultiEditOutput, NAME};
 use aries_theme::Theme;
-use rig::tool::Tool;
 
 use crate::display::preview;
 
 pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
-    const NAME: &str = MultiEditTool::NAME;
     let args = serde_json::from_str::<MultiEditArgs>(args);
 
     let (first, rest) = match args {

@@ -24,10 +24,12 @@ pub enum ApplyPatchError {
     PatchError(String),
 }
 
+pub const NAME: &str = "apply_patch";
+
 pub struct ApplyPatchTool;
 
 impl Tool for ApplyPatchTool {
-    const NAME: &'static str = "apply_patch";
+    const NAME: &'static str = NAME;
     type Error = ApplyPatchError;
     type Args = ApplyPatchArgs;
     type Output = ApplyPatchOutput;

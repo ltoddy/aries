@@ -1,9 +1,7 @@
-use aries_core::tools::{QuestionArgs, QuestionOutput, QuestionTool};
+use aries_core::tools::question::{NAME, QuestionArgs, QuestionOutput};
 use aries_theme::Theme;
-use rig::tool::Tool;
 
 pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
-    const NAME: &str = QuestionTool::NAME;
     let args = serde_json::from_str::<QuestionArgs>(args);
 
     let first = match args {

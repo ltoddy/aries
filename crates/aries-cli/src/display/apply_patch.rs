@@ -1,6 +1,5 @@
-use aries_core::tools::{ApplyPatchArgs, ApplyPatchOutput, ApplyPatchTool};
+use aries_core::tools::apply_patch::{ApplyPatchArgs, ApplyPatchOutput, NAME};
 use aries_theme::Theme;
-use rig::tool::Tool;
 
 pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
     let args = serde_json::from_str::<ApplyPatchArgs>(args);
@@ -62,7 +61,7 @@ pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
         out_lines.push(theme.dimmed(&format!("... ({} more lines truncated)", total - out_lines.len())).to_string());
     }
 
-    (format!("{} {}", theme.cyan_text(ApplyPatchTool::NAME), theme.yellow_text(&file)), Some(out_lines.join("\n")))
+    (format!("{} {}", theme.cyan_text(NAME), theme.yellow_text(&file)), Some(out_lines.join("\n")))
 }
 
 pub fn format_tool_result(raw_text: &str, theme: Theme) -> String {

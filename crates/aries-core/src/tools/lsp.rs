@@ -26,10 +26,12 @@ pub enum LspError {
     OperationFailed(String),
 }
 
+pub const NAME: &str = "lsp";
+
 pub struct LspTool;
 
 impl Tool for LspTool {
-    const NAME: &'static str = "lsp";
+    const NAME: &'static str = NAME;
     type Error = LspError;
     type Args = LspArgs;
     type Output = LspOutput;

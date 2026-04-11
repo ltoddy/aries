@@ -1,8 +1,7 @@
 use std::path::PathBuf;
 
-use aries_core::tools::{LsArgs, LsOutput, LsTool};
+use aries_core::tools::ls::{LsArgs, LsOutput, NAME};
 use aries_theme::Theme;
-use rig::tool::Tool;
 
 use crate::display::preview;
 
@@ -14,7 +13,7 @@ pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
         Err(_) => return (String::from("?"), None),
     };
 
-    (format!("{} {}", theme.cyan_text(LsTool::NAME), theme.yellow_text(&first)), None)
+    (format!("{} {}", theme.cyan_text(NAME), theme.yellow_text(&first)), None)
 }
 
 pub fn format_tool_result(result: &str, theme: Theme) -> String {

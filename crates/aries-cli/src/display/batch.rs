@@ -1,11 +1,7 @@
-use aries_core::tools::{BatchArgs, BatchTool};
+use aries_core::tools::batch::{BatchArgs, NAME};
 use aries_theme::Theme;
-use rig::providers::openai;
-use rig::tool::Tool;
 
 pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
-    const NAME: &str = BatchTool::<openai::CompletionModel, ()>::NAME;
-
     let args = serde_json::from_str::<BatchArgs>(args);
 
     let (first, rest) = match args {

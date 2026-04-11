@@ -1,10 +1,10 @@
 use std::future::Future;
 
+use anyhow::Context;
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
-use aries_core::AgentWrapper;
-use aries_core::agent_type::AgentType;
 use aries_core::compaction::CompactionAgent;
+use aries_core::{AgentType, AgentWrapper};
 use futures::{StreamExt, pin_mut};
 use rig::agent::{FinalResponse, MultiTurnStreamItem, PromptHook, Text};
 use rig::completion::{self, Message};
@@ -166,23 +166,38 @@ where
         task_hook: P,
     ) -> anyhow::Result<Self> {
         match config.clone() {
-            AriesConfig::OpenAICompatible(_) => {
-                let agent = AgentWrapper::<openai::CompletionModel, P>::new(
+            AriesConfig::OpenAICompatible(ref conf) => {
+                let client = openai::CompletionsClient::builder()
+                    .base_url(&conf.base_url)
+                    .api_key(&conf.api_key)
+                    .build()
+                    .with_context(|| "Failed to create llm client")?;
+
+                let agent = AgentWrapper::new(
+                    client,
                     format!("Session Agent {}", id),
                     config.clone(),
                     AgentType::Build,
                     task_hook,
-                )?;
+                );
                 let compaction_agent = CompactionAgent::<openai::CompletionModel>::new(config)?;
                 Ok(Self::OpenAICompatible(SessionInner::new(id, context, agent, compaction_agent)))
             },
-            AriesConfig::Azure(_) => {
-                let agent = AgentWrapper::<azure::CompletionModel, P>::new(
+            AriesConfig::Azure(ref conf) => {
+                let client = azure::Client::builder()
+                    .api_key(&conf.api_key)
+                    .azure_endpoint(conf.azure_endpoint.to_owned())
+                    .api_version(&conf.api_version)
+                    .build()
+                    .with_context(|| "Failed to create llm client")?;
+
+                let agent = AgentWrapper::new(
+                    client,
                     format!("Session Agent {}", id),
                     config.clone(),
                     AgentType::Build,
                     task_hook,
-                )?;
+                );
                 let compaction_agent = CompactionAgent::<azure::CompletionModel>::new(config)?;
                 Ok(Self::Azure(SessionInner::new(id, context, agent, compaction_agent)))
             },

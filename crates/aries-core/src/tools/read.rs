@@ -23,10 +23,12 @@ pub enum ReadFileError {
     Io(#[from] std::io::Error),
 }
 
+pub const NAME: &str = "read_file";
+
 pub struct ReadFileTool;
 
 impl Tool for ReadFileTool {
-    const NAME: &'static str = "read_file";
+    const NAME: &'static str = NAME;
     type Error = ReadFileError;
     type Args = ReadFileArgs;
     type Output = ReadFileOutput;

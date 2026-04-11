@@ -36,10 +36,12 @@ pub enum QuestionError {
     InteractionError(String),
 }
 
+pub const NAME: &str = "question";
+
 pub struct QuestionTool;
 
 impl Tool for QuestionTool {
-    const NAME: &'static str = "question";
+    const NAME: &'static str = NAME;
     type Error = QuestionError;
     type Args = QuestionArgs;
     type Output = QuestionOutput;

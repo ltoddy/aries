@@ -20,10 +20,12 @@ pub enum WebSearchError {
     SearchError(String),
 }
 
+pub const NAME: &str = "web_search";
+
 pub struct WebSearchTool;
 
 impl Tool for WebSearchTool {
-    const NAME: &'static str = "web_search";
+    const NAME: &'static str = NAME;
     type Error = WebSearchError;
     type Args = WebSearchArgs;
     type Output = WebSearchOutput;

@@ -1,11 +1,9 @@
-use aries_core::tools::{WebSearchArgs, WebSearchOutput, WebSearchTool};
+use aries_core::tools::websearch::{NAME, WebSearchArgs, WebSearchOutput};
 use aries_theme::Theme;
-use rig::tool::Tool;
 
 use crate::display::preview;
 
 pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
-    const NAME: &str = WebSearchTool::NAME;
     let args = serde_json::from_str::<WebSearchArgs>(args);
 
     let first = match args {

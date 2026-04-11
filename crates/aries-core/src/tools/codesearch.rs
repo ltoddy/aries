@@ -20,6 +20,8 @@ pub enum CodeSearchError {
     SearchError(String),
 }
 
+pub const NAME: &str = "code_search";
+
 pub struct CodeSearchTool;
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -62,7 +64,7 @@ struct McpCodeResponse {
 }
 
 impl Tool for CodeSearchTool {
-    const NAME: &'static str = "code_search";
+    const NAME: &'static str = NAME;
     type Error = CodeSearchError;
     type Args = CodeSearchArgs;
     type Output = CodeSearchOutput;
