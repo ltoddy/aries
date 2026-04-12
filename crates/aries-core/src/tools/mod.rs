@@ -11,6 +11,8 @@ pub mod multiedit;
 pub mod question;
 pub mod read;
 pub mod task;
+pub mod task_spawn;
+pub mod task_status;
 pub mod webfetch;
 pub mod websearch;
 pub mod write;

@@ -15,10 +15,11 @@ glob.workspace = true
 globset.workspace = true
 ignore.workspace = true
 nanoid.workspace = true
+parking_lot.workspace = true
 regex.workspace = true
 reqwest.workspace = true
 rig-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-tokio = { workspace = true, features = ["fs", "process"] }
+tokio = { workspace = true, features = ["fs", "process", "sync"] }

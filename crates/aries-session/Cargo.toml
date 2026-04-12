@@ -11,3 +11,4 @@ aries-core = { path = "../aries-core" }
 futures.workspace = true
 nanoid.workspace = true
 rig-core.workspace = true
+time.workspace = true

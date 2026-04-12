@@ -1,4 +1,5 @@
 pub mod compaction;
+pub mod task_spawner;
 pub mod tools;
 
 use aries_config::AriesConfig;
@@ -7,6 +8,7 @@ use rig::client::CompletionClient;
 use rig::completion::{self, Message, Prompt};
 use rig::streaming::StreamingPrompt;
 use rig::tool::ToolDyn;
+use task_spawner::TaskSpawner;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AgentType {
@@ -40,10 +42,11 @@ where
         config: AriesConfig,
         agent_type: AgentType,
         hook: P,
+        spawner: TaskSpawner,
     ) -> Self {
         let model = config.model().to_owned();
         let preamble = Self::preamble(agent_type);
-        let tools = Self::tools::<C>(agent_type, config, &client);
+        let tools = Self::tools::<C>(agent_type, config, &client, spawner);
 
         let inner = client
             .agent(model)
@@ -101,6 +104,7 @@ where
         agent_type: AgentType,
         config: AriesConfig,
         client: &C,
+        spawner: TaskSpawner,
     ) -> Vec<Box<dyn ToolDyn>> {
         match agent_type {
             AgentType::Build | AgentType::General => vec![
@@ -118,6 +122,8 @@ where
                 Box::new(tools::task::TaskTool::<C>::new(client.clone(), config.clone())),
                 Box::new(tools::lsp::LspTool),
                 Box::new(tools::codesearch::CodeSearchTool),
+                Box::new(tools::task_spawn::TaskSpawnTool::new(spawner.clone())),
+                Box::new(tools::task_status::TaskStatusTool::new(spawner)),
             ],
             AgentType::Plan => vec![
                 Box::new(tools::bash::ShellCommand),

@@ -11,6 +11,7 @@ use rig::one_or_many::OneOrMany;
 use rig::providers::{azure, openai};
 use rig::{completion, message};
 
+use crate::task_spawner::TaskSpawner;
 use crate::{AgentType, AgentWrapper};
 
 const KEEP_RECENT_TOOL_RESULTS: usize = 3;
@@ -142,7 +143,7 @@ impl CompactionAgent<openai::CompletionModel, ()> {
             .with_context(|| "Failed to create llm client")?;
 
         let name = String::from("Compaction Agent");
-        let inner = AgentWrapper::new(client, name, config, AgentType::Compaction, ());
+        let inner = AgentWrapper::new(client, name, config, AgentType::Compaction, (), TaskSpawner::noop());
         Ok(Self { inner })
     }
 }
@@ -161,7 +162,7 @@ impl CompactionAgent<azure::CompletionModel, ()> {
             .with_context(|| "Failed to create llm client")?;
 
         let name = String::from("Compaction Agent");
-        let inner = AgentWrapper::new(client, name, config, AgentType::Compaction, ());
+        let inner = AgentWrapper::new(client, name, config, AgentType::Compaction, (), TaskSpawner::noop());
         Ok(Self { inner })
     }
 }

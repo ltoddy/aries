@@ -27,6 +27,7 @@ globset = "0.4"
 ignore = "0.4"
 itertools = "0.14"
 nanoid = "0.4.0"
+parking_lot = "0.12"
 regex = "1"
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
 rig-core = "0.33"
@@ -36,6 +37,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 terminal_size = "0.4"
 thiserror = "2.0"
+time = "0.3"
 tokio = { version = "1", default-features = false }
 tokio-util = { version = "0.7", default-features = false, features = ["compat"] }
 toml = "1.1"

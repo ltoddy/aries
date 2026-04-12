@@ -5,6 +5,7 @@ use anyhow::Context;
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
 use aries_core::compaction::CompactionAgent;
+use aries_core::task_spawner::{NotificationReceiver, TaskSpawner};
 use aries_core::{AgentType, AgentWrapper};
 use futures::{StreamExt, pin_mut};
 use rig::agent::{FinalResponse, MultiTurnStreamItem, PromptHook, Text};
@@ -12,6 +13,7 @@ use rig::completion::Message;
 use rig::message::{ReasoningContent, ToolResultContent};
 use rig::providers::{azure, openai};
 use rig::streaming::{StreamedAssistantContent, StreamedUserContent};
+use time::OffsetDateTime;
 
 pub type NoCb = fn(StreamEvent) -> Ready<anyhow::Result<()>>;
 
@@ -30,6 +32,7 @@ where
         id: String,
         agent: AgentWrapper<openai::CompletionModel, P>,
         compaction_agent: CompactionAgent<openai::CompletionModel>,
+        task_notifications: NotificationReceiver,
         history: Vec<Message>,
         base_history_len: usize,
         transcript_dir: PathBuf,
@@ -38,6 +41,7 @@ where
         id: String,
         agent: AgentWrapper<azure::CompletionModel, P>,
         compaction_agent: CompactionAgent<azure::CompletionModel>,
+        task_notifications: NotificationReceiver,
         history: Vec<Message>,
         base_history_len: usize,
         transcript_dir: PathBuf,
@@ -49,9 +53,10 @@ where
     P: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel> + Clone + 'static,
 {
     pub fn new(id: String, context: &GlobalContext, config: AriesConfig, task_hook: P) -> anyhow::Result<Self> {
-        let history = vec![Message::user(format!("当前目录：{}", context.current_dir.display()))];
+        let today = OffsetDateTime::now_utc().date();
+        let history = vec![Message::user(format!("当前目录：{}\n当前日期：{}", context.current_dir.display(), today))];
         let base_history_len = history.len();
-        let transcript_dir = context.config_dir.join(".transcripts");
+        let transcript_dir = context.config_dir.join("transcripts");
 
         match config.clone() {
             AriesConfig::OpenAICompatible(ref conf) => {
@@ -61,15 +66,25 @@ where
                     .build()
                     .with_context(|| "Failed to create llm client")?;
 
+                let (spawner, task_notifications) = TaskSpawner::new();
                 let agent = AgentWrapper::new(
                     client,
                     format!("Session Agent {}", id),
                     config.clone(),
                     AgentType::Build,
                     task_hook,
+                    spawner,
                 );
                 let compaction_agent = CompactionAgent::<openai::CompletionModel>::new(config)?;
-                Ok(Self::OpenAICompatible { id, agent, compaction_agent, history, base_history_len, transcript_dir })
+                Ok(Self::OpenAICompatible {
+                    id,
+                    agent,
+                    compaction_agent,
+                    task_notifications,
+                    history,
+                    base_history_len,
+                    transcript_dir,
+                })
             },
             AriesConfig::Azure(ref conf) => {
                 let client = azure::Client::builder()
@@ -79,15 +94,25 @@ where
                     .build()
                     .with_context(|| "Failed to create llm client")?;
 
+                let (spawner, task_notifications) = TaskSpawner::new();
                 let agent = AgentWrapper::new(
                     client,
                     format!("Session Agent {}", id),
                     config.clone(),
                     AgentType::Build,
                     task_hook,
+                    spawner,
                 );
                 let compaction_agent = CompactionAgent::<azure::CompletionModel>::new(config)?;
-                Ok(Self::Azure { id, agent, compaction_agent, history, base_history_len, transcript_dir })
+                Ok(Self::Azure {
+                    id,
+                    agent,
+                    compaction_agent,
+                    task_notifications,
+                    history,
+                    base_history_len,
+                    transcript_dir,
+                })
             },
         }
     }
@@ -119,7 +144,16 @@ where
         Fut: Future<Output = anyhow::Result<()>>,
     {
         let (stream, history) = match self {
-            Self::OpenAICompatible { agent, compaction_agent, history, base_history_len, transcript_dir, .. } => {
+            Self::OpenAICompatible {
+                agent,
+                compaction_agent,
+                task_notifications,
+                history,
+                base_history_len,
+                transcript_dir,
+                ..
+            } => {
+                drain_task_notifications(task_notifications, history);
                 CompactionAgent::<openai::CompletionModel>::micro_compact(history);
                 if let Some(compressed) = compaction_agent.auto_compact(history, transcript_dir).await? {
                     history.truncate(*base_history_len);
@@ -128,7 +162,16 @@ where
                 let snapshot = history.clone();
                 (agent.stream_prompt(prompt, &snapshot).await, history)
             },
-            Self::Azure { agent, compaction_agent, history, base_history_len, transcript_dir, .. } => {
+            Self::Azure {
+                agent,
+                compaction_agent,
+                task_notifications,
+                history,
+                base_history_len,
+                transcript_dir,
+                ..
+            } => {
+                drain_task_notifications(task_notifications, history);
                 CompactionAgent::<azure::CompletionModel>::micro_compact(history);
                 if let Some(compressed) = compaction_agent.auto_compact(history, transcript_dir).await? {
                     history.truncate(*base_history_len);
@@ -219,4 +262,29 @@ where
         }
         Ok(())
     }
+}
+
+fn drain_task_notifications(receiver: &mut NotificationReceiver, history: &mut Vec<Message>) {
+    let notifications = receiver.drain();
+    if notifications.is_empty() {
+        return;
+    }
+
+    let notif_text: String = notifications
+        .iter()
+        .map(|n| {
+            let mut parts = format!("[task:{}] command={} exit_code={}", n.task_id, n.command, n.exit_code);
+            if !n.stdout.is_empty() {
+                parts.push_str(&format!("\nstdout: {}", n.stdout));
+            }
+            if !n.stderr.is_empty() {
+                parts.push_str(&format!("\nstderr: {}", n.stderr));
+            }
+            parts
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n");
+
+    history.push(Message::user(format!("<task-results>\n{}\n</task-results>", notif_text)));
+    history.push(Message::assistant("Noted task results."));
 }
