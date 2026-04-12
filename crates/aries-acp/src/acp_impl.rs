@@ -3,11 +3,12 @@ use std::cell::Cell;
 use agent_client_protocol::{
     AuthenticateRequest, AuthenticateResponse, CancelNotification, ContentBlock, ContentChunk, Error, Implementation,
     InitializeRequest, InitializeResponse, NewSessionRequest, NewSessionResponse, PromptRequest, PromptResponse,
-    ProtocolVersion, SessionNotification, SessionUpdate, StopReason, TextContent,
+    ProtocolVersion, SessionNotification, SessionUpdate, StopReason, TextContent, ToolCallId, ToolCallStatus,
+    ToolCallUpdate, ToolCallUpdateFields,
 };
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
-use aries_session::SessionManager;
+use aries_session::{SessionManager, StreamEvent};
 use async_trait::async_trait;
 use tokio::sync::{Mutex, mpsc, oneshot};
 use tracing::info;
@@ -25,7 +26,7 @@ impl AcpImpl {
         sender: mpsc::UnboundedSender<(SessionNotification, oneshot::Sender<()>)>,
     ) -> Self {
         let next_session_id = Cell::new(nanoid::nanoid!());
-        let sessions = SessionManager::new(context, config);
+        let sessions = SessionManager::new(context, config, ());
 
         Self { sessions: Mutex::new(sessions), sender, next_session_id }
     }
@@ -73,29 +74,41 @@ impl agent_client_protocol::Agent for AcpImpl {
         let session_id = args.session_id.to_string();
         let session = sessions.get_session_mut(&session_id).ok_or_else(Error::internal_error)?;
         session
-            .prompt(&promot, |text| {
-                let sender = self.sender.clone();
-                let session_id = args.session_id.clone();
-                async move {
-                    let (tx, rx) = oneshot::channel();
-                    if sender
-                        .send((
-                            SessionNotification::new(
-                                session_id,
-                                SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::Text(
-                                    TextContent::new(text),
-                                ))),
-                            ),
-                            tx,
-                        ))
-                        .is_ok()
-                    {
-                        let _ = rx.await;
-                    }
+            .prompt(
+                &promot,
+                Some(|event| {
+                    let sender = self.sender.clone();
+                    let session_id = args.session_id.clone();
+                    async move {
+                        let update = match event {
+                            StreamEvent::Text(text) => SessionUpdate::AgentMessageChunk(ContentChunk::new(
+                                ContentBlock::Text(TextContent::new(text)),
+                            )),
+                            StreamEvent::Reasoning(text) => SessionUpdate::AgentThoughtChunk(ContentChunk::new(
+                                ContentBlock::Text(TextContent::new(text)),
+                            )),
+                            StreamEvent::ToolCall { name, arguments } => {
+                                let tool_call = agent_client_protocol::ToolCall::new(ToolCallId::new(&*name), &name)
+                                    .status(ToolCallStatus::InProgress)
+                                    .raw_input(serde_json::Value::String(arguments));
+                                SessionUpdate::ToolCall(tool_call)
+                            },
+                            StreamEvent::ToolResult { id, content } => {
+                                let fields = ToolCallUpdateFields::new()
+                                    .status(ToolCallStatus::Completed)
+                                    .raw_output(serde_json::Value::String(content));
+                                SessionUpdate::ToolCallUpdate(ToolCallUpdate::new(ToolCallId::new(&*id), fields))
+                            },
+                        };
+                        let (tx, rx) = oneshot::channel();
+                        if sender.send((SessionNotification::new(session_id, update), tx)).is_ok() {
+                            let _ = rx.await;
+                        }
 
-                    Ok(())
-                }
-            })
+                        Ok(())
+                    }
+                }),
+            )
             .await
             .map_err(|_| Error::internal_error())?;
 

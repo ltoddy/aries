@@ -9,7 +9,7 @@ use std::time::Instant;
 
 use aries_config::AriesConfigLoader;
 use aries_context::GlobalContext;
-use aries_session::Session;
+use aries_session::{NoCb, Session};
 use aries_theme::Theme;
 use clap::Parser;
 use rustyline::error::ReadlineError;
@@ -29,12 +29,8 @@ async fn main() -> anyhow::Result<()> {
         None => {},
     };
 
-    let mut session = Session::new_with_task_hook(
-        String::from("main"),
-        &gctx,
-        app_config.clone(),
-        hook::DisplayPromptHook::new(Theme::default()),
-    )?;
+    let mut session =
+        Session::new(String::from("main"), &gctx, app_config.clone(), hook::DisplayPromptHook::new(Theme::default()))?;
 
     let mut reader = input::InputReader::new(&gctx.config_dir)?;
     welcome::welcome(app_config.provider(), app_config.model(), &gctx);
@@ -55,7 +51,7 @@ async fn main() -> anyhow::Result<()> {
                 }
 
                 let start = Instant::now();
-                if let Err(err) = session.prompt(input, |_| async { Ok(()) }).await {
+                if let Err(err) = session.prompt(input, None::<NoCb>).await {
                     eprintln!("\n{}: {}", theme.red_text("Error streaming_chunk"), err);
                     continue;
                 }

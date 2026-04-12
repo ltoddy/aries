@@ -18,32 +18,24 @@ where
     hook: H,
 }
 
-impl SessionManager<()> {
-    pub fn new(context: GlobalContext, config: AriesConfig) -> Self {
-        Self { sessions: HashMap::new(), active_session_id: None, context, config, hook: () }
-    }
-}
-
 impl<H> SessionManager<H>
 where
     H: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel> + Clone + 'static,
 {
-    pub fn new_with_task_hook(context: GlobalContext, config: AriesConfig, hook: H) -> Self {
+    pub fn new(context: GlobalContext, config: AriesConfig, hook: H) -> Self {
         Self { sessions: HashMap::new(), active_session_id: None, context, config, hook }
     }
 
     pub fn create_session(&mut self) -> anyhow::Result<String> {
         let session_id = nanoid::nanoid!();
-        let session =
-            Session::new_with_task_hook(session_id.clone(), &self.context, self.config.clone(), self.hook.clone())?;
+        let session = Session::new(session_id.clone(), &self.context, self.config.clone(), self.hook.clone())?;
         self.sessions.insert(session_id.clone(), session);
         self.active_session_id = Some(session_id.clone());
         Ok(session_id)
     }
 
     pub fn insert_session(&mut self, session_id: String) -> anyhow::Result<()> {
-        let session =
-            Session::new_with_task_hook(session_id.clone(), &self.context, self.config.clone(), self.hook.clone())?;
+        let session = Session::new(session_id.clone(), &self.context, self.config.clone(), self.hook.clone())?;
         self.sessions.insert(session_id.clone(), session);
         self.active_session_id = Some(session_id);
         Ok(())

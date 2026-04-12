@@ -1,4 +1,4 @@
-use std::future::Future;
+use std::future::{Future, Ready};
 
 use anyhow::Context;
 use aries_config::AriesConfig;
@@ -7,164 +7,48 @@ use aries_core::compaction::CompactionAgent;
 use aries_core::{AgentType, AgentWrapper};
 use futures::{StreamExt, pin_mut};
 use rig::agent::{FinalResponse, MultiTurnStreamItem, PromptHook, Text};
-use rig::completion::{self, Message};
+use rig::completion::Message;
+use rig::message::{ReasoningContent, ToolResultContent};
 use rig::providers::{azure, openai};
-use rig::streaming::StreamedAssistantContent;
+use rig::streaming::{StreamedAssistantContent, StreamedUserContent};
 
-pub struct SessionInner<M, P = ()>
-where
-    M: completion::CompletionModel,
-    P: PromptHook<M>,
-{
-    id: String,
-    agent: AgentWrapper<M, P>,
-    compaction_agent: CompactionAgent<M>,
-    history: Vec<Message>,
-    base_history_len: usize,
-}
+pub type NoCb = fn(StreamEvent) -> Ready<anyhow::Result<()>>;
 
-impl<M, P> SessionInner<M, P>
-where
-    M: completion::CompletionModel,
-    P: PromptHook<M>,
-{
-    fn new(
-        id: String,
-        context: &GlobalContext,
-        agent: AgentWrapper<M, P>,
-        compaction_agent: CompactionAgent<M>,
-    ) -> Self {
-        let history = vec![Message::user(format!("当前目录：{}", context.current_dir.display()))];
-        let base_history_len = history.len();
-
-        Self { id, agent, compaction_agent, history, base_history_len }
-    }
-
-    fn id(&self) -> &str {
-        &self.id
-    }
-
-    fn history(&self) -> &[Message] {
-        &self.history
-    }
-
-    fn clear_history(&mut self) {
-        self.history.truncate(self.base_history_len);
-    }
-
-    fn update_history_from_response(&mut self, response: &FinalResponse) {
-        if let Some(history) = response.history() {
-            self.history = history.to_vec();
-        }
-    }
-}
-
-impl<P> SessionInner<openai::CompletionModel, P>
-where
-    P: PromptHook<openai::CompletionModel> + Clone + 'static,
-{
-    async fn prompt<F, Fut>(&mut self, prompt: &str, mut on_text: F) -> anyhow::Result<()>
-    where
-        F: FnMut(String) -> Fut,
-        Fut: Future<Output = anyhow::Result<()>>,
-    {
-        let _ = self.compact_if_needed().await?;
-        let history = self.history.clone();
-        let stream = self.agent.stream_prompt(prompt, &history).await;
-        pin_mut!(stream);
-        let mut final_res = FinalResponse::empty();
-
-        while let Some(chunk) = stream.next().await {
-            match chunk? {
-                MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Text(Text { text })) => {
-                    on_text(text).await?;
-                },
-                MultiTurnStreamItem::FinalResponse(response) => final_res = response,
-                _ => {},
-            }
-        }
-
-        self.update_history_from_response(&final_res);
-        Ok(())
-    }
-
-    async fn compact_if_needed(&mut self) -> anyhow::Result<Option<String>> {
-        let Some(summary) = self.compaction_agent.compact(self.history.clone()).await? else {
-            return Ok(None);
-        };
-
-        self.history.truncate(self.base_history_len);
-        self.history.push(Message::assistant(summary.clone()));
-
-        Ok(Some(summary))
-    }
-}
-
-impl<P> SessionInner<azure::CompletionModel, P>
-where
-    P: PromptHook<azure::CompletionModel> + Clone + 'static,
-{
-    async fn prompt<F, Fut>(&mut self, prompt: &str, mut on_text: F) -> anyhow::Result<()>
-    where
-        F: FnMut(String) -> Fut,
-        Fut: Future<Output = anyhow::Result<()>>,
-    {
-        let _ = self.compact_if_needed().await?;
-        let history = self.history.clone();
-        let stream = self.agent.stream_prompt(prompt, &history).await;
-        pin_mut!(stream);
-        let mut final_res = FinalResponse::empty();
-
-        while let Some(chunk) = stream.next().await {
-            match chunk? {
-                MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Text(Text { text })) => {
-                    on_text(text).await?;
-                },
-                MultiTurnStreamItem::FinalResponse(response) => final_res = response,
-                _ => {},
-            }
-        }
-
-        self.update_history_from_response(&final_res);
-        Ok(())
-    }
-
-    async fn compact_if_needed(&mut self) -> anyhow::Result<Option<String>> {
-        let Some(summary) = self.compaction_agent.compact(self.history.clone()).await? else {
-            return Ok(None);
-        };
-
-        self.history.truncate(self.base_history_len);
-        self.history.push(Message::assistant(summary.clone()));
-
-        Ok(Some(summary))
-    }
+pub enum StreamEvent {
+    Text(String),
+    Reasoning(String),
+    ToolCall { name: String, arguments: String },
+    ToolResult { id: String, content: String },
 }
 
 pub enum Session<P = ()>
 where
     P: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel>,
 {
-    OpenAICompatible(SessionInner<openai::CompletionModel, P>),
-    Azure(SessionInner<azure::CompletionModel, P>),
-}
-
-impl Session<()> {
-    pub fn new(id: String, context: &GlobalContext, config: AriesConfig) -> anyhow::Result<Self> {
-        Self::new_with_task_hook(id, context, config, ())
-    }
+    OpenAICompatible {
+        id: String,
+        agent: AgentWrapper<openai::CompletionModel, P>,
+        compaction_agent: CompactionAgent<openai::CompletionModel>,
+        history: Vec<Message>,
+        base_history_len: usize,
+    },
+    Azure {
+        id: String,
+        agent: AgentWrapper<azure::CompletionModel, P>,
+        compaction_agent: CompactionAgent<azure::CompletionModel>,
+        history: Vec<Message>,
+        base_history_len: usize,
+    },
 }
 
 impl<P> Session<P>
 where
     P: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel> + Clone + 'static,
 {
-    pub fn new_with_task_hook(
-        id: String,
-        context: &GlobalContext,
-        config: AriesConfig,
-        task_hook: P,
-    ) -> anyhow::Result<Self> {
+    pub fn new(id: String, context: &GlobalContext, config: AriesConfig, task_hook: P) -> anyhow::Result<Self> {
+        let history = vec![Message::user(format!("当前目录：{}", context.current_dir.display()))];
+        let base_history_len = history.len();
+
         match config.clone() {
             AriesConfig::OpenAICompatible(ref conf) => {
                 let client = openai::CompletionsClient::builder()
@@ -181,7 +65,7 @@ where
                     task_hook,
                 );
                 let compaction_agent = CompactionAgent::<openai::CompletionModel>::new(config)?;
-                Ok(Self::OpenAICompatible(SessionInner::new(id, context, agent, compaction_agent)))
+                Ok(Self::OpenAICompatible { id, agent, compaction_agent, history, base_history_len })
             },
             AriesConfig::Azure(ref conf) => {
                 let client = azure::Client::builder()
@@ -199,40 +83,116 @@ where
                     task_hook,
                 );
                 let compaction_agent = CompactionAgent::<azure::CompletionModel>::new(config)?;
-                Ok(Self::Azure(SessionInner::new(id, context, agent, compaction_agent)))
+                Ok(Self::Azure { id, agent, compaction_agent, history, base_history_len })
             },
-        }
-    }
-
-    pub async fn prompt<F, Fut>(&mut self, prompt: &str, on_text: F) -> anyhow::Result<()>
-    where
-        F: FnMut(String) -> Fut,
-        Fut: Future<Output = anyhow::Result<()>>,
-    {
-        match self {
-            Self::OpenAICompatible(session) => session.prompt(prompt, on_text).await,
-            Self::Azure(session) => session.prompt(prompt, on_text).await,
         }
     }
 
     pub fn id(&self) -> &str {
         match self {
-            Self::OpenAICompatible(session) => session.id(),
-            Self::Azure(session) => session.id(),
+            Self::OpenAICompatible { id, .. } => id,
+            Self::Azure { id, .. } => id,
         }
     }
 
     pub fn history(&self) -> &[Message] {
         match self {
-            Self::OpenAICompatible(session) => session.history(),
-            Self::Azure(session) => session.history(),
+            Self::OpenAICompatible { history, .. } => history,
+            Self::Azure { history, .. } => history,
         }
     }
 
     pub fn clear_history(&mut self) {
         match self {
-            Self::OpenAICompatible(session) => session.clear_history(),
-            Self::Azure(session) => session.clear_history(),
+            Self::OpenAICompatible { history, base_history_len, .. } => history.truncate(*base_history_len),
+            Self::Azure { history, base_history_len, .. } => history.truncate(*base_history_len),
         }
+    }
+
+    pub async fn prompt<F, Fut>(&mut self, prompt: &str, mut cb: Option<F>) -> anyhow::Result<()>
+    where
+        F: FnMut(StreamEvent) -> Fut,
+        Fut: Future<Output = anyhow::Result<()>>,
+    {
+        let (stream, history) = match self {
+            Self::OpenAICompatible { agent, compaction_agent, history, base_history_len, .. } => {
+                if let Some(summary) = compaction_agent.compact(history.clone()).await? {
+                    history.truncate(*base_history_len);
+                    history.push(Message::assistant(summary));
+                }
+                let snapshot = history.clone();
+                (agent.stream_prompt(prompt, &snapshot).await, history)
+            },
+            Self::Azure { agent, compaction_agent, history, base_history_len, .. } => {
+                if let Some(summary) = compaction_agent.compact(history.clone()).await? {
+                    history.truncate(*base_history_len);
+                    history.push(Message::assistant(summary));
+                }
+                let snapshot = history.clone();
+                (agent.stream_prompt(prompt, &snapshot).await, history)
+            },
+        };
+
+        pin_mut!(stream);
+        let mut final_res = FinalResponse::empty();
+
+        while let Some(chunk) = stream.next().await {
+            match chunk? {
+                MultiTurnStreamItem::StreamAssistantItem(item) => {
+                    if let Some(ref mut cb) = cb {
+                        match item {
+                            StreamedAssistantContent::Text(Text { text }) => {
+                                cb(StreamEvent::Text(text)).await?;
+                            },
+                            StreamedAssistantContent::Reasoning(reasoning) => {
+                                for rc in reasoning.content {
+                                    let text = match rc {
+                                        ReasoningContent::Text { text, .. } => text,
+                                        ReasoningContent::Encrypted(s) => s,
+                                        ReasoningContent::Redacted { data } => data,
+                                        ReasoningContent::Summary(s) => s,
+                                        _ => continue,
+                                    };
+                                    cb(StreamEvent::Reasoning(text)).await?;
+                                }
+                            },
+                            StreamedAssistantContent::ReasoningDelta { reasoning, .. } => {
+                                cb(StreamEvent::Reasoning(reasoning)).await?;
+                            },
+                            StreamedAssistantContent::ToolCall { tool_call, .. } => {
+                                cb(StreamEvent::ToolCall {
+                                    name: tool_call.function.name,
+                                    arguments: tool_call.function.arguments.to_string(),
+                                })
+                                .await?;
+                            },
+                            _ => {},
+                        }
+                    }
+                },
+                MultiTurnStreamItem::StreamUserItem(StreamedUserContent::ToolResult { tool_result, .. }) => {
+                    if let Some(ref mut cb) = cb {
+                        let content = tool_result
+                            .content
+                            .iter()
+                            .filter_map(|c| match c {
+                                ToolResultContent::Text(text) => Some(text.text.as_str()),
+                                _ => None,
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        cb(StreamEvent::ToolResult { id: tool_result.id.clone(), content }).await?;
+                    }
+                },
+                MultiTurnStreamItem::FinalResponse(response) => final_res = response,
+                _ => {},
+            }
+        }
+
+        if let Some(new_history) = final_res.history() {
+            *history = new_history.to_vec();
+        }
+
+        Ok(())
     }
 }
