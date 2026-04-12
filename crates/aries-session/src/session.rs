@@ -1,4 +1,5 @@
 use std::future::{Future, Ready};
+use std::path::PathBuf;
 
 use anyhow::Context;
 use aries_config::AriesConfig;
@@ -31,6 +32,7 @@ where
         compaction_agent: CompactionAgent<openai::CompletionModel>,
         history: Vec<Message>,
         base_history_len: usize,
+        transcript_dir: PathBuf,
     },
     Azure {
         id: String,
@@ -38,6 +40,7 @@ where
         compaction_agent: CompactionAgent<azure::CompletionModel>,
         history: Vec<Message>,
         base_history_len: usize,
+        transcript_dir: PathBuf,
     },
 }
 
@@ -48,6 +51,7 @@ where
     pub fn new(id: String, context: &GlobalContext, config: AriesConfig, task_hook: P) -> anyhow::Result<Self> {
         let history = vec![Message::user(format!("当前目录：{}", context.current_dir.display()))];
         let base_history_len = history.len();
+        let transcript_dir = context.config_dir.join(".transcripts");
 
         match config.clone() {
             AriesConfig::OpenAICompatible(ref conf) => {
@@ -65,7 +69,7 @@ where
                     task_hook,
                 );
                 let compaction_agent = CompactionAgent::<openai::CompletionModel>::new(config)?;
-                Ok(Self::OpenAICompatible { id, agent, compaction_agent, history, base_history_len })
+                Ok(Self::OpenAICompatible { id, agent, compaction_agent, history, base_history_len, transcript_dir })
             },
             AriesConfig::Azure(ref conf) => {
                 let client = azure::Client::builder()
@@ -83,7 +87,7 @@ where
                     task_hook,
                 );
                 let compaction_agent = CompactionAgent::<azure::CompletionModel>::new(config)?;
-                Ok(Self::Azure { id, agent, compaction_agent, history, base_history_len })
+                Ok(Self::Azure { id, agent, compaction_agent, history, base_history_len, transcript_dir })
             },
         }
     }
@@ -115,18 +119,20 @@ where
         Fut: Future<Output = anyhow::Result<()>>,
     {
         let (stream, history) = match self {
-            Self::OpenAICompatible { agent, compaction_agent, history, base_history_len, .. } => {
-                if let Some(summary) = compaction_agent.compact(history.clone()).await? {
+            Self::OpenAICompatible { agent, compaction_agent, history, base_history_len, transcript_dir, .. } => {
+                CompactionAgent::<openai::CompletionModel>::micro_compact(history);
+                if let Some(compressed) = compaction_agent.auto_compact(history, transcript_dir).await? {
                     history.truncate(*base_history_len);
-                    history.push(Message::assistant(summary));
+                    history.extend(compressed);
                 }
                 let snapshot = history.clone();
                 (agent.stream_prompt(prompt, &snapshot).await, history)
             },
-            Self::Azure { agent, compaction_agent, history, base_history_len, .. } => {
-                if let Some(summary) = compaction_agent.compact(history.clone()).await? {
+            Self::Azure { agent, compaction_agent, history, base_history_len, transcript_dir, .. } => {
+                CompactionAgent::<azure::CompletionModel>::micro_compact(history);
+                if let Some(compressed) = compaction_agent.auto_compact(history, transcript_dir).await? {
                     history.truncate(*base_history_len);
-                    history.push(Message::assistant(summary));
+                    history.extend(compressed);
                 }
                 let snapshot = history.clone();
                 (agent.stream_prompt(prompt, &snapshot).await, history)
@@ -193,6 +199,24 @@ where
             *history = new_history.to_vec();
         }
 
+        Ok(())
+    }
+
+    pub async fn force_compact(&mut self) -> anyhow::Result<()> {
+        match self {
+            Self::OpenAICompatible { compaction_agent, history, base_history_len, transcript_dir, .. } => {
+                if let Some(compressed) = compaction_agent.force_compact(history, transcript_dir).await? {
+                    history.truncate(*base_history_len);
+                    history.extend(compressed);
+                }
+            },
+            Self::Azure { compaction_agent, history, base_history_len, transcript_dir, .. } => {
+                if let Some(compressed) = compaction_agent.force_compact(history, transcript_dir).await? {
+                    history.truncate(*base_history_len);
+                    history.extend(compressed);
+                }
+            },
+        }
         Ok(())
     }
 }

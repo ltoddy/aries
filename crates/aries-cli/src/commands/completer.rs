@@ -5,7 +5,7 @@ use rustyline::hint::HistoryHinter;
 use rustyline::{Context, Result};
 use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
 
-use crate::commands::{clear_history, exit, save_history, setup, shell};
+use crate::commands::{clear_history, compact, exit, save_history, setup, shell};
 
 #[derive(Helper, Highlighter, Hinter, Validator)]
 pub struct CommandCompleter {
@@ -39,6 +39,7 @@ const COMMANDS: &[(&str, &str)] = &[
     (setup::NAME, "Open configuration setup"),
     (save_history::NAME, "Save chat history to file"),
     (clear_history::NAME, "Clear chat history"),
+    (compact::NAME, "Force compact conversation context"),
 ];
 
 pub fn show(prefix: &str) -> Option<String> {

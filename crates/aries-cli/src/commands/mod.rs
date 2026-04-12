@@ -5,6 +5,7 @@ use rig::agent::PromptHook;
 use rig::providers::{azure, openai};
 
 pub mod clear_history;
+pub mod compact;
 pub mod completer;
 pub mod exit;
 pub mod save_history;
@@ -27,6 +28,9 @@ where
         clear_history::NAME => {
             session.clear_history();
             println!("{}", theme.green_text("Chat history cleared."));
+        },
+        compact::NAME => {
+            compact::execute(session, theme).await;
         },
         setup::NAME => {
             if let Err(e) = setup::execute(theme, &gctx.config_dir).await {
