@@ -1,3 +1,6 @@
+use std::env::current_dir;
+use std::path::PathBuf;
+
 use anyhow::Result;
 use globset::GlobBuilder;
 use ignore::WalkBuilder;
@@ -60,18 +63,22 @@ impl Tool for GrepTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
+        let current_dir = current_dir().unwrap_or(PathBuf::from("."));
+
         let re = Regex::new(&args.pattern)?;
         let mut matches = Vec::new();
 
-        // WalkBuilder automatically respects .gitignore files
-        let mut builder = WalkBuilder::new(".");
-        builder.hidden(false); // Don't skip hidden files by default
+        let mut builder = WalkBuilder::new(&current_dir);
+        builder.hidden(false);
 
-        // Add glob filter if specified
         if let Some(include) = &args.include {
             let glob = GlobBuilder::new(include).literal_separator(true).build()?;
             let glob = glob.compile_matcher();
-            builder.filter_entry(move |entry| glob.is_match(entry.path()));
+            let prefix = current_dir.clone();
+            builder.filter_entry(move |entry| {
+                entry.file_type().is_some_and(|ft| ft.is_dir())
+                    || entry.path().strip_prefix(&prefix).map(|rel| glob.is_match(rel)).unwrap_or(false)
+            });
         }
 
         for result in builder.build() {
