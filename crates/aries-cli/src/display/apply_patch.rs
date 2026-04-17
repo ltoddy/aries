@@ -58,7 +58,11 @@ pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
     }
 
     if total > out_lines.len() {
-        out_lines.push(theme.dimmed(&format!("... ({} more lines truncated)", total - out_lines.len())).to_string());
+        out_lines.push(
+            theme
+                .dimmed(&format!("... ({} more lines truncated)", total - out_lines.len()))
+                .to_string(),
+        );
     }
 
     (format!("{} {}", theme.cyan_text(NAME), theme.yellow_text(&file)), Some(out_lines.join("\n")))

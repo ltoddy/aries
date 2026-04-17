@@ -87,17 +87,16 @@ impl Tool for QuestionTool {
         let theme = ColorfulTheme::default();
 
         if let Some(options) = args.options {
-            let mut labels: Vec<String> =
-                options
-                    .iter()
-                    .map(|o| {
-                        if let Some(desc) = &o.description {
-                            format!("{} - {}", o.label, desc)
-                        } else {
-                            o.label.clone()
-                        }
-                    })
-                    .collect();
+            let mut labels: Vec<String> = options
+                .iter()
+                .map(|o| {
+                    if let Some(desc) = &o.description {
+                        format!("{} - {}", o.label, desc)
+                    } else {
+                        o.label.clone()
+                    }
+                })
+                .collect();
 
             let custom_opt = "Type your own answer...";
             if args.custom {

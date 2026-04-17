@@ -15,16 +15,16 @@ pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
 
             let mut rest = None;
             if !args.old_string.is_empty() || !args.new_string.is_empty() {
-                let old_lines = args.old_string.lines().map(|line| {
-                    let s = format!("- {}", line);
-                    theme.red_text(&s).to_string()
-                });
-                let new_lines = args.new_string.lines().map(|line| {
-                    let s = format!("+ {}", line);
-                    theme.green_text(&s).to_string()
-                });
+                let old_lines = args
+                    .old_string
+                    .lines()
+                    .map(|line| theme.red_text(&format!("- {}", line)).to_string());
+                let new_lines = args
+                    .new_string
+                    .lines()
+                    .map(|line| theme.green_text(&format!("+ {}", line)).to_string());
                 let diff = old_lines.chain(new_lines).collect::<Vec<_>>().join("\n");
-                rest = Some(diff);
+                rest = Some(preview(&diff));
             }
 
             (first, rest)

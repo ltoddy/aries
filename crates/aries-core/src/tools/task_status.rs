@@ -62,10 +62,9 @@ impl Tool for TaskStatusTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        let info = self
-            .spawner
-            .check(&args.task_id)
-            .ok_or_else(|| TaskStatusError::NotFound(format!("Task '{}' not found", args.task_id)))?;
+        let info = self.spawner.check(&args.task_id).ok_or_else(|| {
+            TaskStatusError::NotFound(format!("Task '{}' not found", args.task_id))
+        })?;
 
         let status = match info.status {
             TaskStatus::Running => "running",

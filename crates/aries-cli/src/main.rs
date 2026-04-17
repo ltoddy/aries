@@ -29,8 +29,12 @@ async fn main() -> anyhow::Result<()> {
         None => {},
     };
 
-    let mut session =
-        Session::new(String::from("main"), &gctx, app_config.clone(), hook::DisplayPromptHook::new(Theme::default()))?;
+    let mut session = Session::new(
+        String::from("main"),
+        &gctx,
+        app_config.clone(),
+        hook::DisplayPromptHook::new(Theme::default()),
+    )?;
 
     let mut reader = input::InputReader::new(&gctx.config_dir)?;
     welcome::welcome(app_config.provider(), app_config.model(), &gctx);

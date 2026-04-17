@@ -91,7 +91,9 @@ impl Tool for MultiEditTool {
 
         for edit in args.edits {
             if edit.old_string == edit.new_string {
-                return Err(MultiEditError::EditError("old_string and new_string cannot be identical".to_string()));
+                return Err(MultiEditError::EditError(
+                    "old_string and new_string cannot be identical".to_string(),
+                ));
             }
 
             if edit.old_string.is_empty() {

@@ -77,7 +77,11 @@ impl Tool for GrepTool {
             let prefix = current_dir.clone();
             builder.filter_entry(move |entry| {
                 entry.file_type().is_some_and(|ft| ft.is_dir())
-                    || entry.path().strip_prefix(&prefix).map(|rel| glob.is_match(rel)).unwrap_or(false)
+                    || entry
+                        .path()
+                        .strip_prefix(&prefix)
+                        .map(|rel| glob.is_match(rel))
+                        .unwrap_or(false)
             });
         }
 

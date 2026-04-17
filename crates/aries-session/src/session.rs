@@ -52,9 +52,18 @@ impl<P> Session<P>
 where
     P: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel> + Clone + 'static,
 {
-    pub fn new(id: String, context: &GlobalContext, config: AriesConfig, task_hook: P) -> anyhow::Result<Self> {
+    pub fn new(
+        id: String,
+        context: &GlobalContext,
+        config: AriesConfig,
+        task_hook: P,
+    ) -> anyhow::Result<Self> {
         let today = OffsetDateTime::now_utc().date();
-        let history = vec![Message::user(format!("当前目录：{}\n当前日期：{}", context.current_dir.display(), today))];
+        let history = vec![Message::user(format!(
+            "当前目录：{}\n当前日期：{}",
+            context.current_dir.display(),
+            today
+        ))];
         let base_history_len = history.len();
         let transcript_dir = context.config_dir.join("transcripts");
 
@@ -133,7 +142,9 @@ where
 
     pub fn clear_history(&mut self) {
         match self {
-            Self::OpenAICompatible { history, base_history_len, .. } => history.truncate(*base_history_len),
+            Self::OpenAICompatible { history, base_history_len, .. } => {
+                history.truncate(*base_history_len)
+            },
             Self::Azure { history, base_history_len, .. } => history.truncate(*base_history_len),
         }
     }
@@ -155,7 +166,9 @@ where
             } => {
                 drain_task_notifications(task_notifications, history);
                 CompactionAgent::<openai::CompletionModel>::micro_compact(history);
-                if let Some(compressed) = compaction_agent.auto_compact(history, transcript_dir).await? {
+                if let Some(compressed) =
+                    compaction_agent.auto_compact(history, transcript_dir).await?
+                {
                     history.truncate(*base_history_len);
                     history.extend(compressed);
                 }
@@ -173,7 +186,9 @@ where
             } => {
                 drain_task_notifications(task_notifications, history);
                 CompactionAgent::<azure::CompletionModel>::micro_compact(history);
-                if let Some(compressed) = compaction_agent.auto_compact(history, transcript_dir).await? {
+                if let Some(compressed) =
+                    compaction_agent.auto_compact(history, transcript_dir).await?
+                {
                     history.truncate(*base_history_len);
                     history.extend(compressed);
                 }
@@ -220,7 +235,10 @@ where
                         }
                     }
                 },
-                MultiTurnStreamItem::StreamUserItem(StreamedUserContent::ToolResult { tool_result, .. }) => {
+                MultiTurnStreamItem::StreamUserItem(StreamedUserContent::ToolResult {
+                    tool_result,
+                    ..
+                }) => {
                     if let Some(ref mut cb) = cb {
                         let content = tool_result
                             .content
@@ -248,14 +266,24 @@ where
 
     pub async fn force_compact(&mut self) -> anyhow::Result<()> {
         match self {
-            Self::OpenAICompatible { compaction_agent, history, base_history_len, transcript_dir, .. } => {
-                if let Some(compressed) = compaction_agent.force_compact(history, transcript_dir).await? {
+            Self::OpenAICompatible {
+                compaction_agent,
+                history,
+                base_history_len,
+                transcript_dir,
+                ..
+            } => {
+                if let Some(compressed) =
+                    compaction_agent.force_compact(history, transcript_dir).await?
+                {
                     history.truncate(*base_history_len);
                     history.extend(compressed);
                 }
             },
             Self::Azure { compaction_agent, history, base_history_len, transcript_dir, .. } => {
-                if let Some(compressed) = compaction_agent.force_compact(history, transcript_dir).await? {
+                if let Some(compressed) =
+                    compaction_agent.force_compact(history, transcript_dir).await?
+                {
                     history.truncate(*base_history_len);
                     history.extend(compressed);
                 }
@@ -274,7 +302,8 @@ fn drain_task_notifications(receiver: &mut NotificationReceiver, history: &mut V
     let notif_text: String = notifications
         .iter()
         .map(|n| {
-            let mut parts = format!("[task:{}] command={} exit_code={}", n.task_id, n.command, n.exit_code);
+            let mut parts =
+                format!("[task:{}] command={} exit_code={}", n.task_id, n.command, n.exit_code);
             if !n.stdout.is_empty() {
                 parts.push_str(&format!("\nstdout: {}", n.stdout));
             }

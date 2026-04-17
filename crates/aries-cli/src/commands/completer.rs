@@ -43,7 +43,8 @@ const COMMANDS: &[(&str, &str)] = &[
 ];
 
 pub fn show(prefix: &str) -> Option<String> {
-    let filtered: Vec<(&str, &str)> = COMMANDS.iter().filter(|(cmd, _)| cmd.starts_with(prefix)).copied().collect();
+    let filtered: Vec<(&str, &str)> =
+        COMMANDS.iter().filter(|(cmd, _)| cmd.starts_with(prefix)).copied().collect();
 
     if filtered.is_empty() {
         return None;

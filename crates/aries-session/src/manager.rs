@@ -28,14 +28,24 @@ where
 
     pub fn create_session(&mut self) -> anyhow::Result<String> {
         let session_id = nanoid::nanoid!();
-        let session = Session::new(session_id.clone(), &self.context, self.config.clone(), self.hook.clone())?;
+        let session = Session::new(
+            session_id.clone(),
+            &self.context,
+            self.config.clone(),
+            self.hook.clone(),
+        )?;
         self.sessions.insert(session_id.clone(), session);
         self.active_session_id = Some(session_id.clone());
         Ok(session_id)
     }
 
     pub fn insert_session(&mut self, session_id: String) -> anyhow::Result<()> {
-        let session = Session::new(session_id.clone(), &self.context, self.config.clone(), self.hook.clone())?;
+        let session = Session::new(
+            session_id.clone(),
+            &self.context,
+            self.config.clone(),
+            self.hook.clone(),
+        )?;
         self.sessions.insert(session_id.clone(), session);
         self.active_session_id = Some(session_id);
         Ok(())

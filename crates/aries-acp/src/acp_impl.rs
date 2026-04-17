@@ -1,10 +1,11 @@
 use std::cell::Cell;
 
 use agent_client_protocol::{
-    AuthenticateRequest, AuthenticateResponse, CancelNotification, ContentBlock, ContentChunk, Error, Implementation,
-    InitializeRequest, InitializeResponse, NewSessionRequest, NewSessionResponse, PromptRequest, PromptResponse,
-    ProtocolVersion, SessionNotification, SessionUpdate, StopReason, TextContent, ToolCallId, ToolCallStatus,
-    ToolCallUpdate, ToolCallUpdateFields,
+    AuthenticateRequest, AuthenticateResponse, CancelNotification, ContentBlock, ContentChunk,
+    Error, Implementation, InitializeRequest, InitializeResponse, NewSessionRequest,
+    NewSessionResponse, PromptRequest, PromptResponse, ProtocolVersion, SessionNotification,
+    SessionUpdate, StopReason, TextContent, ToolCallId, ToolCallStatus, ToolCallUpdate,
+    ToolCallUpdateFields,
 };
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
@@ -34,7 +35,10 @@ impl AcpImpl {
 
 #[async_trait(?Send)]
 impl agent_client_protocol::Agent for AcpImpl {
-    async fn initialize(&self, args: InitializeRequest) -> agent_client_protocol::Result<InitializeResponse> {
+    async fn initialize(
+        &self,
+        args: InitializeRequest,
+    ) -> agent_client_protocol::Result<InitializeResponse> {
         info!("Received initialize request {args:?}");
 
         let info = Implementation::new("aries", "0.1.0").title("Aries Agent");
@@ -42,14 +46,20 @@ impl agent_client_protocol::Agent for AcpImpl {
         Ok(resp)
     }
 
-    async fn authenticate(&self, args: AuthenticateRequest) -> agent_client_protocol::Result<AuthenticateResponse> {
+    async fn authenticate(
+        &self,
+        args: AuthenticateRequest,
+    ) -> agent_client_protocol::Result<AuthenticateResponse> {
         info!("Received authenticate request {args:?}");
 
         let resp = AuthenticateResponse::new();
         Ok(resp)
     }
 
-    async fn new_session(&self, args: NewSessionRequest) -> agent_client_protocol::Result<NewSessionResponse> {
+    async fn new_session(
+        &self,
+        args: NewSessionRequest,
+    ) -> agent_client_protocol::Result<NewSessionResponse> {
         info!("Received new session request {args:?}");
 
         let mut sessions = self.sessions.lock().await;
@@ -66,7 +76,9 @@ impl agent_client_protocol::Agent for AcpImpl {
         let promot = args
             .prompt
             .iter()
-            .filter_map(|block| if let ContentBlock::Text(text) = block { Some(text.text.clone()) } else { None })
+            .filter_map(|block| {
+                if let ContentBlock::Text(text) = block { Some(text.text.clone()) } else { None }
+            })
             .collect::<Vec<_>>()
             .join("\n");
 
@@ -81,23 +93,29 @@ impl agent_client_protocol::Agent for AcpImpl {
                     let session_id = args.session_id.clone();
                     async move {
                         let update = match event {
-                            StreamEvent::Text(text) => SessionUpdate::AgentMessageChunk(ContentChunk::new(
-                                ContentBlock::Text(TextContent::new(text)),
-                            )),
-                            StreamEvent::Reasoning(text) => SessionUpdate::AgentThoughtChunk(ContentChunk::new(
-                                ContentBlock::Text(TextContent::new(text)),
-                            )),
+                            StreamEvent::Text(text) => SessionUpdate::AgentMessageChunk(
+                                ContentChunk::new(ContentBlock::Text(TextContent::new(text))),
+                            ),
+                            StreamEvent::Reasoning(text) => SessionUpdate::AgentThoughtChunk(
+                                ContentChunk::new(ContentBlock::Text(TextContent::new(text))),
+                            ),
                             StreamEvent::ToolCall { id, name, arguments } => {
-                                let tool_call = agent_client_protocol::ToolCall::new(ToolCallId::new(&*id), &name)
-                                    .status(ToolCallStatus::InProgress)
-                                    .raw_input(serde_json::Value::String(arguments));
+                                let tool_call = agent_client_protocol::ToolCall::new(
+                                    ToolCallId::new(&*id),
+                                    &name,
+                                )
+                                .status(ToolCallStatus::InProgress)
+                                .raw_input(serde_json::Value::String(arguments));
                                 SessionUpdate::ToolCall(tool_call)
                             },
                             StreamEvent::ToolResult { id, content } => {
                                 let fields = ToolCallUpdateFields::new()
                                     .status(ToolCallStatus::Completed)
                                     .raw_output(serde_json::Value::String(content));
-                                SessionUpdate::ToolCallUpdate(ToolCallUpdate::new(ToolCallId::new(&*id), fields))
+                                SessionUpdate::ToolCallUpdate(ToolCallUpdate::new(
+                                    ToolCallId::new(&*id),
+                                    fields,
+                                ))
                             },
                         };
                         let (tx, rx) = oneshot::channel();

@@ -49,8 +49,11 @@ where
             return;
         }
 
-        let to_replace_ids: HashSet<&str> =
-            tool_result_ids[..tool_result_ids.len() - KEEP_RECENT_TOOL_RESULTS].iter().map(|s| s.as_str()).collect();
+        let to_replace_ids: HashSet<&str> = tool_result_ids
+            [..tool_result_ids.len() - KEEP_RECENT_TOOL_RESULTS]
+            .iter()
+            .map(|s| s.as_str())
+            .collect();
 
         for msg in messages.iter_mut() {
             if let Message::User { content } = msg {
@@ -73,7 +76,8 @@ where
                             continue;
                         }
 
-                        let tool_name = tool_name_map.get(&tr.id).map(|s| s.as_str()).unwrap_or("unknown");
+                        let tool_name =
+                            tool_name_map.get(&tr.id).map(|s| s.as_str()).unwrap_or("unknown");
 
                         let placeholder = format!("[Previous: used {}]", tool_name);
                         *item = UserContent::tool_result(
@@ -123,8 +127,10 @@ where
             return Ok(None);
         }
 
-        let compressed_messages =
-            vec![Message::user(format!("[Compressed]\n\n{}", summary)), Message::assistant("Understood. Continuing.")];
+        let compressed_messages = vec![
+            Message::user(format!("[Compressed]\n\n{}", summary)),
+            Message::assistant("Understood. Continuing."),
+        ];
 
         Ok(Some(compressed_messages))
     }
@@ -143,7 +149,8 @@ impl CompactionAgent<openai::CompletionModel, ()> {
             .with_context(|| "Failed to create llm client")?;
 
         let name = String::from("Compaction Agent");
-        let inner = AgentWrapper::new(client, name, config, AgentType::Compaction, (), TaskSpawner::noop());
+        let inner =
+            AgentWrapper::new(client, name, config, AgentType::Compaction, (), TaskSpawner::noop());
         Ok(Self { inner })
     }
 }
@@ -162,7 +169,8 @@ impl CompactionAgent<azure::CompletionModel, ()> {
             .with_context(|| "Failed to create llm client")?;
 
         let name = String::from("Compaction Agent");
-        let inner = AgentWrapper::new(client, name, config, AgentType::Compaction, (), TaskSpawner::noop());
+        let inner =
+            AgentWrapper::new(client, name, config, AgentType::Compaction, (), TaskSpawner::noop());
         Ok(Self { inner })
     }
 }
@@ -184,7 +192,10 @@ fn build_tool_name_map(messages: &[Message]) -> HashMap<String, String> {
 async fn save_transcript(messages: &[Message], transcript_dir: &Path) -> anyhow::Result<()> {
     tokio::fs::create_dir_all(transcript_dir).await?;
 
-    let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
     let path = transcript_dir.join(format!("transcript_{}.json", timestamp));
 
     let content = serde_json::to_string_pretty(messages)?;
@@ -265,7 +276,9 @@ fn estimate_tokens_exceeds(messages: &[Message], threshold: usize) -> bool {
             Message::Assistant { content, .. } => {
                 for c in content.iter() {
                     match c {
-                        AssistantContent::Text(message::Text { text }) => total_chars += text.chars().count(),
+                        AssistantContent::Text(message::Text { text }) => {
+                            total_chars += text.chars().count()
+                        },
                         AssistantContent::Reasoning(message::Reasoning { content, .. }) => {
                             for rc in content {
                                 total_chars += match rc {

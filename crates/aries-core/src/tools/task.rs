@@ -99,8 +99,14 @@ where
 
         let name = format!("Subagent [{}]", args.subagent_type);
 
-        let mut agent =
-            AgentWrapper::new(self.client.clone(), name, self.config.clone(), agent_type, (), TaskSpawner::noop());
+        let mut agent = AgentWrapper::new(
+            self.client.clone(),
+            name,
+            self.config.clone(),
+            agent_type,
+            (),
+            TaskSpawner::noop(),
+        );
 
         let stream = agent.stream_prompt(&args.prompt, &[]).await;
         tokio::pin!(stream);

@@ -85,8 +85,13 @@ impl TaskSpawner {
     }
 
     async fn execute(&self, task_id: String, command: String) {
-        let result =
-            Command::new("sh").arg("-c").arg(&command).stdout(Stdio::piped()).stderr(Stdio::piped()).output().await;
+        let result = Command::new("sh")
+            .arg("-c")
+            .arg(&command)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .await;
 
         let (stdout, stderr, exit_code) = match result {
             Ok(output) => {

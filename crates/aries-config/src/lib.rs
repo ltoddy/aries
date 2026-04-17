@@ -98,7 +98,8 @@ impl AriesConfigLoader {
 }
 
 fn prompt_required(theme: &ColorfulTheme, prompt: &str) -> anyhow::Result<String> {
-    let input: String = Input::with_theme(theme).with_prompt(prompt).allow_empty(false).interact_text()?;
+    let input: String =
+        Input::with_theme(theme).with_prompt(prompt).allow_empty(false).interact_text()?;
     Ok(input.trim().to_owned())
 }
 
@@ -108,8 +109,11 @@ pub fn setup() -> anyhow::Result<AriesConfig> {
 
     let providers = [Provider::OpenAICompatible, Provider::Azure];
     let labels: Vec<_> = providers.iter().map(Provider::label).collect();
-    let provider =
-        &providers[Select::with_theme(&theme).with_prompt("provider").items(&labels).default(0).interact()?];
+    let provider = &providers[Select::with_theme(&theme)
+        .with_prompt("provider")
+        .items(&labels)
+        .default(0)
+        .interact()?];
 
     match provider {
         Provider::OpenAICompatible => {

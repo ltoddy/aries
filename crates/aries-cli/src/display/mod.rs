@@ -19,7 +19,11 @@ use aries_core::tools;
 use aries_theme::Theme;
 use itertools::Itertools;
 
-pub fn format_tool_call_args(tool_name: &str, args: &str, theme: &Theme) -> (String, Option<String>) {
+pub fn format_tool_call_args(
+    tool_name: &str,
+    args: &str,
+    theme: &Theme,
+) -> (String, Option<String>) {
     match tool_name {
         tools::read::NAME => read_file::format_tool_call(args, theme),
         tools::write::NAME => write_file::format_tool_call(args, theme),
@@ -81,7 +85,10 @@ pub fn format_unknown_call(tool_name: &str, args: &str, theme: &Theme) -> (Strin
         .and_then(|value| serde_json::to_string_pretty(&value))
         .unwrap_or_else(|_| args.to_string());
 
-    (format!("{} {}", theme.cyan_text(tool_name), theme.yellow_text("(unknown tool)")), Some(args_str))
+    (
+        format!("{} {}", theme.cyan_text(tool_name), theme.yellow_text("(unknown tool)")),
+        Some(args_str),
+    )
 }
 
 pub fn preview(content: &str) -> String {
