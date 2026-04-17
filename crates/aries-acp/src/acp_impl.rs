@@ -87,8 +87,8 @@ impl agent_client_protocol::Agent for AcpImpl {
                             StreamEvent::Reasoning(text) => SessionUpdate::AgentThoughtChunk(ContentChunk::new(
                                 ContentBlock::Text(TextContent::new(text)),
                             )),
-                            StreamEvent::ToolCall { name, arguments } => {
-                                let tool_call = agent_client_protocol::ToolCall::new(ToolCallId::new(&*name), &name)
+                            StreamEvent::ToolCall { id, name, arguments } => {
+                                let tool_call = agent_client_protocol::ToolCall::new(ToolCallId::new(&*id), &name)
                                     .status(ToolCallStatus::InProgress)
                                     .raw_input(serde_json::Value::String(arguments));
                                 SessionUpdate::ToolCall(tool_call)

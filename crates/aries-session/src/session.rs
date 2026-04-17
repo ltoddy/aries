@@ -20,7 +20,7 @@ pub type NoCb = fn(StreamEvent) -> Ready<anyhow::Result<()>>;
 pub enum StreamEvent {
     Text(String),
     Reasoning(String),
-    ToolCall { name: String, arguments: String },
+    ToolCall { id: String, name: String, arguments: String },
     ToolResult { id: String, content: String },
 }
 
@@ -210,6 +210,7 @@ where
                             },
                             StreamedAssistantContent::ToolCall { tool_call, .. } => {
                                 cb(StreamEvent::ToolCall {
+                                    id: tool_call.id,
                                     name: tool_call.function.name,
                                     arguments: tool_call.function.arguments.to_string(),
                                 })
