@@ -54,6 +54,7 @@ async fn main() -> anyhow::Result<()> {
                     continue;
                 }
 
+                print!("\n{}: ", theme.magenta_text("Aries"));
                 let start = Instant::now();
                 if let Err(err) = session.prompt(input, None::<NoCb>).await {
                     eprintln!("\n{}: {}", theme.red_text("Error streaming_chunk"), err);

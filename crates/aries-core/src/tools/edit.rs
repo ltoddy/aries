@@ -11,6 +11,7 @@ pub struct EditArgs {
     pub file_path: PathBuf,
     pub old_string: String,
     pub new_string: String,
+    #[serde(default)]
     pub replace_all: bool,
 }
 

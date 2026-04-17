@@ -80,4 +80,8 @@ impl Theme {
     pub fn blue_text(&self, s: &str) -> colored::ColoredString {
         s.color(self.blue())
     }
+
+    pub fn magenta_text(&self, s: &str) -> colored::ColoredString {
+        s.color(self.magenta())
+    }
 }
