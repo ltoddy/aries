@@ -6,11 +6,20 @@ pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
 
     let first = match args {
         Ok(args) => {
-            let mut operation = args.operation;
+            let mut display = format!("{:?}", args.operation);
             if let Some(path) = args.file_path {
-                operation.push_str(&format!(", filePath = {}", path.display()));
+                display.push_str(&format!(" {}", path.display()));
             }
-            operation
+            if let Some(line) = args.line {
+                display.push_str(&format!(":{line}"));
+            }
+            if let Some(character) = args.character {
+                display.push_str(&format!(":{character}"));
+            }
+            if let Some(query) = args.query {
+                display.push_str(&format!(" query = {query}"));
+            }
+            display
         },
         Err(_) => return (String::from("?"), None),
     };

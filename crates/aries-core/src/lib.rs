@@ -1,4 +1,5 @@
 pub mod compaction;
+pub mod language_server;
 pub mod rpc;
 pub mod task_spawner;
 pub mod tools;
