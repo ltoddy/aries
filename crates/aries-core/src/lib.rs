@@ -39,7 +39,6 @@ where
 {
     pub fn new<C: CompletionClient<CompletionModel = M> + Clone + Send + Sync + 'static>(
         client: C,
-        name: String,
         config: AriesConfig,
         agent_type: AgentType,
         hook: P,
@@ -52,7 +51,7 @@ where
         let inner = client
             .agent(model)
             .hook(hook)
-            .name(&name)
+            .name(Self::name(agent_type))
             .description(Self::description(agent_type))
             .preamble(preamble)
             .tools(tools)
@@ -84,6 +83,18 @@ where
             AgentType::Compaction => include_str!("prompts/compaction.txt"),
             AgentType::Title => include_str!("prompts/title.txt"),
             AgentType::Summary => include_str!("prompts/summary.txt"),
+        }
+    }
+
+    const fn name(agent_type: AgentType) -> &'static str {
+        match agent_type {
+            AgentType::Build => "Builder",
+            AgentType::Plan => "Planner",
+            AgentType::General => "Assistant",
+            AgentType::Explore => "Explorer",
+            AgentType::Compaction => "Archivist",
+            AgentType::Title => "Namer",
+            AgentType::Summary => "Summarizer",
         }
     }
 

@@ -97,11 +97,8 @@ where
             _ => AgentType::General,
         };
 
-        let name = format!("Subagent [{}]", args.subagent_type);
-
         let mut agent = AgentWrapper::new(
             self.client.clone(),
-            name,
             self.config.clone(),
             agent_type,
             (),

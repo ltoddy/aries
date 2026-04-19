@@ -148,9 +148,8 @@ impl CompactionAgent<openai::CompletionModel, ()> {
             .build()
             .with_context(|| "Failed to create llm client")?;
 
-        let name = String::from("Compaction Agent");
         let inner =
-            AgentWrapper::new(client, name, config, AgentType::Compaction, (), TaskSpawner::noop());
+            AgentWrapper::new(client, config, AgentType::Compaction, (), TaskSpawner::noop());
         Ok(Self { inner })
     }
 }
@@ -168,9 +167,8 @@ impl CompactionAgent<azure::CompletionModel, ()> {
             .build()
             .with_context(|| "Failed to create llm client")?;
 
-        let name = String::from("Compaction Agent");
         let inner =
-            AgentWrapper::new(client, name, config, AgentType::Compaction, (), TaskSpawner::noop());
+            AgentWrapper::new(client, config, AgentType::Compaction, (), TaskSpawner::noop());
         Ok(Self { inner })
     }
 }

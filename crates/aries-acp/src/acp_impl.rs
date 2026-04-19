@@ -3,13 +3,13 @@ use std::cell::Cell;
 use agent_client_protocol::{
     AuthenticateRequest, AuthenticateResponse, CancelNotification, ContentBlock, ContentChunk,
     Error, Implementation, InitializeRequest, InitializeResponse, NewSessionRequest,
-    NewSessionResponse, PromptRequest, PromptResponse, ProtocolVersion, SessionNotification,
-    SessionUpdate, StopReason, TextContent, ToolCallId, ToolCallStatus, ToolCallUpdate,
-    ToolCallUpdateFields,
+    NewSessionResponse, Plan, PlanEntry, PlanEntryPriority, PlanEntryStatus as AcpPlanEntryStatus,
+    PromptRequest, PromptResponse, ProtocolVersion, SessionNotification, SessionUpdate, StopReason,
+    TextContent, ToolCallId, ToolCallStatus, ToolCallUpdate, ToolCallUpdateFields,
 };
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
-use aries_session::{SessionManager, StreamEvent};
+use aries_session::{PlanEntryStatus, SessionManager, StreamEvent};
 use async_trait::async_trait;
 use tokio::sync::{Mutex, mpsc, oneshot};
 use tracing::info;
@@ -117,6 +117,25 @@ impl agent_client_protocol::Agent for AcpImpl {
                                     fields,
                                 ))
                             },
+                            StreamEvent::Plan(entries) => {
+                                let plan_entries = entries
+                                    .into_iter()
+                                    .map(|e| {
+                                        let status = match e.status {
+                                            PlanEntryStatus::Pending => AcpPlanEntryStatus::Pending,
+                                            PlanEntryStatus::InProgress => {
+                                                AcpPlanEntryStatus::InProgress
+                                            },
+                                            PlanEntryStatus::Completed => {
+                                                AcpPlanEntryStatus::Completed
+                                            },
+                                        };
+                                        PlanEntry::new(e.content, PlanEntryPriority::Medium, status)
+                                    })
+                                    .collect();
+                                SessionUpdate::Plan(Plan::new(plan_entries))
+                            },
+                            StreamEvent::Finish => return Ok(()),
                         };
                         let (tx, rx) = oneshot::channel();
                         if sender.send((SessionNotification::new(session_id, update), tx)).is_ok() {
