@@ -30,8 +30,14 @@ impl LspClient {
             .kill_on_drop(true)
             .spawn()?;
 
-        let stdin = child.stdin.take().unwrap();
-        let stdout = child.stdout.take().unwrap();
+        let stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| anyhow::anyhow!("Failed to open stdin for LSP process"))?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| anyhow::anyhow!("Failed to open stdout for LSP process"))?;
 
         let pending: Arc<Mutex<HashMap<RequestId, oneshot::Sender<Value>>>> =
             Arc::new(Mutex::new(HashMap::new()));

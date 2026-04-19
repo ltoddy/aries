@@ -5,6 +5,7 @@ use anyhow::Context;
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
 use aries_core::compaction::CompactionAgent;
+use aries_core::language_server::SharedLspClient;
 use aries_core::task_spawner::{NotificationReceiver, TaskSpawner};
 use aries_core::{AgentType, AgentWrapper};
 use futures::{StreamExt, pin_mut};
@@ -24,6 +25,7 @@ where
     id: String,
     provider_agents: ProviderAgents<P>,
     task_notifications: NotificationReceiver,
+    _lsp_client: SharedLspClient,
     history: Vec<Message>,
     base_history_len: usize,
     transcript_dir: PathBuf,
@@ -61,6 +63,7 @@ where
         ))];
         let base_history_len = history.len();
         let transcript_dir = gctx.config_dir.join("transcripts");
+        let lsp_client: SharedLspClient = Default::default();
 
         let (provider_agents, task_notifications) = match config.clone() {
             AriesConfig::OpenAICompatible(ref conf) => {
@@ -71,8 +74,8 @@ where
                     .with_context(|| "Failed to create llm client")?;
 
                 let (spawner, task_notifications) = TaskSpawner::new();
-                let agent =
-                    AgentWrapper::new(client, config.clone(), AgentType::Build, task_hook, spawner);
+                let agent = AgentWrapper::new(client, config.clone(), AgentType::Build, task_hook)
+                    .with_tools(spawner, lsp_client.clone());
                 let compaction_agent = CompactionAgent::<openai::CompletionModel>::new(config)?;
                 (ProviderAgents::OpenAICompatible { agent, compaction_agent }, task_notifications)
             },
@@ -85,8 +88,8 @@ where
                     .with_context(|| "Failed to create llm client")?;
 
                 let (spawner, task_notifications) = TaskSpawner::new();
-                let agent =
-                    AgentWrapper::new(client, config.clone(), AgentType::Build, task_hook, spawner);
+                let agent = AgentWrapper::new(client, config.clone(), AgentType::Build, task_hook)
+                    .with_tools(spawner, lsp_client.clone());
                 let compaction_agent = CompactionAgent::<azure::CompletionModel>::new(config)?;
                 (ProviderAgents::Azure { agent, compaction_agent }, task_notifications)
             },
@@ -96,6 +99,7 @@ where
             id,
             provider_agents,
             task_notifications,
+            _lsp_client: lsp_client,
             history,
             base_history_len,
             transcript_dir,

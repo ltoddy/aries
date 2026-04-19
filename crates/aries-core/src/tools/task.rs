@@ -6,7 +6,6 @@ use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 
-use crate::task_spawner::TaskSpawner;
 use crate::{AgentType, AgentWrapper};
 
 pub const NAME: &str = "task";
@@ -97,13 +96,8 @@ where
             _ => AgentType::General,
         };
 
-        let mut agent = AgentWrapper::new(
-            self.client.clone(),
-            self.config.clone(),
-            agent_type,
-            (),
-            TaskSpawner::noop(),
-        );
+        let mut agent =
+            AgentWrapper::new(self.client.clone(), self.config.clone(), agent_type, ()).build();
 
         let stream = agent.stream_prompt(&args.prompt, &[]).await;
         tokio::pin!(stream);

@@ -7,7 +7,9 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::language_server::{LspClient, detect_language_server, is_binary_installed};
+use crate::language_server::{
+    LspClient, SharedLspClient, detect_language_server, is_binary_installed,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -45,7 +47,52 @@ pub enum LspError {
 
 pub const NAME: &str = "lsp";
 
-pub struct LspTool;
+pub struct LspTool {
+    client: SharedLspClient,
+}
+
+impl LspTool {
+    pub fn new(client: SharedLspClient) -> Self {
+        Self { client }
+    }
+
+    async fn ensure_client(&self) -> Result<(), LspError> {
+        let mut guard = self.client.lock().await;
+        if guard.is_some() {
+            return Ok(());
+        }
+
+        let project_dir = env::current_dir().map_err(|e| {
+            LspError::OperationFailed(format!("Failed to get current directory: {}", e))
+        })?;
+
+        let server_info = detect_language_server(&project_dir).ok_or_else(|| {
+            LspError::OperationFailed(
+                "Unable to detect language server for this project. No recognized project markers found (e.g., Cargo.toml, package.json, go.mod).".to_string(),
+            )
+        })?;
+
+        if !is_binary_installed(server_info.binary) {
+            return Err(LspError::OperationFailed(format!(
+                "{} ({}) is not installed. Please install it to use LSP features.",
+                server_info.name, server_info.binary
+            )));
+        }
+
+        let mut client = LspClient::start(server_info.binary, &project_dir).await.map_err(|e| {
+            LspError::OperationFailed(format!("Failed to start {}: {}", server_info.binary, e))
+        })?;
+
+        let root_uri = format!("file://{}", project_dir.display());
+        client
+            .initialize(&root_uri)
+            .await
+            .map_err(|e| LspError::OperationFailed(format!("Failed to initialize LSP: {}", e)))?;
+
+        *guard = Some(client);
+        Ok(())
+    }
+}
 
 impl Tool for LspTool {
     const NAME: &'static str = NAME;
@@ -83,28 +130,11 @@ impl Tool for LspTool {
             LspError::OperationFailed(format!("Failed to get current directory: {}", e))
         })?;
 
-        let server_info = detect_language_server(&project_dir).ok_or_else(|| {
-            LspError::OperationFailed(
-                "Unable to detect language server for this project. No recognized project markers found (e.g., Cargo.toml, package.json, go.mod).".to_string(),
-            )
-        })?;
-
-        if !is_binary_installed(server_info.binary) {
-            return Err(LspError::OperationFailed(format!(
-                "{} ({}) is not installed. Please install it to use LSP features.",
-                server_info.name, server_info.binary
-            )));
-        }
-
-        let mut client = LspClient::start(server_info.binary, &project_dir).await.map_err(|e| {
-            LspError::OperationFailed(format!("Failed to start {}: {}", server_info.binary, e))
-        })?;
-
-        let root_uri = format!("file://{}", project_dir.display());
-        client
-            .initialize(&root_uri)
-            .await
-            .map_err(|e| LspError::OperationFailed(format!("Failed to initialize LSP: {}", e)))?;
+        self.ensure_client().await?;
+        let mut guard = self.client.lock().await;
+        let client = guard
+            .as_mut()
+            .ok_or_else(|| LspError::OperationFailed("LSP client is not initialized".into()))?;
 
         if let Some(ref file_path) = args.file_path {
             let abs_path = if file_path.is_absolute() {
@@ -182,8 +212,6 @@ impl Tool for LspTool {
                 client.outgoing_calls(item).await
             },
         };
-
-        let _ = client.shutdown().await;
 
         let value = result.map_err(|e| LspError::OperationFailed(e.to_string()))?;
         Ok(LspOutput { result: value })

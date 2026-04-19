@@ -7,6 +7,7 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::language_server::SharedLspClient;
 use crate::tools::apply_patch::ApplyPatchTool;
 use crate::tools::bash::ShellCommand;
 use crate::tools::codesearch::CodeSearchTool;
@@ -57,14 +58,15 @@ where
 {
     client: C,
     config: AriesConfig,
+    lsp_client: SharedLspClient,
 }
 
 impl<C> BatchTool<C>
 where
     C: CompletionClient,
 {
-    pub fn new(client: C, config: AriesConfig) -> Self {
-        Self { client, config }
+    pub fn new(client: C, config: AriesConfig, lsp_client: SharedLspClient) -> Self {
+        Self { client, config, lsp_client }
     }
 }
 
@@ -210,7 +212,7 @@ where
                 } else if tool_name == lsp::NAME {
                     let parsed_args =
                         serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
-                    Tool::call(&LspTool, parsed_args)
+                    Tool::call(&LspTool::new(self.lsp_client.clone()), parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
