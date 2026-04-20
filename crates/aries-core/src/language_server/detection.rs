@@ -4,16 +4,18 @@ use std::path::Path;
 pub struct LspServerInfo {
     pub name: &'static str,
     pub binary: &'static str,
+    pub args: &'static [&'static str],
 }
 
 pub fn detect_language_server(project_dir: &Path) -> Option<LspServerInfo> {
     let markers: &[(&str, LspServerInfo)] = &[
-        ("Cargo.toml", LspServerInfo { name: "Rust Analyzer", binary: "rust-analyzer" }),
+        ("Cargo.toml", LspServerInfo { name: "Rust Analyzer", binary: "rust-analyzer", args: &[] }),
         (
             "tsconfig.json",
             LspServerInfo {
                 name: "TypeScript Language Server",
                 binary: "typescript-language-server",
+                args: &["--stdio"],
             },
         ),
         (
@@ -21,12 +23,22 @@ pub fn detect_language_server(project_dir: &Path) -> Option<LspServerInfo> {
             LspServerInfo {
                 name: "TypeScript Language Server",
                 binary: "typescript-language-server",
+                args: &["--stdio"],
             },
         ),
-        ("go.mod", LspServerInfo { name: "gopls", binary: "gopls" }),
-        ("pyproject.toml", LspServerInfo { name: "Pyright", binary: "pyright-langserver" }),
-        ("requirements.txt", LspServerInfo { name: "Pyright", binary: "pyright-langserver" }),
-        ("setup.py", LspServerInfo { name: "Pyright", binary: "pyright-langserver" }),
+        ("go.mod", LspServerInfo { name: "gopls", binary: "gopls", args: &[] }),
+        (
+            "pyproject.toml",
+            LspServerInfo { name: "Pyright", binary: "pyright-langserver", args: &["--stdio"] },
+        ),
+        (
+            "requirements.txt",
+            LspServerInfo { name: "Pyright", binary: "pyright-langserver", args: &["--stdio"] },
+        ),
+        (
+            "setup.py",
+            LspServerInfo { name: "Pyright", binary: "pyright-langserver", args: &["--stdio"] },
+        ),
     ];
 
     for (marker, info) in markers {

@@ -20,13 +20,14 @@ pub struct LspClient {
 }
 
 impl LspClient {
-    pub async fn start(binary: &str, project_dir: &Path) -> anyhow::Result<Self> {
+    pub async fn start(binary: &str, args: &[&str], project_dir: &Path) -> anyhow::Result<Self> {
         let mut child = Command::new(binary)
-            .arg("--stdio")
+            .args(args)
             .current_dir(project_dir)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
+            .stderr(Stdio::piped())
             .kill_on_drop(true)
             .spawn()?;
 

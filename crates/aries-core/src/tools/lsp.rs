@@ -79,9 +79,11 @@ impl LspTool {
             )));
         }
 
-        let mut client = LspClient::start(server_info.binary, &project_dir).await.map_err(|e| {
-            LspError::OperationFailed(format!("Failed to start {}: {}", server_info.binary, e))
-        })?;
+        let mut client = LspClient::start(server_info.binary, server_info.args, &project_dir)
+            .await
+            .map_err(|e| {
+                LspError::OperationFailed(format!("Failed to start {}: {}", server_info.binary, e))
+            })?;
 
         let root_uri = format!("file://{}", project_dir.display());
         client
