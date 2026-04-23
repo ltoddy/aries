@@ -10,20 +10,20 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::oneshot;
 
+use crate::language_server::LspServerInfo;
 use crate::rpc::{JsonRpcMessage, Notification, Request, RequestId, Response};
 
 pub struct LspClient {
-    stdin: tokio::process::ChildStdin,
+    stdin: tokio::sync::Mutex<tokio::process::ChildStdin>,
     _child: Child,
     next_id: AtomicI64,
     pending: Arc<Mutex<HashMap<RequestId, oneshot::Sender<Value>>>>,
 }
 
 impl LspClient {
-    pub async fn start(binary: &str, args: &[&str], project_dir: &Path) -> anyhow::Result<Self> {
-        let mut child = Command::new(binary)
-            .args(args)
-            .current_dir(project_dir)
+    pub async fn start(info: LspServerInfo) -> anyhow::Result<Self> {
+        let mut child = Command::new(info.binary)
+            .args(info.args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -80,10 +80,15 @@ impl LspClient {
             }
         });
 
-        Ok(Self { stdin, _child: child, next_id: AtomicI64::new(1), pending })
+        Ok(Self {
+            stdin: tokio::sync::Mutex::new(stdin),
+            _child: child,
+            next_id: AtomicI64::new(1),
+            pending,
+        })
     }
 
-    pub async fn initialize(&mut self, root_uri: &str) -> anyhow::Result<Value> {
+    pub async fn initialize(&self, root_uri: &str) -> anyhow::Result<Value> {
         let params = serde_json::json!({
             "processId": std::process::id(),
             "rootUri": root_uri,
@@ -107,33 +112,38 @@ impl LspClient {
         Ok(result)
     }
 
-    pub async fn send_request(&mut self, method: &str, params: Value) -> anyhow::Result<Value> {
+    pub async fn send_request(&self, method: &str, params: Value) -> anyhow::Result<Value> {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let request = JsonRpcMessage::wrap(Request::new(id, method, params));
 
         let body = serde_json::to_string(&request)?;
         let message = format!("Content-Length: {}\r\n\r\n{}", body.len(), body);
-        self.stdin.write_all(message.as_bytes()).await?;
-        self.stdin.flush().await?;
 
         let (tx, rx) = oneshot::channel();
         self.pending.lock().insert(RequestId::Number(id), tx);
+
+        {
+            let mut stdin = self.stdin.lock().await;
+            stdin.write_all(message.as_bytes()).await?;
+            stdin.flush().await?;
+        }
 
         let result = tokio::time::timeout(std::time::Duration::from_secs(30), rx).await??;
         Ok(result)
     }
 
-    pub async fn send_notification(&mut self, method: &str, params: Value) -> anyhow::Result<()> {
+    pub async fn send_notification(&self, method: &str, params: Value) -> anyhow::Result<()> {
         let notification = JsonRpcMessage::wrap(Notification::new(method, params));
         let body = serde_json::to_string(&notification)?;
         let message = format!("Content-Length: {}\r\n\r\n{}", body.len(), body);
-        self.stdin.write_all(message.as_bytes()).await?;
-        self.stdin.flush().await?;
+        let mut stdin = self.stdin.lock().await;
+        stdin.write_all(message.as_bytes()).await?;
+        stdin.flush().await?;
         Ok(())
     }
 
     pub async fn goto_definition(
-        &mut self,
+        &self,
         file_path: &Path,
         line: u32,
         character: u32,
@@ -143,7 +153,7 @@ impl LspClient {
     }
 
     pub async fn find_references(
-        &mut self,
+        &self,
         file_path: &Path,
         line: u32,
         character: u32,
@@ -154,7 +164,7 @@ impl LspClient {
     }
 
     pub async fn hover(
-        &mut self,
+        &self,
         file_path: &Path,
         line: u32,
         character: u32,
@@ -163,7 +173,7 @@ impl LspClient {
         self.send_request("textDocument/hover", params).await
     }
 
-    pub async fn document_symbol(&mut self, file_path: &Path) -> anyhow::Result<Value> {
+    pub async fn document_symbol(&self, file_path: &Path) -> anyhow::Result<Value> {
         let params = serde_json::json!({
             "textDocument": {
                 "uri": path_to_uri(file_path)
@@ -172,13 +182,13 @@ impl LspClient {
         self.send_request("textDocument/documentSymbol", params).await
     }
 
-    pub async fn workspace_symbol(&mut self, query: &str) -> anyhow::Result<Value> {
+    pub async fn workspace_symbol(&self, query: &str) -> anyhow::Result<Value> {
         let params = serde_json::json!({ "query": query });
         self.send_request("workspace/symbol", params).await
     }
 
     pub async fn goto_implementation(
-        &mut self,
+        &self,
         file_path: &Path,
         line: u32,
         character: u32,
@@ -188,7 +198,7 @@ impl LspClient {
     }
 
     pub async fn prepare_call_hierarchy(
-        &mut self,
+        &self,
         file_path: &Path,
         line: u32,
         character: u32,
@@ -197,17 +207,17 @@ impl LspClient {
         self.send_request("textDocument/prepareCallHierarchy", params).await
     }
 
-    pub async fn incoming_calls(&mut self, item: Value) -> anyhow::Result<Value> {
+    pub async fn incoming_calls(&self, item: Value) -> anyhow::Result<Value> {
         let params = serde_json::json!({ "item": item });
         self.send_request("callHierarchy/incomingCalls", params).await
     }
 
-    pub async fn outgoing_calls(&mut self, item: Value) -> anyhow::Result<Value> {
+    pub async fn outgoing_calls(&self, item: Value) -> anyhow::Result<Value> {
         let params = serde_json::json!({ "item": item });
         self.send_request("callHierarchy/outgoingCalls", params).await
     }
 
-    pub async fn did_open(&mut self, file_path: &Path) -> anyhow::Result<()> {
+    pub async fn did_open(&self, file_path: &Path) -> anyhow::Result<()> {
         let content = tokio::fs::read_to_string(file_path).await?;
         let language_id = detect_language_id(file_path);
         let params = serde_json::json!({
@@ -221,7 +231,7 @@ impl LspClient {
         self.send_notification("textDocument/didOpen", params).await
     }
 
-    pub async fn shutdown(&mut self) -> anyhow::Result<()> {
+    pub async fn shutdown(&self) -> anyhow::Result<()> {
         let _ = self.send_request("shutdown", Value::Null).await;
         self.send_notification("exit", Value::Null).await?;
         Ok(())

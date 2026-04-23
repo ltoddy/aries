@@ -7,7 +7,6 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::language_server::SharedLspClient;
 use crate::tools::apply_patch::ApplyPatchTool;
 use crate::tools::bash::ShellCommand;
 use crate::tools::codesearch::CodeSearchTool;
@@ -15,7 +14,6 @@ use crate::tools::edit::EditTool;
 use crate::tools::glob::GlobTool;
 use crate::tools::grep::GrepTool;
 use crate::tools::ls::LsTool;
-use crate::tools::lsp::LspTool;
 use crate::tools::multiedit::MultiEditTool;
 use crate::tools::question::QuestionTool;
 use crate::tools::read::ReadFileTool;
@@ -24,8 +22,8 @@ use crate::tools::webfetch::WebFetchTool;
 use crate::tools::websearch::WebSearchTool;
 use crate::tools::write::WriteFileTool;
 use crate::tools::{
-    apply_patch, bash, codesearch, edit, glob, grep, ls, lsp, multiedit, question, read, task,
-    webfetch, websearch, write,
+    apply_patch, bash, codesearch, edit, glob, grep, ls, multiedit, question, read, task, webfetch,
+    websearch, write,
 };
 
 pub const NAME: &str = "batch";
@@ -58,15 +56,14 @@ where
 {
     client: C,
     config: AriesConfig,
-    lsp_client: SharedLspClient,
 }
 
 impl<C> BatchTool<C>
 where
     C: CompletionClient,
 {
-    pub fn new(client: C, config: AriesConfig, lsp_client: SharedLspClient) -> Self {
-        Self { client, config, lsp_client }
+    pub fn new(client: C, config: AriesConfig) -> Self {
+        Self { client, config }
     }
 }
 
@@ -206,13 +203,6 @@ where
                     let parsed_args =
                         serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
                     Tool::call(&WebSearchTool, parsed_args)
-                        .await
-                        .map(|res| serde_json::to_value(res).unwrap())
-                        .map_err(|e| e.to_string())
-                } else if tool_name == lsp::NAME {
-                    let parsed_args =
-                        serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
-                    Tool::call(&LspTool::new(self.lsp_client.clone()), parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())

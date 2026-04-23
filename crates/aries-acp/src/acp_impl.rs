@@ -63,7 +63,7 @@ impl agent_client_protocol::Agent for AcpImpl {
         info!("Received new session request {args:?}");
 
         let mut sessions = self.sessions.lock().await;
-        let session_id = sessions.create_session().map_err(|_| Error::internal_error())?;
+        let session_id = sessions.create_session().await.map_err(|_| Error::internal_error())?;
         self.next_session_id.set(nanoid::nanoid!());
 
         let resp = NewSessionResponse::new(session_id);

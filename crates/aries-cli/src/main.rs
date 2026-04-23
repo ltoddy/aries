@@ -34,7 +34,8 @@ async fn main() -> anyhow::Result<()> {
         &gctx,
         app_config.clone(),
         hook::DisplayPromptHook::new(Theme::default()),
-    )?;
+    )
+    .await?;
 
     let mut reader = input::InputReader::new(&gctx.config_dir)?;
     welcome::welcome(app_config.provider(), app_config.model(), &gctx);

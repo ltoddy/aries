@@ -46,7 +46,7 @@ where
     pub fn with_tools(
         self,
         spawner: TaskSpawner,
-        lsp_client: SharedLspClient,
+        lsp_client: Option<SharedLspClient>,
     ) -> AgentWrapper<C::CompletionModel, P> {
         let model = self.config.model().to_owned();
         let agent_type = self.agent_type;
@@ -72,44 +72,50 @@ fn build_tools<C: CompletionClient + Clone + Send + Sync + 'static>(
     config: AriesConfig,
     client: &C,
     spawner: TaskSpawner,
-    lsp_client: SharedLspClient,
+    lsp_client: Option<SharedLspClient>,
 ) -> Vec<Box<dyn ToolDyn>>
 where
     C::CompletionModel: completion::CompletionModel + 'static,
 {
     match agent_type {
-        AgentType::Build | AgentType::General => vec![
-            Box::new(tools::bash::ShellCommand),
-            Box::new(tools::read::ReadFileTool),
-            Box::new(tools::write::WriteFileTool),
-            Box::new(tools::glob::GlobTool),
-            Box::new(tools::grep::GrepTool),
-            Box::new(tools::ls::LsTool),
-            Box::new(tools::apply_patch::ApplyPatchTool),
-            Box::new(tools::multiedit::MultiEditTool),
-            Box::new(tools::edit::EditTool),
-            Box::new(tools::batch::BatchTool::<C>::new(
-                client.clone(),
-                config.clone(),
-                lsp_client.clone(),
-            )),
-            Box::new(tools::question::QuestionTool),
-            Box::new(tools::task::TaskTool::<C>::new(client.clone(), config.clone())),
-            Box::new(tools::lsp::LspTool::new(lsp_client.clone())),
-            Box::new(tools::codesearch::CodeSearchTool),
-            Box::new(tools::task_spawn::TaskSpawnTool::new(spawner.clone())),
-            Box::new(tools::task_status::TaskStatusTool::new(spawner)),
-        ],
-        AgentType::Plan => vec![
-            Box::new(tools::bash::ShellCommand),
-            Box::new(tools::read::ReadFileTool),
-            Box::new(tools::glob::GlobTool),
-            Box::new(tools::grep::GrepTool),
-            Box::new(tools::ls::LsTool),
-            Box::new(tools::question::QuestionTool),
-            Box::new(tools::lsp::LspTool::new(lsp_client.clone())),
-            Box::new(tools::codesearch::CodeSearchTool),
-        ],
+        AgentType::Build | AgentType::General => {
+            let mut tools: Vec<Box<dyn ToolDyn>> = vec![
+                Box::new(tools::bash::ShellCommand),
+                Box::new(tools::read::ReadFileTool),
+                Box::new(tools::write::WriteFileTool),
+                Box::new(tools::glob::GlobTool),
+                Box::new(tools::grep::GrepTool),
+                Box::new(tools::ls::LsTool),
+                Box::new(tools::apply_patch::ApplyPatchTool),
+                Box::new(tools::multiedit::MultiEditTool),
+                Box::new(tools::edit::EditTool),
+                Box::new(tools::batch::BatchTool::<C>::new(client.clone(), config.clone())),
+                Box::new(tools::question::QuestionTool),
+                Box::new(tools::task::TaskTool::<C>::new(client.clone(), config.clone())),
+                Box::new(tools::codesearch::CodeSearchTool),
+                Box::new(tools::task_spawn::TaskSpawnTool::new(spawner.clone())),
+                Box::new(tools::task_status::TaskStatusTool::new(spawner)),
+            ];
+            if let Some(lsp_client) = lsp_client {
+                tools.push(Box::new(tools::lsp::LspTool::new(lsp_client)));
+            }
+            tools
+        },
+        AgentType::Plan => {
+            let mut tools: Vec<Box<dyn ToolDyn>> = vec![
+                Box::new(tools::bash::ShellCommand),
+                Box::new(tools::read::ReadFileTool),
+                Box::new(tools::glob::GlobTool),
+                Box::new(tools::grep::GrepTool),
+                Box::new(tools::ls::LsTool),
+                Box::new(tools::question::QuestionTool),
+                Box::new(tools::codesearch::CodeSearchTool),
+            ];
+            if let Some(lsp_client) = lsp_client {
+                tools.push(Box::new(tools::lsp::LspTool::new(lsp_client)));
+            }
+            tools
+        },
         AgentType::Explore => vec![
             Box::new(tools::bash::ShellCommand),
             Box::new(tools::read::ReadFileTool),

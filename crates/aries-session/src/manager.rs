@@ -26,10 +26,11 @@ where
         Self { sessions: HashMap::new(), active_session_id: None, gctx, config, hook }
     }
 
-    pub fn create_session(&mut self) -> anyhow::Result<String> {
+    pub async fn create_session(&mut self) -> anyhow::Result<String> {
         let session_id = nanoid::nanoid!();
         let session =
-            Session::new(session_id.clone(), &self.gctx, self.config.clone(), self.hook.clone())?;
+            Session::new(session_id.clone(), &self.gctx, self.config.clone(), self.hook.clone())
+                .await?;
         self.sessions.insert(session_id.clone(), session);
         self.active_session_id = Some(session_id.clone());
         Ok(session_id)

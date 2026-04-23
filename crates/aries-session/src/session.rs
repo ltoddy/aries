@@ -5,7 +5,7 @@ use anyhow::Context;
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
 use aries_core::compaction::CompactionAgent;
-use aries_core::language_server::SharedLspClient;
+use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
 use aries_core::task_spawner::{NotificationReceiver, TaskSpawner};
 use aries_core::{AgentType, AgentWrapper};
 use futures::{StreamExt, pin_mut};
@@ -14,7 +14,6 @@ use rig::completion::Message;
 use rig::message::{ReasoningContent, ToolResultContent};
 use rig::providers::{azure, openai};
 use rig::streaming::{StreamedAssistantContent, StreamedUserContent};
-use time::OffsetDateTime;
 
 use crate::event::StreamEvent;
 
@@ -25,9 +24,9 @@ where
     id: String,
     provider_agents: ProviderAgents<P>,
     task_notifications: NotificationReceiver,
-    _lsp_client: SharedLspClient,
+    _lsp_client: Option<SharedLspClient>,
     history: Vec<Message>,
-    base_history_len: usize,
+    base_len: usize,
     transcript_dir: PathBuf,
 }
 
@@ -49,21 +48,40 @@ impl<P> Session<P>
 where
     P: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel> + Clone + 'static,
 {
-    pub fn new(
+    pub async fn new(
         id: String,
         gctx: &GlobalContext,
         config: AriesConfig,
         task_hook: P,
     ) -> anyhow::Result<Self> {
-        let today = OffsetDateTime::now_utc().date();
-        let history = vec![Message::user(format!(
-            "当前目录：{}\n当前日期：{}",
-            gctx.current_dir.display(),
-            today
-        ))];
-        let base_history_len = history.len();
+        let mut history = vec![Message::user(format!("当前目录：{}", gctx.current_dir.display(),))];
         let transcript_dir = gctx.config_dir.join("transcripts");
-        let lsp_client: SharedLspClient = Default::default();
+        let mut lsp_client: Option<SharedLspClient> = None;
+
+        match LspServerInfo::detect(&gctx.current_dir) {
+            Some(info) if info.installed() => {
+                history.push(Message::user(format!(
+                    "已检测到本项目适用的语言服务器 `{}` 并开始后台启动与索引。当需要代码定义跳转、引用查找、符号查询、调用层级等语义级检索时，优先使用 `lsp` 工具以获得更准确的结果。若首次调用时 `lsp` 工具返回尚未就绪（语言服务器可能仍在索引工作区），可稍后重试，或临时改用 `codesearch`、`grep`。",
+                    info.binary
+                )));
+                if let Ok(lsp) = warm_up(info, &gctx.current_dir).await {
+                    lsp_client = Some(lsp);
+                }
+            },
+            Some(info) => {
+                history.push(Message::user(format!(
+                    "检测到本项目适用的语言服务器 `{}` 尚未安装，LSP 功能不可用。请不要调用 `lsp` 工具，改用 `codesearch`、`grep`、`read` 等替代方式检索代码。",
+                    info.binary
+                )));
+            },
+            None => {
+                history.push(Message::user(
+                    "未能识别当前项目使用的语言（未发现 Cargo.toml / package.json / go.mod 等标志文件），LSP 功能不可用。请不要调用 `lsp` 工具，改用 `codesearch`、`grep`、`read` 等替代方式检索代码。".to_string(),
+                ));
+            },
+        }
+
+        let base_len = history.len();
 
         let (provider_agents, task_notifications) = match config.clone() {
             AriesConfig::OpenAICompatible(ref conf) => {
@@ -101,7 +119,7 @@ where
             task_notifications,
             _lsp_client: lsp_client,
             history,
-            base_history_len,
+            base_len,
             transcript_dir,
         })
     }
@@ -115,7 +133,7 @@ where
     }
 
     pub fn clear_history(&mut self) {
-        self.history.truncate(self.base_history_len);
+        self.history.truncate(self.base_len);
     }
 
     pub async fn prompt<F, Fut>(&mut self, prompt: &str, mut cb: Option<F>) -> anyhow::Result<()>
@@ -131,7 +149,7 @@ where
                 if let Some(compressed) =
                     compaction_agent.auto_compact(&self.history, &self.transcript_dir).await?
                 {
-                    self.history.truncate(self.base_history_len);
+                    self.history.truncate(self.base_len);
                     self.history.extend(compressed);
                 }
                 let snapshot = self.history.clone();
@@ -142,7 +160,7 @@ where
                 if let Some(compressed) =
                     compaction_agent.auto_compact(&self.history, &self.transcript_dir).await?
                 {
-                    self.history.truncate(self.base_history_len);
+                    self.history.truncate(self.base_len);
                     self.history.extend(compressed);
                 }
                 let snapshot = self.history.clone();
@@ -232,7 +250,7 @@ where
             },
         };
         if let Some(compressed) = compressed {
-            self.history.truncate(self.base_history_len);
+            self.history.truncate(self.base_len);
             self.history.extend(compressed);
         }
         Ok(())
