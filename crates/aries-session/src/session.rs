@@ -58,27 +58,13 @@ where
         let transcript_dir = gctx.config_dir.join("transcripts");
         let mut lsp_client: Option<SharedLspClient> = None;
 
-        match LspServerInfo::detect(&gctx.current_dir) {
-            Some(info) if info.installed() => {
-                history.push(Message::user(format!(
-                    "已检测到本项目适用的语言服务器 `{}` 并开始后台启动与索引。当需要代码定义跳转、引用查找、符号查询、调用层级等语义级检索时，优先使用 `lsp` 工具以获得更准确的结果。若首次调用时 `lsp` 工具返回尚未就绪（语言服务器可能仍在索引工作区），可稍后重试，或临时改用 `codesearch`、`grep`。",
-                    info.binary
-                )));
-                if let Ok(lsp) = warm_up(info, &gctx.current_dir).await {
-                    lsp_client = Some(lsp);
-                }
-            },
-            Some(info) => {
-                history.push(Message::user(format!(
-                    "检测到本项目适用的语言服务器 `{}` 尚未安装，LSP 功能不可用。请不要调用 `lsp` 工具，改用 `codesearch`、`grep`、`read` 等替代方式检索代码。",
-                    info.binary
-                )));
-            },
-            None => {
-                history.push(Message::user(
-                    "未能识别当前项目使用的语言（未发现 Cargo.toml / package.json / go.mod 等标志文件），LSP 功能不可用。请不要调用 `lsp` 工具，改用 `codesearch`、`grep`、`read` 等替代方式检索代码。".to_string(),
-                ));
-            },
+        if let Some(info) = LspServerInfo::detect(&gctx.current_dir)
+            && info.installed()
+        {
+            if let Ok(lsp) = warm_up(info, &gctx.current_dir).await {
+                lsp_client = Some(lsp);
+                history.push(Message::user("已检测到本项目适用的语言服务器，现已启动并开始预热。进行代码定义跳转、引用查找、符号查询或调用层级等语义级检索时，请优先使用 `lsp` 工具以获得更准确的结果。若首次调用时 `lsp` 尚未就绪（语言服务器可能仍在索引工作区），可稍后重试，或临时改用 `codesearch`、`grep`。"));
+            }
         }
 
         let base_len = history.len();
