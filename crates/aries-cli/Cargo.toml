@@ -19,6 +19,7 @@ aries-theme = { path = "../aries-theme" }
 clap.workspace = true
 dialoguer.workspace = true
 ferris-says.workspace = true
+hex = "0.4.3"
 itertools.workspace = true
 rig-core.workspace = true
 rustyline.workspace = true

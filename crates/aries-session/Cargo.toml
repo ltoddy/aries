@@ -8,6 +8,8 @@ anyhow.workspace = true
 aries-config = { path = "../aries-config" }
 aries-context = { path = "../aries-context" }
 aries-core = { path = "../aries-core" }
+blake3.workspace = true
 futures.workspace = true
 nanoid.workspace = true
 rig-core.workspace = true
+tokio.workspace = true

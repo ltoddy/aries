@@ -1,4 +1,5 @@
 use std::future::Future;
+use std::os::unix::prelude::OsStrExt;
 use std::path::PathBuf;
 
 use anyhow::Context;
@@ -28,6 +29,8 @@ where
     history: Vec<Message>,
     base_len: usize,
     transcript_dir: PathBuf,
+
+    dir: PathBuf, // session 的数据存放的目录
 }
 
 enum ProviderAgents<P = ()>
@@ -99,6 +102,16 @@ where
             },
         };
 
+        let dir = gctx
+            .config_dir
+            .join(format!("session-{}", blake3::hash(gctx.current_dir.as_os_str().as_bytes())));
+
+        if !dir.exists() {
+            if let Err(err) = tokio::fs::create_dir_all(&dir).await {
+                eprintln!("Failed to create session directory: {err}");
+            };
+        }
+
         Ok(Self {
             id,
             provider_agents,
@@ -107,6 +120,7 @@ where
             history,
             base_len,
             transcript_dir,
+            dir,
         })
     }
 
