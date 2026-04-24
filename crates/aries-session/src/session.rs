@@ -1,6 +1,6 @@
 use std::future::Future;
 use std::os::unix::prelude::OsStrExt;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use anyhow::Context;
 use aries_config::AriesConfig;
@@ -8,14 +8,14 @@ use aries_context::GlobalContext;
 use aries_core::compaction::CompactionAgent;
 use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
 use aries_core::task_spawner::{NotificationReceiver, TaskSpawner};
-use aries_core::{AgentType, AgentWrapper, jsonl};
+use aries_core::{AgentType, AgentWrapper};
 use futures::{StreamExt, pin_mut};
 use rig::agent::{FinalResponse, MultiTurnStreamItem, PromptHook, Text};
 use rig::completion::Message;
 use rig::message::{ReasoningContent, ToolResultContent};
 use rig::providers::{azure, openai};
 use rig::streaming::{StreamedAssistantContent, StreamedUserContent};
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::UnboundedSender;
 
 use crate::event::StreamEvent;
 
@@ -59,7 +59,8 @@ where
         config: AriesConfig,
         task_hook: P,
     ) -> anyhow::Result<Self> {
-        let mut history = vec![Message::user(format!("当前目录：{}", gctx.current_dir.display(),))];
+        let mut history =
+            vec![Message::user(format!("当前工作目录：{}", gctx.current_dir.display(),))];
         let transcript_dir = gctx.config_dir.join("transcripts");
         let mut lsp_client: Option<SharedLspClient> = None;
 
@@ -69,6 +70,21 @@ where
         {
             lsp_client = Some(lsp);
             history.push(Message::user("已检测到本项目适用的语言服务器，现已启动并开始预热。进行代码定义跳转、引用查找、符号查询或调用层级等语义级检索时，请优先使用 `lsp` 工具以获得更准确的结果。若首次调用时 `lsp` 尚未就绪（语言服务器可能仍在索引工作区），可稍后重试，或临时改用 `codesearch`、`grep`。"));
+        }
+
+        let dir = gctx
+            .config_dir
+            .join(format!("session-{}", blake3::hash(gctx.current_dir.as_os_str().as_bytes())));
+
+        if !dir.exists()
+            && let Err(err) = tokio::fs::create_dir_all(&dir).await
+        {
+            eprintln!("Failed to create session directory: {err}");
+        };
+
+        let history_file_path = dir.join("chat-history.jsonl");
+        if let Ok(prior) = crate::history::load_history(&history_file_path).await {
+            history.extend_from_slice(&prior);
         }
 
         let base_len = history.len();
@@ -103,18 +119,8 @@ where
             },
         };
 
-        let dir = gctx
-            .config_dir
-            .join(format!("session-{}", blake3::hash(gctx.current_dir.as_os_str().as_bytes())));
-
-        if !dir.exists()
-            && let Err(err) = tokio::fs::create_dir_all(&dir).await
-        {
-            eprintln!("Failed to create session directory: {err}");
-        };
-
         let (history_tx, history_rx) = tokio::sync::mpsc::unbounded_channel::<Vec<Message>>();
-        tokio::spawn(refresh_history(history_rx, dir.join("chat-history.jsonl")));
+        tokio::spawn(crate::history::refresh_history(history_rx, history_file_path));
 
         Ok(Self {
             id,
@@ -151,9 +157,12 @@ where
 
         let stream = match &mut self.provider_agents {
             ProviderAgents::OpenAICompatible { agent, compaction_agent } => {
-                CompactionAgent::<openai::CompletionModel>::micro_compact(&mut self.history);
-                if let Some(compressed) =
-                    compaction_agent.auto_compact(&self.history, &self.transcript_dir).await?
+                CompactionAgent::<openai::CompletionModel>::micro_compact(
+                    &mut self.history[self.base_len..],
+                );
+                if let Some(compressed) = compaction_agent
+                    .auto_compact(&self.history[self.base_len..], &self.transcript_dir)
+                    .await?
                 {
                     self.history.truncate(self.base_len);
                     self.history.extend(compressed);
@@ -163,8 +172,9 @@ where
             },
             ProviderAgents::Azure { agent, compaction_agent } => {
                 CompactionAgent::<azure::CompletionModel>::micro_compact(&mut self.history);
-                if let Some(compressed) =
-                    compaction_agent.auto_compact(&self.history, &self.transcript_dir).await?
+                if let Some(compressed) = compaction_agent
+                    .auto_compact(&self.history[self.base_len..], &self.transcript_dir)
+                    .await?
                 {
                     self.history.truncate(self.base_len);
                     self.history.extend(compressed);
@@ -177,8 +187,8 @@ where
         pin_mut!(stream);
         let mut final_res = FinalResponse::empty();
 
-        while let Some(chunk) = stream.next().await {
-            match chunk? {
+        while let Some(Ok(chunk)) = stream.next().await {
+            match chunk {
                 MultiTurnStreamItem::StreamAssistantItem(item) => {
                     if let Some(ref mut cb) = cb {
                         match item {
@@ -241,19 +251,23 @@ where
 
         if let Some(his) = final_res.history() {
             self.history = his.to_vec();
-            let _ = self.history_tx.send(his.to_vec());
+            let _ = self.history_tx.send(his.get(self.base_len..).unwrap_or(&[]).to_vec());
         }
 
         Ok(())
     }
 
-    pub async fn force_compact(&mut self) -> anyhow::Result<()> {
+    pub async fn compact(&mut self) -> anyhow::Result<()> {
         let compressed = match &mut self.provider_agents {
             ProviderAgents::OpenAICompatible { compaction_agent, .. } => {
-                compaction_agent.force_compact(&self.history, &self.transcript_dir).await?
+                compaction_agent
+                    .force_compact(&self.history[self.base_len..], &self.transcript_dir)
+                    .await?
             },
             ProviderAgents::Azure { compaction_agent, .. } => {
-                compaction_agent.force_compact(&self.history, &self.transcript_dir).await?
+                compaction_agent
+                    .force_compact(&self.history[self.base_len..], &self.transcript_dir)
+                    .await?
             },
         };
         if let Some(compressed) = compressed {
@@ -288,18 +302,5 @@ where
         self.history
             .push(Message::user(format!("<task-results>\n{}\n</task-results>", notif_text)));
         self.history.push(Message::assistant("Noted task results."));
-    }
-}
-
-async fn refresh_history(mut rx: UnboundedReceiver<Vec<Message>>, file_path: impl AsRef<Path>) {
-    let file_path = file_path.as_ref();
-    while let Some(messages) = rx.recv().await {
-        if let Some(parent) = file_path.parent()
-            && !parent.exists()
-        {
-            let _ = tokio::fs::create_dir_all(parent).await;
-        }
-
-        let _ = jsonl::write(file_path, messages).await;
     }
 }

@@ -23,7 +23,7 @@ fmt-check:
     @cargo +{{nightly_toolchain}} fmt -- --check
 
 fix:
-    @cargo +{{default_toolchain}} clippy --fix --allow-dirty
+    @cargo +{{default_toolchain}} clippy --fix --allow-dirty --all
     @cargo +{{nightly_toolchain}} fmt
 
 lint: fmt-check clippy
