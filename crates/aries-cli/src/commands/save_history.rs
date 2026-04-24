@@ -1,13 +1,12 @@
+use aries_core::jsonl;
 use aries_theme::Theme;
 use rig::completion::Message;
 
 pub const NAME: &str = "/save-history";
 
-pub async fn execute(chat_history: &[Message], theme: &Theme) {
-    if let Ok(content) = serde_json::to_string_pretty(chat_history) {
-        match tokio::fs::write("chat-history.json", content).await {
-            Ok(_) => println!("{}", theme.green_text("Chat history saved to chat-history.json")),
-            Err(err) => eprintln!("{}: {}", theme.red_text("Failed to save history"), err),
-        }
+pub async fn execute(history: &[Message], theme: &Theme) {
+    match jsonl::write("chat-history.jsonl", history).await {
+        Ok(_) => println!("{}", theme.green_text("Chat history saved to chat-history.jsonl")),
+        Err(err) => eprintln!("{}: {}", theme.red_text("Failed to save history"), err),
     }
 }

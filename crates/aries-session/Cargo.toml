@@ -12,4 +12,4 @@ blake3.workspace = true
 futures.workspace = true
 nanoid.workspace = true
 rig-core.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["sync"] }

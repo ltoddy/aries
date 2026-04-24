@@ -1,6 +1,6 @@
 use std::future::Future;
 use std::os::unix::prelude::OsStrExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 use aries_config::AriesConfig;
@@ -8,13 +8,14 @@ use aries_context::GlobalContext;
 use aries_core::compaction::CompactionAgent;
 use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
 use aries_core::task_spawner::{NotificationReceiver, TaskSpawner};
-use aries_core::{AgentType, AgentWrapper};
+use aries_core::{AgentType, AgentWrapper, jsonl};
 use futures::{StreamExt, pin_mut};
 use rig::agent::{FinalResponse, MultiTurnStreamItem, PromptHook, Text};
 use rig::completion::Message;
 use rig::message::{ReasoningContent, ToolResultContent};
 use rig::providers::{azure, openai};
 use rig::streaming::{StreamedAssistantContent, StreamedUserContent};
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::event::StreamEvent;
 
@@ -27,10 +28,11 @@ where
     task_notifications: NotificationReceiver,
     _lsp_client: Option<SharedLspClient>,
     history: Vec<Message>,
+    history_tx: UnboundedSender<Vec<Message>>,
     base_len: usize,
     transcript_dir: PathBuf,
 
-    dir: PathBuf, // session 的数据存放的目录
+    _dir: PathBuf, // session 的数据存放的目录
 }
 
 enum ProviderAgents<P = ()>
@@ -63,11 +65,10 @@ where
 
         if let Some(info) = LspServerInfo::detect(&gctx.current_dir)
             && info.installed()
+            && let Ok(lsp) = warm_up(info, &gctx.current_dir).await
         {
-            if let Ok(lsp) = warm_up(info, &gctx.current_dir).await {
-                lsp_client = Some(lsp);
-                history.push(Message::user("已检测到本项目适用的语言服务器，现已启动并开始预热。进行代码定义跳转、引用查找、符号查询或调用层级等语义级检索时，请优先使用 `lsp` 工具以获得更准确的结果。若首次调用时 `lsp` 尚未就绪（语言服务器可能仍在索引工作区），可稍后重试，或临时改用 `codesearch`、`grep`。"));
-            }
+            lsp_client = Some(lsp);
+            history.push(Message::user("已检测到本项目适用的语言服务器，现已启动并开始预热。进行代码定义跳转、引用查找、符号查询或调用层级等语义级检索时，请优先使用 `lsp` 工具以获得更准确的结果。若首次调用时 `lsp` 尚未就绪（语言服务器可能仍在索引工作区），可稍后重试，或临时改用 `codesearch`、`grep`。"));
         }
 
         let base_len = history.len();
@@ -106,11 +107,14 @@ where
             .config_dir
             .join(format!("session-{}", blake3::hash(gctx.current_dir.as_os_str().as_bytes())));
 
-        if !dir.exists() {
-            if let Err(err) = tokio::fs::create_dir_all(&dir).await {
-                eprintln!("Failed to create session directory: {err}");
-            };
-        }
+        if !dir.exists()
+            && let Err(err) = tokio::fs::create_dir_all(&dir).await
+        {
+            eprintln!("Failed to create session directory: {err}");
+        };
+
+        let (history_tx, history_rx) = tokio::sync::mpsc::unbounded_channel::<Vec<Message>>();
+        tokio::spawn(refresh_history(history_rx, dir.join("chat-history.jsonl")));
 
         Ok(Self {
             id,
@@ -118,9 +122,10 @@ where
             task_notifications,
             _lsp_client: lsp_client,
             history,
+            history_tx,
             base_len,
             transcript_dir,
-            dir,
+            _dir: dir,
         })
     }
 
@@ -134,6 +139,7 @@ where
 
     pub fn clear_history(&mut self) {
         self.history.truncate(self.base_len);
+        let _ = self.history_tx.send(vec![]);
     }
 
     pub async fn prompt<F, Fut>(&mut self, prompt: &str, mut cb: Option<F>) -> anyhow::Result<()>
@@ -235,6 +241,7 @@ where
 
         if let Some(his) = final_res.history() {
             self.history = his.to_vec();
+            let _ = self.history_tx.send(his.to_vec());
         }
 
         Ok(())
@@ -281,5 +288,18 @@ where
         self.history
             .push(Message::user(format!("<task-results>\n{}\n</task-results>", notif_text)));
         self.history.push(Message::assistant("Noted task results."));
+    }
+}
+
+async fn refresh_history(mut rx: UnboundedReceiver<Vec<Message>>, file_path: impl AsRef<Path>) {
+    let file_path = file_path.as_ref();
+    while let Some(messages) = rx.recv().await {
+        if let Some(parent) = file_path.parent()
+            && !parent.exists()
+        {
+            let _ = tokio::fs::create_dir_all(parent).await;
+        }
+
+        let _ = jsonl::write(file_path, messages).await;
     }
 }

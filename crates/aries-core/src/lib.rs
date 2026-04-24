@@ -1,15 +1,17 @@
-mod build;
+pub mod build;
 pub mod compaction;
+pub mod jsonl;
 pub mod language_server;
 pub mod rpc;
 pub mod task_spawner;
 pub mod tools;
 
-pub use build::AgentBuilder;
 use rig::agent::{Agent, PromptHook, StreamingResult};
 use rig::client::CompletionClient;
 use rig::completion::{self, Message, Prompt};
 use rig::streaming::StreamingPrompt;
+
+use crate::build::AgentBuilder;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AgentType {
