@@ -4,6 +4,8 @@ use rig::client::CompletionClient;
 use rig::completion;
 use rig::tool::ToolDyn;
 
+use crate::ext::skill;
+use crate::ext::skill::SkillInfo;
 use crate::language_server::SharedLspClient;
 use crate::task_spawner::TaskSpawner;
 use crate::{AGENT_LOOP_MAX_TURNS, AgentType, AgentWrapper, tools};
@@ -43,14 +45,24 @@ where
         AgentWrapper { inner }
     }
 
-    pub fn with_tools(
+    pub async fn with_tools(
         self,
         spawner: TaskSpawner,
         lsp_client: Option<SharedLspClient>,
     ) -> AgentWrapper<C::CompletionModel, P> {
         let model = self.config.model().to_owned();
         let agent_type = self.agent_type;
-        let tools = build_tools::<C>(agent_type, self.config, &self.client, spawner, lsp_client);
+
+        let available_skills = skill::load().await.unwrap_or_default();
+        let preamble = build_preamble(agent_type, &available_skills);
+        let tools = build_tools::<C>(
+            agent_type,
+            self.config,
+            &self.client,
+            spawner,
+            lsp_client,
+            available_skills,
+        );
 
         let inner = self
             .client
@@ -58,7 +70,7 @@ where
             .hook(self.hook)
             .name(agent_type.agent_name())
             .description(agent_type.description())
-            .preamble(agent_type.preamble())
+            .preamble(&preamble)
             .tools(tools)
             .default_max_turns(AGENT_LOOP_MAX_TURNS)
             .build();
@@ -73,6 +85,7 @@ fn build_tools<C: CompletionClient + Clone + Send + Sync + 'static>(
     client: &C,
     spawner: TaskSpawner,
     lsp_client: Option<SharedLspClient>,
+    available_skills: Vec<SkillInfo>,
 ) -> Vec<Box<dyn ToolDyn>>
 where
     C::CompletionModel: completion::CompletionModel + 'static,
@@ -96,6 +109,9 @@ where
                 Box::new(tools::task_spawn::TaskSpawnTool::new(spawner.clone())),
                 Box::new(tools::task_status::TaskStatusTool::new(spawner)),
             ];
+            if !available_skills.is_empty() {
+                tools.push(Box::new(tools::skill::SkillTool::new(available_skills)))
+            }
             if let Some(lsp_client) = lsp_client {
                 tools.push(Box::new(tools::lsp::LspTool::new(lsp_client)));
             }
@@ -111,6 +127,9 @@ where
                 Box::new(tools::question::QuestionTool),
                 Box::new(tools::codesearch::CodeSearchTool),
             ];
+            if !available_skills.is_empty() {
+                tools.push(Box::new(tools::skill::SkillTool::new(available_skills)))
+            }
             if let Some(lsp_client) = lsp_client {
                 tools.push(Box::new(tools::lsp::LspTool::new(lsp_client)));
             }
@@ -125,5 +144,19 @@ where
             Box::new(tools::codesearch::CodeSearchTool),
         ],
         _ => vec![],
+    }
+}
+
+fn build_preamble(agent_type: AgentType, available_skills: &[SkillInfo]) -> String {
+    match agent_type {
+        AgentType::Build | AgentType::General | AgentType::Plan => {
+            let mut preamble = agent_type.preamble().to_string();
+            if !available_skills.is_empty() {
+                preamble.push_str("\n\n");
+                preamble.push_str(&skill::render_available_skills(available_skills));
+            }
+            preamble
+        },
+        _ => agent_type.preamble().to_string(),
     }
 }

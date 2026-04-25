@@ -29,7 +29,7 @@ pub fn format_tool_result(result: &str, theme: Theme) -> String {
                 }
                 out.push_str(&output.stderr);
             }
-            theme.dimmed(&preview(&out)).to_string()
+            theme.dimmed(&preview(out)).to_string()
         },
         Err(err) => theme.red_text(&format!("Error as follow: {err}")).to_string(),
     }

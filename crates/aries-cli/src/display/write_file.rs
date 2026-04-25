@@ -9,7 +9,7 @@ pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
     let (first, rest) = match args {
         Ok(args) => {
             let first = args.file_path.display().to_string();
-            let rest = Some(theme.dimmed(&preview(&args.content)).to_string());
+            let rest = Some(theme.dimmed(&preview(args.content)).to_string());
             (first, rest)
         },
         Err(_) => return (String::from("?"), None),

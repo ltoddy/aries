@@ -10,6 +10,7 @@ pub mod multi_edit;
 pub mod question;
 pub mod read_file;
 pub mod shell_command;
+pub mod skill;
 pub mod task;
 pub mod web_fetch;
 pub mod web_search;
@@ -41,6 +42,7 @@ pub fn format_tool_call_args(
         tools::websearch::NAME => web_search::format_tool_call(args, theme),
         tools::codesearch::NAME => code_search::format_tool_call(args, theme),
         tools::lsp::NAME => lsp::format_tool_call(args, theme),
+        tools::skill::NAME => skill::format_tool_call(args, theme),
         _ => format_unknown_call(tool_name, args, theme),
     }
 }
@@ -63,6 +65,7 @@ pub fn format_tool_result_output(tool_name: &str, result: &str, theme: Theme) ->
         tools::websearch::NAME => web_search::format_tool_result(result, theme),
         tools::codesearch::NAME => code_search::format_tool_result(result, theme),
         tools::lsp::NAME => lsp::format_tool_result(result, theme),
+        tools::skill::NAME => skill::format_tool_result(result, theme),
         _ => result.to_string(),
     };
 
@@ -91,9 +94,10 @@ pub fn format_unknown_call(tool_name: &str, args: &str, theme: &Theme) -> (Strin
     )
 }
 
-pub fn preview(content: &str) -> String {
+pub fn preview(content: impl AsRef<str>) -> String {
     const MAX_LINES: usize = 5;
 
+    let content = content.as_ref();
     let lines: Vec<_> = content.lines().map(|line| format!("| {line}")).collect();
     let len = lines.len();
 

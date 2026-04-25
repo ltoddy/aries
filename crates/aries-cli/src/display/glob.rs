@@ -24,7 +24,7 @@ pub fn format_tool_result(result: &str, theme: Theme) -> String {
     let output = serde_json::from_str::<GlobOutput>(result);
 
     match output {
-        Ok(output) => theme.dimmed(&preview(&output.files.join("\n"))).to_string(),
+        Ok(output) => theme.dimmed(&preview(output.files.join("\n"))).to_string(),
         Err(err) => theme.red_text(&format!("Error as follow: {err}")).to_string(),
     }
 }

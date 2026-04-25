@@ -24,7 +24,7 @@ pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
                 .map(|line| theme.green_text(&format!("+ {}", line)).to_string());
             let diff = old_lines.chain(new_lines).collect::<Vec<_>>().join("\n");
             if !diff.is_empty() {
-                rest = Some(preview(&diff));
+                rest = Some(preview(diff));
             }
 
             (first, rest)
@@ -39,7 +39,7 @@ pub fn format_tool_result(result: &str, theme: Theme) -> String {
     let output = serde_json::from_str::<EditOutput>(result);
 
     match output {
-        Ok(output) => theme.dimmed(&preview(&output.message)).to_string(),
+        Ok(output) => theme.dimmed(&preview(output.message)).to_string(),
         Err(err) => theme.red_text(&format!("Error as follow: {err}")).to_string(),
     }
 }

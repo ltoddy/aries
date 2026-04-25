@@ -10,6 +10,7 @@ pub mod lsp;
 pub mod multiedit;
 pub mod question;
 pub mod read;
+pub mod skill;
 pub mod task;
 pub mod task_spawn;
 pub mod task_status;

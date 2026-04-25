@@ -34,7 +34,7 @@ pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
                 rest.push(line);
             }
 
-            (first, Some(preview(&rest.join("\n"))))
+            (first, Some(preview(rest.join("\n"))))
         },
         Err(_) => return (String::from("?"), None),
     };

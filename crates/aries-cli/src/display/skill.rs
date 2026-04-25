@@ -1,0 +1,30 @@
+use aries_core::tools::skill::{NAME, SkillArgs, SkillOutput};
+use aries_theme::Theme;
+
+use crate::display::preview;
+
+pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
+    let args = serde_json::from_str::<SkillArgs>(args);
+
+    let first = match args {
+        Ok(args) => args.name,
+        Err(_) => return (String::from("?"), None),
+    };
+
+    (format!("{}: {}", theme.cyan_text(NAME), theme.yellow_text(&first)), None)
+}
+
+pub fn format_tool_result(result: &str, theme: Theme) -> String {
+    let output = serde_json::from_str::<SkillOutput>(result);
+
+    match output {
+        Ok(output) => {
+            let mut out = format!("{} at {}", output.metadata.name, output.metadata.dir.display());
+            out.push('\n');
+            out.push_str(&output.output);
+
+            theme.dimmed(&preview(out)).to_string()
+        },
+        Err(err) => theme.red_text(&format!("Error as follow: {err}")).to_string(),
+    }
+}

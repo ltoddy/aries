@@ -99,7 +99,8 @@ where
 
                 let (spawner, task_notifications) = TaskSpawner::new();
                 let agent = AgentWrapper::new(client, config.clone(), AgentType::Build, task_hook)
-                    .with_tools(spawner, lsp_client.clone());
+                    .with_tools(spawner, lsp_client.clone())
+                    .await;
                 let compaction_agent = CompactionAgent::<openai::CompletionModel>::new(config)?;
                 (ProviderAgents::OpenAICompatible { agent, compaction_agent }, task_notifications)
             },
@@ -113,7 +114,8 @@ where
 
                 let (spawner, task_notifications) = TaskSpawner::new();
                 let agent = AgentWrapper::new(client, config.clone(), AgentType::Build, task_hook)
-                    .with_tools(spawner, lsp_client.clone());
+                    .with_tools(spawner, lsp_client.clone())
+                    .await;
                 let compaction_agent = CompactionAgent::<azure::CompletionModel>::new(config)?;
                 (ProviderAgents::Azure { agent, compaction_agent }, task_notifications)
             },
