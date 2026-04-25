@@ -61,7 +61,7 @@ pub struct AriesConfigLoader {
 }
 
 impl AriesConfigLoader {
-    const FILE_NAME: &str = "config.toml";
+    const FILE_NAME: &str = "config.yaml";
 
     pub fn new(config_dir: &Path) -> Self {
         let file_path = config_dir.join(Self::FILE_NAME);
@@ -82,12 +82,12 @@ impl AriesConfigLoader {
 
     async fn load(&self) -> anyhow::Result<AriesConfig> {
         let content = tokio::fs::read_to_string(&self.file_path).await?;
-        let config = toml::from_str::<AriesConfig>(&content)?;
+        let config = serde_yaml::from_str::<AriesConfig>(&content)?;
         Ok(config)
     }
 
     pub async fn save(&self, config: &AriesConfig) -> anyhow::Result<()> {
-        let content = toml::to_string_pretty(config)?;
+        let content = serde_yaml::to_string(config)?;
         tokio::fs::write(&self.file_path, &content).await?;
         Ok(())
     }

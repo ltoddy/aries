@@ -7,6 +7,5 @@ edition = "2024"
 anyhow.workspace = true
 dialoguer.workspace = true
 serde.workspace = true
+serde_yaml.workspace = true
 tokio = { workspace = true, features = ["fs"] }
-
-toml.workspace = true

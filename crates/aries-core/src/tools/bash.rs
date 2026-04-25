@@ -26,9 +26,9 @@ pub enum ShellCommandError {
 
 pub const NAME: &str = "shell_command";
 
-pub struct ShellCommand;
+pub struct ShellCommandTool;
 
-impl Tool for ShellCommand {
+impl Tool for ShellCommandTool {
     const NAME: &'static str = NAME;
     type Error = ShellCommandError;
     type Args = ShellCommandArgs;

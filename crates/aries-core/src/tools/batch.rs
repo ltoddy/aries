@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::tools::apply_patch::ApplyPatchTool;
-use crate::tools::bash::ShellCommand;
+use crate::tools::bash::ShellCommandTool;
 use crate::tools::codesearch::CodeSearchTool;
 use crate::tools::edit::EditTool;
 use crate::tools::glob::GlobTool;
@@ -115,7 +115,7 @@ where
                 if tool_name == bash::NAME {
                     let parsed_args =
                         serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
-                    Tool::call(&ShellCommand, parsed_args)
+                    Tool::call(&ShellCommandTool, parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())

@@ -1,5 +1,7 @@
 pub mod build;
 pub mod compaction;
+pub mod ext;
+pub mod fs;
 pub mod jsonl;
 pub mod language_server;
 pub mod rpc;

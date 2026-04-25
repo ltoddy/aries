@@ -80,7 +80,7 @@ where
     match agent_type {
         AgentType::Build | AgentType::General => {
             let mut tools: Vec<Box<dyn ToolDyn>> = vec![
-                Box::new(tools::bash::ShellCommand),
+                Box::new(tools::bash::ShellCommandTool),
                 Box::new(tools::read::ReadFileTool),
                 Box::new(tools::write::WriteFileTool),
                 Box::new(tools::glob::GlobTool),
@@ -103,7 +103,7 @@ where
         },
         AgentType::Plan => {
             let mut tools: Vec<Box<dyn ToolDyn>> = vec![
-                Box::new(tools::bash::ShellCommand),
+                Box::new(tools::bash::ShellCommandTool),
                 Box::new(tools::read::ReadFileTool),
                 Box::new(tools::glob::GlobTool),
                 Box::new(tools::grep::GrepTool),
@@ -117,7 +117,7 @@ where
             tools
         },
         AgentType::Explore => vec![
-            Box::new(tools::bash::ShellCommand),
+            Box::new(tools::bash::ShellCommandTool),
             Box::new(tools::read::ReadFileTool),
             Box::new(tools::glob::GlobTool),
             Box::new(tools::grep::GrepTool),
