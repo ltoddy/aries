@@ -8,7 +8,7 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 
 use crate::ext::skill::SkillInfo;
-use crate::fs::walk_dir;
+use crate::fs::{path_to_uri, walk_dir};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SkillArgs {
@@ -117,7 +117,7 @@ impl Tool for SkillTool {
             format!(r#"<skill_content name="{}">"#, skill.frontmatter.name),
             format!("# Skill: {}", skill.frontmatter.name),
             skill.body.clone(),
-            format!("Base directory for this skill: file://{}", dir.display()),
+            format!("Base directory for this skill: {}", path_to_uri(dir)),
             "Relative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.".to_owned(),
             "Note: file list is sampled.".to_owned(),
             "<skill_files>".to_owned(),

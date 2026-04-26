@@ -1,11 +1,17 @@
 mod client;
 mod detection;
+mod schema;
 
 use std::path::Path;
 use std::sync::Arc;
 
-pub use self::client::LspClient;
+pub use self::client::{LspClient, LspResult};
 pub use self::detection::LspServerInfo;
+pub use self::schema::{
+    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, Hover, Location,
+    Position, Range, SymbolInformation, SymbolKind,
+};
+use crate::fs::path_to_uri;
 
 pub type SharedLspClient = Arc<LspClient>;
 
@@ -15,7 +21,7 @@ pub async fn warm_up(info: LspServerInfo, project_dir: &Path) -> anyhow::Result<
         err
     })?;
 
-    let root_uri = format!("file://{}", project_dir.display());
+    let root_uri = path_to_uri(project_dir);
     let shared = Arc::new(lsp);
 
     let init = shared.clone();

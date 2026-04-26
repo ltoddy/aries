@@ -1,17 +1,36 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::io;
+use std::path::Path;
 use std::process::Stdio;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 
 use parking_lot::Mutex;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::oneshot;
 
-use crate::language_server::LspServerInfo;
+use crate::fs::path_to_uri;
+use crate::language_server::{
+    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, Hover, Location,
+    LspServerInfo, SymbolInformation,
+};
 use crate::rpc::{JsonRpcMessage, Notification, Request, RequestId, Response};
+
+#[derive(Debug, Deserialize, Serialize)]
+pub enum LspResult {
+    Definition(Vec<Location>),
+    References(Vec<Location>),
+    Hover(Hover),
+    DocumentSymbol(Vec<SymbolInformation>),
+    WorkspaceSymbol(Vec<SymbolInformation>),
+    Implementation(Vec<Location>),
+    PrepareCallHierarchy(Vec<CallHierarchyItem>),
+    IncomingCalls(Vec<CallHierarchyIncomingCall>),
+    OutgoingCalls(Vec<CallHierarchyOutgoingCall>),
+}
 
 pub struct LspClient {
     stdin: tokio::sync::Mutex<tokio::process::ChildStdin>,
@@ -131,7 +150,7 @@ impl LspClient {
         Ok(result)
     }
 
-    pub async fn send_notification(&self, method: &str, params: Value) -> anyhow::Result<()> {
+    pub async fn send_notification(&self, method: &str, params: Value) -> io::Result<()> {
         let notification = JsonRpcMessage::wrap(Notification::new(method, params));
         let body = serde_json::to_string(&notification)?;
         let message = format!("Content-Length: {}\r\n\r\n{}", body.len(), body);
@@ -143,82 +162,100 @@ impl LspClient {
 
     pub async fn goto_definition(
         &self,
-        file_path: &Path,
+        file_path: impl AsRef<Path>,
         line: u32,
         character: u32,
-    ) -> anyhow::Result<Value> {
+    ) -> anyhow::Result<LspResult> {
         let params = text_document_position_params(file_path, line, character);
-        self.send_request("textDocument/definition", params).await
+        let result = self.send_request("textDocument/definition", params).await?;
+        let locations: Vec<Location> = serde_json::from_value(result)?;
+        Ok(LspResult::Definition(locations))
     }
 
     pub async fn find_references(
         &self,
-        file_path: &Path,
+        file_path: impl AsRef<Path>,
         line: u32,
         character: u32,
-    ) -> anyhow::Result<Value> {
+    ) -> anyhow::Result<LspResult> {
         let mut params = text_document_position_params(file_path, line, character);
         params["context"] = serde_json::json!({ "includeDeclaration": true });
-        self.send_request("textDocument/references", params).await
+        let result = self.send_request("textDocument/references", params).await?;
+        let locations: Vec<Location> = serde_json::from_value(result)?;
+        Ok(LspResult::References(locations))
     }
 
     pub async fn hover(
         &self,
-        file_path: &Path,
+        file_path: impl AsRef<Path>,
         line: u32,
         character: u32,
-    ) -> anyhow::Result<Value> {
+    ) -> anyhow::Result<LspResult> {
         let params = text_document_position_params(file_path, line, character);
-        self.send_request("textDocument/hover", params).await
+        let result = self.send_request("textDocument/hover", params).await?;
+        let hover: Hover = serde_json::from_value(result)?;
+        Ok(LspResult::Hover(hover))
     }
 
-    pub async fn document_symbol(&self, file_path: &Path) -> anyhow::Result<Value> {
+    pub async fn document_symbol(&self, file_path: impl AsRef<Path>) -> anyhow::Result<LspResult> {
         let params = serde_json::json!({
             "textDocument": {
                 "uri": path_to_uri(file_path)
             }
         });
-        self.send_request("textDocument/documentSymbol", params).await
+        let result = self.send_request("textDocument/documentSymbol", params).await?;
+        let symbols: Vec<SymbolInformation> = serde_json::from_value(result)?;
+        Ok(LspResult::DocumentSymbol(symbols))
     }
 
-    pub async fn workspace_symbol(&self, query: &str) -> anyhow::Result<Value> {
+    pub async fn workspace_symbol(&self, query: &str) -> anyhow::Result<LspResult> {
         let params = serde_json::json!({ "query": query });
-        self.send_request("workspace/symbol", params).await
+        let result = self.send_request("workspace/symbol", params).await?;
+        let symbols: Vec<SymbolInformation> = serde_json::from_value(result)?;
+        Ok(LspResult::WorkspaceSymbol(symbols))
     }
 
     pub async fn goto_implementation(
         &self,
-        file_path: &Path,
+        file_path: impl AsRef<Path>,
         line: u32,
         character: u32,
-    ) -> anyhow::Result<Value> {
+    ) -> anyhow::Result<LspResult> {
         let params = text_document_position_params(file_path, line, character);
-        self.send_request("textDocument/implementation", params).await
+        let result = self.send_request("textDocument/implementation", params).await?;
+        let locations: Vec<Location> = serde_json::from_value(result)?;
+        Ok(LspResult::Implementation(locations))
     }
 
     pub async fn prepare_call_hierarchy(
         &self,
-        file_path: &Path,
+        file_path: impl AsRef<Path>,
         line: u32,
         character: u32,
-    ) -> anyhow::Result<Value> {
+    ) -> anyhow::Result<LspResult> {
         let params = text_document_position_params(file_path, line, character);
-        self.send_request("textDocument/prepareCallHierarchy", params).await
+        let result = self.send_request("textDocument/prepareCallHierarchy", params).await?;
+        let items: Vec<CallHierarchyItem> = serde_json::from_value(result)?;
+        Ok(LspResult::PrepareCallHierarchy(items))
     }
 
-    pub async fn incoming_calls(&self, item: Value) -> anyhow::Result<Value> {
+    pub async fn incoming_calls(&self, item: Value) -> anyhow::Result<LspResult> {
         let params = serde_json::json!({ "item": item });
-        self.send_request("callHierarchy/incomingCalls", params).await
+        let result = self.send_request("callHierarchy/incomingCalls", params).await?;
+        let calls: Vec<CallHierarchyIncomingCall> = serde_json::from_value(result)?;
+        Ok(LspResult::IncomingCalls(calls))
     }
 
-    pub async fn outgoing_calls(&self, item: Value) -> anyhow::Result<Value> {
+    pub async fn outgoing_calls(&self, item: Value) -> anyhow::Result<LspResult> {
         let params = serde_json::json!({ "item": item });
-        self.send_request("callHierarchy/outgoingCalls", params).await
+        let result = self.send_request("callHierarchy/outgoingCalls", params).await?;
+        let calls: Vec<CallHierarchyOutgoingCall> = serde_json::from_value(result)?;
+        Ok(LspResult::OutgoingCalls(calls))
     }
 
-    pub async fn did_open(&self, file_path: &Path) -> anyhow::Result<()> {
-        let content = tokio::fs::read_to_string(file_path).await?;
-        let language_id = detect_language_id(file_path);
+    pub async fn did_open(&self, file_path: impl AsRef<Path>) -> io::Result<()> {
+        let content = tokio::fs::read_to_string(file_path.as_ref()).await?;
+        let language_id = detect_language_id(file_path.as_ref());
         let params = serde_json::json!({
             "textDocument": {
                 "uri": path_to_uri(file_path),
@@ -237,7 +274,7 @@ impl LspClient {
     }
 }
 
-fn text_document_position_params(file_path: &Path, line: u32, character: u32) -> Value {
+fn text_document_position_params(file_path: impl AsRef<Path>, line: u32, character: u32) -> Value {
     serde_json::json!({
         "textDocument": {
             "uri": path_to_uri(file_path)
@@ -249,13 +286,8 @@ fn text_document_position_params(file_path: &Path, line: u32, character: u32) ->
     })
 }
 
-fn path_to_uri(path: &Path) -> String {
-    let abs = if path.is_absolute() { path.to_path_buf() } else { PathBuf::from("/").join(path) };
-    format!("file://{}", abs.display())
-}
-
-fn detect_language_id(path: &Path) -> &'static str {
-    match path.extension().and_then(|e| e.to_str()) {
+fn detect_language_id(path: impl AsRef<Path>) -> &'static str {
+    match path.as_ref().extension().and_then(|e| e.to_str()) {
         Some("rs") => "rust",
         Some("ts") => "typescript",
         Some("tsx") => "typescriptreact",
