@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use globset::GlobBuilder;
 use ignore::WalkBuilder;
-use regex::Regex;
+use regex_lite::Regex;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
@@ -24,7 +24,7 @@ pub struct GrepOutput {
 #[derive(thiserror::Error, Debug)]
 pub enum GrepError {
     #[error("Regex error: {0}")]
-    Regex(#[from] regex::Error),
+    Regex(#[from] regex_lite::Error),
     #[error("Glob error: {0}")]
     Glob(#[from] glob::PatternError),
     #[error("Globset error: {0}")]

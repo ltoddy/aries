@@ -1,7 +1,6 @@
-use std::io::{BufWriter, stdout};
-
 use aries_context::GlobalContext;
 use aries_theme::Theme;
+use terminal_size::{Width, terminal_size};
 
 pub fn welcome(provider: &str, model: &str, context: &GlobalContext) {
     let theme = Theme::default();
@@ -9,24 +8,55 @@ pub fn welcome(provider: &str, model: &str, context: &GlobalContext) {
     let name = env!("CARGO_PKG_NAME");
     let version = env!("CARGO_PKG_VERSION");
 
-    let input = [
-        format!("{} {}", name, version),
-        format!("provider {provider}"),
-        format!("model {model}"),
-        format!("dir {}", context.current_dir.display()),
-    ]
-    .join("\n");
+    let title = format!(" {name} v{version} ");
+    let greeting = if context.user.is_empty() {
+        "Welcome!".to_string()
+    } else {
+        format!("Welcome, {}!", context.user)
+    };
+    let mascot = ["▄▀▀▙▟▀▀▄", " ▝▜██▛▘", "   ▘▘"];
+    let info = format!("{model} · {provider}");
+    let dir = context.current_dir.display().to_string();
 
-    let stdout = stdout();
-    let width = 80;
+    let term_width = terminal_size().map(|(Width(w), _)| w as usize).unwrap_or(80);
+    let inner = term_width.clamp(36, 50);
 
-    let writer = BufWriter::new(stdout.lock());
+    let blank = format!("{}{}{}", theme.dimmed("│"), " ".repeat(inner), theme.dimmed("│"));
 
-    if let Err(e) = ferris_says::say(&input, width, writer) {
-        eprintln!("ferris_says error: {}", e);
-        return;
+    // ╭─── title ──────────────────╮
+    let title_len = title.chars().count();
+    let remaining = inner.saturating_sub(title_len);
+    let left = 3;
+    let right = remaining.saturating_sub(left);
+    print!("{}", theme.dimmed(&format!("╭{}", "─".repeat(left))));
+    print!("{}", theme.cyan_text(&title));
+    println!("{}", theme.dimmed(&format!("{}╮", "─".repeat(right))));
+
+    println!("{blank}");
+    print_centered(&theme, &greeting, inner, |s| s.to_string());
+    println!("{blank}");
+
+    for line in &mascot {
+        print_centered(&theme, line, inner, |s| format!("{}", theme.cyan_text(s)));
     }
 
-    println!();
-    println!("{}", theme.dimmed("  /help for help  /exit to exit"));
+    println!("{blank}");
+    print_centered(&theme, &info, inner, |s| s.to_string());
+    print_centered(&theme, &dir, inner, |s| format!("{}", theme.dimmed(s)));
+
+    println!("{}", theme.dimmed(&format!("╰{}╯", "─".repeat(inner))));
+}
+
+fn print_centered(theme: &Theme, text: &str, width: usize, style: impl Fn(&str) -> String) {
+    let len = text.chars().count();
+    let lp = width.saturating_sub(len) / 2;
+    let rp = width.saturating_sub(len).saturating_sub(lp);
+    println!(
+        "{}{}{}{}{}",
+        theme.dimmed("│"),
+        " ".repeat(lp),
+        style(text),
+        " ".repeat(rp),
+        theme.dimmed("│"),
+    );
 }

@@ -1,5 +1,5 @@
 use std::future::Future;
-use std::os::unix::prelude::OsStrExt;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
 
 use anyhow::Context;
@@ -72,9 +72,11 @@ where
             history.push(Message::user("已检测到本项目适用的语言服务器，现已启动并开始预热。进行代码定义跳转、引用查找、符号查询或调用层级等语义级检索时，请优先使用 `lsp` 工具以获得更准确的结果。若首次调用时 `lsp` 尚未就绪（语言服务器可能仍在索引工作区），可稍后重试，或临时改用 `codesearch`、`grep`。"));
         }
 
-        let dir = gctx
-            .config_dir
-            .join(format!("session-{}", blake3::hash(gctx.current_dir.as_os_str().as_bytes())));
+        let dir = gctx.config_dir.join(format!("session-{:x}", {
+            let mut hasher = DefaultHasher::new();
+            gctx.current_dir.hash(&mut hasher);
+            hasher.finish()
+        }));
 
         if !dir.exists()
             && let Err(err) = tokio::fs::create_dir_all(&dir).await
