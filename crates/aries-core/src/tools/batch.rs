@@ -1,5 +1,6 @@
 use anyhow::Result;
 use aries_config::AriesConfig;
+use aries_context::GlobalContext;
 use futures::future::join_all;
 use rig::client::CompletionClient;
 use rig::completion::ToolDefinition;
@@ -56,14 +57,15 @@ where
 {
     client: C,
     config: AriesConfig,
+    gctx: GlobalContext,
 }
 
 impl<C> BatchTool<C>
 where
     C: CompletionClient,
 {
-    pub fn new(client: C, config: AriesConfig) -> Self {
-        Self { client, config }
+    pub fn new(client: C, config: AriesConfig, gctx: GlobalContext) -> Self {
+        Self { client, config, gctx }
     }
 }
 
@@ -136,21 +138,21 @@ where
                 } else if tool_name == glob::NAME {
                     let parsed_args =
                         serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
-                    Tool::call(&GlobTool, parsed_args)
+                    Tool::call(&GlobTool::new(self.gctx.clone()), parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
                 } else if tool_name == grep::NAME {
                     let parsed_args =
                         serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
-                    Tool::call(&GrepTool, parsed_args)
+                    Tool::call(&GrepTool::new(self.gctx.clone()), parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
                 } else if tool_name == ls::NAME {
                     let parsed_args =
                         serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
-                    Tool::call(&LsTool, parsed_args)
+                    Tool::call(&LsTool::new(self.gctx.clone()), parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
@@ -186,7 +188,11 @@ where
                     let parsed_args =
                         serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
                     Tool::call(
-                        &TaskTool::<C>::new(self.client.clone(), self.config.clone()),
+                        &TaskTool::<C>::new(
+                            self.client.clone(),
+                            self.config.clone(),
+                            self.gctx.clone(),
+                        ),
                         parsed_args,
                     )
                     .await

@@ -1,7 +1,5 @@
-use std::env::current_dir;
-use std::path::PathBuf;
-
 use anyhow::Result;
+use aries_context::GlobalContext;
 use globset::GlobBuilder;
 use ignore::WalkBuilder;
 use regex_lite::Regex;
@@ -33,7 +31,15 @@ pub enum GrepError {
 
 pub const NAME: &str = "grep";
 
-pub struct GrepTool;
+pub struct GrepTool {
+    gctx: GlobalContext,
+}
+
+impl GrepTool {
+    pub fn new(gctx: GlobalContext) -> Self {
+        Self { gctx }
+    }
+}
 
 impl Tool for GrepTool {
     const NAME: &'static str = NAME;
@@ -63,18 +69,16 @@ impl Tool for GrepTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        let current_dir = current_dir().unwrap_or(PathBuf::from("."));
-
         let re = Regex::new(&args.pattern)?;
         let mut matches = Vec::new();
 
-        let mut builder = WalkBuilder::new(&current_dir);
+        let mut builder = WalkBuilder::new(&self.gctx.current_dir);
         builder.hidden(false);
 
         if let Some(include) = &args.include {
             let glob = GlobBuilder::new(include).literal_separator(true).build()?;
             let glob = glob.compile_matcher();
-            let prefix = current_dir.clone();
+            let prefix = self.gctx.current_dir.clone();
             builder.filter_entry(move |entry| {
                 entry.file_type().is_some_and(|ft| ft.is_dir())
                     || entry

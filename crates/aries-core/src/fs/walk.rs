@@ -1,5 +1,6 @@
+use std::collections::VecDeque;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use ignore::WalkBuilder;
 
@@ -8,7 +9,9 @@ use ignore::WalkBuilder;
 /// - If `recursive == false`: returns direct children (files + dirs).
 /// - If `recursive == true`: returns all descendants (files + dirs) in
 ///   breadth-first order.
-pub async fn walk_dir(root: PathBuf, recursive: bool, hidden: bool) -> io::Result<Vec<PathBuf>> {
+pub fn walk_dir(root: impl AsRef<Path>, recursive: bool, hidden: bool) -> io::Result<Vec<PathBuf>> {
+    let root = root.as_ref();
+
     if !root.is_dir() {
         return Err(io::Error::new(
             io::ErrorKind::NotADirectory,
@@ -16,14 +19,28 @@ pub async fn walk_dir(root: PathBuf, recursive: bool, hidden: bool) -> io::Resul
         ));
     }
 
-    let mut builder = WalkBuilder::new(&root);
-    builder.hidden(hidden).ignore(true);
-    if !recursive {
-        builder.max_depth(Some(1));
-    }
+    walk_dirs(&[root], recursive, hidden)
+}
 
-    tokio::task::spawn_blocking(move || {
-        let mut results = Vec::new();
+pub fn walk_dirs(
+    roots: &[impl AsRef<Path>],
+    recursive: bool,
+    hidden: bool,
+) -> io::Result<Vec<PathBuf>> {
+    let mut queue: VecDeque<&Path> = roots.iter().map(|r| r.as_ref()).collect();
+    let mut results = Vec::new();
+
+    while let Some(dir) = queue.pop_front() {
+        if !dir.is_dir() {
+            continue;
+        }
+
+        let mut builder = WalkBuilder::new(dir);
+        builder.hidden(hidden).ignore(true);
+        if !recursive {
+            builder.max_depth(Some(1));
+        }
+
         for result in builder.build() {
             let entry = match result {
                 Ok(entry) => entry,
@@ -31,14 +48,12 @@ pub async fn walk_dir(root: PathBuf, recursive: bool, hidden: bool) -> io::Resul
             };
 
             let path = entry.path();
-            if path == root {
+            if path == dir {
                 continue;
             }
             results.push(path.to_path_buf());
         }
+    }
 
-        results
-    })
-    .await
-    .map_err(|err| io::Error::other(err.to_string()))
+    Ok(results)
 }

@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 anyhow.workspace = true
 aries-config = { path = "../aries-config" }
+aries-context = { path = "../aries-context" }
 aries-theme = { path = "../aries-theme" }
 colored.workspace = true
 dialoguer.workspace = true

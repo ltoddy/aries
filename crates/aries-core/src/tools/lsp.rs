@@ -1,8 +1,8 @@
-use std::env::current_dir;
 use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
+use aries_context::GlobalContext;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
@@ -68,11 +68,12 @@ pub const NAME: &str = "lsp";
 
 pub struct LspTool {
     client: SharedLspClient,
+    gctx: GlobalContext,
 }
 
 impl LspTool {
-    pub fn new(client: SharedLspClient) -> Self {
-        Self { client }
+    pub fn new(client: SharedLspClient, gctx: GlobalContext) -> Self {
+        Self { client, gctx }
     }
 
     fn extract_position_args(
@@ -151,8 +152,6 @@ impl Tool for LspTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        let current_dir = current_dir()?;
-
         if let Some(ref file_path) = args.file_path {
             self.client.did_open(file_path).await?;
         }
@@ -160,17 +159,17 @@ impl Tool for LspTool {
         let result = match args.operation {
             LspOperation::GoToDefinition => {
                 let (file_path, line, character) =
-                    Self::extract_position_args(&args, &current_dir)?;
+                    Self::extract_position_args(&args, &self.gctx.current_dir)?;
                 self.client.goto_definition(file_path, line, character).await
             },
             LspOperation::FindReferences => {
                 let (file_path, line, character) =
-                    Self::extract_position_args(&args, &current_dir)?;
+                    Self::extract_position_args(&args, &self.gctx.current_dir)?;
                 self.client.find_references(file_path, line, character).await
             },
             LspOperation::Hover => {
                 let (file_path, line, character) =
-                    Self::extract_position_args(&args, &current_dir)?;
+                    Self::extract_position_args(&args, &self.gctx.current_dir)?;
                 self.client.hover(file_path, line, character).await
             },
             LspOperation::DocumentSymbol => {
@@ -180,7 +179,7 @@ impl Tool for LspTool {
                 let abs_path = if file_path.is_absolute() {
                     file_path.clone()
                 } else {
-                    current_dir.join(file_path)
+                    self.gctx.current_dir.join(file_path)
                 };
                 self.client.document_symbol(abs_path).await
             },
@@ -190,17 +189,17 @@ impl Tool for LspTool {
             },
             LspOperation::GoToImplementation => {
                 let (file_path, line, character) =
-                    Self::extract_position_args(&args, &current_dir)?;
+                    Self::extract_position_args(&args, &self.gctx.current_dir)?;
                 self.client.goto_implementation(file_path, line, character).await
             },
             LspOperation::PrepareCallHierarchy => {
                 let (file_path, line, character) =
-                    Self::extract_position_args(&args, &current_dir)?;
+                    Self::extract_position_args(&args, &self.gctx.current_dir)?;
                 self.client.prepare_call_hierarchy(file_path, line, character).await
             },
             LspOperation::IncomingCalls => {
                 let (file_path, line, character) =
-                    Self::extract_position_args(&args, &current_dir)?;
+                    Self::extract_position_args(&args, &self.gctx.current_dir)?;
                 let items = self
                     .client
                     .prepare_call_hierarchy(file_path, line, character)
@@ -221,7 +220,7 @@ impl Tool for LspTool {
             },
             LspOperation::OutgoingCalls => {
                 let (file_path, line, character) =
-                    Self::extract_position_args(&args, &current_dir)?;
+                    Self::extract_position_args(&args, &self.gctx.current_dir)?;
                 let items = self
                     .client
                     .prepare_call_hierarchy(file_path, line, character)

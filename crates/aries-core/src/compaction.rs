@@ -3,6 +3,7 @@ use std::path::Path;
 
 use anyhow::Context;
 use aries_config::AriesConfig;
+use aries_context::GlobalContext;
 use colored::Colorize;
 use rig::agent::PromptHook;
 use rig::completion::Message;
@@ -147,7 +148,9 @@ impl CompactionAgent<openai::CompletionModel, ()> {
             .build()
             .with_context(|| "Failed to create llm client")?;
 
-        let inner = AgentWrapper::new(client, config, AgentType::Compaction, ()).build();
+        let inner =
+            AgentWrapper::new(client, config, AgentType::Compaction, (), GlobalContext::new()?)
+                .build();
         Ok(Self { inner })
     }
 }
@@ -165,7 +168,9 @@ impl CompactionAgent<azure::CompletionModel, ()> {
             .build()
             .with_context(|| "Failed to create llm client")?;
 
-        let inner = AgentWrapper::new(client, config, AgentType::Compaction, ()).build();
+        let inner =
+            AgentWrapper::new(client, config, AgentType::Compaction, (), GlobalContext::new()?)
+                .build();
         Ok(Self { inner })
     }
 }

@@ -1,5 +1,6 @@
 use anyhow::Result;
 use aries_config::AriesConfig;
+use aries_context::GlobalContext;
 use futures::StreamExt;
 use rig::client::CompletionClient;
 use rig::completion::ToolDefinition;
@@ -36,14 +37,15 @@ where
 {
     client: C,
     config: AriesConfig,
+    gctx: GlobalContext,
 }
 
 impl<C> TaskTool<C>
 where
     C: CompletionClient,
 {
-    pub fn new(client: C, config: AriesConfig) -> Self {
-        Self { client, config }
+    pub fn new(client: C, config: AriesConfig, gctx: GlobalContext) -> Self {
+        Self { client, config, gctx }
     }
 }
 
@@ -96,8 +98,14 @@ where
             _ => AgentType::General,
         };
 
-        let mut agent =
-            AgentWrapper::new(self.client.clone(), self.config.clone(), agent_type, ()).build();
+        let mut agent = AgentWrapper::new(
+            self.client.clone(),
+            self.config.clone(),
+            agent_type,
+            (),
+            self.gctx.clone(),
+        )
+        .build();
 
         let stream = agent.stream_prompt(&args.prompt, &[]).await;
         tokio::pin!(stream);

@@ -1,7 +1,7 @@
-use std::env::current_dir;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
+use aries_context::GlobalContext;
 use ignore::WalkBuilder;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
@@ -30,7 +30,15 @@ pub enum GlobError {
 
 pub const NAME: &str = "glob";
 
-pub struct GlobTool;
+pub struct GlobTool {
+    gctx: GlobalContext,
+}
+
+impl GlobTool {
+    pub fn new(gctx: GlobalContext) -> Self {
+        Self { gctx }
+    }
+}
 
 impl Tool for GlobTool {
     const NAME: &'static str = NAME;
@@ -60,7 +68,7 @@ impl Tool for GlobTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        let base_dir = args.base_dir.unwrap_or_else(|| current_dir().unwrap_or(PathBuf::from(".")));
+        let base_dir = args.base_dir.unwrap_or_else(|| self.gctx.current_dir.clone());
 
         let pattern = if Path::new(&args.pattern).is_absolute() {
             match Path::new(&args.pattern).strip_prefix(&base_dir) {

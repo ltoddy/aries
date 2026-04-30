@@ -2,12 +2,15 @@ pub mod build;
 pub mod compaction;
 pub mod ext;
 pub mod fs;
+pub mod instructions;
 pub mod jsonl;
 pub mod language_server;
+pub mod preamble;
 pub mod rpc;
 pub mod task_spawner;
 pub mod tools;
 
+use aries_context::GlobalContext;
 use rig::agent::{Agent, PromptHook, StreamingResult};
 use rig::client::CompletionClient;
 use rig::completion::{self, Message, Prompt};
@@ -89,8 +92,9 @@ where
         config: aries_config::AriesConfig,
         agent_type: AgentType,
         hook: P,
+        gctx: GlobalContext,
     ) -> AgentBuilder<C, P> {
-        AgentBuilder { client, config, agent_type, hook }
+        AgentBuilder { client, config, agent_type, hook, gctx }
     }
 
     pub async fn stream_prompt(

@@ -1,7 +1,7 @@
-use std::env;
 use std::path::PathBuf;
 
 use anyhow::Result;
+use aries_context::GlobalContext;
 use globset::{Glob, GlobSetBuilder};
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
@@ -27,7 +27,15 @@ pub enum LsError {
 
 pub const NAME: &str = "ls";
 
-pub struct LsTool;
+pub struct LsTool {
+    gctx: GlobalContext,
+}
+
+impl LsTool {
+    pub fn new(gctx: GlobalContext) -> Self {
+        Self { gctx }
+    }
+}
 
 impl Tool for LsTool {
     const NAME: &'static str = NAME;
@@ -61,7 +69,7 @@ impl Tool for LsTool {
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         let dir_path = match args.path {
             Some(p) => p,
-            None => env::current_dir()?,
+            None => self.gctx.current_dir.clone(),
         };
 
         let mut builder = GlobSetBuilder::new();

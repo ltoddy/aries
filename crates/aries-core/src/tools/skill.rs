@@ -106,7 +106,7 @@ impl Tool for SkillTool {
             .parent()
             .ok_or_else(|| SkillError::not_found(name.clone(), available.clone()))?;
 
-        let entries = walk_dir(dir.to_path_buf(), true, true).await?;
+        let entries = walk_dir(dir, true, true)?;
         let files = entries
             .iter()
             .filter(|e| e.is_file())

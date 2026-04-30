@@ -100,9 +100,15 @@ where
                     .with_context(|| "Failed to create llm client")?;
 
                 let (spawner, task_notifications) = TaskSpawner::new();
-                let agent = AgentWrapper::new(client, config.clone(), AgentType::Build, task_hook)
-                    .with_tools(spawner, lsp_client.clone())
-                    .await;
+                let agent = AgentWrapper::new(
+                    client,
+                    config.clone(),
+                    AgentType::Build,
+                    task_hook,
+                    gctx.clone(),
+                )
+                .with_tools(spawner, lsp_client.clone())
+                .await;
                 let compaction_agent = CompactionAgent::<openai::CompletionModel>::new(config)?;
                 (ProviderAgents::OpenAICompatible { agent, compaction_agent }, task_notifications)
             },
@@ -115,9 +121,15 @@ where
                     .with_context(|| "Failed to create llm client")?;
 
                 let (spawner, task_notifications) = TaskSpawner::new();
-                let agent = AgentWrapper::new(client, config.clone(), AgentType::Build, task_hook)
-                    .with_tools(spawner, lsp_client.clone())
-                    .await;
+                let agent = AgentWrapper::new(
+                    client,
+                    config.clone(),
+                    AgentType::Build,
+                    task_hook,
+                    gctx.clone(),
+                )
+                .with_tools(spawner, lsp_client.clone())
+                .await;
                 let compaction_agent = CompactionAgent::<azure::CompletionModel>::new(config)?;
                 (ProviderAgents::Azure { agent, compaction_agent }, task_notifications)
             },

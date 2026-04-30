@@ -3,35 +3,36 @@ use std::collections::HashMap;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use aries_context::GlobalContext;
 use futures::stream::{self, StreamExt, TryStreamExt};
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::fs::walk_dir;
+use crate::fs::walk_dirs;
 
-pub const FILENAME: &str = "SKILL.md";
-
-pub async fn load() -> anyhow::Result<Vec<SkillInfo>> {
-    let dir = std::env::home_dir().unwrap_or(PathBuf::from("~"));
-    let dir = dir.join(".agents/skills");
-    let entries = walk_dir(dir, false, true).await?;
-
-    stream::iter(entries.into_iter().filter(|entry| entry.is_dir()))
-        .map(|entry| entry.join(FILENAME))
-        .then(SkillInfo::parse)
-        .try_collect()
-        .await
-        .map_err(Into::into)
+pub struct SkillFilesLoader {
+    roots: Vec<PathBuf>,
 }
 
-pub fn render_available_skills(skills: &[SkillInfo]) -> String {
-    if skills.is_empty() {
-        return "<available_skills>\n(none)\n</available_skills>".to_string();
+impl SkillFilesLoader {
+    pub const FILENAME: &str = "SKILL.md";
+
+    pub fn new(gctx: &GlobalContext) -> Self {
+        let roots = vec![gctx.home_dir.join(".agents").join("skills"), gctx.current_dir.clone()];
+
+        Self { roots }
     }
 
-    let skills = skills.iter().map(|s| s.frontmatter.render(&s.location)).join("\n");
-    format!("<available_skills>\n{skills}\n</available_skills>",)
+    pub async fn load(self) -> anyhow::Result<Vec<SkillInfo>> {
+        let entries = walk_dirs(&self.roots, true, true)?;
+
+        stream::iter(entries.into_iter().filter(|entry| entry.is_dir()))
+            .map(|entry| entry.join(Self::FILENAME))
+            .then(SkillInfo::parse)
+            .try_collect()
+            .await
+            .map_err(Into::into)
+    }
 }
 
 #[derive(Error, Debug)]
