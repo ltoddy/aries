@@ -5,7 +5,6 @@ use rig::client::CompletionClient;
 use rig::completion;
 use rig::tool::ToolDyn;
 
-use crate::ext::skill;
 use crate::ext::skill::{SkillFilesLoader, SkillInfo};
 use crate::language_server::SharedLspClient;
 use crate::task_spawner::TaskSpawner;
@@ -58,7 +57,8 @@ where
         let skillloader = SkillFilesLoader::new(&self.gctx);
         let available_skills = skillloader.load().await.unwrap_or_default();
 
-        let preamble = crate::preamble::render(&self.gctx, agent_type, &available_skills).await;
+        let preamble =
+            crate::preamble::render(&self.gctx, agent_type, &model, &available_skills).await;
 
         let tools = build_tools::<C>(
             agent_type,

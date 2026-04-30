@@ -59,8 +59,7 @@ where
         config: AriesConfig,
         task_hook: P,
     ) -> anyhow::Result<Self> {
-        let mut history =
-            vec![Message::user(format!("当前工作目录：{}", gctx.current_dir.display(),))];
+        let mut history = Vec::new();
         let transcript_dir = gctx.config_dir.join("transcripts");
         let mut lsp_client: Option<SharedLspClient> = None;
 
