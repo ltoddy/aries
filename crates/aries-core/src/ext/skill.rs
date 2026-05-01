@@ -88,12 +88,14 @@ impl Frontmatter {
         let name = &self.name;
         let description = &self.description;
         let location = file_path.as_ref().display();
-        format!(
-            r#"<skill>
-  <name>{name}</name>
-  <description>{description}</description>
-  <location>{location}</location>
-</skill>"#
-        )
+
+        [
+            "<skill>",
+            format!("  <name>{name}</name>").as_str(),
+            format!("  <description>{description}</description>").as_str(),
+            format!("  <location>{location}</location>").as_str(),
+            "</skill>",
+        ]
+        .join("\n")
     }
 }
