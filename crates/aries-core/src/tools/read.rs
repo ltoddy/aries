@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
+use itertools::Itertools;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
@@ -12,10 +13,7 @@ pub struct ReadFileArgs {
     pub offset: Option<usize>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ReadFileOutput {
-    pub content: String,
-}
+pub type ReadFileOutput = String;
 
 #[derive(thiserror::Error, Debug)]
 pub enum ReadFileError {
@@ -59,9 +57,9 @@ impl Tool for ReadFileTool {
 
         let offset = args.offset.map(|offset| offset.saturating_sub(1));
         if let Some(offset) = offset {
-            content = content.lines().skip(offset).collect::<Vec<_>>().join("\n");
+            content = content.lines().skip(offset).join("\n");
         }
 
-        Ok(ReadFileOutput { content })
+        Ok(content)
     }
 }
