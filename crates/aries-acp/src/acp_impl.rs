@@ -3,14 +3,17 @@ use std::cell::Cell;
 use agent_client_protocol::{
     AuthenticateRequest, AuthenticateResponse, CancelNotification, ContentBlock, ContentChunk,
     Error, Implementation, InitializeRequest, InitializeResponse, NewSessionRequest,
-    NewSessionResponse, Plan, PlanEntry, PlanEntryPriority, PlanEntryStatus as AcpPlanEntryStatus,
-    PromptRequest, PromptResponse, ProtocolVersion, SessionNotification, SessionUpdate, StopReason,
-    TextContent, ToolCallId, ToolCallStatus, ToolCallUpdate, ToolCallUpdateFields,
+    NewSessionResponse, PromptRequest, PromptResponse, ProtocolVersion, SessionNotification,
+    SessionUpdate, StopReason, TextContent, ToolCallId, ToolCallStatus, ToolCallUpdate,
+    ToolCallUpdateFields,
 };
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
-use aries_session::{PlanEntryStatus, SessionManager, StreamEvent};
+use aries_session::SessionManager;
 use async_trait::async_trait;
+use rig::agent::{MultiTurnStreamItem, Text};
+use rig::message::{ReasoningContent, ToolResultContent};
+use rig::streaming::{StreamedAssistantContent, StreamedUserContent};
 use tokio::sync::{Mutex, mpsc, oneshot};
 use tracing::info;
 
@@ -88,60 +91,20 @@ impl agent_client_protocol::Agent for AcpImpl {
         session
             .prompt(
                 &promot,
-                Some(|event| {
+                Some(|item| {
                     let sender = self.sender.clone();
                     let session_id = args.session_id.clone();
                     async move {
-                        let update = match event {
-                            StreamEvent::Text(text) => SessionUpdate::AgentMessageChunk(
-                                ContentChunk::new(ContentBlock::Text(TextContent::new(text))),
-                            ),
-                            StreamEvent::Reasoning(text) => SessionUpdate::AgentThoughtChunk(
-                                ContentChunk::new(ContentBlock::Text(TextContent::new(text))),
-                            ),
-                            StreamEvent::ToolCall { id, name, arguments } => {
-                                let tool_call = agent_client_protocol::ToolCall::new(
-                                    ToolCallId::new(&*id),
-                                    &name,
-                                )
-                                .status(ToolCallStatus::InProgress)
-                                .raw_input(serde_json::Value::String(arguments));
-                                SessionUpdate::ToolCall(tool_call)
-                            },
-                            StreamEvent::ToolResult { id, content } => {
-                                let fields = ToolCallUpdateFields::new()
-                                    .status(ToolCallStatus::Completed)
-                                    .raw_output(serde_json::Value::String(content));
-                                SessionUpdate::ToolCallUpdate(ToolCallUpdate::new(
-                                    ToolCallId::new(&*id),
-                                    fields,
-                                ))
-                            },
-                            StreamEvent::Plan(entries) => {
-                                let plan_entries = entries
-                                    .into_iter()
-                                    .map(|e| {
-                                        let status = match e.status {
-                                            PlanEntryStatus::Pending => AcpPlanEntryStatus::Pending,
-                                            PlanEntryStatus::InProgress => {
-                                                AcpPlanEntryStatus::InProgress
-                                            },
-                                            PlanEntryStatus::Completed => {
-                                                AcpPlanEntryStatus::Completed
-                                            },
-                                        };
-                                        PlanEntry::new(e.content, PlanEntryPriority::Medium, status)
-                                    })
-                                    .collect();
-                                SessionUpdate::Plan(Plan::new(plan_entries))
-                            },
-                            StreamEvent::Finish => return Ok(()),
-                        };
-                        let (tx, rx) = oneshot::channel();
-                        if sender.send((SessionNotification::new(session_id, update), tx)).is_ok() {
-                            let _ = rx.await;
+                        let updates = stream_item_to_updates(item);
+                        for update in updates {
+                            let (tx, rx) = oneshot::channel();
+                            if sender
+                                .send((SessionNotification::new(session_id.clone(), update), tx))
+                                .is_ok()
+                            {
+                                let _ = rx.await;
+                            }
                         }
-
                         Ok(())
                     }
                 }),
@@ -157,5 +120,79 @@ impl agent_client_protocol::Agent for AcpImpl {
         info!("Received cancel request {args:?}");
 
         Ok(())
+    }
+}
+
+fn stream_item_to_updates(item: MultiTurnStreamItem<()>) -> Vec<SessionUpdate> {
+    match item {
+        MultiTurnStreamItem::StreamAssistantItem(assistant) => assistant_to_updates(assistant),
+        MultiTurnStreamItem::StreamUserItem(user) => user_to_updates(user),
+        MultiTurnStreamItem::FinalResponse(_) => Vec::new(),
+        _ => Vec::new(),
+    }
+}
+
+fn assistant_to_updates(content: StreamedAssistantContent<()>) -> Vec<SessionUpdate> {
+    match content {
+        StreamedAssistantContent::Text(Text { text }) => {
+            vec![SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::Text(
+                TextContent::new(text),
+            )))]
+        },
+        StreamedAssistantContent::Reasoning(reasoning) => reasoning
+            .content
+            .into_iter()
+            .filter_map(|rc| match rc {
+                ReasoningContent::Text { text, .. } => Some(text),
+                ReasoningContent::Encrypted(s) => Some(s),
+                ReasoningContent::Redacted { data } => Some(data),
+                ReasoningContent::Summary(s) => Some(s),
+                _ => None,
+            })
+            .map(|text| {
+                SessionUpdate::AgentThoughtChunk(ContentChunk::new(ContentBlock::Text(
+                    TextContent::new(text),
+                )))
+            })
+            .collect(),
+        StreamedAssistantContent::ReasoningDelta { reasoning, .. } => {
+            vec![SessionUpdate::AgentThoughtChunk(ContentChunk::new(ContentBlock::Text(
+                TextContent::new(reasoning),
+            )))]
+        },
+        StreamedAssistantContent::ToolCall { tool_call, .. } => {
+            let arguments = tool_call.function.arguments.to_string();
+            let tool_call = agent_client_protocol::ToolCall::new(
+                ToolCallId::new(&*tool_call.id),
+                &tool_call.function.name,
+            )
+            .status(ToolCallStatus::InProgress)
+            .raw_input(serde_json::Value::String(arguments));
+            vec![SessionUpdate::ToolCall(tool_call)]
+        },
+        _ => Vec::new(),
+    }
+}
+
+fn user_to_updates(content: StreamedUserContent) -> Vec<SessionUpdate> {
+    match content {
+        StreamedUserContent::ToolResult { tool_result, .. } => {
+            let content = tool_result
+                .content
+                .iter()
+                .filter_map(|c| match c {
+                    ToolResultContent::Text(text) => Some(text.text.as_str()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            let fields = ToolCallUpdateFields::new()
+                .status(ToolCallStatus::Completed)
+                .raw_output(serde_json::Value::String(content));
+            vec![SessionUpdate::ToolCallUpdate(ToolCallUpdate::new(
+                ToolCallId::new(&*tool_result.id),
+                fields,
+            ))]
+        },
     }
 }

@@ -11,14 +11,11 @@ use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
 use aries_core::task_spawner::{NotificationReceiver, TaskSpawner};
 use aries_core::{AgentBuilder, AriesAgent};
 use futures::{StreamExt, pin_mut};
-use rig::agent::{FinalResponse, MultiTurnStreamItem, PromptHook, Text};
+use rig::agent::{FinalResponse, MultiTurnStreamItem, PromptHook};
 use rig::completion::Message;
-use rig::message::{ReasoningContent, ToolResultContent};
 use rig::providers::{azure, openai};
-use rig::streaming::{StreamedAssistantContent, StreamedUserContent};
+use rig::streaming::StreamedAssistantContent;
 use tokio::sync::mpsc::UnboundedSender;
-
-use crate::event::StreamEvent;
 
 pub struct Session<P = ()>
 where
@@ -166,7 +163,7 @@ where
 
     pub async fn prompt<F, Fut>(&mut self, prompt: &str, mut cb: Option<F>) -> anyhow::Result<()>
     where
-        F: FnMut(StreamEvent) -> Fut,
+        F: FnMut(MultiTurnStreamItem<()>) -> Fut,
         Fut: Future<Output = anyhow::Result<()>>,
     {
         self.drain_task_notifications();
@@ -204,64 +201,13 @@ where
         let mut final_res = FinalResponse::empty();
 
         while let Some(Ok(chunk)) = stream.next().await {
-            match chunk {
-                MultiTurnStreamItem::StreamAssistantItem(item) => {
-                    if let Some(ref mut cb) = cb {
-                        match item {
-                            StreamedAssistantContent::Text(Text { text }) => {
-                                cb(StreamEvent::Text(text)).await?;
-                            },
-                            StreamedAssistantContent::Reasoning(reasoning) => {
-                                for rc in reasoning.content {
-                                    let text = match rc {
-                                        ReasoningContent::Text { text, .. } => text,
-                                        ReasoningContent::Encrypted(s) => s,
-                                        ReasoningContent::Redacted { data } => data,
-                                        ReasoningContent::Summary(s) => s,
-                                        _ => continue,
-                                    };
-                                    cb(StreamEvent::Reasoning(text)).await?;
-                                }
-                            },
-                            StreamedAssistantContent::ReasoningDelta { reasoning, .. } => {
-                                cb(StreamEvent::Reasoning(reasoning)).await?;
-                            },
-                            StreamedAssistantContent::ToolCall { tool_call, .. } => {
-                                cb(StreamEvent::ToolCall {
-                                    id: tool_call.id,
-                                    name: tool_call.function.name,
-                                    arguments: tool_call.function.arguments.to_string(),
-                                })
-                                .await?;
-                            },
-                            _ => {},
-                        }
-                    }
-                },
-                MultiTurnStreamItem::StreamUserItem(StreamedUserContent::ToolResult {
-                    tool_result,
-                    ..
-                }) => {
-                    if let Some(ref mut cb) = cb {
-                        let content = tool_result
-                            .content
-                            .iter()
-                            .filter_map(|c| match c {
-                                ToolResultContent::Text(text) => Some(text.text.as_str()),
-                                _ => None,
-                            })
-                            .collect::<Vec<_>>()
-                            .join("\n");
-                        cb(StreamEvent::ToolResult { id: tool_result.id.clone(), content }).await?;
-                    }
-                },
-                MultiTurnStreamItem::FinalResponse(response) => {
-                    if let Some(ref mut cb) = cb {
-                        cb(StreamEvent::Finish).await?;
-                    }
-                    final_res = response;
-                },
-                _ => {},
+            if let MultiTurnStreamItem::FinalResponse(response) = &chunk {
+                final_res = response.clone();
+            }
+            if let Some(ref mut cb) = cb
+                && let Some(stripped) = erase_provider_type(chunk)
+            {
+                cb(stripped).await?;
             }
         }
 
@@ -318,5 +264,46 @@ where
         self.history
             .push(Message::user(format!("<task-results>\n{}\n</task-results>", notif_text)));
         self.history.push(Message::assistant("Noted task results."));
+    }
+}
+
+/// 把 `MultiTurnStreamItem<R>` 中 provider 相关的泛型 `R` 擦除为 `()`。
+///
+/// `StreamedAssistantContent::Final(R)` 是 provider 内部的原始流结束负载，
+/// 上层不需要它（真正的最终结果是 `MultiTurnStreamItem::FinalResponse`）。
+/// 遇到 `Final(R)` 时返回 `None`，其余变体安全映射为
+/// `MultiTurnStreamItem<()>`。
+fn erase_provider_type<R>(item: MultiTurnStreamItem<R>) -> Option<MultiTurnStreamItem<()>> {
+    match item {
+        MultiTurnStreamItem::StreamAssistantItem(assistant) => match assistant {
+            StreamedAssistantContent::Final(_) => None,
+            StreamedAssistantContent::Text(t) => {
+                Some(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Text(t)))
+            },
+            StreamedAssistantContent::ToolCall { tool_call, internal_call_id } => {
+                Some(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::ToolCall {
+                    tool_call,
+                    internal_call_id,
+                }))
+            },
+            StreamedAssistantContent::ToolCallDelta { id, internal_call_id, content } => {
+                Some(MultiTurnStreamItem::StreamAssistantItem(
+                    StreamedAssistantContent::ToolCallDelta { id, internal_call_id, content },
+                ))
+            },
+            StreamedAssistantContent::Reasoning(r) => Some(
+                MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Reasoning(r)),
+            ),
+            StreamedAssistantContent::ReasoningDelta { id, reasoning } => {
+                Some(MultiTurnStreamItem::StreamAssistantItem(
+                    StreamedAssistantContent::ReasoningDelta { id, reasoning },
+                ))
+            },
+        },
+        MultiTurnStreamItem::StreamUserItem(user) => {
+            Some(MultiTurnStreamItem::StreamUserItem(user))
+        },
+        MultiTurnStreamItem::FinalResponse(resp) => Some(MultiTurnStreamItem::FinalResponse(resp)),
+        _ => None,
     }
 }

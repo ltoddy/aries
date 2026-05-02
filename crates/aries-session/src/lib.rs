@@ -1,12 +1,12 @@
-mod event;
 mod history;
 mod manager;
 mod session;
 
 use std::future::Ready;
 
-pub use self::event::{PlanEntry, PlanEntryStatus, StreamEvent};
+use rig::agent::MultiTurnStreamItem;
+
 pub use self::manager::SessionManager;
 pub use self::session::Session;
 
-pub type NoCb = fn(StreamEvent) -> Ready<anyhow::Result<()>>;
+pub type NoCb = fn(MultiTurnStreamItem<()>) -> Ready<anyhow::Result<()>>;
