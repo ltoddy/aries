@@ -4,7 +4,7 @@ mod skill;
 
 use aries_context::GlobalContext;
 
-use crate::AgentType;
+use crate::agent_type::AgentType;
 use crate::ext::skill::SkillInfo;
 
 pub async fn render(

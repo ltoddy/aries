@@ -5,10 +5,11 @@ use std::path::PathBuf;
 use anyhow::Context;
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
+use aries_core::agent_type::AgentType;
 use aries_core::compaction::CompactionAgent;
 use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
 use aries_core::task_spawner::{NotificationReceiver, TaskSpawner};
-use aries_core::{AgentType, AgentWrapper};
+use aries_core::{AgentBuilder, AriesAgent};
 use futures::{StreamExt, pin_mut};
 use rig::agent::{FinalResponse, MultiTurnStreamItem, PromptHook, Text};
 use rig::completion::Message;
@@ -40,11 +41,11 @@ where
     P: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel>,
 {
     OpenAICompatible {
-        agent: AgentWrapper<openai::CompletionModel, P>,
+        agent: AriesAgent<openai::CompletionModel, P>,
         compaction_agent: CompactionAgent<openai::CompletionModel>,
     },
     Azure {
-        agent: AgentWrapper<azure::CompletionModel, P>,
+        agent: AriesAgent<azure::CompletionModel, P>,
         compaction_agent: CompactionAgent<azure::CompletionModel>,
     },
 }
@@ -99,7 +100,7 @@ where
                     .with_context(|| "Failed to create llm client")?;
 
                 let (spawner, task_notifications) = TaskSpawner::new();
-                let agent = AgentWrapper::new(
+                let agent = AgentBuilder::new(
                     client,
                     config.clone(),
                     AgentType::Build,
@@ -120,7 +121,7 @@ where
                     .with_context(|| "Failed to create llm client")?;
 
                 let (spawner, task_notifications) = TaskSpawner::new();
-                let agent = AgentWrapper::new(
+                let agent = AgentBuilder::new(
                     client,
                     config.clone(),
                     AgentType::Build,

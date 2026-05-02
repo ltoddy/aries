@@ -12,7 +12,8 @@ use rig::one_or_many::OneOrMany;
 use rig::providers::{azure, openai};
 use rig::{completion, message};
 
-use crate::{AgentType, AgentWrapper};
+use crate::agent_type::AgentType;
+use crate::{AgentBuilder, AriesAgent};
 
 const KEEP_RECENT_TOOL_RESULTS: usize = 3;
 
@@ -21,7 +22,7 @@ where
     M: completion::CompletionModel,
     P: PromptHook<M>,
 {
-    inner: AgentWrapper<M, P>,
+    inner: AriesAgent<M, P>,
 }
 
 impl<M, P> CompactionAgent<M, P>
@@ -149,7 +150,7 @@ impl CompactionAgent<openai::CompletionModel, ()> {
             .with_context(|| "Failed to create llm client")?;
 
         let inner =
-            AgentWrapper::new(client, config, AgentType::Compaction, (), GlobalContext::new()?)
+            AgentBuilder::new(client, config, AgentType::Compaction, (), GlobalContext::new()?)
                 .build();
         Ok(Self { inner })
     }
@@ -169,7 +170,7 @@ impl CompactionAgent<azure::CompletionModel, ()> {
             .with_context(|| "Failed to create llm client")?;
 
         let inner =
-            AgentWrapper::new(client, config, AgentType::Compaction, (), GlobalContext::new()?)
+            AgentBuilder::new(client, config, AgentType::Compaction, (), GlobalContext::new()?)
                 .build();
         Ok(Self { inner })
     }

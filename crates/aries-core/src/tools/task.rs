@@ -7,7 +7,8 @@ use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 
-use crate::{AgentType, AgentWrapper};
+use crate::AgentBuilder;
+use crate::agent_type::AgentType;
 
 pub const NAME: &str = "task";
 
@@ -98,7 +99,7 @@ where
             _ => AgentType::General,
         };
 
-        let mut agent = AgentWrapper::new(
+        let mut agent = AgentBuilder::new(
             self.client.clone(),
             self.config.clone(),
             agent_type,
