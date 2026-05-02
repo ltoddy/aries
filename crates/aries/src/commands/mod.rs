@@ -1,8 +1,9 @@
 use aries_context::GlobalContext;
 use aries_session::Session;
-use aries_theme::Theme;
 use rig::agent::PromptHook;
 use rig::providers::{azure, openai};
+
+use crate::theme::Theme;
 
 pub mod clear_history;
 pub mod compact;

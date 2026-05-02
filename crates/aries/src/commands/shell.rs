@@ -1,7 +1,8 @@
 use std::process::Stdio;
 
-use aries_theme::Theme;
 use tokio::process::Command;
+
+use crate::theme::Theme;
 
 pub const NAME: &str = "/shell";
 

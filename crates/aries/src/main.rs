@@ -3,6 +3,7 @@ mod commands;
 mod display;
 mod hook;
 mod input;
+mod theme;
 mod welcome;
 
 use std::time::Instant;
@@ -10,10 +11,11 @@ use std::time::Instant;
 use aries_config::AriesConfigLoader;
 use aries_context::GlobalContext;
 use aries_session::{NoCb, Session};
-use aries_theme::Theme;
 use clap::Parser;
 use rustyline::error::ReadlineError;
 use terminal_size::{Width, terminal_size};
+
+use crate::theme::Theme;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

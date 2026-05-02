@@ -1,10 +1,10 @@
 use std::io::Write;
 
-use aries_theme::Theme;
 use rig::agent::{HookAction, PromptHook, ToolCallHookAction};
 use rig::completion::{CompletionModel, CompletionResponse, GetTokenUsage, Message};
 
 use crate::display::{display_token_usage, format_tool_call_args, format_tool_result_output};
+use crate::theme::Theme;
 
 #[derive(Debug, Clone)]
 pub struct DisplayPromptHook {

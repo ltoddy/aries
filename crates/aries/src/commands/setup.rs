@@ -1,7 +1,8 @@
 use std::path::Path;
 
 use aries_config::{AriesConfigLoader, setup};
-use aries_theme::Theme;
+
+use crate::theme::Theme;
 
 pub const NAME: &str = "/setup";
 

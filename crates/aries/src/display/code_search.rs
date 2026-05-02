@@ -1,7 +1,7 @@
 use aries_core::tools::codesearch::{CodeSearchArgs, CodeSearchOutput, NAME};
-use aries_theme::Theme;
 
 use crate::display::preview;
+use crate::theme::Theme;
 
 pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
     let args = serde_json::from_str::<CodeSearchArgs>(args);

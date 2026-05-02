@@ -6,7 +6,6 @@ members = [
     "crates/aries-context",
     "crates/aries-core",
     "crates/aries-session",
-    "crates/aries-theme",
 ]
 default-members = ["crates/aries"]
 resolver = "3"

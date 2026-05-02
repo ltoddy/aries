@@ -1,5 +1,6 @@
 use aries_core::tools::question::{NAME, QuestionArgs, QuestionOutput};
-use aries_theme::Theme;
+
+use crate::theme::Theme;
 
 pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
     let args = serde_json::from_str::<QuestionArgs>(args);

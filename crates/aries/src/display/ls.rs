@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
 use aries_core::tools::ls::{LsArgs, LsOutput, NAME};
-use aries_theme::Theme;
 
 use crate::display::preview;
+use crate::theme::Theme;
 
 pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
     let args = serde_json::from_str::<LsArgs>(args);

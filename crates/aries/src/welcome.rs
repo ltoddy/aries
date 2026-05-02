@@ -1,6 +1,7 @@
 use aries_context::GlobalContext;
-use aries_theme::Theme;
 use terminal_size::{Width, terminal_size};
+
+use crate::theme::Theme;
 
 pub fn welcome(provider: &str, model: &str, context: &GlobalContext) {
     let theme = Theme::default();

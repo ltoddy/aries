@@ -17,8 +17,9 @@ pub mod web_search;
 pub mod write_file;
 
 use aries_core::tools;
-use aries_theme::Theme;
 use itertools::Itertools;
+
+use crate::theme::Theme;
 
 pub fn format_tool_call_args(
     tool_name: &str,

@@ -15,8 +15,9 @@ aries-config = { path = "../aries-config" }
 aries-context = { path = "../aries-context" }
 aries-core = { path = "../aries-core" }
 aries-session = { path = "../aries-session" }
-aries-theme = { path = "../aries-theme" }
 clap = { workspace = true, features = ["derive"] }
+colored.workspace = true
+dark-light.workspace = true
 dialoguer.workspace = true
 itertools.workspace = true
 rig-core.workspace = true

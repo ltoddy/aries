@@ -4,7 +4,6 @@ use std::path::Path;
 use anyhow::Context;
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
-use colored::Colorize;
 use rig::agent::PromptHook;
 use rig::completion::Message;
 use rig::message::{AssistantContent, ReasoningContent, ToolResultContent, UserContent};
@@ -116,8 +115,7 @@ where
         messages: &[Message],
         transcript_dir: &Path,
     ) -> anyhow::Result<Option<Vec<Message>>> {
-        let theme = aries_theme::Theme::default();
-        println!("\n{}", theme.yellow_text("🔄 触发上下文压缩...").bold());
+        println!("\n🔄 触发上下文压缩...");
 
         save_transcript(messages, transcript_dir).await?;
 

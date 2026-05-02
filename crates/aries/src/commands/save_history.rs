@@ -1,6 +1,7 @@
 use aries_core::jsonl;
-use aries_theme::Theme;
 use rig::completion::Message;
+
+use crate::theme::Theme;
 
 pub const NAME: &str = "/save-history";
 
