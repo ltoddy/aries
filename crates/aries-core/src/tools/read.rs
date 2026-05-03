@@ -13,7 +13,10 @@ pub struct ReadFileArgs {
     pub offset: Option<usize>,
 }
 
-pub type ReadFileOutput = String;
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ReadFileOutput {
+    pub content: String,
+}
 
 #[derive(thiserror::Error, Debug)]
 pub enum ReadFileError {
@@ -60,6 +63,6 @@ impl Tool for ReadFileTool {
             content = content.lines().skip(offset).join("\n");
         }
 
-        Ok(content)
+        Ok(ReadFileOutput { content })
     }
 }

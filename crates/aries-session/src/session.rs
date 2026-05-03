@@ -27,7 +27,6 @@ where
     _lsp_client: Option<SharedLspClient>,
     history: Vec<Message>,
     history_tx: UnboundedSender<Vec<Message>>,
-    base_len: usize,
     transcript_dir: PathBuf,
 
     _dir: PathBuf, // session 的数据存放的目录
@@ -86,8 +85,6 @@ where
             history.extend_from_slice(&prior);
         }
 
-        let base_len = history.len();
-
         let (provider_agents, task_notifications) = match config.clone() {
             AriesConfig::OpenAICompatible(ref conf) => {
                 let client = openai::CompletionsClient::builder()
@@ -142,7 +139,6 @@ where
             _lsp_client: lsp_client,
             history,
             history_tx,
-            base_len,
             transcript_dir,
             _dir: dir,
         })
@@ -164,7 +160,6 @@ where
     }
 
     pub fn clear_history(&mut self) {
-        self.history.truncate(self.base_len);
         let _ = self.history_tx.send(vec![]);
     }
 
@@ -177,14 +172,10 @@ where
 
         let stream = match &mut self.provider_agents {
             ProviderAgents::OpenAICompatible { agent, compaction_agent } => {
-                CompactionAgent::<openai::CompletionModel>::micro_compact(
-                    &mut self.history[self.base_len..],
-                );
-                if let Some(compressed) = compaction_agent
-                    .auto_compact(&self.history[self.base_len..], &self.transcript_dir)
-                    .await?
+                CompactionAgent::<openai::CompletionModel>::micro_compact(&mut self.history);
+                if let Some(compressed) =
+                    compaction_agent.auto_compact(&self.history, &self.transcript_dir).await?
                 {
-                    self.history.truncate(self.base_len);
                     self.history.extend(compressed);
                 }
                 let snapshot = self.history.clone();
@@ -192,11 +183,9 @@ where
             },
             ProviderAgents::Azure { agent, compaction_agent } => {
                 CompactionAgent::<azure::CompletionModel>::micro_compact(&mut self.history);
-                if let Some(compressed) = compaction_agent
-                    .auto_compact(&self.history[self.base_len..], &self.transcript_dir)
-                    .await?
+                if let Some(compressed) =
+                    compaction_agent.auto_compact(&self.history, &self.transcript_dir).await?
                 {
-                    self.history.truncate(self.base_len);
                     self.history.extend(compressed);
                 }
                 let snapshot = self.history.clone();
@@ -220,7 +209,7 @@ where
 
         if let Some(his) = final_res.history() {
             self.history = his.to_vec();
-            let _ = self.history_tx.send(his.get(self.base_len..).unwrap_or(&[]).to_vec());
+            let _ = self.history_tx.send(his.to_vec());
         }
 
         Ok(())
@@ -229,18 +218,13 @@ where
     pub async fn compact(&mut self) -> anyhow::Result<()> {
         let compressed = match &mut self.provider_agents {
             ProviderAgents::OpenAICompatible { compaction_agent, .. } => {
-                compaction_agent
-                    .force_compact(&self.history[self.base_len..], &self.transcript_dir)
-                    .await?
+                compaction_agent.force_compact(&self.history, &self.transcript_dir).await?
             },
             ProviderAgents::Azure { compaction_agent, .. } => {
-                compaction_agent
-                    .force_compact(&self.history[self.base_len..], &self.transcript_dir)
-                    .await?
+                compaction_agent.force_compact(&self.history, &self.transcript_dir).await?
             },
         };
         if let Some(compressed) = compressed {
-            self.history.truncate(self.base_len);
             self.history.extend(compressed);
         }
         Ok(())

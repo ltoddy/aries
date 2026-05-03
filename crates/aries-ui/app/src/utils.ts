@@ -81,8 +81,10 @@ export function formatToolResult(toolName: string, content: string): string {
 
   switch (toolName) {
     case "read_file": {
-      // ReadFileOutput is just a string
-      if (typeof parsed === "string") return parsed;
+      // ReadFileOutput: { content: string }
+      if (parsed && typeof parsed === "object" && typeof (parsed as { content?: unknown }).content === "string") {
+        return (parsed as { content: string }).content;
+      }
       return trimmed;
     }
     case "write_file": {

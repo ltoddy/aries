@@ -175,9 +175,7 @@ pub async fn send_chat_message(
 }
 
 #[tauri::command]
-pub async fn get_system_prompt(
-    state: tauri::State<'_, SharedState>,
-) -> Result<String, String> {
+pub async fn get_system_prompt(state: tauri::State<'_, SharedState>) -> Result<String, String> {
     let guard = state.lock().await;
     let app_state = guard.as_ref().ok_or_else(|| "chat session is not initialized".to_string())?;
     let session_id = &app_state.active_session_id;

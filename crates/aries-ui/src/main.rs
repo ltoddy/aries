@@ -17,7 +17,9 @@ use state::{AppState, SharedState};
 
 #[tauri::command]
 fn resize_window_for_chat(window: tauri::Window) -> Result<(), String> {
-    let monitor = window.current_monitor().map_err(|e| e.to_string())?
+    let monitor = window
+        .current_monitor()
+        .map_err(|e| e.to_string())?
         .ok_or_else(|| "no monitor".to_string())?;
     let logical_size = monitor.size().to_logical::<f64>(monitor.scale_factor());
     let width = (logical_size.width * 0.75).round();

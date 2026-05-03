@@ -40,7 +40,7 @@ where
     }
 
     pub async fn prompt(&mut self, prompt: &str, history: &[Message]) -> anyhow::Result<String> {
-        let res = self.inner.prompt(prompt).with_history(&mut history.to_vec()).await?;
+        let res = self.inner.prompt(prompt).with_history(history.to_vec()).await?;
         Ok(res)
     }
 

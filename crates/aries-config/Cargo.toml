@@ -6,6 +6,6 @@ edition = "2024"
 [dependencies]
 anyhow.workspace = true
 dialoguer.workspace = true
-serde.workspace = true
+serde = { workspace = true, features = ["derive"] }
 serde_yaml.workspace = true
 tokio = { workspace = true, features = ["fs"] }
