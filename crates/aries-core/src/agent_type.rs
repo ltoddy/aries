@@ -4,31 +4,28 @@ pub enum AgentType {
     Plan,
     General,
     Explore,
-    Compaction,
     Title,
     Summary,
 }
 
 impl AgentType {
-    pub const fn preamble(self) -> &'static str {
+    pub const fn bare_preamble(self) -> &'static str {
         match self {
             Self::Build => include_str!("prompts/build.txt"),
             Self::Plan => include_str!("prompts/plan.txt"),
             Self::General => include_str!("prompts/generate.txt"),
             Self::Explore => include_str!("prompts/explore.txt"),
-            Self::Compaction => include_str!("prompts/compaction.txt"),
             Self::Title => include_str!("prompts/title.txt"),
             Self::Summary => include_str!("prompts/summary.txt"),
         }
     }
 
-    pub const fn agent_name(self) -> &'static str {
+    pub const fn name(self) -> &'static str {
         match self {
             Self::Build => "Builder",
             Self::Plan => "Planner",
             Self::General => "Assistant",
             Self::Explore => "Explorer",
-            Self::Compaction => "Archivist",
             Self::Title => "Namer",
             Self::Summary => "Summarizer",
         }
@@ -44,7 +41,6 @@ impl AgentType {
             Self::Explore => {
                 "专门用于探索代码库的快速智能体。当您需要通过模式快速查找文件、搜索关键字或回答有关代码库的问题时使用。"
             },
-            Self::Compaction => "用于压缩和总结对话上下文的智能体。",
             Self::Title => "用于生成对话标题的智能体。",
             Self::Summary => "用于生成对话摘要（类似于 PR 描述）的智能体。",
         }

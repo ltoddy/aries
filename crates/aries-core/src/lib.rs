@@ -28,6 +28,16 @@ where
 
 impl<M, P> AriesAgent<M, P>
 where
+    M: completion::CompletionModel,
+    P: PromptHook<M>,
+{
+    pub fn new(inner: Agent<M, P>, preamble: String) -> Self {
+        Self { inner, preamble }
+    }
+}
+
+impl<M, P> AriesAgent<M, P>
+where
     M: completion::CompletionModel + 'static,
     P: PromptHook<M> + 'static,
 {

@@ -15,7 +15,7 @@ pub async fn render(
 ) -> String {
     match agent_type {
         AgentType::Build | AgentType::General | AgentType::Plan => {
-            let mut preamble = agent_type.preamble().to_string();
+            let mut preamble = agent_type.bare_preamble().to_string();
 
             preamble.push('\n');
             preamble.push_str(&env::render(gctx, model));
@@ -38,6 +38,6 @@ pub async fn render(
 
             preamble
         },
-        _ => agent_type.preamble().to_string(),
+        _ => agent_type.bare_preamble().to_string(),
     }
 }

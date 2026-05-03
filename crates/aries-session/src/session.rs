@@ -95,7 +95,7 @@ where
 
                 let (spawner, task_notifications) = TaskSpawner::new();
                 let agent = AgentBuilder::new(
-                    client,
+                    client.clone(),
                     config.clone(),
                     AgentType::Build,
                     task_hook,
@@ -103,7 +103,7 @@ where
                 )
                 .with_tools(spawner, lsp_client.clone())
                 .await;
-                let compaction_agent = CompactionAgent::<openai::CompletionModel>::new(config)?;
+                let compaction_agent = CompactionAgent::new(client, config.model());
                 (ProviderAgents::OpenAICompatible { agent, compaction_agent }, task_notifications)
             },
             AriesConfig::Azure(ref conf) => {
@@ -116,7 +116,7 @@ where
 
                 let (spawner, task_notifications) = TaskSpawner::new();
                 let agent = AgentBuilder::new(
-                    client,
+                    client.clone(),
                     config.clone(),
                     AgentType::Build,
                     task_hook,
@@ -124,7 +124,7 @@ where
                 )
                 .with_tools(spawner, lsp_client.clone())
                 .await;
-                let compaction_agent = CompactionAgent::<azure::CompletionModel>::new(config)?;
+                let compaction_agent = CompactionAgent::new(client, config.model());
                 (ProviderAgents::Azure { agent, compaction_agent }, task_notifications)
             },
         };

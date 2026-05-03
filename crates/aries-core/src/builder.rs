@@ -44,19 +44,19 @@ where
         let model = self.config.model().to_owned();
         let agent_type = self.agent_type;
 
-        let preamble = agent_type.preamble().to_owned();
+        let preamble = agent_type.bare_preamble().to_owned();
 
         let inner = self
             .client
             .agent(model)
             .hook(self.hook)
-            .name(agent_type.agent_name())
+            .name(agent_type.name())
             .description(agent_type.description())
             .preamble(&preamble)
             .default_max_turns(AGENT_LOOP_MAX_TURNS)
             .build();
 
-        AriesAgent { inner, preamble }
+        AriesAgent::new(inner, preamble)
     }
 
     pub async fn with_tools(
@@ -79,14 +79,14 @@ where
             .client
             .agent(model)
             .hook(self.hook)
-            .name(agent_type.agent_name())
+            .name(agent_type.name())
             .description(agent_type.description())
             .preamble(&preamble)
             .tools(tools)
             .default_max_turns(AGENT_LOOP_MAX_TURNS)
             .build();
 
-        AriesAgent { inner, preamble }
+        AriesAgent::new(inner, preamble)
     }
 
     fn build_tools(

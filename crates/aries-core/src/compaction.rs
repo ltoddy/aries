@@ -1,35 +1,46 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-use anyhow::Context;
-use aries_config::AriesConfig;
-use aries_context::GlobalContext;
-use rig::agent::PromptHook;
+use rig::client::CompletionClient;
 use rig::completion::Message;
 use rig::message::{AssistantContent, ReasoningContent, ToolResultContent, UserContent};
 use rig::one_or_many::OneOrMany;
-use rig::providers::{azure, openai};
 use rig::{completion, message};
 
-use crate::agent_type::AgentType;
-use crate::{AgentBuilder, AriesAgent};
+use crate::{AGENT_LOOP_MAX_TURNS, AriesAgent};
 
 const KEEP_RECENT_TOOL_RESULTS: usize = 3;
 
-pub struct CompactionAgent<M, P = ()>
+const PREAMBLE: &str = include_str!("prompts/compaction.txt");
+const NAME: &str = "Archivist";
+const DESCRIPTION: &str = "用于压缩和总结对话上下文的智能体。";
+
+pub struct CompactionAgent<M>
 where
     M: completion::CompletionModel,
-    P: PromptHook<M>,
 {
-    inner: AriesAgent<M, P>,
+    inner: AriesAgent<M, ()>,
 }
 
-impl<M, P> CompactionAgent<M, P>
+impl<M> CompactionAgent<M>
 where
     M: completion::CompletionModel + 'static,
-    P: PromptHook<M> + 'static,
 {
     pub const TOKEN_THRESHOLD: usize = 80_000;
+
+    pub fn new<C>(client: C, model: &str) -> Self
+    where
+        C: CompletionClient<CompletionModel = M>,
+    {
+        let agent = client
+            .agent(model)
+            .name(NAME)
+            .description(DESCRIPTION)
+            .preamble(PREAMBLE)
+            .default_max_turns(AGENT_LOOP_MAX_TURNS)
+            .build();
+        Self { inner: AriesAgent::new(agent, PREAMBLE.to_owned()) }
+    }
 
     pub fn micro_compact(messages: &mut [Message]) {
         let tool_name_map = build_tool_name_map(messages);
@@ -132,45 +143,6 @@ where
         ];
 
         Ok(Some(compressed_messages))
-    }
-}
-
-impl CompactionAgent<openai::CompletionModel, ()> {
-    pub fn new(config: AriesConfig) -> anyhow::Result<Self> {
-        let AriesConfig::OpenAICompatible(ref conf) = config else {
-            anyhow::bail!("OpenAI compatible agent requires an OpenAI compatible config");
-        };
-
-        let client = openai::CompletionsClient::builder()
-            .base_url(&conf.base_url)
-            .api_key(&conf.api_key)
-            .build()
-            .with_context(|| "Failed to create llm client")?;
-
-        let inner =
-            AgentBuilder::new(client, config, AgentType::Compaction, (), GlobalContext::new()?)
-                .build();
-        Ok(Self { inner })
-    }
-}
-
-impl CompactionAgent<azure::CompletionModel, ()> {
-    pub fn new(config: AriesConfig) -> anyhow::Result<Self> {
-        let AriesConfig::Azure(ref conf) = config else {
-            anyhow::bail!("Azure agent requires an Azure config");
-        };
-
-        let client = azure::Client::builder()
-            .api_key(&conf.api_key)
-            .azure_endpoint(conf.azure_endpoint.to_owned())
-            .api_version(&conf.api_version)
-            .build()
-            .with_context(|| "Failed to create llm client")?;
-
-        let inner =
-            AgentBuilder::new(client, config, AgentType::Compaction, (), GlobalContext::new()?)
-                .build();
-        Ok(Self { inner })
     }
 }
 
