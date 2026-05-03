@@ -5,18 +5,19 @@ description = "Aries desktop application"
 authors = ["Bytedance"]
 edition = "2021"
 
-[build-dependencies]
-tauri-build = { version = "2", features = [] }
-
 [dependencies]
-tauri = { version = "2", features = [] }
-tauri-plugin-opener = "2"
-serde = { workspace = true, features = ["derive"] }
-serde_json.workspace = true
 anyhow.workspace = true
-tokio = { workspace = true, features = ["sync", "rt", "macros"] }
 aries-config = { path = "../aries-config" }
 aries-context = { path = "../aries-context" }
 aries-core = { path = "../aries-core" }
 aries-session = { path = "../aries-session" }
-rig-core = "0.33"
+rig-core.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tokio = { workspace = true, features = ["sync", "rt", "macros"] }
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }

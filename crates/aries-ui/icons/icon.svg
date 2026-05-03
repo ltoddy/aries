@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Background: deep navy rounded square -->
+  <rect width="512" height="512" rx="112" fill="#1C1B3A"/>
+
+  <!-- Aries ♈ symbol: two outward arcs + vertical stem -->
+  <g stroke="#F0EEF8" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- Left horn: arc curving up and to the left from center-top -->
+    <path d="M 256 270 C 256 200, 230 155, 190 145 C 155 136, 130 158, 132 190 C 134 218, 160 230, 186 218"/>
+    <!-- Right horn: arc curving up and to the right from center-top -->
+    <path d="M 256 270 C 256 200, 282 155, 322 145 C 357 136, 382 158, 380 190 C 378 218, 352 230, 326 218"/>
+    <!-- Vertical stem going down from meeting point -->
+    <line x1="256" y1="270" x2="256" y2="370"/>
+  </g>
+</svg>

@@ -26,6 +26,16 @@ export function findLastAssistantIndex(messages: ChatMessage[]): number | null {
 }
 
 export function appendStreamBlock(message: ChatMessage, payload: ChatStreamPayload): ChatMessage {
+  // Handle usage event separately - store on message, don't add as block
+  if (payload.kind === "usage") {
+    try {
+      const usage = JSON.parse(payload.delta);
+      return { ...message, usage };
+    } catch {
+      return message;
+    }
+  }
+
   const prevBlocks = message.blocks ?? [];
   const lastBlock = prevBlocks[prevBlocks.length - 1];
   let blocks: ChatBlock[];
@@ -172,7 +182,7 @@ function formatToolCallArgs(name: string, args: Record<string, unknown>): ToolCa
       return { name, summary: s, detail: null };
     }
     case "write_file":
-      return { name, summary: str(args.file_path), detail: truncate(str(args.content)) };
+      return { name, summary: str(args.file_path), detail: str(args.content) || null };
     case "shell_command":
       return { name, summary: str(args.command), detail: null };
     case "glob": {
@@ -200,25 +210,27 @@ function formatToolCallArgs(name: string, args: Record<string, unknown>): ToolCa
         const d = diffLines(str((edit as Record<string, unknown>).old_string), str((edit as Record<string, unknown>).new_string));
         if (d) detail += (detail ? "\n" : "") + d;
       }
-      return { name, summary: str(args.file_path), detail: truncate(detail) || null };
+      return { name, summary: str(args.file_path), detail: detail || null };
     }
     case "apply_patch": {
       const patch = str(args.patch);
       const file = patch.split("\n").find(l => l.startsWith("+++ b/") || l.startsWith("--- a/"))?.replace(/^(\+\+\+ b\/|--- a\/)/, "") ?? "?";
-      return { name, summary: file, detail: truncate(patch) };
+      return { name, summary: file, detail: patch || null };
     }
     case "batch": {
       const calls = Array.isArray(args.calls) ? args.calls : [];
       const summaries = calls.map((c: unknown) => {
         const call = c as Record<string, unknown>;
-        return `${call.tool}(...)`;
+        const toolArgs = call.parameters;
+        const argsStr = toolArgs ? JSON.stringify(toolArgs) : "";
+        return `${call.tool}(${argsStr})`;
       });
-      return { name, summary: `${calls.length} tool calls`, detail: truncate(summaries.join("\n")) };
+      return { name, summary: `${calls.length} tool calls`, detail: summaries.join("\n") || null };
     }
     case "task": {
       let s = str(args.description);
       if (args.subagent_type) s += `, subagent_type = ${args.subagent_type}`;
-      return { name, summary: s, detail: truncate(str(args.prompt)) };
+      return { name, summary: s, detail: str(args.prompt) || null };
     }
     case "web_search":
       return { name, summary: str(args.query), detail: null };
@@ -252,16 +264,8 @@ function str(v: unknown): string {
   return String(v);
 }
 
-function truncate(s: string, maxLines = 5): string {
-  if (!s) return s;
-  const lines = s.split("\n");
-  if (lines.length <= maxLines) return s;
-  return lines.slice(0, maxLines).join("\n") + `\n... (${lines.length - maxLines} more lines)`;
-}
-
 function diffLines(oldStr: string, newStr: string): string {
   const old = oldStr.split("\n").map(l => `- ${l}`);
   const neu = newStr.split("\n").map(l => `+ ${l}`);
-  const diff = [...old, ...neu].join("\n");
-  return truncate(diff);
+  return [...old, ...neu].join("\n");
 }

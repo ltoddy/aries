@@ -23,6 +23,7 @@ where
     P: PromptHook<M>,
 {
     inner: Agent<M, P>,
+    preamble: String,
 }
 
 impl<M, P> AriesAgent<M, P>
@@ -41,5 +42,10 @@ where
     pub async fn prompt(&mut self, prompt: &str, history: &[Message]) -> anyhow::Result<String> {
         let res = self.inner.prompt(prompt).with_history(&mut history.to_vec()).await?;
         Ok(res)
+    }
+
+    #[inline]
+    pub fn system_prompt(&self) -> &str {
+        &self.preamble
     }
 }

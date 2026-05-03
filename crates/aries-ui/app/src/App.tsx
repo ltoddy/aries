@@ -1,11 +1,13 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { Bot, Monitor, Moon, Send, Sun, User } from "lucide-react";
+import { ArrowLeft, Bot, FileText, Monitor, Moon, Send, Sun, User } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { WelcomePage } from "@/components/WelcomePage";
 
 import type { ChatMessage, ChatResponse, ChatStreamPayload, SessionBootstrap, ThemeMode } from "./types";
 import { CHAT_STREAM_EVENT, THEME_STORAGE_KEY } from "./constants";
@@ -14,16 +16,7 @@ import { renderMessage } from "./components/MessageBlocks";
 
 function App() {
   const [theme, setTheme] = useState<ThemeMode>(() => getPreferredTheme());
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [prompt, setPrompt] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const activeSessionIdRef = useRef<string | null>(null);
-  const isSubmittingRef = useRef(false);
-  const lastProcessedSeqRef = useRef(0);
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const [projectPath, setProjectPath] = useState<string | null>(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", resolveTheme(theme) === "dark");
@@ -40,6 +33,43 @@ function App() {
     media.addEventListener("change", listener);
     return () => media.removeEventListener("change", listener);
   }, [theme]);
+
+  if (!projectPath) {
+    return <WelcomePage onSelect={setProjectPath} />;
+  }
+
+  return <ChatView theme={theme} setTheme={setTheme} projectPath={projectPath} onBack={() => setProjectPath(null)} />;
+}
+
+function ChatView({
+  theme,
+  setTheme,
+  projectPath,
+  onBack,
+}: {
+  theme: ThemeMode;
+  setTheme: (t: ThemeMode | ((prev: ThemeMode) => ThemeMode)) => void;
+  projectPath: string;
+  onBack: () => void;
+}) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [prompt, setPrompt] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
+  const activeSessionIdRef = useRef<string | null>(null);
+  const isSubmittingRef = useRef(false);
+  const lastProcessedSeqRef = useRef(0);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  async function fetchSystemPrompt() {
+    try {
+      const sp = await invoke<string>("get_system_prompt");
+      setSystemPrompt(sp);
+    } catch {}
+  }
 
   useEffect(() => {
     activeSessionIdRef.current = sessionId;
@@ -69,7 +99,8 @@ function App() {
   }, []);
 
   useEffect(() => {
-    invoke<SessionBootstrap>("bootstrap_chat")
+    invoke("resize_window_for_chat").catch(() => {});
+    invoke<SessionBootstrap>("bootstrap_chat", { projectPath })
       .then((data) => { setMessages(data.messages); setSessionId(data.sessionId); })
       .catch((err) => setError(String(err)))
       .finally(() => setLoading(false));
@@ -138,6 +169,12 @@ function App() {
   }
 
   function handlePromptKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === "Enter" && event.metaKey) {
+      // Cmd+Enter inserts newline
+      event.preventDefault();
+      setPrompt((p) => p + "\n");
+      return;
+    }
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       const content = prompt.trim();
@@ -147,85 +184,112 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-background">
-      {/* Header */}
-      <header className="flex h-9 shrink-0 items-center justify-between border-b px-3">
-        <div className="flex items-center gap-1.5">
-          <Bot className="h-4 w-4" />
-          <h1 className="text-sm font-semibold">Aries</h1>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setTheme((c) => c === "system" ? "light" : c === "light" ? "dark" : "system")}
-          title={theme === "system" ? "System" : theme === "dark" ? "Dark" : "Light"}
-        >
-          {theme === "system" ? <Monitor className="h-4 w-4" /> : theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+    <div className="flex h-screen bg-background">
+      {/* Left sidebar */}
+      <aside className="flex w-12 shrink-0 flex-col items-center justify-between border-r py-2">
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onBack} title="Back to projects">
+          <ArrowLeft className="h-4 w-4" />
         </Button>
-      </header>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="px-3 py-3">
-          {!loading && messages.length === 0 && (
-            <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                <Bot className="h-6 w-6 text-muted-foreground" />
+        <div className="flex flex-col items-center gap-1">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={fetchSystemPrompt} title="System Prompt">
+                <FileText className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-h-[80vh] max-w-2xl overflow-hidden">
+              <DialogHeader>
+                <DialogTitle>System Prompt</DialogTitle>
+              </DialogHeader>
+              <div className="overflow-y-auto max-h-[65vh]">
+                <pre className="whitespace-pre-wrap text-xs leading-relaxed">{systemPrompt ?? "Loading..."}</pre>
               </div>
-              <div>
-                <h2 className="text-lg font-semibold">Start a conversation</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Ask about the current project, inspect files, run tools, or iterate on code.</p>
-              </div>
-            </div>
-          )}
+            </DialogContent>
+          </Dialog>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setTheme((c) => c === "system" ? "light" : c === "light" ? "dark" : "system")}
+            title={theme === "system" ? "System" : theme === "dark" ? "Dark" : "Light"}
+          >
+            {theme === "system" ? <Monitor className="h-4 w-4" /> : theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+          </Button>
+        </div>
+      </aside>
 
-          <div className="flex flex-col gap-2">
-            {messages.map((message, index) => {
-              const isStreamingMessage = sending && message.role === "assistant" && index === lastAssistantIndex;
-              const isUser = message.role === "user";
-              return (
-                <div key={`${message.role}-${index}`} className={`flex items-start gap-2 ${isUser ? "flex-row-reverse" : ""}`}>
-                  <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${isUser ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-                    {isUser ? <User className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
-                  </div>
-                  <Card className={`max-w-[85%] shadow-sm ${isUser ? "bg-primary text-primary-foreground" : ""}`}>
-                    <CardContent className="px-2.5 py-1.5">{renderMessage(message, isStreamingMessage)}</CardContent>
-                  </Card>
+      {/* Main content */}
+      <div className="flex flex-1 flex-col">
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-3xl px-6 py-3">
+            {!loading && messages.length === 0 && (
+              <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                  <Bot className="h-6 w-6 text-muted-foreground" />
                 </div>
-              );
-            })}
-            <div ref={messagesEndRef} />
+                <div>
+                  <h2 className="text-lg font-semibold">Start a conversation</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Ask about the current project, inspect files, run tools, or iterate on code.</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-3">
+              {messages.map((message, index) => {
+                const isStreamingMessage = sending && message.role === "assistant" && index === lastAssistantIndex;
+                const isUser = message.role === "user";
+                if (isUser) {
+                  return (
+                    <div key={`${message.role}-${index}`} className="flex items-start gap-2 flex-row-reverse">
+                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                        <User className="h-3 w-3" />
+                      </div>
+                      <Card className="max-w-[85%] shadow-sm bg-primary text-primary-foreground">
+                        <CardContent className="px-2.5 py-1.5">{renderMessage(message, false)}</CardContent>
+                      </Card>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={`${message.role}-${index}`} className="w-full">
+                    {renderMessage(message, isStreamingMessage)}
+                  </div>
+                );
+              })}
+              <div ref={messagesEndRef} />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Input */}
-      <div className="shrink-0 border-t bg-background px-3 py-2">
-        <form className="flex flex-col gap-1.5" onSubmit={handleSubmit}>
-          <div className="relative">
-            <Textarea
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              onKeyDown={handlePromptKeyDown}
-              placeholder="Ask Aries about the current project..."
-              rows={3}
-              className="resize-none pr-12"
-            />
-            <Button
-              type="submit"
-              size="icon"
-              disabled={!canSend}
-              className="absolute bottom-2 right-2 h-8 w-8"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{sending ? "Streaming..." : "Enter to send, Shift+Enter for newline"}</span>
-            {sessionId && <span className="font-mono text-[10px]">{sessionId}</span>}
-          </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
-        </form>
+        {/* Input */}
+        <div className="shrink-0 border-t bg-background py-2">
+          <form className="mx-auto flex max-w-3xl flex-col gap-1.5 px-6" onSubmit={handleSubmit}>
+            <div className="relative">
+              <Textarea
+                value={prompt}
+                onChange={(event) => setPrompt(event.target.value)}
+                onKeyDown={handlePromptKeyDown}
+                placeholder="Ask Aries about the current project..."
+                rows={3}
+                className="resize-none pr-12"
+              />
+              <Button
+                type="submit"
+                size="icon"
+                disabled={!canSend}
+                className="absolute bottom-2 right-2 h-8 w-8"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>{sending ? "Streaming..." : "Enter to send, ⌘+Enter for newline"}</span>
+              {sessionId && <span className="font-mono text-[10px]">{sessionId}</span>}
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+          </form>
+        </div>
       </div>
     </div>
   );

@@ -152,6 +152,13 @@ where
         &self.id
     }
 
+    pub fn system_prompt(&self) -> &str {
+        match &self.provider_agents {
+            ProviderAgents::OpenAICompatible { agent, .. } => agent.system_prompt(),
+            ProviderAgents::Azure { agent, .. } => agent.system_prompt(),
+        }
+    }
+
     pub fn history(&self) -> &[Message] {
         &self.history
     }

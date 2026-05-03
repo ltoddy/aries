@@ -10,12 +10,14 @@ use crate::types::{ChatMessage, ChatRequest, ChatResponse, ChatStreamPayload, Se
 
 #[tauri::command]
 pub async fn bootstrap_chat(
+    project_path: String,
     state: tauri::State<'_, SharedState>,
 ) -> Result<SessionBootstrap, String> {
     let mut guard = state.lock().await;
 
     if guard.is_none() {
-        let gctx = GlobalContext::new().map_err(|err| err.to_string())?;
+        let mut gctx = GlobalContext::new().map_err(|err| err.to_string())?;
+        gctx.current_dir = std::path::PathBuf::from(&project_path);
         let loader = AriesConfigLoader::new(&gctx.config_dir);
         let config = loader.load_or_setup().await.map_err(|err| err.to_string())?;
         let provider = config.provider().to_string();
@@ -69,6 +71,7 @@ pub async fn send_chat_message(
     let stream_session_id = session_id.clone();
     let mut answer = String::new();
     let mut seq: u64 = 0;
+    let start_time = std::time::Instant::now();
 
     session
         .prompt(
@@ -76,6 +79,7 @@ pub async fn send_chat_message(
             Some(|event: MultiTurnStreamItem<()>| {
                 let app_handle = stream_app_handle.clone();
                 let session_id = stream_session_id.clone();
+                let elapsed_ms = start_time.elapsed().as_millis();
 
                 seq += 1;
                 let current_seq = seq;
@@ -144,6 +148,18 @@ pub async fn send_chat_message(
                             }
                         },
                     },
+                    MultiTurnStreamItem::FinalResponse(ref response) => {
+                        let usage = response.usage();
+                        let delta = serde_json::json!({
+                            "total_tokens": usage.total_tokens,
+                            "input_tokens": usage.input_tokens,
+                            "output_tokens": usage.output_tokens,
+                            "cached_input_tokens": usage.cached_input_tokens,
+                            "elapsed_ms": elapsed_ms,
+                        })
+                        .to_string();
+                        emit("usage", delta)
+                    },
                     _ => Ok(()),
                 };
 
@@ -156,4 +172,18 @@ pub async fn send_chat_message(
     let content = if answer.trim().is_empty() { "Done.".to_string() } else { answer };
 
     Ok(ChatResponse { session_id, message: ChatMessage { role: "assistant".to_string(), content } })
+}
+
+#[tauri::command]
+pub async fn get_system_prompt(
+    state: tauri::State<'_, SharedState>,
+) -> Result<String, String> {
+    let guard = state.lock().await;
+    let app_state = guard.as_ref().ok_or_else(|| "chat session is not initialized".to_string())?;
+    let session_id = &app_state.active_session_id;
+    let session = app_state
+        .manager
+        .get_session(session_id)
+        .ok_or_else(|| "active session not found".to_string())?;
+    Ok(session.system_prompt().to_string())
 }

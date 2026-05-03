@@ -94,6 +94,7 @@ export function ReasoningBlock({ content, isStreaming }: { content: string; isSt
 function ToolCallPairBlock({ callContent, resultContent }: { callContent: string; resultContent: string | null }) {
   const parsed = parseToolCall(callContent);
   const [open, setOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
   const hasResult = resultContent !== null;
   const formattedResult = hasResult ? formatToolResult(parsed.name, resultContent!) : "";
   return (
@@ -104,11 +105,19 @@ function ToolCallPairBlock({ callContent, resultContent }: { callContent: string
         {parsed.summary && <span className="truncate text-muted-foreground">{parsed.summary}</span>}
       </div>
       {parsed.detail && (
-        <div className="border-t px-2 py-1.5">
-          <pre className="overflow-x-auto whitespace-pre-wrap rounded bg-muted px-2 py-1 font-mono text-[11px] leading-relaxed">
-            {parsed.detail}
-          </pre>
-        </div>
+        <Collapsible open={detailOpen} onOpenChange={setDetailOpen} className="border-t">
+          <CollapsibleTrigger className="flex h-6 w-full items-center justify-between px-2 text-left text-[11px] text-muted-foreground hover:bg-accent">
+            <span>Detail</span>
+            <ChevronRight className={`h-3 w-3 transition-transform ${detailOpen ? "rotate-90" : "rotate-0"}`} />
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="border-t px-2 py-1.5">
+              <pre className="overflow-x-auto whitespace-pre-wrap rounded bg-muted px-2 py-1 font-mono text-[11px] leading-relaxed">
+                {parsed.detail}
+              </pre>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       )}
       {hasResult && (
         <Collapsible open={open} onOpenChange={setOpen} className="border-t">
@@ -165,5 +174,24 @@ export function renderMessage(message: ChatMessage, isStreaming: boolean) {
     }
   }
 
-  return <div className="space-y-2">{elements}</div>;
+  const usage = message.usage;
+
+  return (
+    <div className="space-y-2">
+      {elements}
+      {usage && (
+        <div className="flex items-center gap-2 pt-3 text-[11px] text-muted-foreground/70">
+          <div className="h-px flex-1 bg-border" />
+          <span className="shrink-0">
+            tokens: {usage.total_tokens.toLocaleString()} (in {usage.input_tokens.toLocaleString()}{usage.cached_input_tokens > 0 ? `, cached ${usage.cached_input_tokens.toLocaleString()}` : ""}, out {usage.output_tokens.toLocaleString()})
+            {" · "}
+            {usage.elapsed_ms >= 1000
+              ? `${(usage.elapsed_ms / 1000).toFixed(2)}s`
+              : `${usage.elapsed_ms}ms`}
+          </span>
+          <div className="h-px flex-1 bg-border" />
+        </div>
+      )}
+    </div>
+  );
 }
