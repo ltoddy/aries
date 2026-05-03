@@ -33,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut session = Session::new(
         String::from("main"),
-        &gctx,
+        gctx.clone(),
         app_config.clone(),
         hook::DisplayPromptHook::new(Theme::default()),
     )

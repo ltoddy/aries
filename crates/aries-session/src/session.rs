@@ -1,6 +1,6 @@
 use std::future::Future;
-use std::hash::{DefaultHasher, Hash, Hasher};
-use std::path::PathBuf;
+use std::io;
+use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 use aries_config::AriesConfig;
@@ -13,21 +13,24 @@ use rig::agent::{FinalResponse, MultiTurnStreamItem, PromptHook};
 use rig::completion::Message;
 use rig::providers::{azure, openai};
 use rig::streaming::StreamedAssistantContent;
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::fs::create_dir_all;
+use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
+use tracing::error;
 
 pub struct Session<P = ()>
 where
     P: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel>,
 {
     id: String,
-    provider_agents: ProviderAgents<P>,
-    task_notifications: NotificationReceiver,
-    _lsp_client: Option<SharedLspClient>,
+    agents: ProviderAgents<P>,
+    notifications_rx: NotificationReceiver,
+    #[allow(unused)]
+    lsp_client: Option<SharedLspClient>,
     history: Vec<Message>,
     history_tx: UnboundedSender<Vec<Message>>,
     transcript_dir: PathBuf,
-
-    dir: PathBuf, // session 的数据存放的目录
+    root: PathBuf, // session 的数据存放的目录
+    gctx: GlobalContext,
 }
 
 enum ProviderAgents<P = ()>
@@ -46,110 +49,95 @@ where
 
 impl<P> Session<P>
 where
-    P: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel> + Clone + 'static,
+    P: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel> + 'static,
 {
     pub async fn new(
         id: String,
-        gctx: &GlobalContext,
+        gctx: GlobalContext,
         config: AriesConfig,
-        task_hook: P,
+        hook: P,
     ) -> anyhow::Result<Self> {
-        let mut history = Vec::new();
-        let transcript_dir = gctx.config_dir.join("transcripts");
-        let mut lsp_client: Option<SharedLspClient> = None;
+        let (root, transcript_dir) = Self::setup_directories(&gctx.config_dir, &id).await;
 
-        if let Some(info) = LspServerInfo::detect(&gctx.current_dir)
-            && info.installed()
-            && let Ok(lsp) = warm_up(info, &gctx.current_dir).await
-        {
-            lsp_client = Some(lsp);
-        }
+        let lsp_client = Self::warm_up_lsp(&gctx.current_dir).await;
+        let history = Self::load_chat_history(&root).await;
+        let history_tx = Self::spawn_refresh_history(root.join("chat-history.jsonl"));
 
-        let dir = gctx.config_dir.join(format!("session-{:x}", {
-            let mut hasher = DefaultHasher::new();
-            gctx.current_dir.hash(&mut hasher);
-            hasher.finish()
-        }));
+        let (agents, notifications_rx) =
+            Self::create_agents(&gctx, config, lsp_client.clone(), hook).await?;
 
-        if !dir.exists()
-            && let Err(err) = tokio::fs::create_dir_all(&dir).await
-        {
-            eprintln!("Failed to create session directory: {err}");
-        };
-
-        let history_file_path = dir.join("chat-history.jsonl");
-        if let Ok(prior) = crate::history::load_history(&history_file_path).await {
-            history.extend_from_slice(&prior);
-        }
-
-        let (provider_agents, task_notifications) = match config.clone() {
-            AriesConfig::OpenAICompatible(ref conf) => {
-                let client = openai::CompletionsClient::builder()
-                    .base_url(&conf.base_url)
-                    .api_key(&conf.api_key)
-                    .build()
-                    .with_context(|| "Failed to create llm client")?;
-
-                let (spawner, task_notifications) = TaskSpawner::new();
-                let agent = AgentBuilder::new(
-                    client.clone(),
-                    config.clone(),
-                    AgentType::Build,
-                    task_hook,
-                    gctx.clone(),
-                )
-                .with_tools(spawner, lsp_client.clone())
-                .await;
-                let compaction_agent = CompactionAgent::new(client, config.model());
-                (ProviderAgents::OpenAICompatible { agent, compaction_agent }, task_notifications)
-            },
-            AriesConfig::Azure(ref conf) => {
-                let client = azure::Client::builder()
-                    .api_key(&conf.api_key)
-                    .azure_endpoint(conf.azure_endpoint.to_owned())
-                    .api_version(&conf.api_version)
-                    .build()
-                    .with_context(|| "Failed to create llm client")?;
-
-                let (spawner, task_notifications) = TaskSpawner::new();
-                let agent = AgentBuilder::new(
-                    client.clone(),
-                    config.clone(),
-                    AgentType::Build,
-                    task_hook,
-                    gctx.clone(),
-                )
-                .with_tools(spawner, lsp_client.clone())
-                .await;
-                let compaction_agent = CompactionAgent::new(client, config.model());
-                (ProviderAgents::Azure { agent, compaction_agent }, task_notifications)
-            },
-        };
-
-        let (history_tx, history_rx) = tokio::sync::mpsc::unbounded_channel::<Vec<Message>>();
-        tokio::spawn(crate::history::refresh_history(history_rx, history_file_path));
-
-        Ok(Self {
+        let s = Self {
             id,
-            provider_agents,
-            task_notifications,
-            _lsp_client: lsp_client,
+            agents,
+            notifications_rx,
+            lsp_client,
             history,
             history_tx,
             transcript_dir,
-            dir,
+            root,
+            gctx,
+        };
+        s.save_current_dir().await;
+
+        Ok(s)
+    }
+}
+
+impl<P> Session<P>
+where
+    P: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel> + 'static,
+{
+    pub async fn load(
+        id: String,
+        root: impl AsRef<Path>,
+        config: AriesConfig,
+        hook: P,
+    ) -> anyhow::Result<Self> {
+        let root = root.as_ref();
+
+        let current_dir = Self::load_current_dir(root).await?;
+        let gctx = GlobalContext::with_current_dir(current_dir)?;
+
+        let lsp_client = Self::warm_up_lsp(&gctx.current_dir).await;
+        let history = Self::load_chat_history(&root).await;
+        let history_tx = Self::spawn_refresh_history(root.join("chat-history.jsonl"));
+
+        let (agents, notifications_rx) =
+            Self::create_agents(&gctx, config, lsp_client.clone(), hook).await?;
+
+        Ok(Self {
+            id,
+            agents,
+            notifications_rx,
+            lsp_client,
+            history,
+            history_tx,
+            transcript_dir: root.join("transcripts"),
+            root: root.to_path_buf(),
+            gctx,
         })
     }
+}
+
+impl<P> Session<P>
+where
+    P: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel> + 'static,
+{
+    pub const PREFIX: &str = "session-";
 
     pub fn id(&self) -> &str {
         &self.id
     }
 
     pub fn system_prompt(&self) -> &str {
-        match &self.provider_agents {
+        match &self.agents {
             ProviderAgents::OpenAICompatible { agent, .. } => agent.system_prompt(),
             ProviderAgents::Azure { agent, .. } => agent.system_prompt(),
         }
+    }
+
+    pub fn current_dir(&self) -> PathBuf {
+        self.gctx.current_dir.clone()
     }
 
     pub fn history(&self) -> &[Message] {
@@ -157,11 +145,12 @@ where
     }
 
     pub fn clear_history(&mut self) {
-        let _ = self.history_tx.send(vec![]);
+        self.history = vec![];
+        let _ = self.history_tx.send(self.history.clone());
     }
 
     pub fn dir(&self) -> PathBuf {
-        self.dir.clone()
+        self.root.clone()
     }
 
     pub async fn prompt<F, Fut>(&mut self, prompt: &str, mut cb: Option<F>) -> anyhow::Result<()>
@@ -171,7 +160,7 @@ where
     {
         self.drain_task_notifications();
 
-        let stream = match &mut self.provider_agents {
+        let stream = match &mut self.agents {
             ProviderAgents::OpenAICompatible { agent, compaction_agent } => {
                 CompactionAgent::<openai::CompletionModel>::micro_compact(&mut self.history);
                 if let Some(compressed) =
@@ -217,7 +206,7 @@ where
     }
 
     pub async fn compact(&mut self) -> anyhow::Result<()> {
-        let compressed = match &mut self.provider_agents {
+        let compressed = match &mut self.agents {
             ProviderAgents::OpenAICompatible { compaction_agent, .. } => {
                 compaction_agent.force_compact(&self.history, &self.transcript_dir).await?
             },
@@ -231,8 +220,124 @@ where
         Ok(())
     }
 
+    async fn create_agents(
+        gctx: &GlobalContext,
+        config: AriesConfig,
+        lsp_client: Option<SharedLspClient>,
+        hook: P,
+    ) -> anyhow::Result<(ProviderAgents<P>, NotificationReceiver)> {
+        let (agents, notifications_rx) = match config.clone() {
+            AriesConfig::OpenAICompatible(ref conf) => {
+                let client = openai::CompletionsClient::builder()
+                    .base_url(&conf.base_url)
+                    .api_key(&conf.api_key)
+                    .build()
+                    .with_context(|| "Failed to create llm client")?;
+
+                let (spawner, notifications_rx) = TaskSpawner::new();
+                let agent = AgentBuilder::new(
+                    client.clone(),
+                    config.clone(),
+                    AgentType::Build,
+                    hook,
+                    gctx.clone(),
+                )
+                .with_tools(spawner, lsp_client)
+                .await;
+                let compaction_agent = CompactionAgent::new(client, config.model());
+                (ProviderAgents::OpenAICompatible { agent, compaction_agent }, notifications_rx)
+            },
+            AriesConfig::Azure(ref conf) => {
+                let client = azure::Client::builder()
+                    .api_key(&conf.api_key)
+                    .azure_endpoint(conf.azure_endpoint.to_owned())
+                    .api_version(&conf.api_version)
+                    .build()
+                    .with_context(|| "Failed to create llm client")?;
+
+                let (spawner, notifications_rx) = TaskSpawner::new();
+                let agent = AgentBuilder::new(
+                    client.clone(),
+                    config.clone(),
+                    AgentType::Build,
+                    hook,
+                    gctx.clone(),
+                )
+                .with_tools(spawner, lsp_client)
+                .await;
+                let compaction_agent = CompactionAgent::new(client, config.model());
+                (ProviderAgents::Azure { agent, compaction_agent }, notifications_rx)
+            },
+        };
+
+        Ok((agents, notifications_rx))
+    }
+
+    async fn save_current_dir(&self) {
+        let file_path = self.root.join("current_dir");
+
+        if let Err(err) =
+            tokio::fs::write(&file_path, self.gctx.current_dir.display().to_string()).await
+        {
+            error!("failed to save current directory: {err}")
+        }
+    }
+
+    async fn load_current_dir(dir: impl AsRef<Path>) -> io::Result<PathBuf> {
+        let dir = dir.as_ref();
+        let file_path = dir.join("current_dir");
+
+        let current_dir =
+            tokio::fs::read_to_string(&file_path).await.map(|path| PathBuf::from(path.trim()))?;
+        Ok(current_dir)
+    }
+
+    async fn setup_directories(root: impl AsRef<Path>, id: &str) -> (PathBuf, PathBuf) {
+        let root = root.as_ref();
+
+        let dir = root.join(format!("{}{}", Self::PREFIX, id));
+        if !dir.exists()
+            && let Err(err) = create_dir_all(&dir).await
+        {
+            error!("Failed to create session directory: {err}");
+        };
+
+        let transcript_dir = dir.join("transcripts");
+        if !transcript_dir.exists()
+            && let Err(err) = create_dir_all(&transcript_dir).await
+        {
+            error!("Failed to create session transcript directory: {err}");
+        }
+
+        (dir, transcript_dir)
+    }
+
+    async fn load_chat_history(root: impl AsRef<Path>) -> Vec<Message> {
+        let file_path = root.as_ref().join("chat-history.jsonl");
+        crate::history::load_history(file_path).await.unwrap_or_default()
+    }
+
+    async fn warm_up_lsp(dir: impl AsRef<Path>) -> Option<SharedLspClient> {
+        let dir = dir.as_ref();
+
+        if let Some(info) = LspServerInfo::detect(dir)
+            && info.installed()
+            && let Ok(lsp) = warm_up(info, dir).await
+        {
+            return Some(lsp);
+        }
+
+        None
+    }
+
+    fn spawn_refresh_history(file_path: PathBuf) -> UnboundedSender<Vec<Message>> {
+        let (history_tx, history_rx) = unbounded_channel::<Vec<Message>>();
+        tokio::spawn(crate::history::refresh_history(history_rx, file_path));
+        history_tx
+    }
+
     fn drain_task_notifications(&mut self) {
-        let notifications = self.task_notifications.drain();
+        let notifications = self.notifications_rx.drain();
         if notifications.is_empty() {
             return;
         }

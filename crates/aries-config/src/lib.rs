@@ -63,8 +63,8 @@ pub struct AriesConfigLoader {
 impl AriesConfigLoader {
     const FILE_NAME: &str = "config.yaml";
 
-    pub fn new(config_dir: &Path) -> Self {
-        let file_path = config_dir.join(Self::FILE_NAME);
+    pub fn new(config_dir: impl AsRef<Path>) -> Self {
+        let file_path = config_dir.as_ref().join(Self::FILE_NAME);
 
         Self { file_path }
     }

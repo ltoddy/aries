@@ -12,3 +12,4 @@ futures.workspace = true
 nanoid.workspace = true
 rig-core.workspace = true
 tokio = { workspace = true, features = ["sync"] }
+tracing.workspace = true
