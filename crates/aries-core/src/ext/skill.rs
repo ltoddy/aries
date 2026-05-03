@@ -4,7 +4,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use aries_context::GlobalContext;
-use futures::stream::{self, StreamExt, TryStreamExt};
+use futures::stream::{self, StreamExt};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -26,12 +26,14 @@ impl SkillFilesLoader {
     pub async fn load(self) -> anyhow::Result<Vec<SkillInfo>> {
         let entries = walk_dirs(&self.roots, true, true)?;
 
-        stream::iter(entries.into_iter().filter(|entry| entry.is_dir()))
-            .map(|entry| entry.join(Self::FILENAME))
-            .then(SkillInfo::parse)
-            .try_collect()
-            .await
-            .map_err(Into::into)
+        let skills = stream::iter(entries.into_iter().filter(|entry| entry.is_dir()))
+            .filter_map(
+                |entry| async move { SkillInfo::parse(entry.join(Self::FILENAME)).await.ok() },
+            )
+            .collect()
+            .await;
+
+        Ok(skills)
     }
 }
 
