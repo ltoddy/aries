@@ -1,15 +1,109 @@
+pub mod compaction;
+pub mod summary;
+pub mod title;
+
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
-use rig::agent::PromptHook;
+use rig::agent::{Agent, PromptHook, StreamingResult};
 use rig::client::CompletionClient;
 use rig::completion;
+use rig::completion::{Message, Prompt};
+use rig::streaming::StreamingPrompt;
 use rig::tool::ToolDyn;
 
-use crate::agent_type::AgentType;
+pub use self::compaction::CompactionAgent;
+pub use self::summary::SummaryAgent;
+pub use self::title::TitleAgent;
 use crate::ext::skill::{SkillFilesLoader, SkillInfo};
 use crate::language_server::SharedLspClient;
 use crate::task_spawner::TaskSpawner;
-use crate::{AGENT_LOOP_MAX_TURNS, AriesAgent, tools};
+use crate::tools;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AgentType {
+    Build,
+    Plan,
+    General,
+    Explore,
+}
+
+impl AgentType {
+    pub const fn bare_preamble(self) -> &'static str {
+        match self {
+            Self::Build => include_str!("prompts/build.txt"),
+            Self::Plan => include_str!("prompts/plan.txt"),
+            Self::General => include_str!("prompts/generate.txt"),
+            Self::Explore => include_str!("prompts/explore.txt"),
+        }
+    }
+
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Build => "Builder",
+            Self::Plan => "Planner",
+            Self::General => "Assistant",
+            Self::Explore => "Explorer",
+        }
+    }
+
+    pub const fn description(self) -> &'static str {
+        match self {
+            Self::Build => "默认主智能体。直接使用工具执行任务，并在需要时委托子智能体。",
+            Self::Plan => "计划模式。不允许使用所有编辑工具。",
+            Self::General => {
+                "用于研究复杂问题和执行多步任务的通用智能体。使用此智能体并行执行多个工作单元。"
+            },
+            Self::Explore => {
+                "专门用于探索代码库的快速智能体。当您需要通过模式快速查找文件、搜索关键字或回答有关代码库的问题时使用。"
+            },
+        }
+    }
+}
+
+pub const AGENT_LOOP_MAX_TURNS: usize = 200;
+
+pub struct AriesAgent<M, P = ()>
+where
+    M: completion::CompletionModel,
+    P: PromptHook<M>,
+{
+    inner: Agent<M, P>,
+    preamble: String,
+}
+
+impl<M, P> AriesAgent<M, P>
+where
+    M: completion::CompletionModel,
+    P: PromptHook<M>,
+{
+    pub fn new(inner: Agent<M, P>, preamble: String) -> Self {
+        Self { inner, preamble }
+    }
+}
+
+impl<M, P> AriesAgent<M, P>
+where
+    M: completion::CompletionModel + 'static,
+    P: PromptHook<M> + 'static,
+{
+    pub async fn stream_prompt(
+        &mut self,
+        prompt: &str,
+        history: &[Message],
+    ) -> StreamingResult<<M>::StreamingResponse> {
+        self.inner.stream_prompt(prompt).with_history(history.to_vec()).await
+    }
+
+    pub async fn prompt(&mut self, prompt: &str, history: &[Message]) -> anyhow::Result<String> {
+        let res = self.inner.prompt(prompt).with_history(history.to_vec()).await?;
+        Ok(res)
+    }
+
+    #[inline]
+    pub fn system_prompt(&self) -> &str {
+        &self.preamble
+    }
+}
 
 pub struct AgentBuilder<C, P>
 where
@@ -161,7 +255,6 @@ where
                 Box::new(tools::ls::LsTool::new(gctx.clone())),
                 Box::new(tools::codesearch::CodeSearchTool),
             ],
-            _ => vec![],
         }
     }
 }

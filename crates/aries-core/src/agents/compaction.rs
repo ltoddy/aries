@@ -7,7 +7,7 @@ use rig::message::{AssistantContent, ReasoningContent, ToolResultContent, UserCo
 use rig::one_or_many::OneOrMany;
 use rig::{completion, message};
 
-use crate::{AGENT_LOOP_MAX_TURNS, AriesAgent};
+use crate::agents::{AGENT_LOOP_MAX_TURNS, AriesAgent};
 
 const KEEP_RECENT_TOOL_RESULTS: usize = 3;
 

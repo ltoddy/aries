@@ -7,8 +7,7 @@ use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 
-use crate::AgentBuilder;
-use crate::agent_type::AgentType;
+use crate::agents::{AgentBuilder, AgentType};
 
 pub const NAME: &str = "task";
 
