@@ -2,19 +2,19 @@ default_toolchain := "stable"
 nightly_toolchain := "nightly"
 
 install:
-    @cargo +{{default_toolchain}} install --path crates/aries
+    @cargo install --path crates/aries
 
 build:
-    @cargo +{{default_toolchain}} build
+    @cargo build --all
 
 check:
-    @cargo +{{default_toolchain}} check
+    @cargo check --all
 
 test:
-    @cargo +{{default_toolchain}} test
+    @cargo test
 
 clippy:
-    @cargo +{{default_toolchain}} clippy
+    @cargo clippy
 
 fmt:
     @cargo +{{nightly_toolchain}} fmt
@@ -23,7 +23,27 @@ fmt-check:
     @cargo +{{nightly_toolchain}} fmt -- --check
 
 fix:
-    @cargo +{{default_toolchain}} clippy --fix --allow-dirty --all
+    @cargo clippy --fix --allow-dirty --all
     @cargo +{{nightly_toolchain}} fmt
 
 lint: fmt-check clippy
+
+ui-install:
+    @cd crates/aries-ui/app && npm install
+
+ui-dev:
+    @cd crates/aries-ui/app && npm run dev
+
+ui-build:
+    @cd crates/aries-ui/app && npm run build
+
+ui-tauri-dev:
+    @cd crates/aries-ui && cargo tauri dev
+
+ui-tauri-build:
+    @cd crates/aries-ui/app && npm run build
+    @cd crates/aries-ui && cargo tauri build
+
+ui-macos-package:
+    @cd crates/aries-ui/app && npm run build
+    @cd crates/aries-ui && cargo tauri build --bundles app,dmg
