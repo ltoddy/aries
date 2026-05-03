@@ -27,7 +27,7 @@ where
     history_tx: UnboundedSender<Vec<Message>>,
     transcript_dir: PathBuf,
 
-    _dir: PathBuf, // session 的数据存放的目录
+    dir: PathBuf, // session 的数据存放的目录
 }
 
 enum ProviderAgents<P = ()>
@@ -63,7 +63,6 @@ where
             && let Ok(lsp) = warm_up(info, &gctx.current_dir).await
         {
             lsp_client = Some(lsp);
-            history.push(Message::user("已检测到本项目适用的语言服务器，现已启动并开始预热。进行代码定义跳转、引用查找、符号查询或调用层级等语义级检索时，请优先使用 `lsp` 工具以获得更准确的结果。若首次调用时 `lsp` 尚未就绪（语言服务器可能仍在索引工作区），可稍后重试，或临时改用 `codesearch`、`grep`。"));
         }
 
         let dir = gctx.config_dir.join(format!("session-{:x}", {
@@ -138,7 +137,7 @@ where
             history,
             history_tx,
             transcript_dir,
-            _dir: dir,
+            dir,
         })
     }
 
@@ -159,6 +158,10 @@ where
 
     pub fn clear_history(&mut self) {
         let _ = self.history_tx.send(vec![]);
+    }
+
+    pub fn dir(&self) -> PathBuf {
+        self.dir.clone()
     }
 
     pub async fn prompt<F, Fut>(&mut self, prompt: &str, mut cb: Option<F>) -> anyhow::Result<()>
@@ -206,8 +209,8 @@ where
         }
 
         if let Some(his) = final_res.history() {
-            self.history = his.to_vec();
-            let _ = self.history_tx.send(his.to_vec());
+            self.history.extend_from_slice(his);
+            let _ = self.history_tx.send(self.history.clone());
         }
 
         Ok(())
