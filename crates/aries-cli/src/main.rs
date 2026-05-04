@@ -1,8 +1,10 @@
-mod args;
+mod acp;
+mod cli;
 mod commands;
 mod display;
 mod hook;
 mod input;
+mod logger;
 mod theme;
 mod welcome;
 
@@ -20,27 +22,26 @@ use crate::theme::Theme;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let gctx = GlobalContext::new()?;
-
-    let loader = AriesConfigLoader::new(&gctx.config_dir);
-    let app_config = loader.load_or_setup().await?;
-
-    let args = args::Args::parse();
+    let args = cli::Args::parse();
 
     match args.command {
-        Some(args::Subcommands::Acp) => return aries_acp::run(gctx, app_config).await,
-        None => {},
-    };
+        Some(cli::Subcommands::Init { command }) => {
+            return cli::init::execute(gctx, command).await;
+        },
+        Some(cli::Subcommands::Setup) => return cli::setup::execute(gctx).await,
+        Some(cli::Subcommands::Acp) => return cli::acp::execute(gctx).await,
+        _ => {},
+    }
 
-    let mut session = Session::new(
-        String::from("main"),
-        gctx.clone(),
-        app_config.clone(),
-        hook::DisplayPromptHook::new(Theme::default()),
-    )
-    .await?;
+    let loader = AriesConfigLoader::new(&gctx.config_dir);
+    let config = loader.load_or_setup().await?;
 
-    let mut reader = input::InputReader::new(&gctx.config_dir)?;
-    welcome::welcome(app_config.provider(), app_config.model(), &gctx);
+    let h = hook::DisplayPromptHook::new(Theme::default());
+    let mut session = Session::new("main".to_owned(), gctx.clone(), config.clone(), h).await?;
+    let _guard = logger::init(session.dir());
+
+    let mut reader = input::InputReader::new(session.dir())?;
+    welcome::welcome(config.provider(), config.model(), &gctx);
 
     loop {
         let theme = Theme::default();
@@ -64,20 +65,21 @@ async fn main() -> anyhow::Result<()> {
                     continue;
                 }
 
-                let elapsed = start.elapsed();
-                let terminal_width = terminal_size().map(|(Width(w), _)| w as usize).unwrap_or(80);
-
-                let prefix = "─".repeat(5);
-                let time = format!("⏱️  耗时: {:.2}s", elapsed.as_secs_f64());
-                let remining_width = terminal_width.saturating_sub(prefix.len() + time.len());
-                let line = format!("{}{}{}", "─".repeat(5), time, "─".repeat(remining_width));
-                println!("{}\n", theme.dimmed(&line));
+                display_elapsed(start, &theme);
             },
             Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => commands::exit::exit(),
-            Err(err) => {
-                eprintln!("Error: {:?}", err);
-                continue;
-            },
+            Err(err) => eprintln!("Error: {:?}", err),
         }
     }
+}
+
+fn display_elapsed(start: Instant, theme: &Theme) {
+    let elapsed = start.elapsed();
+    let terminal_width = terminal_size().map(|(Width(w), _)| w as usize).unwrap_or(80);
+
+    let prefix = "─".repeat(5);
+    let time = format!("⏱️  耗时: {:.2}s", elapsed.as_secs_f64());
+    let remining_width = terminal_width.saturating_sub(prefix.len() + time.len());
+    let line = format!("{}{}{}", "─".repeat(5), time, "─".repeat(remining_width));
+    println!("{}\n", theme.dimmed(&line));
 }

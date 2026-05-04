@@ -4,8 +4,8 @@ use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{EnvFilter, fmt};
 
-pub fn init(dir: &Path) -> WorkerGuard {
-    let log_dir = dir.join("logs");
+pub fn init(dir: impl AsRef<Path>) -> WorkerGuard {
+    let log_dir = dir.as_ref().join("logs");
     let file_appender = tracing_appender::rolling::Builder::new()
         .rotation(tracing_appender::rolling::Rotation::DAILY)
         .filename_prefix("aries.log")

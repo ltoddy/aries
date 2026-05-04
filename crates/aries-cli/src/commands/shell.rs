@@ -4,12 +4,10 @@ use tokio::process::Command;
 
 use crate::theme::Theme;
 
-pub const NAME: &str = "/shell";
-
 pub async fn execute(command: &str, theme: &Theme) {
     let command = command.trim();
     if command.is_empty() {
-        eprintln!("{}", theme.red_text(&format!("No command provided after {NAME}")));
+        eprintln!("{}", theme.red_text("No command provided after /shell"));
         return;
     }
 

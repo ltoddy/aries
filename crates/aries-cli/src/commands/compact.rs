@@ -4,8 +4,6 @@ use rig::providers::{azure, openai};
 
 use crate::theme::Theme;
 
-pub const NAME: &str = "/compact";
-
 pub async fn execute<P>(session: &mut Session<P>, theme: &Theme)
 where
     P: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel> + 'static,

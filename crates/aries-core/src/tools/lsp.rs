@@ -78,7 +78,7 @@ impl LspTool {
 
     fn extract_position_args(
         args: &LspArgs,
-        project_dir: &Path,
+        project_dir: impl AsRef<Path>,
     ) -> Result<(PathBuf, u32, u32), LspError> {
         let LspArgs { file_path, line, character, operation, .. } = args;
 
@@ -87,7 +87,7 @@ impl LspTool {
                 let file_path = if file_path.is_absolute() {
                     file_path.clone()
                 } else {
-                    project_dir.join(file_path)
+                    project_dir.as_ref().join(file_path)
                 };
 
                 Ok((file_path, *line, *character))

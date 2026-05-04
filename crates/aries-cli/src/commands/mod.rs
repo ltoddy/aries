@@ -1,12 +1,11 @@
 use aries_context::GlobalContext;
 use aries_session::Session;
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 use rig::agent::PromptHook;
 use rig::providers::{azure, openai};
 
 use crate::theme::Theme;
 
-pub mod clear_history;
 pub mod compact;
 pub mod completer;
 pub mod exit;
@@ -15,7 +14,7 @@ pub mod setup;
 pub mod shell;
 
 #[derive(Parser)]
-#[command(name = "aries")]
+#[command(name = "aries", override_usage = "")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -27,7 +26,6 @@ pub enum Command {
     Exit,
     /// Run a shell command
     Shell {
-        /// The command to execute
         #[arg(trailing_var_arg = true)]
         command: Vec<String>,
     },
@@ -42,15 +40,16 @@ pub enum Command {
 }
 
 impl Command {
-    pub fn names() -> &'static [(&'static str, &'static str)] {
-        &[
-            ("exit", "Exit Aries"),
-            ("shell", "Run a shell command"),
-            ("setup", "Open configuration setup"),
-            ("save-history", "Save chat history to file"),
-            ("clear-history", "Clear chat history"),
-            ("compact", "Force compact conversation context"),
-        ]
+    /// Returns all subcommands with their `/`-prefixed names and descriptions.
+    pub fn all() -> Vec<(String, String)> {
+        Cli::command()
+            .get_subcommands()
+            .map(|sub| {
+                let name = format!("/{}", sub.get_name());
+                let about = sub.get_about().map(|s| s.to_string()).unwrap_or_default();
+                (name, about)
+            })
+            .collect()
     }
 }
 

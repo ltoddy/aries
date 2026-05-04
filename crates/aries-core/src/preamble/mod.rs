@@ -14,7 +14,7 @@ pub async fn render(
     available_skills: &[SkillInfo],
 ) -> String {
     match agent_type {
-        AgentType::Build | AgentType::General | AgentType::Plan => {
+        AgentType::Build | AgentType::General => {
             let mut preamble = agent_type.bare_preamble().to_string();
 
             preamble.push('\n');

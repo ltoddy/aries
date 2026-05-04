@@ -1,8 +1,6 @@
 use anyhow::Result;
-use aries_config::AriesConfig;
 use aries_context::GlobalContext;
 use futures::future::join_all;
-use rig::client::CompletionClient;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
@@ -18,7 +16,6 @@ use crate::tools::ls::LsTool;
 use crate::tools::multiedit::MultiEditTool;
 use crate::tools::question::QuestionTool;
 use crate::tools::read::ReadFileTool;
-use crate::tools::task::TaskTool;
 use crate::tools::webfetch::WebFetchTool;
 use crate::tools::websearch::WebSearchTool;
 use crate::tools::write::WriteFileTool;
@@ -51,28 +48,17 @@ pub enum BatchError {
     ExecutionError(String),
 }
 
-pub struct BatchTool<C>
-where
-    C: CompletionClient,
-{
-    client: C,
-    config: AriesConfig,
+pub struct BatchTool {
     gctx: GlobalContext,
 }
 
-impl<C> BatchTool<C>
-where
-    C: CompletionClient,
-{
-    pub fn new(client: C, config: AriesConfig, gctx: GlobalContext) -> Self {
-        Self { client, config, gctx }
+impl BatchTool {
+    pub fn new(gctx: GlobalContext) -> Self {
+        Self { gctx }
     }
 }
 
-impl<C> Tool for BatchTool<C>
-where
-    C: CompletionClient + Clone + Send + Sync + 'static,
-{
+impl Tool for BatchTool {
     const NAME: &'static str = NAME;
     type Error = BatchError;
     type Args = BatchArgs;
@@ -185,19 +171,7 @@ where
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
                 } else if tool_name == task::NAME {
-                    let parsed_args =
-                        serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
-                    Tool::call(
-                        &TaskTool::<C>::new(
-                            self.client.clone(),
-                            self.config.clone(),
-                            self.gctx.clone(),
-                        ),
-                        parsed_args,
-                    )
-                    .await
-                    .map(|res| serde_json::to_value(res).unwrap())
-                    .map_err(|e| e.to_string())
+                    Err("TaskTool is not allowed in batch".to_string())
                 } else if tool_name == webfetch::NAME {
                     let parsed_args =
                         serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;

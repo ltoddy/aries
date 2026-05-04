@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "crates/aries-acp",
     "crates/aries-cli",
     "crates/aries-config",
     "crates/aries-context",

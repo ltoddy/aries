@@ -3,8 +3,6 @@ use rig::completion::Message;
 
 use crate::theme::Theme;
 
-pub const NAME: &str = "/save-history";
-
 pub async fn execute(history: &[Message], theme: &Theme) {
     match jsonl::write("chat-history.jsonl", history).await {
         Ok(_) => println!("{}", theme.green_text("Chat history saved to chat-history.jsonl")),

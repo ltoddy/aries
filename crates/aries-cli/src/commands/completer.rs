@@ -5,7 +5,7 @@ use rustyline::hint::HistoryHinter;
 use rustyline::{Context, Result};
 use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
 
-use crate::commands::{clear_history, compact, exit, save_history, setup, shell};
+use super::Command;
 
 #[derive(Helper, Highlighter, Hinter, Validator)]
 pub struct CommandCompleter {
@@ -33,18 +33,10 @@ impl Completer for CommandCompleter {
     }
 }
 
-const COMMANDS: &[(&str, &str)] = &[
-    (exit::NAME, "Exit Aries"),
-    (shell::NAME, "Run a shell command"),
-    (setup::NAME, "Open configuration setup"),
-    (save_history::NAME, "Save chat history to file"),
-    (clear_history::NAME, "Clear chat history"),
-    (compact::NAME, "Force compact conversation context"),
-];
-
 pub fn show(prefix: &str) -> Option<String> {
-    let filtered: Vec<(&str, &str)> =
-        COMMANDS.iter().filter(|(cmd, _)| cmd.starts_with(prefix)).copied().collect();
+    let commands = Command::all();
+    let filtered: Vec<(String, String)> =
+        commands.into_iter().filter(|(cmd, _)| cmd.starts_with(prefix)).collect();
 
     if filtered.is_empty() {
         return None;
@@ -60,5 +52,5 @@ pub fn show(prefix: &str) -> Option<String> {
         .ok()
         .flatten()?;
 
-    Some(filtered[selection].0.to_string())
+    Some(filtered[selection].0.clone())
 }

@@ -104,31 +104,31 @@ where
     pub async fn auto_compact(
         &mut self,
         messages: &[Message],
-        transcript_dir: &Path,
+        transcript_dir: impl AsRef<Path>,
     ) -> anyhow::Result<Option<Vec<Message>>> {
         if !estimate_tokens_exceeds(messages, Self::TOKEN_THRESHOLD) {
             return Ok(None);
         }
 
-        self.compact_inner(messages, transcript_dir).await
+        self.compact_inner(messages, transcript_dir.as_ref()).await
     }
 
     pub async fn force_compact(
         &mut self,
         messages: &[Message],
-        transcript_dir: &Path,
+        transcript_dir: impl AsRef<Path>,
     ) -> anyhow::Result<Option<Vec<Message>>> {
-        self.compact_inner(messages, transcript_dir).await
+        self.compact_inner(messages, transcript_dir.as_ref()).await
     }
 
     async fn compact_inner(
         &mut self,
         messages: &[Message],
-        transcript_dir: &Path,
+        transcript_dir: impl AsRef<Path>,
     ) -> anyhow::Result<Option<Vec<Message>>> {
         println!("\n🔄 触发上下文压缩...");
 
-        save_transcript(messages, transcript_dir).await?;
+        save_transcript(messages, transcript_dir.as_ref()).await?;
 
         let compacted = compress(messages);
         let summary = self.inner.prompt(&compacted, &[]).await?;
@@ -160,7 +160,11 @@ fn build_tool_name_map(messages: &[Message]) -> HashMap<String, String> {
     map
 }
 
-async fn save_transcript(messages: &[Message], transcript_dir: &Path) -> anyhow::Result<()> {
+async fn save_transcript(
+    messages: &[Message],
+    transcript_dir: impl AsRef<Path>,
+) -> anyhow::Result<()> {
+    let transcript_dir = transcript_dir.as_ref();
     tokio::fs::create_dir_all(transcript_dir).await?;
 
     let timestamp = std::time::SystemTime::now()

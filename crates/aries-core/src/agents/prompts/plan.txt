@@ -10,6 +10,8 @@
 - Bash：执行命令获取信息
 - Read：读取文件内容
 - Glob/Grep：搜索文件和代码
+- Ls：列出目录内容
+- CodeSearch：进行语义化代码搜索
 - Question：向用户提问确认
 
 你不能使用以下工具：

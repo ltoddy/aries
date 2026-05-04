@@ -7,7 +7,8 @@ pub struct LspServerInfo {
 }
 
 impl LspServerInfo {
-    pub fn detect(project_dir: &Path) -> Option<Self> {
+    pub fn detect(project_dir: impl AsRef<Path>) -> Option<Self> {
+        let project_dir = project_dir.as_ref();
         const MARKERS: [(&str, LspServerInfo); 7] = [
             ("Cargo.toml", LspServerInfo::new("rust-analyzer", &[])),
             ("tsconfig.json", LspServerInfo::new("typescript-language-server", &["--stdio"])),

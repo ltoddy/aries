@@ -10,6 +10,7 @@ use rig::completion;
 use rig::completion::{Message, Prompt};
 use rig::streaming::StreamingPrompt;
 use rig::tool::ToolDyn;
+use rig::wasm_compat::WasmCompatSend;
 
 pub use self::compaction::CompactionAgent;
 pub use self::summary::SummaryAgent;
@@ -88,13 +89,17 @@ where
 {
     pub async fn stream_prompt(
         &mut self,
-        prompt: &str,
+        prompt: impl Into<Message> + WasmCompatSend,
         history: &[Message],
     ) -> StreamingResult<<M>::StreamingResponse> {
         self.inner.stream_prompt(prompt).with_history(history.to_vec()).await
     }
 
-    pub async fn prompt(&mut self, prompt: &str, history: &[Message]) -> anyhow::Result<String> {
+    pub async fn prompt(
+        &mut self,
+        prompt: impl Into<Message> + WasmCompatSend,
+        history: &[Message],
+    ) -> anyhow::Result<String> {
         let res = self.inner.prompt(prompt).with_history(history.to_vec()).await?;
         Ok(res)
     }
@@ -194,67 +199,43 @@ where
         let client = self.client.clone();
         let gctx = self.gctx.clone();
 
-        match agent_type {
-            AgentType::Build | AgentType::General => {
-                let mut tools: Vec<Box<dyn ToolDyn>> = vec![
-                    Box::new(tools::bash::ShellCommandTool),
-                    Box::new(tools::read::ReadFileTool),
-                    Box::new(tools::write::WriteFileTool),
-                    Box::new(tools::glob::GlobTool::new(gctx.clone())),
-                    Box::new(tools::grep::GrepTool::new(gctx.clone())),
-                    Box::new(tools::ls::LsTool::new(gctx.clone())),
-                    Box::new(tools::apply_patch::ApplyPatchTool),
-                    Box::new(tools::multiedit::MultiEditTool),
-                    Box::new(tools::edit::EditTool),
-                    Box::new(tools::batch::BatchTool::<C>::new(
-                        client.clone(),
-                        config.clone(),
-                        gctx.clone(),
-                    )),
-                    Box::new(tools::question::QuestionTool),
-                    Box::new(tools::task::TaskTool::<C>::new(
-                        client.clone(),
-                        config.clone(),
-                        gctx.clone(),
-                    )),
-                    Box::new(tools::codesearch::CodeSearchTool),
-                    Box::new(tools::task_spawn::TaskSpawnTool::new(spawner.clone())),
-                    Box::new(tools::task_status::TaskStatusTool::new(spawner)),
-                ];
-                if !available_skills.is_empty() {
-                    tools.push(Box::new(tools::skill::SkillTool::new(available_skills)))
-                }
-                if let Some(lsp_client) = lsp_client {
-                    tools.push(Box::new(tools::lsp::LspTool::new(lsp_client, gctx.clone())));
-                }
-                tools
-            },
-            AgentType::Plan => {
-                let mut tools: Vec<Box<dyn ToolDyn>> = vec![
-                    Box::new(tools::bash::ShellCommandTool),
-                    Box::new(tools::read::ReadFileTool),
-                    Box::new(tools::glob::GlobTool::new(gctx.clone())),
-                    Box::new(tools::grep::GrepTool::new(gctx.clone())),
-                    Box::new(tools::ls::LsTool::new(gctx.clone())),
-                    Box::new(tools::question::QuestionTool),
-                    Box::new(tools::codesearch::CodeSearchTool),
-                ];
-                if !available_skills.is_empty() {
-                    tools.push(Box::new(tools::skill::SkillTool::new(available_skills)))
-                }
-                if let Some(lsp_client) = lsp_client {
-                    tools.push(Box::new(tools::lsp::LspTool::new(lsp_client, gctx.clone())));
-                }
-                tools
-            },
-            AgentType::Explore => vec![
-                Box::new(tools::bash::ShellCommandTool),
-                Box::new(tools::read::ReadFileTool),
-                Box::new(tools::glob::GlobTool::new(gctx.clone())),
-                Box::new(tools::grep::GrepTool::new(gctx.clone())),
-                Box::new(tools::ls::LsTool::new(gctx.clone())),
-                Box::new(tools::codesearch::CodeSearchTool),
-            ],
+        let mut tools: Vec<Box<dyn ToolDyn>> = vec![
+            Box::new(tools::bash::ShellCommandTool),
+            Box::new(tools::read::ReadFileTool),
+            Box::new(tools::glob::GlobTool::new(gctx.clone())),
+            Box::new(tools::grep::GrepTool::new(gctx.clone())),
+            Box::new(tools::ls::LsTool::new(gctx.clone())),
+            Box::new(tools::codesearch::CodeSearchTool),
+        ];
+
+        if matches!(agent_type, AgentType::Build | AgentType::General) {
+            tools.push(Box::new(tools::write::WriteFileTool));
+            tools.push(Box::new(tools::apply_patch::ApplyPatchTool));
+            tools.push(Box::new(tools::multiedit::MultiEditTool));
+            tools.push(Box::new(tools::edit::EditTool));
+            tools.push(Box::new(tools::batch::BatchTool::new(gctx.clone())));
+            tools.push(Box::new(tools::task::TaskTool::<C>::new(
+                client.clone(),
+                config.clone(),
+                gctx.clone(),
+            )));
+            tools.push(Box::new(tools::task_spawn::TaskSpawnTool::new(spawner.clone())));
+            tools.push(Box::new(tools::task_status::TaskStatusTool::new(spawner)));
         }
+
+        if matches!(agent_type, AgentType::Build | AgentType::General | AgentType::Plan) {
+            tools.push(Box::new(tools::question::QuestionTool));
+        }
+
+        if matches!(agent_type, AgentType::Build | AgentType::General) {
+            if !available_skills.is_empty() {
+                tools.push(Box::new(tools::skill::SkillTool::new(available_skills)));
+            }
+            if let Some(lsp_client) = lsp_client {
+                tools.push(Box::new(tools::lsp::LspTool::new(lsp_client, gctx.clone())));
+            }
+        }
+
+        tools
     }
 }

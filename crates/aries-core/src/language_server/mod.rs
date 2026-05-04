@@ -15,13 +15,16 @@ use crate::fs::path_to_uri;
 
 pub type SharedLspClient = Arc<LspClient>;
 
-pub async fn warm_up(info: LspServerInfo, project_dir: &Path) -> anyhow::Result<SharedLspClient> {
+pub async fn warm_up(
+    info: LspServerInfo,
+    project_dir: impl AsRef<Path>,
+) -> anyhow::Result<SharedLspClient> {
     let lsp = LspClient::start(info.clone()).await.map_err(|err| {
         eprintln!("Failed to start {}: {err}", info.binary);
         err
     })?;
 
-    let root_uri = path_to_uri(project_dir);
+    let root_uri = path_to_uri(project_dir.as_ref());
     let shared = Arc::new(lsp);
 
     let init = shared.clone();
