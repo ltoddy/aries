@@ -63,7 +63,7 @@ pub async fn bootstrap_chat(
         let provider = config.provider().to_string();
         let model = config.model().to_string();
 
-        let mut manager = aries_session::SessionManager::new(gctx, config, ());
+        let mut manager = aries_session::SessionRegistry::new(gctx, config, ());
         let session_id = manager.create_session().await.map_err(|err| err.to_string())?;
 
         let (messages, session_dir_name) = manager

@@ -7,7 +7,7 @@ use rig::providers::{azure, openai};
 
 use crate::Session;
 
-pub struct SessionManager<P = ()>
+pub struct SessionRegistry<P = ()>
 where
     P: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel>,
 {
@@ -18,7 +18,7 @@ where
     hook: P,
 }
 
-impl<P> SessionManager<P>
+impl<P> SessionRegistry<P>
 where
     P: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel> + Clone + 'static,
 {

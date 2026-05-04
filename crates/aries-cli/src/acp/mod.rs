@@ -9,7 +9,7 @@ use agent_client_protocol::{
 };
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
-use aries_session::SessionManager;
+use aries_session::SessionRegistry;
 use async_trait::async_trait;
 use rig::agent::{MultiTurnStreamItem, Text};
 use rig::message::{ReasoningContent, ToolResultContent};
@@ -18,7 +18,7 @@ use tokio::sync::{Mutex, mpsc, oneshot};
 use tracing::info;
 
 pub struct AcpImpl {
-    sessions: Mutex<SessionManager>,
+    sessions: Mutex<SessionRegistry>,
     sender: mpsc::UnboundedSender<(SessionNotification, oneshot::Sender<()>)>,
     next_session_id: Cell<String>,
 }
@@ -30,7 +30,7 @@ impl AcpImpl {
         sender: mpsc::UnboundedSender<(SessionNotification, oneshot::Sender<()>)>,
     ) -> Self {
         let next_session_id = Cell::new(nanoid::nanoid!());
-        let sessions = SessionManager::new(context, config, ());
+        let sessions = SessionRegistry::new(context, config, ());
 
         Self { sessions: Mutex::new(sessions), sender, next_session_id }
     }
