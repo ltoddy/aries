@@ -1,14 +1,14 @@
 [workspace]
 members = [
-    "crates/aries",
     "crates/aries-acp",
+    "crates/aries-cli",
     "crates/aries-config",
     "crates/aries-context",
     "crates/aries-core",
     "crates/aries-session",
     "crates/aries-ui",
 ]
-default-members = ["crates/aries"]
+default-members = ["crates/aries-cli"]
 resolver = "3"
 
 [workspace.dependencies]

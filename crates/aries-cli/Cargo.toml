@@ -1,5 +1,5 @@
 [package]
-name = "aries"
+name = "aries-cli"
 version = "0.1.0"
 edition = "2024"
 authors = ["ltoddy <taoliu0509@gmail.com>"]
