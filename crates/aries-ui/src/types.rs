@@ -7,6 +7,7 @@ pub struct SessionBootstrap {
     pub provider: String,
     pub model: String,
     pub session_id: String,
+    pub session_dir_name: String,
     pub messages: Vec<ChatMessage>,
 }
 

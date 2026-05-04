@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { memo, useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
+import remarkBreaks from "remark-breaks";
 import { ChevronRight, Wrench } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -8,10 +9,14 @@ import { Separator } from "@/components/ui/separator";
 import type { ChatMessage } from "../types";
 import { blockLabel, formatToolResult, parseToolCall } from "../utils";
 
-function Markdown({ content }: { content: string }) {
+const rehypePlugins = [rehypeHighlight];
+const remarkPlugins = [remarkBreaks];
+
+export const Markdown = memo(function Markdown({ content }: { content: string }) {
   return (
     <ReactMarkdown
-      rehypePlugins={[rehypeHighlight]}
+      remarkPlugins={remarkPlugins}
+      rehypePlugins={rehypePlugins}
       components={{
         pre({ children }) {
           return <pre className="overflow-x-auto rounded-md bg-muted p-2 text-[13px] leading-relaxed">{children}</pre>;
@@ -67,6 +72,30 @@ function Markdown({ content }: { content: string }) {
       {content}
     </ReactMarkdown>
   );
+});
+
+/**
+ * 流式文本块：流式期间以纯文本展示（避免每个 token 都做 Markdown 解析），
+ * 流结束后渲染完整 Markdown。
+ */
+function StreamingTextBlock({ content, isStreaming }: { content: string; isStreaming: boolean }) {
+  const [settled, setSettled] = useState(false);
+  const prevStreamingRef = useRef(isStreaming);
+
+  useEffect(() => {
+    // 当从 streaming -> 非 streaming 状态切换时，标记为已完成
+    if (prevStreamingRef.current && !isStreaming) {
+      setSettled(true);
+    }
+    prevStreamingRef.current = isStreaming;
+  }, [isStreaming]);
+
+  if (isStreaming && !settled) {
+    // 流式期间：使用轻量的 pre-wrap 显示，避免 Markdown 解析
+    return <div className="whitespace-pre-wrap">{content}</div>;
+  }
+
+  return <Markdown content={content} />;
 }
 
 export function ReasoningBlock({ content, isStreaming }: { content: string; isStreaming: boolean }) {
@@ -138,7 +167,7 @@ function ToolCallPairBlock({ callContent, resultContent }: { callContent: string
   );
 }
 
-export function renderMessage(message: ChatMessage, isStreaming: boolean) {
+export function renderMessage(message: ChatMessage, isStreamingMessage: boolean) {
   if (message.role === "user") {
     return (
       <div className="whitespace-pre-wrap text-sm leading-relaxed">
@@ -160,13 +189,13 @@ export function renderMessage(message: ChatMessage, isStreaming: boolean) {
     } else if (block.type === "text") {
       elements.push(
         <div key={i} className="text-sm leading-relaxed">
-          <Markdown content={block.content} />
-          {isStreaming && i === blocks.length - 1 && <span className="ml-1 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-foreground/50 align-middle" />}
+          <StreamingTextBlock content={block.content} isStreaming={isStreamingMessage && i === blocks.length - 1} />
+          {isStreamingMessage && i === blocks.length - 1 && <span className="ml-1 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-foreground/50 align-middle" />}
         </div>
       );
       i += 1;
     } else if (block.type === "reasoning") {
-      elements.push(<ReasoningBlock key={i} content={block.content} isStreaming={isStreaming} />);
+      elements.push(<ReasoningBlock key={i} content={block.content} isStreaming={isStreamingMessage} />);
       i += 1;
     } else {
       elements.push(<ToolCallPairBlock key={i} callContent={`[Tool] unknown\n{}`} resultContent={block.content} />);

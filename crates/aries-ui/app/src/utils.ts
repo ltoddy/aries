@@ -39,18 +39,22 @@ export function appendStreamBlock(message: ChatMessage, payload: ChatStreamPaylo
   const prevBlocks = message.blocks ?? [];
   const lastBlock = prevBlocks[prevBlocks.length - 1];
   let blocks: ChatBlock[];
+  let textDelta = "";
 
   if (lastBlock && lastBlock.type === payload.kind) {
-    blocks = prevBlocks.slice(0, -1);
-    blocks.push({ type: lastBlock.type, content: lastBlock.content + payload.delta });
+    // 就地更新最后一个 block，只替换最后一个元素（避免 slice 整个数组）
+    const updatedBlock = { type: lastBlock.type, content: lastBlock.content + payload.delta };
+    blocks = prevBlocks.slice();
+    blocks[blocks.length - 1] = updatedBlock;
+    if (payload.kind === "text") textDelta = payload.delta;
   } else {
     blocks = [...prevBlocks, { type: payload.kind, content: payload.delta }];
+    if (payload.kind === "text") textDelta = payload.delta;
   }
 
-  const textContent = blocks
-    .filter((block) => block.type === "text")
-    .map((block) => block.content)
-    .join("");
+  // 增量更新 textContent，无需每次遍历所有 blocks
+  const prevTextContent = message.content ?? "";
+  const textContent = prevTextContent + textDelta;
 
   return { ...message, content: textContent, blocks };
 }

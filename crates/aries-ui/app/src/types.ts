@@ -21,6 +21,7 @@ export type SessionBootstrap = {
   provider: string;
   model: string;
   sessionId: string;
+  sessionDirName: string;
   messages: ChatMessage[];
 };
 

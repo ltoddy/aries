@@ -1,12 +1,52 @@
 use aries_config::AriesConfigLoader;
 use aries_context::GlobalContext;
 use rig::agent::MultiTurnStreamItem;
-use rig::message::ToolResultContent;
+use rig::completion::Message;
+use rig::message::{AssistantContent, ToolResultContent, UserContent};
 use rig::streaming::{StreamedAssistantContent, StreamedUserContent};
 use tauri::{AppHandle, Emitter};
 
 use crate::state::{AppState, SharedState, CHAT_STREAM_EVENT};
 use crate::types::{ChatMessage, ChatRequest, ChatResponse, ChatStreamPayload, SessionBootstrap};
+
+fn convert_history(history: &[Message]) -> Vec<ChatMessage> {
+    history
+        .iter()
+        .filter_map(|msg| match msg {
+            Message::User { content } => {
+                let text: String = content
+                    .iter()
+                    .filter_map(|c| match c {
+                        UserContent::Text(t) => Some(t.text.as_str()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                if text.is_empty() {
+                    None
+                } else {
+                    Some(ChatMessage { role: "user".to_string(), content: text })
+                }
+            },
+            Message::Assistant { content, .. } => {
+                let text: String = content
+                    .iter()
+                    .filter_map(|c| match c {
+                        AssistantContent::Text(t) => Some(t.text.as_str()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                if text.is_empty() {
+                    None
+                } else {
+                    Some(ChatMessage { role: "assistant".to_string(), content: text })
+                }
+            },
+            _ => None,
+        })
+        .collect()
+}
 
 #[tauri::command]
 pub async fn bootstrap_chat(
@@ -26,6 +66,19 @@ pub async fn bootstrap_chat(
         let mut manager = aries_session::SessionManager::new(gctx, config, ());
         let session_id = manager.create_session().await.map_err(|err| err.to_string())?;
 
+        let (messages, session_dir_name) = manager
+            .get_session(&session_id)
+            .map(|s| {
+                (
+                    convert_history(s.history()),
+                    s.dir()
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default(),
+                )
+            })
+            .unwrap_or_default();
+
         *guard = Some(AppState {
             manager,
             active_session_id: session_id.clone(),
@@ -38,19 +91,44 @@ pub async fn bootstrap_chat(
             provider,
             model,
             session_id,
-            messages: vec![],
+            session_dir_name,
+            messages,
         });
     }
 
     let app_state = guard.as_ref().expect("state initialized");
+    let (messages, session_dir_name) = app_state
+        .manager
+        .get_session(&app_state.active_session_id)
+        .map(|s| {
+            (
+                convert_history(s.history()),
+                s.dir().file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default(),
+            )
+        })
+        .unwrap_or_default();
 
     Ok(SessionBootstrap {
         app_name: "Aries",
         provider: app_state.provider.clone(),
         model: app_state.model.clone(),
         session_id: app_state.active_session_id.clone(),
-        messages: vec![],
+        session_dir_name,
+        messages,
     })
+}
+
+#[tauri::command]
+pub async fn clear_history(state: tauri::State<'_, SharedState>) -> Result<(), String> {
+    let mut guard = state.lock().await;
+    let app_state = guard.as_mut().ok_or_else(|| "chat session is not initialized".to_string())?;
+    let session_id = app_state.active_session_id.clone();
+    let session = app_state
+        .manager
+        .get_session_mut(&session_id)
+        .ok_or_else(|| "active session not found".to_string())?;
+    session.clear_history();
+    Ok(())
 }
 
 #[tauri::command]

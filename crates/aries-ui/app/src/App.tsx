@@ -1,18 +1,17 @@
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { ArrowLeft, Bot, FileText, Monitor, Moon, Send, Sun, User } from "lucide-react";
+import { EmojiPicker } from "frimousse";
+import { ArrowLeft, Bot, FileText, MessageSquare, Monitor, Moon, PanelLeftClose, PanelLeftOpen, Send, Smile, Square, Sun, Trash2, User } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { WelcomePage } from "@/components/WelcomePage";
 
 import type { ChatMessage, ChatResponse, ChatStreamPayload, SessionBootstrap, ThemeMode } from "./types";
 import { CHAT_STREAM_EVENT, THEME_STORAGE_KEY } from "./constants";
 import { appendStreamBlock, findLastAssistantIndex, getPreferredTheme, resolveTheme } from "./utils";
-import { renderMessage } from "./components/MessageBlocks";
+import { Markdown, renderMessage } from "./components/MessageBlocks";
 
 function App() {
   const [theme, setTheme] = useState<ThemeMode>(() => getPreferredTheme());
@@ -58,7 +57,13 @@ function ChatView({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionDirName, setSessionDirName] = useState<string | null>(null);
   const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"chat" | "system-prompt">("chat");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const emojiPickerRef = useRef<HTMLDivElement | null>(null);
+  const emojiButtonRef = useRef<HTMLButtonElement | null>(null);
   const activeSessionIdRef = useRef<string | null>(null);
   const isSubmittingRef = useRef(false);
   const lastProcessedSeqRef = useRef(0);
@@ -71,9 +76,42 @@ function ChatView({
     } catch {}
   }
 
+  function openSystemPromptTab() {
+    fetchSystemPrompt();
+    setActiveTab("system-prompt");
+  }
+
+  async function handleClearHistory() {
+    try {
+      await invoke("clear_history");
+      setMessages([]);
+    } catch {}
+  }
+
   useEffect(() => {
     activeSessionIdRef.current = sessionId;
   }, [sessionId]);
+
+  const pendingPayloadsRef = useRef<ChatStreamPayload[]>([]);
+  const rafIdRef = useRef<number | null>(null);
+
+  const flushPayloads = useCallback(() => {
+    rafIdRef.current = null;
+    const payloads = pendingPayloadsRef.current;
+    if (payloads.length === 0) return;
+    pendingPayloadsRef.current = [];
+    setMessages((current) => {
+      const targetIndex = findLastAssistantIndex(current);
+      if (targetIndex === null) return current;
+      let updated = current[targetIndex];
+      for (const payload of payloads) {
+        updated = appendStreamBlock(updated, payload);
+      }
+      const next = [...current];
+      next[targetIndex] = updated;
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -85,23 +123,27 @@ function ChatView({
         if (!payload || payload.sessionId !== activeSessionIdRef.current) return;
         if (payload.seq <= lastProcessedSeqRef.current) return;
         lastProcessedSeqRef.current = payload.seq;
-        setMessages((current) => {
-          const targetIndex = findLastAssistantIndex(current);
-          if (targetIndex === null) return current;
-          const next = [...current];
-          next[targetIndex] = appendStreamBlock(next[targetIndex], payload);
-          return next;
-        });
+        pendingPayloadsRef.current.push(payload);
+        if (rafIdRef.current === null) {
+          rafIdRef.current = requestAnimationFrame(flushPayloads);
+        }
       });
       if (active) { unlisten = fn; } else { fn(); }
     })();
-    return () => { active = false; if (unlisten) unlisten(); };
-  }, []);
+    return () => {
+      active = false;
+      if (unlisten) unlisten();
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+    };
+  }, [flushPayloads]);
 
   useEffect(() => {
     invoke("resize_window_for_chat").catch(() => {});
     invoke<SessionBootstrap>("bootstrap_chat", { projectPath })
-      .then((data) => { setMessages(data.messages); setSessionId(data.sessionId); })
+      .then((data) => { setMessages(data.messages); setSessionId(data.sessionId); setSessionDirName(data.sessionDirName); })
       .catch((err) => setError(String(err)))
       .finally(() => setLoading(false));
   }, []);
@@ -109,6 +151,20 @@ function ChatView({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: sending ? "auto" : "smooth", block: "end" });
   }, [messages, sending]);
+
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+    function handleClick(e: MouseEvent) {
+      if (
+        emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node) &&
+        emojiButtonRef.current && !emojiButtonRef.current.contains(e.target as Node)
+      ) {
+        setShowEmojiPicker(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showEmojiPicker]);
 
   const canSend = useMemo(() => prompt.trim().length > 0 && !sending, [prompt, sending]);
   const lastAssistantIndex = useMemo(() => findLastAssistantIndex(messages), [messages]);
@@ -168,13 +224,7 @@ function ChatView({
     submitPrompt(content);
   }
 
-  function handlePromptKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Enter" && event.metaKey) {
-      // Cmd+Enter inserts newline
-      event.preventDefault();
-      setPrompt((p) => p + "\n");
-      return;
-    }
+  function handlePromptKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       const content = prompt.trim();
@@ -185,27 +235,35 @@ function ChatView({
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Left sidebar */}
+      {/* Icon sidebar */}
       <aside className="flex w-12 shrink-0 flex-col items-center justify-between border-r py-2">
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onBack} title="Back to projects">
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
         <div className="flex flex-col items-center gap-1">
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={fetchSystemPrompt} title="System Prompt">
-                <FileText className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[80vh] max-w-2xl overflow-hidden">
-              <DialogHeader>
-                <DialogTitle>System Prompt</DialogTitle>
-              </DialogHeader>
-              <div className="overflow-y-auto max-h-[65vh]">
-                <pre className="whitespace-pre-wrap text-xs leading-relaxed">{systemPrompt ?? "Loading..."}</pre>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onBack} title="Back to projects">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSidebarOpen((o) => !o)} title="Toggle sidebar">
+            {sidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+          </Button>
+        </div>
+        <div className="flex flex-col items-center gap-1">
+          <Button
+            variant={activeTab === "chat" ? "secondary" : "ghost"}
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setActiveTab("chat")}
+            title="Chat"
+          >
+            <MessageSquare className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={activeTab === "system-prompt" ? "secondary" : "ghost"}
+            size="icon"
+            className="h-8 w-8"
+            onClick={openSystemPromptTab}
+            title="System Prompt"
+          >
+            <FileText className="h-4 w-4" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -218,79 +276,146 @@ function ChatView({
         </div>
       </aside>
 
-      {/* Main content */}
-      <div className="flex flex-1 flex-col">
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-3xl px-6 py-3">
-            {!loading && messages.length === 0 && (
-              <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                  <Bot className="h-6 w-6 text-muted-foreground" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold">Start a conversation</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">Ask about the current project, inspect files, run tools, or iterate on code.</p>
-                </div>
-              </div>
-            )}
-
-            <div className="flex flex-col gap-3">
-              {messages.map((message, index) => {
-                const isStreamingMessage = sending && message.role === "assistant" && index === lastAssistantIndex;
-                const isUser = message.role === "user";
-                if (isUser) {
-                  return (
-                    <div key={`${message.role}-${index}`} className="flex items-start gap-2 flex-row-reverse">
-                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                        <User className="h-3 w-3" />
-                      </div>
-                      <Card className="max-w-[85%] shadow-sm bg-primary text-primary-foreground">
-                        <CardContent className="px-2.5 py-1.5">{renderMessage(message, false)}</CardContent>
-                      </Card>
-                    </div>
-                  );
-                }
-                return (
-                  <div key={`${message.role}-${index}`} className="w-full">
-                    {renderMessage(message, isStreamingMessage)}
-                  </div>
-                );
-              })}
-              <div ref={messagesEndRef} />
+      {/* Left navigation panel */}
+      {sidebarOpen && (
+        <aside className="flex w-56 shrink-0 flex-col border-r bg-muted/30">
+          <div className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Session</div>
+          <div className="flex-1 overflow-y-auto px-3 py-1">
+            <div className="rounded-md bg-muted/50 px-2.5 py-2 text-xs">
+              <div className="font-medium truncate" title={projectPath}>{projectPath.split("/").pop()}</div>
+              {sessionDirName && <div className="mt-1 truncate text-muted-foreground" title={sessionDirName}>{sessionDirName}</div>}
+              {sessionId && <div className="mt-1 font-mono text-[10px] text-muted-foreground truncate" title={sessionId}>{sessionId}</div>}
             </div>
           </div>
-        </div>
+        </aside>
+      )}
 
-        {/* Input */}
-        <div className="shrink-0 border-t bg-background py-2">
-          <form className="mx-auto flex max-w-3xl flex-col gap-1.5 px-6" onSubmit={handleSubmit}>
-            <div className="relative">
-              <Textarea
-                value={prompt}
-                onChange={(event) => setPrompt(event.target.value)}
-                onKeyDown={handlePromptKeyDown}
-                placeholder="Ask Aries about the current project..."
-                rows={3}
-                className="resize-none pr-12"
-              />
-              <Button
-                type="submit"
-                size="icon"
-                disabled={!canSend}
-                className="absolute bottom-2 right-2 h-8 w-8"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
+      {/* Main content */}
+      {activeTab === "chat" ? (
+        <div className="flex flex-1 flex-col">
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="mx-auto max-w-3xl px-6 py-3">
+              {!loading && messages.length === 0 && (
+                <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                    <Bot className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold">Start a conversation</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">Ask about the current project, inspect files, run tools, or iterate on code.</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-3">
+                {messages.map((message, index) => {
+                  const isStreamingMessage = sending && message.role === "assistant" && index === lastAssistantIndex;
+                  const isUser = message.role === "user";
+                  if (isUser) {
+                    return (
+                      <div key={`${message.role}-${index}`} className="flex items-start gap-2 flex-row-reverse">
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                          <User className="h-3 w-3" />
+                        </div>
+                        <Card className="max-w-[85%] shadow-sm bg-primary text-primary-foreground">
+                          <CardContent className="px-2.5 py-1.5">{renderMessage(message, false)}</CardContent>
+                        </Card>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={`${message.role}-${index}`} className="w-full">
+                      {renderMessage(message, isStreamingMessage)}
+                    </div>
+                  );
+                })}
+                <div ref={messagesEndRef} />
+              </div>
             </div>
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{sending ? "Streaming..." : "Enter to send, ⌘+Enter for newline"}</span>
-              {sessionId && <span className="font-mono text-[10px]">{sessionId}</span>}
-            </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-          </form>
+          </div>
+
+          {/* Input */}
+          <div className="shrink-0 border-t bg-background px-6 py-2">
+            <form className="mx-auto max-w-3xl relative" onSubmit={handleSubmit}>
+              {showEmojiPicker && (
+                <div ref={emojiPickerRef} className="absolute bottom-12 right-0 z-50">
+                  <EmojiPicker.Root
+                    className="isolate flex h-[368px] w-[352px] flex-col rounded-lg border bg-background shadow-lg"
+                    onEmojiSelect={({ emoji }) => {
+                      setPrompt((p) => p + emoji);
+                      setShowEmojiPicker(false);
+                    }}
+                  >
+                    <EmojiPicker.Search className="mx-2 mt-2 appearance-none rounded-md border bg-muted px-2.5 py-2 text-sm outline-none" />
+                    <EmojiPicker.Viewport className="relative flex-1 outline-hidden">
+                      <EmojiPicker.Loading className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
+                        Loading…
+                      </EmojiPicker.Loading>
+                      <EmojiPicker.Empty className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
+                        No emoji found.
+                      </EmojiPicker.Empty>
+                      <EmojiPicker.List
+                        className="select-none pb-1.5"
+                        components={{
+                          CategoryHeader: ({ category, ...props }) => (
+                            <div className="bg-background px-3 pt-3 pb-1.5 text-xs font-medium text-muted-foreground" {...props}>
+                              {category.label}
+                            </div>
+                          ),
+                          Row: ({ children, ...props }) => (
+                            <div className="scroll-my-1.5 px-1.5" {...props}>
+                              {children}
+                            </div>
+                          ),
+                          Emoji: ({ emoji, ...props }) => (
+                            <button className="flex size-8 items-center justify-center rounded-md text-lg data-[active]:bg-muted" {...props}>
+                              {emoji.emoji}
+                            </button>
+                          ),
+                        }}
+                      />
+                    </EmojiPicker.Viewport>
+                  </EmojiPicker.Root>
+                </div>
+              )}
+              <div className="flex items-center rounded-md border bg-background px-3">
+                <input
+                  value={prompt}
+                  onChange={(event) => setPrompt(event.target.value)}
+                  onKeyDown={handlePromptKeyDown}
+                  className="flex-1 h-10 bg-transparent text-sm outline-none"
+                />
+                <div className="flex items-center gap-0.5">
+                  <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={handleClearHistory} title="Clear History">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                  <Button ref={emojiButtonRef} type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowEmojiPicker((v) => !v)} title="Emoji">
+                    <Smile className="h-4 w-4" />
+                  </Button>
+                  <Button type="submit" variant="ghost" size="icon" disabled={!canSend} className="h-7 w-7">
+                    {sending ? <Square className="h-3.5 w-3.5 fill-current" /> : <Send className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+            </form>
+            {error && <p className="mx-auto max-w-3xl mt-1 text-sm text-destructive">{error}</p>}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex flex-1 flex-col overflow-y-auto">
+          <div className="mx-auto w-full max-w-3xl px-6 py-4">
+            <h1 className="mb-4 text-lg font-semibold">System Prompt</h1>
+            {systemPrompt ? (
+              <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed">
+                <Markdown content={systemPrompt} />
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Loading...</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

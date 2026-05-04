@@ -11,7 +11,7 @@ mod projects;
 mod state;
 mod types;
 
-use chat::{bootstrap_chat, get_system_prompt, send_chat_message};
+use chat::{bootstrap_chat, clear_history, get_system_prompt, send_chat_message};
 use projects::{list_projects, open_project};
 use state::{AppState, SharedState};
 
@@ -45,6 +45,7 @@ fn main() {
             bootstrap_chat,
             send_chat_message,
             get_system_prompt,
+            clear_history,
             list_projects,
             open_project,
             resize_window_for_chat
