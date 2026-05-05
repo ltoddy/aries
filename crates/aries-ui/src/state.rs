@@ -7,7 +7,7 @@ pub type SharedState = Arc<Mutex<Option<AppState>>>;
 pub const CHAT_STREAM_EVENT: &str = "chat-stream";
 
 pub struct AppState {
-    pub manager: SessionRegistry<()>,
+    pub manager: SessionRegistry,
     pub active_session_id: String,
     pub provider: String,
     pub model: String,

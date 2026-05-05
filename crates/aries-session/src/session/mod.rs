@@ -14,8 +14,11 @@ use rig::completion::Message;
 use rig::providers::{azure, openai};
 use rig::streaming::StreamedAssistantContent;
 use tokio::fs::create_dir_all;
-use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
 use tracing::error;
+
+use crate::session::history::ChatHistory;
+
+mod history;
 
 pub struct Session<P = ()>
 where
@@ -26,8 +29,7 @@ where
     notifications_rx: NotificationReceiver,
     #[allow(unused)]
     lsp_client: Option<SharedLspClient>,
-    history: Vec<Message>,
-    history_tx: UnboundedSender<Vec<Message>>,
+    chat_history: ChatHistory,
     transcript_dir: PathBuf,
     root: PathBuf, // session 的数据存放的目录
     gctx: GlobalContext,
@@ -51,6 +53,8 @@ impl<P> Session<P>
 where
     P: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel> + 'static,
 {
+    const FILENAME: &str = "chat-history.jsonl";
+
     pub async fn new(
         id: String,
         gctx: GlobalContext,
@@ -60,19 +64,18 @@ where
         let (root, transcript_dir) = Self::setup_directories(&gctx.config_dir, &id).await;
 
         let lsp_client = Self::warm_up_lsp(&gctx.current_dir).await;
-        let history = Self::load_chat_history(&root).await;
-        let history_tx = Self::spawn_refresh_history(root.join("chat-history.jsonl"));
 
         let (agents, notifications_rx) =
             Self::create_agents(&gctx, config, lsp_client.clone(), hook).await?;
+
+        let chat_history = ChatHistory::new(root.join(Self::FILENAME)).await;
 
         let s = Self {
             id,
             agents,
             notifications_rx,
             lsp_client,
-            history,
-            history_tx,
+            chat_history,
             transcript_dir,
             root,
             gctx,
@@ -81,12 +84,7 @@ where
 
         Ok(s)
     }
-}
 
-impl<P> Session<P>
-where
-    P: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel> + 'static,
-{
     pub async fn load(
         id: String,
         root: impl AsRef<Path>,
@@ -99,19 +97,18 @@ where
         let gctx = GlobalContext::with_current_dir(current_dir)?;
 
         let lsp_client = Self::warm_up_lsp(&gctx.current_dir).await;
-        let history = Self::load_chat_history(&root).await;
-        let history_tx = Self::spawn_refresh_history(root.join("chat-history.jsonl"));
 
         let (agents, notifications_rx) =
             Self::create_agents(&gctx, config, lsp_client.clone(), hook).await?;
+
+        let chat_history = ChatHistory::new(root.join(Self::FILENAME)).await;
 
         Ok(Self {
             id,
             agents,
             notifications_rx,
             lsp_client,
-            history,
-            history_tx,
+            chat_history,
             transcript_dir: root.join("transcripts"),
             root: root.to_path_buf(),
             gctx,
@@ -141,12 +138,11 @@ where
     }
 
     pub fn history(&self) -> &[Message] {
-        &self.history
+        self.chat_history.history()
     }
 
     pub fn clear_history(&mut self) {
-        self.history = vec![];
-        let _ = self.history_tx.send(self.history.clone());
+        self.chat_history.clear();
     }
 
     pub fn dir(&self) -> PathBuf {
@@ -162,23 +158,29 @@ where
 
         let stream = match &mut self.agents {
             ProviderAgents::OpenAICompatible { agent, compaction_agent } => {
-                CompactionAgent::<openai::CompletionModel>::micro_compact(&mut self.history);
-                if let Some(compressed) =
-                    compaction_agent.auto_compact(&self.history, &self.transcript_dir).await?
+                CompactionAgent::<openai::CompletionModel>::micro_compact(
+                    self.chat_history.history_mut(),
+                );
+                if let Some(compressed) = compaction_agent
+                    .auto_compact(self.chat_history.history(), &self.transcript_dir)
+                    .await?
                 {
-                    self.history.extend(compressed);
+                    self.chat_history.extend(compressed);
                 }
-                let snapshot = self.history.clone();
+                let snapshot = self.chat_history.history().to_vec();
                 agent.stream_prompt(prompt, &snapshot).await
             },
             ProviderAgents::Azure { agent, compaction_agent } => {
-                CompactionAgent::<azure::CompletionModel>::micro_compact(&mut self.history);
-                if let Some(compressed) =
-                    compaction_agent.auto_compact(&self.history, &self.transcript_dir).await?
+                CompactionAgent::<azure::CompletionModel>::micro_compact(
+                    self.chat_history.history_mut(),
+                );
+                if let Some(compressed) = compaction_agent
+                    .auto_compact(self.chat_history.history(), &self.transcript_dir)
+                    .await?
                 {
-                    self.history.extend(compressed);
+                    self.chat_history.extend(compressed);
                 }
-                let snapshot = self.history.clone();
+                let snapshot = self.chat_history.history().to_vec();
                 agent.stream_prompt(prompt, &snapshot).await
             },
         };
@@ -198,8 +200,8 @@ where
         }
 
         if let Some(his) = final_res.history() {
-            self.history.extend_from_slice(his);
-            let _ = self.history_tx.send(self.history.clone());
+            self.chat_history.extend(his.iter().cloned());
+            self.chat_history.persist();
         }
 
         Ok(())
@@ -208,14 +210,18 @@ where
     pub async fn compact(&mut self) -> anyhow::Result<()> {
         let compressed = match &mut self.agents {
             ProviderAgents::OpenAICompatible { compaction_agent, .. } => {
-                compaction_agent.force_compact(&self.history, &self.transcript_dir).await?
+                compaction_agent
+                    .force_compact(self.chat_history.history(), &self.transcript_dir)
+                    .await?
             },
             ProviderAgents::Azure { compaction_agent, .. } => {
-                compaction_agent.force_compact(&self.history, &self.transcript_dir).await?
+                compaction_agent
+                    .force_compact(self.chat_history.history(), &self.transcript_dir)
+                    .await?
             },
         };
         if let Some(compressed) = compressed {
-            self.history.extend(compressed);
+            self.chat_history.extend(compressed);
         }
         Ok(())
     }
@@ -312,11 +318,6 @@ where
         (dir, transcript_dir)
     }
 
-    async fn load_chat_history(root: impl AsRef<Path>) -> Vec<Message> {
-        let file_path = root.as_ref().join("chat-history.jsonl");
-        crate::history::load_history(file_path).await.unwrap_or_default()
-    }
-
     async fn warm_up_lsp(dir: impl AsRef<Path>) -> Option<SharedLspClient> {
         let dir = dir.as_ref();
 
@@ -328,12 +329,6 @@ where
         }
 
         None
-    }
-
-    fn spawn_refresh_history(file_path: PathBuf) -> UnboundedSender<Vec<Message>> {
-        let (history_tx, history_rx) = unbounded_channel::<Vec<Message>>();
-        tokio::spawn(crate::history::refresh_history(history_rx, file_path));
-        history_tx
     }
 
     fn drain_task_notifications(&mut self) {
@@ -358,9 +353,9 @@ where
             .collect::<Vec<_>>()
             .join("\n\n");
 
-        self.history
+        self.chat_history
             .push(Message::user(format!("<task-results>\n{}\n</task-results>", notif_text)));
-        self.history.push(Message::assistant("Noted task results."));
+        self.chat_history.push(Message::assistant("Noted task results."));
     }
 }
 

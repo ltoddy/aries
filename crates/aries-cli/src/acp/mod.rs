@@ -24,13 +24,13 @@ pub struct AcpImpl {
 }
 
 impl AcpImpl {
-    pub fn new(
+    pub async fn new(
         context: GlobalContext,
         config: AriesConfig,
         sender: mpsc::UnboundedSender<(SessionNotification, oneshot::Sender<()>)>,
     ) -> Self {
         let next_session_id = Cell::new(nanoid::nanoid!());
-        let sessions = SessionRegistry::new(context, config, ());
+        let sessions = SessionRegistry::new(context, config).await;
 
         Self { sessions: Mutex::new(sessions), sender, next_session_id }
     }

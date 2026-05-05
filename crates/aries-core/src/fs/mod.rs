@@ -1,3 +1,4 @@
+pub mod jsonl;
 pub mod walk;
 
 use std::path::{Path, PathBuf};

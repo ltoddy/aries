@@ -11,5 +11,9 @@ aries-core = { path = "../aries-core" }
 futures.workspace = true
 nanoid.workspace = true
 rig-core.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+serde_yaml.workspace = true
+thiserror.workspace = true
 tokio = { workspace = true, features = ["sync"] }
 tracing.workspace = true

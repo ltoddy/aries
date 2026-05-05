@@ -1,4 +1,4 @@
-use aries_core::jsonl;
+use aries_core::fs::jsonl;
 use rig::completion::Message;
 
 use crate::theme::Theme;

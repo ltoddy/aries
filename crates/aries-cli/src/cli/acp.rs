@@ -17,7 +17,7 @@ pub async fn execute(gctx: GlobalContext) -> anyhow::Result<()> {
     local_set
         .run_until(async move {
             let (sender, mut receiver) = mpsc::unbounded_channel();
-            let agent = crate::acp::AcpImpl::new(gctx, config, sender);
+            let agent = crate::acp::AcpImpl::new(gctx, config, sender).await;
 
             let (conn, handle_io) = AgentSideConnection::new(agent, outgoing, incoming, |fut| {
                 task::spawn_local(fut);
