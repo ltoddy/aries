@@ -1,8 +1,6 @@
 use aries_context::GlobalContext;
 use aries_session::Session;
 use clap::{CommandFactory, Parser, Subcommand};
-use rig::agent::PromptHook;
-use rig::providers::{azure, openai};
 
 use crate::theme::Theme;
 
@@ -53,10 +51,7 @@ impl Command {
     }
 }
 
-pub async fn execute<P>(input: &str, theme: &Theme, gctx: &GlobalContext, session: &mut Session<P>)
-where
-    P: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel> + 'static,
-{
+pub async fn execute(input: &str, theme: &Theme, gctx: &GlobalContext, session: &mut Session) {
     let input = input.strip_prefix('/').unwrap_or(input);
     let mut args = vec![String::from(env!("CARGO_PKG_NAME"))];
 

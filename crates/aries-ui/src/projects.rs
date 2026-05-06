@@ -1,59 +1,31 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use serde::{Deserialize, Serialize};
+use aries_config::AriesConfigLoader;
+use aries_context::GlobalContext;
+use aries_session::SessionRegistry;
 
-const RECENT_PROJECTS_FILE: &str = "recent_projects.json";
-const MAX_RECENT_PROJECTS: usize = 20;
+use crate::state::{AppState, SharedState};
+use crate::types::ProjectEntry;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProjectEntry {
-    pub name: String,
-    pub path: String,
-    pub branch: Option<String>,
-}
+async fn ensure_registry(guard: &mut Option<AppState>) -> Result<&mut AppState, String> {
+    if guard.is_none() {
+        let gctx = GlobalContext::new().map_err(|err| err.to_string())?;
+        let loader = AriesConfigLoader::new(&gctx.config_dir);
+        let config = loader.load_or_setup().await.map_err(|err| err.to_string())?;
+        let provider = config.provider().to_string();
+        let model = config.model().to_string();
 
-pub fn recent_projects_path() -> PathBuf {
-    let home = std::env::home_dir().unwrap_or_default();
-    home.join(".local").join("share").join("aries").join(RECENT_PROJECTS_FILE)
-}
+        let registry = SessionRegistry::new(gctx, config).await.map_err(|err| err.to_string())?;
 
-pub fn load_recent_projects() -> Vec<ProjectEntry> {
-    let path = recent_projects_path();
-    if !path.exists() {
-        return vec![];
+        *guard = Some(AppState {
+            registry,
+            provider,
+            model,
+            active_project: None,
+            active_session: None,
+        });
     }
-    let Ok(content) = std::fs::read_to_string(&path) else {
-        return vec![];
-    };
-    serde_json::from_str(&content).unwrap_or_default()
-}
-
-pub fn save_recent_projects(projects: &[ProjectEntry]) {
-    let path = recent_projects_path();
-    if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    let content = serde_json::to_string_pretty(projects).unwrap_or_default();
-    let _ = std::fs::write(&path, content);
-}
-
-pub fn add_to_recent(project_path: &str) {
-    let mut projects = load_recent_projects();
-
-    // Remove existing entry with same path
-    projects.retain(|p| p.path != project_path);
-
-    let name = Path::new(project_path)
-        .file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_else(|| project_path.to_string());
-
-    let branch = detect_git_branch(project_path);
-
-    projects.insert(0, ProjectEntry { name, path: project_path.to_string(), branch });
-
-    projects.truncate(MAX_RECENT_PROJECTS);
-    save_recent_projects(&projects);
+    Ok(guard.as_mut().expect("registry initialized"))
 }
 
 fn detect_git_branch(project_path: &str) -> Option<String> {
@@ -69,16 +41,49 @@ fn detect_git_branch(project_path: &str) -> Option<String> {
 }
 
 #[tauri::command]
-pub fn list_projects() -> Vec<ProjectEntry> {
-    load_recent_projects()
+pub async fn list_projects(
+    state: tauri::State<'_, SharedState>,
+) -> Result<Vec<ProjectEntry>, String> {
+    let mut guard = state.lock().await;
+    let app_state = ensure_registry(&mut guard).await?;
+
+    let projects = app_state.registry.list_projects().await.map_err(|err| err.to_string())?;
+
+    let entries = projects
+        .into_iter()
+        .map(|p| {
+            let branch = detect_git_branch(&p.dir);
+            ProjectEntry { id: p.id, name: p.name, path: p.dir, branch }
+        })
+        .collect();
+
+    Ok(entries)
 }
 
 #[tauri::command]
-pub async fn open_project(path: String) -> Result<(), String> {
+pub async fn activate_project(
+    path: String,
+    state: tauri::State<'_, SharedState>,
+) -> Result<ProjectEntry, String> {
     let p = Path::new(&path);
     if !p.exists() || !p.is_dir() {
         return Err(format!("Directory does not exist: {}", path));
     }
-    add_to_recent(&path);
-    Ok(())
+
+    let mut guard = state.lock().await;
+    let app_state = ensure_registry(&mut guard).await?;
+
+    let project = app_state.registry.active(&path).await.map_err(|err| err.to_string())?;
+
+    let entry = ProjectEntry {
+        id: project.id,
+        name: project.name.clone(),
+        path: project.dir.clone(),
+        branch: detect_git_branch(&project.dir),
+    };
+
+    app_state.active_project = Some(project);
+    app_state.active_session = None;
+
+    Ok(entry)
 }

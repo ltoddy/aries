@@ -80,7 +80,7 @@ impl AriesConfigLoader {
         }
     }
 
-    async fn load(&self) -> anyhow::Result<AriesConfig> {
+    pub async fn load(&self) -> anyhow::Result<AriesConfig> {
         let content = tokio::fs::read_to_string(&self.file_path).await?;
         let config = serde_yaml::from_str::<AriesConfig>(&content)?;
         Ok(config)

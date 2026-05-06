@@ -15,11 +15,12 @@ const PREAMBLE: &str = include_str!("prompts/compaction.txt");
 const NAME: &str = "Archivist";
 const DESCRIPTION: &str = "用于压缩和总结对话上下文的智能体。";
 
+#[derive(Clone)]
 pub struct CompactionAgent<M>
 where
     M: completion::CompletionModel,
 {
-    inner: AriesAgent<M, ()>,
+    inner: AriesAgent<M>,
 }
 
 impl<M> CompactionAgent<M>

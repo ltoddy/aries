@@ -11,6 +11,7 @@ aries-config = { path = "../aries-config" }
 aries-context = { path = "../aries-context" }
 aries-core = { path = "../aries-core" }
 aries-session = { path = "../aries-session" }
+nanoid.workspace = true
 rig-core.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true

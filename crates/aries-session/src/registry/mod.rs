@@ -1,69 +1,105 @@
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
+use anyhow::anyhow;
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
 
-use crate::registry::manifest::ManifestFile;
-
-mod manifest;
-
 use crate::Session;
+use crate::persistence::{ProjectRepository, SessionRepository};
 
 pub struct SessionRegistry {
     gctx: GlobalContext,
     config: AriesConfig,
-    manifest: ManifestFile,
-    sessions: HashMap<String, Session<()>>,
-    active_session_id: Option<String>,
+
+    active_sessions: HashMap<String, Session>,
+
+    project_repo: ProjectRepository,
+    session_repo: SessionRepository,
 }
 
 impl SessionRegistry {
-    pub async fn new(gctx: GlobalContext, config: AriesConfig) -> Self {
-        let manifest = ManifestFile::new(&gctx.config_dir).await;
+    pub async fn new(gctx: GlobalContext, config: AriesConfig) -> anyhow::Result<Self> {
+        let mut db = crate::persistence::connect(&gctx.config_dir).await?;
+        let project_repo = ProjectRepository::new(db.clone());
+        let session_repo = SessionRepository::new(db.clone());
 
-        Self { gctx, config, manifest, sessions: Default::default(), active_session_id: None }
+        let active_sessions = HashMap::new();
+
+        let _ = crate::initalize_tables(&mut db).await;
+
+        let registry = Self { gctx, config, active_sessions, project_repo, session_repo };
+        Ok(registry)
     }
 
-    pub async fn create_session(&mut self) -> anyhow::Result<String> {
-        let session_id = nanoid::nanoid!();
-        let session =
-            Session::new(session_id.clone(), self.gctx.clone(), self.config.clone(), ()).await?;
-        self.sessions.insert(session_id.clone(), session);
-        self.active_session_id = Some(session_id.clone());
-        Ok(session_id)
+    pub async fn active(
+        &mut self,
+        dir: impl AsRef<Path>,
+    ) -> anyhow::Result<crate::persistence::Project> {
+        let dir = dir.as_ref();
+
+        let name =
+            dir.file_name().ok_or_else(|| anyhow!("Unable to recognize the directory name"))?;
+        let name = name.to_string_lossy().to_string();
+
+        let project = self.project_repo.upsert_by_dir(dir.display().to_string(), name).await?;
+
+        Ok(project)
     }
 
-    pub async fn list_sessions(&self) -> anyhow::Result<Vec<Session<()>>> {
-        let mut sessions = Vec::<Session<()>>::new();
+    pub async fn list_projects(&mut self) -> anyhow::Result<Vec<crate::persistence::Project>> {
+        let projects = self.project_repo.all().await?;
+        Ok(projects)
+    }
 
-        let mut entries = tokio::fs::read_dir(&self.gctx.config_dir).await?;
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            let file_name = entry.file_name();
-            let name = file_name.to_string_lossy();
-            if let Some(id) = name.strip_prefix(Session::<()>::PREFIX) {
-                let id = id.to_owned();
-                println!("id is: {}", id);
-                if let Ok(session) = Session::load(id, entry.path(), self.config.clone(), ()).await
-                {
-                    sessions.push(session);
-                }
-            }
-        }
-
+    pub async fn list_sessions(
+        &mut self,
+        project_id: u64,
+    ) -> anyhow::Result<Vec<crate::persistence::Session>> {
+        let sessions = self.session_repo.find_by_project_id(project_id).await?;
         Ok(sessions)
     }
 
-    pub fn get_session(&self, session_id: &str) -> Option<&Session<()>> {
-        self.sessions.get(session_id)
+    pub async fn get_session(
+        &mut self,
+        project: crate::persistence::Project,
+        session_id: String,
+    ) -> anyhow::Result<Session> {
+        if let Some(session) = self.active_sessions.get(&session_id) {
+            return Ok(session.to_owned());
+        }
+
+        match self.session_repo.find_last_by_session_id(&session_id).await {
+            Ok(s) => self.load_session(s).await,
+            Err(_) => self.create_session(project, Some(session_id)).await,
+        }
     }
 
-    pub fn get_session_mut(&mut self, session_id: &str) -> Option<&mut Session<()>> {
-        self.sessions.get_mut(session_id)
+    async fn load_session(&mut self, s: crate::persistence::Session) -> anyhow::Result<Session> {
+        let root = PathBuf::from(s.root_dir);
+        let session = Session::load(s.session_id, &root, self.config.clone()).await?;
+        self.active_sessions.insert(session.id(), session.clone());
+
+        Ok(session)
     }
 
-    fn load_sessions() -> HashMap<String, Session<()>> {
-        let mut sessions = HashMap::new();
+    async fn create_session(
+        &mut self,
+        project: crate::persistence::Project,
+        session_id: Option<String>,
+    ) -> anyhow::Result<Session> {
+        let session_id = session_id.unwrap_or(nanoid::nanoid!());
 
-        sessions
+        let gctx = GlobalContext { current_dir: PathBuf::from(project.dir), ..self.gctx.clone() };
+
+        let session = Session::new(session_id, gctx, self.config.clone()).await?;
+
+        let root = session.dir().display().to_string();
+
+        let _ = self.session_repo.create(&session.id(), "", &root, project.id).await;
+
+        self.active_sessions.insert(session.id(), session.clone());
+
+        Ok(session)
     }
 }

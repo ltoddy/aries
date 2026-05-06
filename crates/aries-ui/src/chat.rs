@@ -1,5 +1,4 @@
-use aries_config::AriesConfigLoader;
-use aries_context::GlobalContext;
+use aries_session::Session;
 use rig::agent::MultiTurnStreamItem;
 use rig::completion::Message;
 use rig::message::{AssistantContent, ToolResultContent, UserContent};
@@ -7,40 +6,121 @@ use rig::streaming::{StreamedAssistantContent, StreamedUserContent};
 use tauri::{AppHandle, Emitter};
 
 use crate::state::{AppState, SharedState, CHAT_STREAM_EVENT};
-use crate::types::{ChatMessage, ChatRequest, ChatResponse, ChatStreamPayload, SessionBootstrap};
+use crate::types::{
+    ChatBlock, ChatMessage, ChatRequest, ChatResponse, ChatStreamPayload, SessionBootstrap,
+    SessionSummary,
+};
 
 fn convert_history(history: &[Message]) -> Vec<ChatMessage> {
     history
         .iter()
         .filter_map(|msg| match msg {
             Message::User { content } => {
-                let text: String = content
-                    .iter()
-                    .filter_map(|c| match c {
-                        UserContent::Text(t) => Some(t.text.as_str()),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n");
-                if text.is_empty() {
+                let mut text_parts: Vec<String> = Vec::new();
+                let mut blocks: Vec<ChatBlock> = Vec::new();
+                for c in content.iter() {
+                    match c {
+                        UserContent::Text(t) => {
+                            text_parts.push(t.text.clone());
+                            blocks.push(ChatBlock {
+                                kind: "text".to_string(),
+                                content: t.text.clone(),
+                            });
+                        },
+                        UserContent::ToolResult(tr) => {
+                            let result_text: String = tr
+                                .content
+                                .iter()
+                                .filter_map(|c| match c {
+                                    ToolResultContent::Text(text) => Some(text.text.as_str()),
+                                    _ => None,
+                                })
+                                .collect::<Vec<_>>()
+                                .join("\n");
+                            if !result_text.trim().is_empty() {
+                                blocks.push(ChatBlock {
+                                    kind: "tool-result".to_string(),
+                                    content: result_text,
+                                });
+                            }
+                        },
+                        _ => {},
+                    }
+                }
+                if text_parts.is_empty() && blocks.is_empty() {
                     None
+                } else if blocks.iter().all(|b| b.kind == "text") {
+                    Some(ChatMessage {
+                        role: "user".to_string(),
+                        content: text_parts.join("\n"),
+                        blocks: None,
+                    })
                 } else {
-                    Some(ChatMessage { role: "user".to_string(), content: text })
+                    Some(ChatMessage {
+                        role: "user".to_string(),
+                        content: text_parts.join("\n"),
+                        blocks: Some(blocks),
+                    })
                 }
             },
             Message::Assistant { content, .. } => {
-                let text: String = content
-                    .iter()
-                    .filter_map(|c| match c {
-                        AssistantContent::Text(t) => Some(t.text.as_str()),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n");
-                if text.is_empty() {
+                let mut text_parts: Vec<String> = Vec::new();
+                let mut blocks: Vec<ChatBlock> = Vec::new();
+                for c in content.iter() {
+                    match c {
+                        AssistantContent::Text(t) => {
+                            text_parts.push(t.text.clone());
+                            blocks.push(ChatBlock {
+                                kind: "text".to_string(),
+                                content: t.text.clone(),
+                            });
+                        },
+                        AssistantContent::Reasoning(r) => {
+                            let text: String = r
+                                .content
+                                .iter()
+                                .filter_map(|rc| match rc {
+                                    rig::message::ReasoningContent::Text { text, .. } => {
+                                        Some(text.clone())
+                                    },
+                                    _ => None,
+                                })
+                                .collect::<Vec<_>>()
+                                .join("\n");
+                            if !text.trim().is_empty() {
+                                blocks.push(ChatBlock {
+                                    kind: "reasoning".to_string(),
+                                    content: text,
+                                });
+                            }
+                        },
+                        AssistantContent::ToolCall(tc) => {
+                            let delta = format!(
+                                "[Tool] {}\n{}",
+                                tc.function.name, tc.function.arguments
+                            );
+                            blocks.push(ChatBlock {
+                                kind: "tool-call".to_string(),
+                                content: delta,
+                            });
+                        },
+                        _ => {},
+                    }
+                }
+                if text_parts.is_empty() && blocks.is_empty() {
                     None
+                } else if blocks.iter().all(|b| b.kind == "text") {
+                    Some(ChatMessage {
+                        role: "assistant".to_string(),
+                        content: text_parts.join("\n"),
+                        blocks: None,
+                    })
                 } else {
-                    Some(ChatMessage { role: "assistant".to_string(), content: text })
+                    Some(ChatMessage {
+                        role: "assistant".to_string(),
+                        content: text_parts.join("\n"),
+                        blocks: Some(blocks),
+                    })
                 }
             },
             _ => None,
@@ -48,85 +128,69 @@ fn convert_history(history: &[Message]) -> Vec<ChatMessage> {
         .collect()
 }
 
-#[tauri::command]
-pub async fn bootstrap_chat(
-    project_path: String,
-    state: tauri::State<'_, SharedState>,
-) -> Result<SessionBootstrap, String> {
-    let mut guard = state.lock().await;
-
-    if guard.is_none() {
-        let mut gctx = GlobalContext::new().map_err(|err| err.to_string())?;
-        gctx.current_dir = std::path::PathBuf::from(&project_path);
-        let loader = AriesConfigLoader::new(&gctx.config_dir);
-        let config = loader.load_or_setup().await.map_err(|err| err.to_string())?;
-        let provider = config.provider().to_string();
-        let model = config.model().to_string();
-
-        let mut manager = aries_session::SessionRegistry::new(gctx, config).await;
-        let session_id = manager.create_session().await.map_err(|err| err.to_string())?;
-
-        let (messages, session_dir_name) = manager
-            .get_session(&session_id)
-            .map(|s| {
-                (
-                    convert_history(s.history()),
-                    s.dir()
-                        .file_name()
-                        .map(|n| n.to_string_lossy().to_string())
-                        .unwrap_or_default(),
-                )
-            })
-            .unwrap_or_default();
-
-        *guard = Some(AppState {
-            manager,
-            active_session_id: session_id.clone(),
-            provider: provider.clone(),
-            model: model.clone(),
-        });
-
-        return Ok(SessionBootstrap {
-            app_name: "Aries",
-            provider,
-            model,
-            session_id,
-            session_dir_name,
-            messages,
-        });
-    }
-
-    let app_state = guard.as_ref().expect("state initialized");
-    let (messages, session_dir_name) = app_state
-        .manager
-        .get_session(&app_state.active_session_id)
-        .map(|s| {
-            (
-                convert_history(s.history()),
-                s.dir().file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default(),
-            )
-        })
-        .unwrap_or_default();
-
-    Ok(SessionBootstrap {
+fn session_to_bootstrap(app_state: &AppState, session: &Session) -> SessionBootstrap {
+    let session_dir_name =
+        session.dir().file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    SessionBootstrap {
         app_name: "Aries",
         provider: app_state.provider.clone(),
         model: app_state.model.clone(),
-        session_id: app_state.active_session_id.clone(),
+        session_id: session.id(),
         session_dir_name,
-        messages,
-    })
+        messages: convert_history(session.history()),
+    }
+}
+
+fn require_project(app_state: &AppState) -> Result<aries_session::persistence::Project, String> {
+    app_state.active_project.clone().ok_or_else(|| "no active project".to_string())
+}
+
+#[tauri::command]
+pub async fn list_sessions(
+    state: tauri::State<'_, SharedState>,
+) -> Result<Vec<SessionSummary>, String> {
+    let mut guard = state.lock().await;
+    let app_state = guard.as_mut().ok_or_else(|| "registry is not initialized".to_string())?;
+    let project = require_project(app_state)?;
+
+    let sessions =
+        app_state.registry.list_sessions(project.id).await.map_err(|err| err.to_string())?;
+
+    Ok(sessions
+        .into_iter()
+        .map(|s| SessionSummary {
+            id: s.id,
+            session_id: s.session_id,
+            title: s.title,
+            root_dir: s.root_dir,
+        })
+        .collect())
+}
+
+#[tauri::command]
+pub async fn bootstrap_chat(
+    session_id: Option<String>,
+    state: tauri::State<'_, SharedState>,
+) -> Result<SessionBootstrap, String> {
+    let mut guard = state.lock().await;
+    let app_state = guard.as_mut().ok_or_else(|| "registry is not initialized".to_string())?;
+    let project = require_project(app_state)?;
+
+    let sid = session_id.unwrap_or_else(|| nanoid::nanoid!());
+    let session =
+        app_state.registry.get_session(project, sid).await.map_err(|err| err.to_string())?;
+
+    let bootstrap = session_to_bootstrap(app_state, &session);
+    app_state.active_session = Some(session);
+    Ok(bootstrap)
 }
 
 #[tauri::command]
 pub async fn clear_history(state: tauri::State<'_, SharedState>) -> Result<(), String> {
     let mut guard = state.lock().await;
-    let app_state = guard.as_mut().ok_or_else(|| "chat session is not initialized".to_string())?;
-    let session_id = app_state.active_session_id.clone();
-    let session = app_state
-        .manager
-        .get_session_mut(&session_id)
-        .ok_or_else(|| "active session not found".to_string())?;
+    let app_state = guard.as_mut().ok_or_else(|| "registry is not initialized".to_string())?;
+    let session =
+        app_state.active_session.as_mut().ok_or_else(|| "active session not found".to_string())?;
     session.clear_history();
     Ok(())
 }
@@ -138,12 +202,10 @@ pub async fn send_chat_message(
     state: tauri::State<'_, SharedState>,
 ) -> Result<ChatResponse, String> {
     let mut guard = state.lock().await;
-    let app_state = guard.as_mut().ok_or_else(|| "chat session is not initialized".to_string())?;
-    let session_id = app_state.active_session_id.clone();
-    let session = app_state
-        .manager
-        .get_session_mut(&session_id)
-        .ok_or_else(|| "active session not found".to_string())?;
+    let app_state = guard.as_mut().ok_or_else(|| "registry is not initialized".to_string())?;
+    let session =
+        app_state.active_session.as_mut().ok_or_else(|| "active session not found".to_string())?;
+    let session_id = session.id();
 
     let stream_app_handle = app_handle.clone();
     let stream_session_id = session_id.clone();
@@ -243,23 +305,24 @@ pub async fn send_chat_message(
 
                 async move { result }
             }),
+            (),
         )
         .await
         .map_err(|err| err.to_string())?;
 
     let content = if answer.trim().is_empty() { "Done.".to_string() } else { answer };
 
-    Ok(ChatResponse { session_id, message: ChatMessage { role: "assistant".to_string(), content } })
+    Ok(ChatResponse {
+        session_id,
+        message: ChatMessage { role: "assistant".to_string(), content, blocks: None },
+    })
 }
 
 #[tauri::command]
 pub async fn get_system_prompt(state: tauri::State<'_, SharedState>) -> Result<String, String> {
     let guard = state.lock().await;
-    let app_state = guard.as_ref().ok_or_else(|| "chat session is not initialized".to_string())?;
-    let session_id = &app_state.active_session_id;
-    let session = app_state
-        .manager
-        .get_session(session_id)
-        .ok_or_else(|| "active session not found".to_string())?;
+    let app_state = guard.as_ref().ok_or_else(|| "registry is not initialized".to_string())?;
+    let session =
+        app_state.active_session.as_ref().ok_or_else(|| "active session not found".to_string())?;
     Ok(session.system_prompt().to_string())
 }

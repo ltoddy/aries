@@ -11,7 +11,7 @@ use aries_core::task_spawner::{NotificationReceiver, TaskSpawner};
 use futures::{StreamExt, pin_mut};
 use rig::agent::{FinalResponse, MultiTurnStreamItem, PromptHook};
 use rig::completion::Message;
-use rig::providers::{azure, openai};
+use rig::providers::{azure, deepseek, openai};
 use rig::streaming::StreamedAssistantContent;
 use tokio::fs::create_dir_all;
 use tracing::error;
@@ -20,12 +20,10 @@ use crate::session::history::ChatHistory;
 
 mod history;
 
-pub struct Session<P = ()>
-where
-    P: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel>,
-{
+#[derive(Clone)]
+pub struct Session {
     id: String,
-    agents: ProviderAgents<P>,
+    agents: ProviderAgents,
     notifications_rx: NotificationReceiver,
     #[allow(unused)]
     lsp_client: Option<SharedLspClient>,
@@ -35,38 +33,28 @@ where
     gctx: GlobalContext,
 }
 
-enum ProviderAgents<P = ()>
-where
-    P: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel>,
-{
+#[derive(Clone)]
+enum ProviderAgents {
     OpenAICompatible {
-        agent: AriesAgent<openai::CompletionModel, P>,
+        agent: AriesAgent<openai::CompletionModel>,
         compaction_agent: CompactionAgent<openai::CompletionModel>,
     },
     Azure {
-        agent: AriesAgent<azure::CompletionModel, P>,
+        agent: AriesAgent<azure::CompletionModel>,
         compaction_agent: CompactionAgent<azure::CompletionModel>,
     },
 }
 
-impl<P> Session<P>
-where
-    P: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel> + 'static,
-{
+impl Session {
     const FILENAME: &str = "chat-history.jsonl";
 
-    pub async fn new(
-        id: String,
-        gctx: GlobalContext,
-        config: AriesConfig,
-        hook: P,
-    ) -> anyhow::Result<Self> {
+    pub async fn new(id: String, gctx: GlobalContext, config: AriesConfig) -> anyhow::Result<Self> {
         let (root, transcript_dir) = Self::setup_directories(&gctx.config_dir, &id).await;
 
         let lsp_client = Self::warm_up_lsp(&gctx.current_dir).await;
 
         let (agents, notifications_rx) =
-            Self::create_agents(&gctx, config, lsp_client.clone(), hook).await?;
+            Self::create_agents(&gctx, config, lsp_client.clone()).await?;
 
         let chat_history = ChatHistory::new(root.join(Self::FILENAME)).await;
 
@@ -89,7 +77,6 @@ where
         id: String,
         root: impl AsRef<Path>,
         config: AriesConfig,
-        hook: P,
     ) -> anyhow::Result<Self> {
         let root = root.as_ref();
 
@@ -99,7 +86,7 @@ where
         let lsp_client = Self::warm_up_lsp(&gctx.current_dir).await;
 
         let (agents, notifications_rx) =
-            Self::create_agents(&gctx, config, lsp_client.clone(), hook).await?;
+            Self::create_agents(&gctx, config, lsp_client.clone()).await?;
 
         let chat_history = ChatHistory::new(root.join(Self::FILENAME)).await;
 
@@ -116,14 +103,11 @@ where
     }
 }
 
-impl<P> Session<P>
-where
-    P: PromptHook<openai::CompletionModel> + PromptHook<azure::CompletionModel> + 'static,
-{
+impl Session {
     pub const PREFIX: &str = "session-";
 
-    pub fn id(&self) -> &str {
-        &self.id
+    pub fn id(&self) -> String {
+        self.id.clone()
     }
 
     pub fn system_prompt(&self) -> &str {
@@ -149,14 +133,23 @@ where
         self.root.clone()
     }
 
-    pub async fn prompt<F, Fut>(&mut self, prompt: &str, mut cb: Option<F>) -> anyhow::Result<()>
+    pub async fn prompt<F, Fut, P>(
+        &mut self,
+        prompt: &str,
+        mut cb: Option<F>,
+        hook: P,
+    ) -> anyhow::Result<()>
     where
         F: FnMut(MultiTurnStreamItem<()>) -> Fut,
         Fut: Future<Output = anyhow::Result<()>>,
+        P: PromptHook<deepseek::CompletionModel>
+            + PromptHook<openai::CompletionModel>
+            + PromptHook<azure::CompletionModel>
+            + 'static,
     {
         self.drain_task_notifications();
 
-        let stream = match &mut self.agents {
+        let final_res = match &mut self.agents {
             ProviderAgents::OpenAICompatible { agent, compaction_agent } => {
                 CompactionAgent::<openai::CompletionModel>::micro_compact(
                     self.chat_history.history_mut(),
@@ -168,7 +161,8 @@ where
                     self.chat_history.extend(compressed);
                 }
                 let snapshot = self.chat_history.history().to_vec();
-                agent.stream_prompt(prompt, &snapshot).await
+                let stream = agent.stream_prompt(prompt, &snapshot, hook).await;
+                Self::consume_stream(stream, &mut cb).await?
             },
             ProviderAgents::Azure { agent, compaction_agent } => {
                 CompactionAgent::<azure::CompletionModel>::micro_compact(
@@ -181,23 +175,10 @@ where
                     self.chat_history.extend(compressed);
                 }
                 let snapshot = self.chat_history.history().to_vec();
-                agent.stream_prompt(prompt, &snapshot).await
+                let stream = agent.stream_prompt(prompt, &snapshot, hook).await;
+                Self::consume_stream(stream, &mut cb).await?
             },
         };
-
-        pin_mut!(stream);
-        let mut final_res = FinalResponse::empty();
-
-        while let Some(Ok(chunk)) = stream.next().await {
-            if let MultiTurnStreamItem::FinalResponse(response) = &chunk {
-                final_res = response.clone();
-            }
-            if let Some(ref mut cb) = cb
-                && let Some(stripped) = erase_provider_type(chunk)
-            {
-                cb(stripped).await?;
-            }
-        }
 
         if let Some(his) = final_res.history() {
             self.chat_history.extend(his.iter().cloned());
@@ -226,12 +207,36 @@ where
         Ok(())
     }
 
+    async fn consume_stream<F, Fut, R>(
+        stream: rig::agent::StreamingResult<R>,
+        cb: &mut Option<F>,
+    ) -> anyhow::Result<FinalResponse>
+    where
+        F: FnMut(MultiTurnStreamItem<()>) -> Fut,
+        Fut: Future<Output = anyhow::Result<()>>,
+    {
+        pin_mut!(stream);
+        let mut final_res = FinalResponse::empty();
+
+        while let Some(Ok(chunk)) = stream.next().await {
+            if let MultiTurnStreamItem::FinalResponse(response) = &chunk {
+                final_res = response.clone();
+            }
+            if let Some(cb) = cb
+                && let Some(stripped) = erase_provider_type(chunk)
+            {
+                cb(stripped).await?;
+            }
+        }
+
+        Ok(final_res)
+    }
+
     async fn create_agents(
         gctx: &GlobalContext,
         config: AriesConfig,
         lsp_client: Option<SharedLspClient>,
-        hook: P,
-    ) -> anyhow::Result<(ProviderAgents<P>, NotificationReceiver)> {
+    ) -> anyhow::Result<(ProviderAgents, NotificationReceiver)> {
         let (agents, notifications_rx) = match config.clone() {
             AriesConfig::OpenAICompatible(ref conf) => {
                 let client = openai::CompletionsClient::builder()
@@ -245,7 +250,6 @@ where
                     client.clone(),
                     config.clone(),
                     AgentType::Build,
-                    hook,
                     gctx.clone(),
                 )
                 .with_tools(spawner, lsp_client)
@@ -266,7 +270,6 @@ where
                     client.clone(),
                     config.clone(),
                     AgentType::Build,
-                    hook,
                     gctx.clone(),
                 )
                 .with_tools(spawner, lsp_client)

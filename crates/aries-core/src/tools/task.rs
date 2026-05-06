@@ -102,12 +102,12 @@ where
             self.client.clone(),
             self.config.clone(),
             agent_type,
-            (),
             self.gctx.clone(),
         )
         .build();
 
-        let stream = agent.stream_prompt(&args.prompt, &[]).await;
+        // TODO: hook
+        let stream = agent.stream_prompt(&args.prompt, &[], ()).await;
         tokio::pin!(stream);
         let mut final_res = rig::agent::FinalResponse::empty();
 

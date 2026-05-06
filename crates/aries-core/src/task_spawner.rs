@@ -36,15 +36,16 @@ pub struct TaskSpawner {
     tx: mpsc::UnboundedSender<TaskNotification>,
 }
 
+#[derive(Clone)]
 pub struct NotificationReceiver {
-    rx: mpsc::UnboundedReceiver<TaskNotification>,
+    rx: Arc<Mutex<mpsc::UnboundedReceiver<TaskNotification>>>,
 }
 
 impl TaskSpawner {
     pub fn new() -> (Self, NotificationReceiver) {
         let (tx, rx) = mpsc::unbounded_channel();
         let manager = Self { tasks: Arc::new(Mutex::new(HashMap::new())), tx };
-        let receiver = NotificationReceiver { rx };
+        let receiver = NotificationReceiver { rx: Arc::new(Mutex::new(rx)) };
         (manager, receiver)
     }
 
@@ -128,7 +129,7 @@ impl TaskSpawner {
 impl NotificationReceiver {
     pub fn drain(&mut self) -> Vec<TaskNotification> {
         let mut notifications = Vec::new();
-        while let Ok(notification) = self.rx.try_recv() {
+        while let Ok(notification) = self.rx.lock().try_recv() {
             notifications.push(notification);
         }
         notifications

@@ -2,20 +2,20 @@ import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useS
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { EmojiPicker } from "frimousse";
-import { ArrowLeft, Bot, FileText, MessageSquare, Monitor, Moon, PanelLeftClose, PanelLeftOpen, Send, Smile, Square, Sun, Trash2, User } from "lucide-react";
+import { ArrowLeft, Bot, FileText, MessageSquare, Monitor, Moon, PanelLeftClose, PanelLeftOpen, Plus, Send, Smile, Square, Sun, Trash2, User } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { WelcomePage } from "@/components/WelcomePage";
 
-import type { ChatMessage, ChatResponse, ChatStreamPayload, SessionBootstrap, ThemeMode } from "./types";
+import type { ChatMessage, ChatResponse, ChatStreamPayload, ProjectEntry, SessionBootstrap, SessionSummary, ThemeMode } from "./types";
 import { CHAT_STREAM_EVENT, THEME_STORAGE_KEY } from "./constants";
 import { appendStreamBlock, findLastAssistantIndex, getPreferredTheme, resolveTheme } from "./utils";
 import { Markdown, renderMessage } from "./components/MessageBlocks";
 
 function App() {
   const [theme, setTheme] = useState<ThemeMode>(() => getPreferredTheme());
-  const [projectPath, setProjectPath] = useState<string | null>(null);
+  const [project, setProject] = useState<ProjectEntry | null>(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", resolveTheme(theme) === "dark");
@@ -33,22 +33,22 @@ function App() {
     return () => media.removeEventListener("change", listener);
   }, [theme]);
 
-  if (!projectPath) {
-    return <WelcomePage onSelect={setProjectPath} />;
+  if (!project) {
+    return <WelcomePage onSelect={setProject} />;
   }
 
-  return <ChatView theme={theme} setTheme={setTheme} projectPath={projectPath} onBack={() => setProjectPath(null)} />;
+  return <ChatView theme={theme} setTheme={setTheme} project={project} onBack={() => setProject(null)} />;
 }
 
 function ChatView({
   theme,
   setTheme,
-  projectPath,
+  project,
   onBack,
 }: {
   theme: ThemeMode;
   setTheme: (t: ThemeMode | ((prev: ThemeMode) => ThemeMode)) => void;
-  projectPath: string;
+  project: ProjectEntry;
   onBack: () => void;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -58,6 +58,8 @@ function ChatView({
   const [error, setError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionDirName, setSessionDirName] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [activeRowId, setActiveRowId] = useState<number | null>(null);
   const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"chat" | "system-prompt">("chat");
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -86,6 +88,40 @@ function ChatView({
       await invoke("clear_history");
       setMessages([]);
     } catch {}
+  }
+
+  async function refreshSessions() {
+    try {
+      const list = await invoke<SessionSummary[]>("list_sessions");
+      setSessions(list);
+    } catch {}
+  }
+
+  async function loadSession(sid?: string, rowId?: number | null) {
+    setLoading(true);
+    setError(null);
+    lastProcessedSeqRef.current = 0;
+    try {
+      const data = await invoke<SessionBootstrap>("bootstrap_chat", { sessionId: sid ?? null });
+      setMessages(data.messages);
+      setSessionId(data.sessionId);
+      setSessionDirName(data.sessionDirName);
+      setActiveRowId(rowId ?? null);
+      await refreshSessions();
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSelectSession(summary: SessionSummary) {
+    if (summary.id === activeRowId) return;
+    await loadSession(summary.sessionId, summary.id);
+  }
+
+  async function handleNewSession() {
+    await loadSession(undefined, null);
   }
 
   useEffect(() => {
@@ -142,10 +178,9 @@ function ChatView({
 
   useEffect(() => {
     invoke("resize_window_for_chat").catch(() => {});
-    invoke<SessionBootstrap>("bootstrap_chat", { projectPath })
-      .then((data) => { setMessages(data.messages); setSessionId(data.sessionId); setSessionDirName(data.sessionDirName); })
-      .catch((err) => setError(String(err)))
-      .finally(() => setLoading(false));
+    refreshSessions();
+    setLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -166,11 +201,12 @@ function ChatView({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showEmojiPicker]);
 
-  const canSend = useMemo(() => prompt.trim().length > 0 && !sending, [prompt, sending]);
+  const canSend = useMemo(() => prompt.trim().length > 0 && !sending && !!sessionId, [prompt, sending, sessionId]);
   const lastAssistantIndex = useMemo(() => findLastAssistantIndex(messages), [messages]);
 
   async function submitPrompt(content: string) {
     if (isSubmittingRef.current) return;
+    if (!sessionId) return;
     isSubmittingRef.current = true;
     lastProcessedSeqRef.current = 0;
     const nextUserMessage: ChatMessage = { role: "user", content };
@@ -279,14 +315,48 @@ function ChatView({
       {/* Left navigation panel */}
       {sidebarOpen && (
         <aside className="flex w-56 shrink-0 flex-col border-r bg-muted/30">
-          <div className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Session</div>
-          <div className="flex-1 overflow-y-auto px-3 py-1">
+          <div className="flex items-center justify-between px-3 py-2">
+            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sessions</div>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleNewSession} title="New session">
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          <div className="px-3 py-1">
             <div className="rounded-md bg-muted/50 px-2.5 py-2 text-xs">
-              <div className="font-medium truncate" title={projectPath}>{projectPath.split("/").pop()}</div>
-              {sessionDirName && <div className="mt-1 truncate text-muted-foreground" title={sessionDirName}>{sessionDirName}</div>}
-              {sessionId && <div className="mt-1 font-mono text-[10px] text-muted-foreground truncate" title={sessionId}>{sessionId}</div>}
+              <div className="font-medium truncate" title={project.path}>{project.name}</div>
+              <div className="mt-0.5 truncate text-[11px] text-muted-foreground" title={project.path}>
+                {project.path.replace(/^\/Users\/[^/]+/, "~")}
+              </div>
             </div>
           </div>
+          <div className="flex-1 overflow-y-auto px-2 py-1">
+            {sessions.length === 0 && (
+              <div className="px-2 py-4 text-center text-xs text-muted-foreground">No sessions yet.</div>
+            )}
+            {sessions.map((s) => {
+              const isActive = s.id === activeRowId;
+              const label = s.title?.trim() ? s.title : s.sessionId;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => handleSelectSession(s)}
+                  className={`mb-0.5 flex w-full flex-col items-start rounded-md px-2 py-1.5 text-left text-xs transition-colors ${
+                    isActive ? "bg-accent text-accent-foreground" : "hover:bg-accent/60"
+                  }`}
+                >
+                  <span className="truncate w-full font-medium" title={label}>{label}</span>
+                  <span className="truncate w-full font-mono text-[10px] text-muted-foreground" title={s.sessionId}>
+                    {s.sessionId}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {sessionDirName && (
+            <div className="border-t px-3 py-1.5 font-mono text-[10px] text-muted-foreground truncate" title={sessionDirName}>
+              {sessionDirName}
+            </div>
+          )}
         </aside>
       )}
 
@@ -296,7 +366,18 @@ function ChatView({
           {/* Messages */}
           <div className="flex-1 overflow-y-auto">
             <div className="mx-auto max-w-3xl px-6 py-3">
-              {!loading && messages.length === 0 && (
+              {!loading && !sessionId && (
+                <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                    <Bot className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold">No session selected</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">Pick a session from the sidebar, or click + to start a new one.</p>
+                  </div>
+                </div>
+              )}
+              {!loading && sessionId && messages.length === 0 && (
                 <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                     <Bot className="h-6 w-6 text-muted-foreground" />

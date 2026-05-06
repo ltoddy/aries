@@ -1,7 +1,15 @@
 export type ProjectEntry = {
+  id: number;
   name: string;
   path: string;
   branch: string | null;
+};
+
+export type SessionSummary = {
+  id: number;
+  sessionId: string;
+  title: string;
+  rootDir: string;
 };
 
 export type ChatBlock = {
@@ -52,3 +60,14 @@ export type ToolCallData = {
 };
 
 export type ThemeMode = "light" | "dark" | "system";
+
+export type ConfigProvider = "deepseek-v4" | "openai-compatible" | "azure";
+
+export type ConfigFormData = {
+  provider: ConfigProvider;
+  apiKey: string;
+  model: string;
+  baseUrl?: string | null;
+  azureEndpoint?: string | null;
+  apiVersion?: string | null;
+};

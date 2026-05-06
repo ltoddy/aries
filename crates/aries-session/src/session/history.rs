@@ -6,7 +6,7 @@ use rig::completion::Message;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 use tracing::{error, warn};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ChatHistory {
     history: Vec<Message>,
     sender: UnboundedSender<Vec<Message>>,

@@ -75,7 +75,7 @@ pub fn format_tool_result_output(tool_name: &str, result: &str, theme: Theme) ->
 
 pub fn display_token_usage(usage: &rig::completion::Usage, theme: &Theme) {
     println!(
-        "\n{} total={} input={} (cached={}) output={}\n",
+        "\n\n{} total={} input={} (cached={}) output={}",
         theme.dimmed("Token usage:"),
         theme.dimmed(&usage.total_tokens.to_string()),
         theme.dimmed(&usage.input_tokens.to_string()),

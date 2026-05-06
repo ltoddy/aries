@@ -12,7 +12,7 @@ use std::time::Instant;
 
 use aries_config::AriesConfigLoader;
 use aries_context::GlobalContext;
-use aries_session::{NoCb, Session};
+use aries_session::{NoCb, SessionRegistry};
 use clap::Parser;
 use rustyline::error::ReadlineError;
 use terminal_size::{Width, terminal_size};
@@ -36,8 +36,10 @@ async fn main() -> anyhow::Result<()> {
     let loader = AriesConfigLoader::new(&gctx.config_dir);
     let config = loader.load_or_setup().await?;
 
-    let h = hook::DisplayPromptHook::new(Theme::default());
-    let mut session = Session::new("main".to_owned(), gctx.clone(), config.clone(), h).await?;
+    let mut registry = SessionRegistry::new(gctx.clone(), config.clone()).await?;
+    let project = registry.active(&gctx.current_dir).await?;
+
+    let mut session = registry.get_session(project, "main".to_owned()).await?;
     let _guard = logger::init(session.dir());
 
     let mut reader = input::InputReader::new(session.dir())?;
@@ -60,7 +62,9 @@ async fn main() -> anyhow::Result<()> {
 
                 print!("\n{}: ", theme.magenta_text("Aries"));
                 let start = Instant::now();
-                if let Err(err) = session.prompt(input, None::<NoCb>).await {
+                if let Err(err) =
+                    session.prompt(input, None::<NoCb>, hook::DisplayPromptHook::new(theme)).await
+                {
                     eprintln!("\n{}: {}", theme.red_text("Error streaming_chunk"), err);
                     continue;
                 }

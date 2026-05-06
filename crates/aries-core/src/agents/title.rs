@@ -11,7 +11,7 @@ pub struct TitleAgent<M>
 where
     M: completion::CompletionModel,
 {
-    inner: AriesAgent<M, ()>,
+    inner: AriesAgent<M>,
 }
 
 impl<M> TitleAgent<M>

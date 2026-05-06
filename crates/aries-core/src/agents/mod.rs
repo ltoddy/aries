@@ -63,36 +63,38 @@ impl AgentType {
 
 pub const AGENT_LOOP_MAX_TURNS: usize = 200;
 
-pub struct AriesAgent<M, P = ()>
+#[derive(Clone)]
+pub struct AriesAgent<M>
 where
     M: completion::CompletionModel,
-    P: PromptHook<M>,
 {
-    inner: Agent<M, P>,
+    inner: Agent<M>,
     preamble: String,
 }
 
-impl<M, P> AriesAgent<M, P>
+impl<M> AriesAgent<M>
 where
     M: completion::CompletionModel,
-    P: PromptHook<M>,
 {
-    pub fn new(inner: Agent<M, P>, preamble: String) -> Self {
+    pub fn new(inner: Agent<M>, preamble: String) -> Self {
         Self { inner, preamble }
     }
 }
 
-impl<M, P> AriesAgent<M, P>
+impl<M> AriesAgent<M>
 where
     M: completion::CompletionModel + 'static,
-    P: PromptHook<M> + 'static,
 {
-    pub async fn stream_prompt(
+    pub async fn stream_prompt<P>(
         &mut self,
         prompt: impl Into<Message> + WasmCompatSend,
         history: &[Message],
-    ) -> StreamingResult<<M>::StreamingResponse> {
-        self.inner.stream_prompt(prompt).with_history(history.to_vec()).await
+        hook: P,
+    ) -> StreamingResult<<M>::StreamingResponse>
+    where
+        P: PromptHook<M> + 'static,
+    {
+        self.inner.stream_prompt(prompt).with_history(history.to_vec()).with_hook(hook).await
     }
 
     pub async fn prompt(
@@ -110,36 +112,27 @@ where
     }
 }
 
-pub struct AgentBuilder<C, P>
+pub struct AgentBuilder<C>
 where
     C: CompletionClient,
     C::CompletionModel: completion::CompletionModel,
-    P: PromptHook<C::CompletionModel>,
 {
     pub(crate) client: C,
     pub(crate) config: AriesConfig,
     pub(crate) agent_type: AgentType,
-    pub(crate) hook: P,
     pub(crate) gctx: GlobalContext,
 }
 
-impl<C, P> AgentBuilder<C, P>
+impl<C> AgentBuilder<C>
 where
     C: CompletionClient + Clone + Send + Sync + 'static,
     C::CompletionModel: completion::CompletionModel + 'static,
-    P: PromptHook<C::CompletionModel> + 'static,
 {
-    pub fn new(
-        client: C,
-        config: AriesConfig,
-        agent_type: AgentType,
-        hook: P,
-        gctx: GlobalContext,
-    ) -> Self {
-        Self { client, config, agent_type, hook, gctx }
+    pub fn new(client: C, config: AriesConfig, agent_type: AgentType, gctx: GlobalContext) -> Self {
+        Self { client, config, agent_type, gctx }
     }
 
-    pub fn build(self) -> AriesAgent<C::CompletionModel, P> {
+    pub fn build(self) -> AriesAgent<C::CompletionModel> {
         let model = self.config.model().to_owned();
         let agent_type = self.agent_type;
 
@@ -148,7 +141,6 @@ where
         let inner = self
             .client
             .agent(model)
-            .hook(self.hook)
             .name(agent_type.name())
             .description(agent_type.description())
             .preamble(&preamble)
@@ -162,7 +154,7 @@ where
         self,
         spawner: TaskSpawner,
         lsp_client: Option<SharedLspClient>,
-    ) -> AriesAgent<C::CompletionModel, P> {
+    ) -> AriesAgent<C::CompletionModel> {
         let model = self.config.model().to_owned();
         let agent_type = self.agent_type;
 
@@ -177,7 +169,6 @@ where
         let inner = self
             .client
             .agent(model)
-            .hook(self.hook)
             .name(agent_type.name())
             .description(agent_type.description())
             .preamble(&preamble)

@@ -9,11 +9,9 @@ aries-config = { path = "../aries-config" }
 aries-context = { path = "../aries-context" }
 aries-core = { path = "../aries-core" }
 futures.workspace = true
+jiff.workspace = true
 nanoid.workspace = true
 rig-core.workspace = true
-serde = { workspace = true, features = ["derive"] }
-serde_json.workspace = true
-serde_yaml.workspace = true
-thiserror.workspace = true
+toasty = { workspace = true, features = ["jiff", "sqlite"] }
 tokio = { workspace = true, features = ["sync"] }
 tracing.workspace = true
