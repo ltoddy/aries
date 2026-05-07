@@ -7,7 +7,6 @@ use aries_config::AriesConfig;
 use aries_context::GlobalContext;
 use aries_core::agents::{AgentBuilder, AgentType, AriesAgent, CompactionAgent};
 use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
-use aries_core::task_spawner::{NotificationReceiver, TaskSpawner};
 use futures::{StreamExt, pin_mut};
 use rig::agent::{FinalResponse, MultiTurnStreamItem, PromptHook};
 use rig::completion::Message;
@@ -24,7 +23,6 @@ mod history;
 pub struct Session {
     id: String,
     agents: ProviderAgents,
-    notifications_rx: NotificationReceiver,
     #[allow(unused)]
     lsp_client: Option<SharedLspClient>,
     chat_history: ChatHistory,
@@ -53,21 +51,11 @@ impl Session {
 
         let lsp_client = Self::warm_up_lsp(&gctx.current_dir).await;
 
-        let (agents, notifications_rx) =
-            Self::create_agents(&gctx, config, lsp_client.clone()).await?;
+        let agents = Self::create_agents(&gctx, config, lsp_client.clone()).await?;
 
         let chat_history = ChatHistory::new(root.join(Self::FILENAME)).await;
 
-        let s = Self {
-            id,
-            agents,
-            notifications_rx,
-            lsp_client,
-            chat_history,
-            transcript_dir,
-            root,
-            gctx,
-        };
+        let s = Self { id, agents, lsp_client, chat_history, transcript_dir, root, gctx };
         s.save_current_dir().await;
 
         Ok(s)
@@ -85,15 +73,13 @@ impl Session {
 
         let lsp_client = Self::warm_up_lsp(&gctx.current_dir).await;
 
-        let (agents, notifications_rx) =
-            Self::create_agents(&gctx, config, lsp_client.clone()).await?;
+        let agents = Self::create_agents(&gctx, config, lsp_client.clone()).await?;
 
         let chat_history = ChatHistory::new(root.join(Self::FILENAME)).await;
 
         Ok(Self {
             id,
             agents,
-            notifications_rx,
             lsp_client,
             chat_history,
             transcript_dir: root.join("transcripts"),
@@ -147,8 +133,6 @@ impl Session {
             + PromptHook<azure::CompletionModel>
             + 'static,
     {
-        self.drain_task_notifications();
-
         let final_res = match &mut self.agents {
             ProviderAgents::OpenAICompatible { agent, compaction_agent } => {
                 CompactionAgent::<openai::CompletionModel>::micro_compact(
@@ -236,8 +220,8 @@ impl Session {
         gctx: &GlobalContext,
         config: AriesConfig,
         lsp_client: Option<SharedLspClient>,
-    ) -> anyhow::Result<(ProviderAgents, NotificationReceiver)> {
-        let (agents, notifications_rx) = match config.clone() {
+    ) -> anyhow::Result<ProviderAgents> {
+        let agents = match config.clone() {
             AriesConfig::OpenAICompatible(ref conf) => {
                 let client = openai::CompletionsClient::builder()
                     .base_url(&conf.base_url)
@@ -245,17 +229,16 @@ impl Session {
                     .build()
                     .with_context(|| "Failed to create llm client")?;
 
-                let (spawner, notifications_rx) = TaskSpawner::new();
                 let agent = AgentBuilder::new(
                     client.clone(),
                     config.clone(),
                     AgentType::Build,
                     gctx.clone(),
                 )
-                .with_tools(spawner, lsp_client)
+                .with_tools(lsp_client)
                 .await;
                 let compaction_agent = CompactionAgent::new(client, config.model());
-                (ProviderAgents::OpenAICompatible { agent, compaction_agent }, notifications_rx)
+                ProviderAgents::OpenAICompatible { agent, compaction_agent }
             },
             AriesConfig::Azure(ref conf) => {
                 let client = azure::Client::builder()
@@ -265,21 +248,20 @@ impl Session {
                     .build()
                     .with_context(|| "Failed to create llm client")?;
 
-                let (spawner, notifications_rx) = TaskSpawner::new();
                 let agent = AgentBuilder::new(
                     client.clone(),
                     config.clone(),
                     AgentType::Build,
                     gctx.clone(),
                 )
-                .with_tools(spawner, lsp_client)
+                .with_tools(lsp_client)
                 .await;
                 let compaction_agent = CompactionAgent::new(client, config.model());
-                (ProviderAgents::Azure { agent, compaction_agent }, notifications_rx)
+                ProviderAgents::Azure { agent, compaction_agent }
             },
         };
 
-        Ok((agents, notifications_rx))
+        Ok(agents)
     }
 
     async fn save_current_dir(&self) {
@@ -332,33 +314,6 @@ impl Session {
         }
 
         None
-    }
-
-    fn drain_task_notifications(&mut self) {
-        let notifications = self.notifications_rx.drain();
-        if notifications.is_empty() {
-            return;
-        }
-
-        let notif_text: String = notifications
-            .iter()
-            .map(|n| {
-                let mut parts =
-                    format!("[task:{}] command={} exit_code={}", n.task_id, n.command, n.exit_code);
-                if !n.stdout.is_empty() {
-                    parts.push_str(&format!("\nstdout: {}", n.stdout));
-                }
-                if !n.stderr.is_empty() {
-                    parts.push_str(&format!("\nstderr: {}", n.stderr));
-                }
-                parts
-            })
-            .collect::<Vec<_>>()
-            .join("\n\n");
-
-        self.chat_history
-            .push(Message::user(format!("<task-results>\n{}\n</task-results>", notif_text)));
-        self.chat_history.push(Message::assistant("Noted task results."));
     }
 }
 

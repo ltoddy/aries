@@ -1,6 +1,0 @@
-查询后台任务的当前状态和结果。
-
-- `task_id` 是 `task_spawn` 返回的任务标识符。
-- 如果任务仍在运行，返回 `status: "running"`。
-- 如果任务已完成，返回 `status: "completed"` 以及 `stdout`、`stderr` 和 `exit_code`。
-- 通常不需要手动调用此工具，因为任务完成后结果会自动注入到对话中。仅在需要主动轮询任务状态时使用。

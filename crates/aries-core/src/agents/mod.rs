@@ -17,7 +17,6 @@ pub use self::summary::SummaryAgent;
 pub use self::title::TitleAgent;
 use crate::ext::skill::{SkillFilesLoader, SkillInfo};
 use crate::language_server::SharedLspClient;
-use crate::task_spawner::TaskSpawner;
 use crate::tools;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -163,7 +162,6 @@ where
 
     pub async fn with_tools(
         self,
-        spawner: TaskSpawner,
         lsp_client: Option<SharedLspClient>,
     ) -> AriesAgent<C::CompletionModel> {
         let model = self.config.model().to_owned();
@@ -175,7 +173,7 @@ where
         let preamble =
             crate::preamble::render(&self.gctx, agent_type, &model, &available_skills).await;
 
-        let tools = self.build_tools(spawner, lsp_client, available_skills);
+        let tools = self.build_tools(lsp_client, available_skills);
 
         let inner = self
             .client
@@ -192,7 +190,6 @@ where
 
     fn build_tools(
         &self,
-        spawner: TaskSpawner,
         lsp_client: Option<SharedLspClient>,
         available_skills: Vec<SkillInfo>,
     ) -> Vec<Box<dyn ToolDyn>> {
@@ -221,8 +218,6 @@ where
                 config.clone(),
                 gctx.clone(),
             )));
-            tools.push(Box::new(tools::task_spawn::TaskSpawnTool::new(spawner.clone())));
-            tools.push(Box::new(tools::task_status::TaskStatusTool::new(spawner)));
         }
 
         if matches!(agent_type, AgentType::Build | AgentType::General | AgentType::Plan) {

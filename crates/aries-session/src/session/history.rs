@@ -50,10 +50,6 @@ impl ChatHistory {
         &mut self.history
     }
 
-    pub fn push(&mut self, message: Message) {
-        self.history.push(message);
-    }
-
     pub fn extend(&mut self, messages: impl IntoIterator<Item = Message>) {
         self.history.extend(messages);
     }
