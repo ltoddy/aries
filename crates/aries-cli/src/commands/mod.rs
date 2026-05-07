@@ -53,7 +53,7 @@ impl Command {
 
 pub async fn execute(input: &str, theme: &Theme, gctx: &GlobalContext, session: &mut Session) {
     let input = input.strip_prefix('/').unwrap_or(input);
-    let mut args = vec![String::from(env!("CARGO_PKG_NAME"))];
+    let mut args = vec![String::from(env!("CARGO_BIN_NAME"))];
 
     if let Some(rest) = input.strip_prefix("help") {
         let rest = rest.trim();
@@ -76,7 +76,7 @@ pub async fn execute(input: &str, theme: &Theme, gctx: &GlobalContext, session: 
     };
 
     match cli.command {
-        Command::Exit => exit::exit(),
+        Command::Exit => exit::exit(&session.id()),
         Command::Shell { command } => {
             let cmd = command.join(" ");
             shell::execute(&cmd, theme).await;

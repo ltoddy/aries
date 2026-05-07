@@ -24,12 +24,14 @@ async fn main() -> anyhow::Result<()> {
     let gctx = GlobalContext::new()?;
     let args = cli::Args::parse();
 
+    let mut session_id = nanoid::nanoid!();
     match args.command {
         Some(cli::Subcommands::Init { command }) => {
             return cli::init::execute(gctx, command).await;
         },
         Some(cli::Subcommands::Setup) => return cli::setup::execute(gctx).await,
         Some(cli::Subcommands::Acp) => return cli::acp::execute(gctx).await,
+        Some(cli::Subcommands::Resume { session_id: id }) => session_id = id,
         _ => {},
     }
 
@@ -37,13 +39,13 @@ async fn main() -> anyhow::Result<()> {
     let config = loader.load_or_setup().await?;
 
     let mut registry = SessionRegistry::new(gctx.clone(), config.clone()).await?;
-    let project = registry.active(&gctx.current_dir).await?;
 
-    let mut session = registry.get_session(project, "main".to_owned()).await?;
+    let current_dir = gctx.current_dir.display().to_string();
+    let mut session = registry.get_session(&current_dir, &session_id).await?;
     let _guard = logger::init(session.dir());
 
     let mut reader = input::InputReader::new(session.dir())?;
-    welcome::welcome(config.provider(), config.model(), &gctx);
+    welcome::welcome(config.provider(), config.model(), &session.id(), &gctx);
 
     loop {
         let theme = Theme::default();
@@ -71,7 +73,9 @@ async fn main() -> anyhow::Result<()> {
 
                 display_elapsed(start, &theme);
             },
-            Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => commands::exit::exit(),
+            Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
+                commands::exit::exit(&session.id())
+            },
             Err(err) => eprintln!("Error: {:?}", err),
         }
     }

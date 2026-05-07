@@ -20,4 +20,7 @@ pub enum Subcommands {
         command: InitCommand,
     },
     Setup,
+    Resume {
+        session_id: String,
+    },
 }

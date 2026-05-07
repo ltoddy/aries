@@ -59,7 +59,7 @@ function ChatView({
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionDirName, setSessionDirName] = useState<string | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
-  const [activeRowId, setActiveRowId] = useState<number | null>(null);
+  const [activeRowId, setActiveRowId] = useState<string | null>(null);
   const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"chat" | "system-prompt">("chat");
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -97,7 +97,7 @@ function ChatView({
     } catch {}
   }
 
-  async function loadSession(sid?: string, rowId?: number | null) {
+  async function loadSession(sid?: string, rowId?: string | null) {
     setLoading(true);
     setError(null);
     lastProcessedSeqRef.current = 0;

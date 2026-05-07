@@ -3,10 +3,10 @@ use terminal_size::{Width, terminal_size};
 
 use crate::theme::Theme;
 
-pub fn welcome(provider: &str, model: &str, context: &GlobalContext) {
+pub fn welcome(provider: &str, model: &str, session_id: &str, context: &GlobalContext) {
     let theme = Theme::default();
 
-    let name = env!("CARGO_PKG_NAME");
+    let name = env!("CARGO_BIN_NAME");
     let version = env!("CARGO_PKG_VERSION");
 
     let title = format!(" {name} v{version} ");
@@ -17,6 +17,7 @@ pub fn welcome(provider: &str, model: &str, context: &GlobalContext) {
     };
     let mascot = ["▄▀▀▙▟▀▀▄", " ▝▜██▛▘", "   ▘▘"];
     let info = format!("{model} · {provider}");
+    let sid = format!("session: {session_id}");
     let dir = context.current_dir.display().to_string();
 
     let term_width = terminal_size().map(|(Width(w), _)| w as usize).unwrap_or(80);
@@ -43,6 +44,7 @@ pub fn welcome(provider: &str, model: &str, context: &GlobalContext) {
 
     println!("{blank}");
     print_centered(&theme, &info, inner, |s| s.to_string());
+    print_centered(&theme, &sid, inner, |s| format!("{}", theme.dimmed(s)));
     print_centered(&theme, &dir, inner, |s| format!("{}", theme.dimmed(s)));
 
     println!("{}", theme.dimmed(&format!("╰{}╯", "─".repeat(inner))));

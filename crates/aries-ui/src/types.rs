@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectEntry {
-    pub id: u64,
+    pub id: String,
     pub name: String,
     pub path: String,
     pub branch: Option<String>,
@@ -12,10 +12,10 @@ pub struct ProjectEntry {
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionSummary {
-    pub id: u64,
+    pub id: String,
     pub session_id: String,
-    pub title: String,
-    pub root_dir: String,
+    pub title: Option<String>,
+    pub project_dir: String,
 }
 
 #[derive(Debug, Serialize)]

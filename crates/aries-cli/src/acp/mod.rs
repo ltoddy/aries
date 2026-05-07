@@ -1,4 +1,5 @@
 use std::cell::Cell;
+use std::path::PathBuf;
 
 use agent_client_protocol::{
     AuthenticateRequest, AuthenticateResponse, CancelNotification, ContentBlock, ContentChunk,
@@ -18,10 +19,10 @@ use tokio::sync::{Mutex, mpsc, oneshot};
 use tracing::info;
 
 pub struct AcpImpl {
+    current_dir: PathBuf,
     registry: Mutex<SessionRegistry>,
     sender: mpsc::UnboundedSender<(SessionNotification, oneshot::Sender<()>)>,
     next_session_id: Cell<String>,
-    project: aries_session::persistence::Project,
 }
 
 impl AcpImpl {
@@ -31,11 +32,14 @@ impl AcpImpl {
         sender: mpsc::UnboundedSender<(SessionNotification, oneshot::Sender<()>)>,
     ) -> anyhow::Result<Self> {
         let next_session_id = Cell::new(nanoid::nanoid!());
-        let mut registry = SessionRegistry::new(gctx.clone(), config).await?;
+        let registry = SessionRegistry::new(gctx.clone(), config).await?;
 
-        let project = registry.active(&gctx.config_dir).await?;
-
-        Ok(Self { registry: Mutex::new(registry), sender, next_session_id, project })
+        Ok(Self {
+            current_dir: gctx.current_dir,
+            registry: Mutex::new(registry),
+            sender,
+            next_session_id,
+        })
     }
 }
 
@@ -68,10 +72,11 @@ impl agent_client_protocol::Agent for AcpImpl {
     ) -> agent_client_protocol::Result<NewSessionResponse> {
         info!("Received new session request {args:?}");
 
+        let current_dir = self.current_dir.display().to_string();
         let mut registry = self.registry.lock().await;
         let session_id = nanoid::nanoid!();
         let session = registry
-            .get_session(self.project.clone(), session_id)
+            .get_session(&current_dir, &session_id)
             .await
             .map_err(|_| Error::internal_error())?;
         self.next_session_id.set(session.id());
@@ -94,7 +99,9 @@ impl agent_client_protocol::Agent for AcpImpl {
 
         let mut registry = self.registry.lock().await;
         let session_id = args.session_id.to_string();
-        let mut session = registry.get_session(self.project.clone(), session_id).await?;
+        let current_dir = self.current_dir.display().to_string();
+
+        let mut session = registry.get_session(&current_dir, &session_id).await?;
         session
             .prompt(
                 &promot,

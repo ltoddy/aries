@@ -95,14 +95,10 @@ fn convert_history(history: &[Message]) -> Vec<ChatMessage> {
                             }
                         },
                         AssistantContent::ToolCall(tc) => {
-                            let delta = format!(
-                                "[Tool] {}\n{}",
-                                tc.function.name, tc.function.arguments
-                            );
-                            blocks.push(ChatBlock {
-                                kind: "tool-call".to_string(),
-                                content: delta,
-                            });
+                            let delta =
+                                format!("[Tool] {}\n{}", tc.function.name, tc.function.arguments);
+                            blocks
+                                .push(ChatBlock { kind: "tool-call".to_string(), content: delta });
                         },
                         _ => {},
                     }
@@ -141,8 +137,8 @@ fn session_to_bootstrap(app_state: &AppState, session: &Session) -> SessionBoots
     }
 }
 
-fn require_project(app_state: &AppState) -> Result<aries_session::persistence::Project, String> {
-    app_state.active_project.clone().ok_or_else(|| "no active project".to_string())
+fn require_project_dir(app_state: &AppState) -> Result<String, String> {
+    app_state.active_project_dir.clone().ok_or_else(|| "no active project".to_string())
 }
 
 #[tauri::command]
@@ -151,18 +147,21 @@ pub async fn list_sessions(
 ) -> Result<Vec<SessionSummary>, String> {
     let mut guard = state.lock().await;
     let app_state = guard.as_mut().ok_or_else(|| "registry is not initialized".to_string())?;
-    let project = require_project(app_state)?;
+    let project_dir = require_project_dir(app_state)?;
 
-    let sessions =
-        app_state.registry.list_sessions(project.id).await.map_err(|err| err.to_string())?;
+    let sessions = app_state
+        .registry
+        .list_sessions(&project_dir)
+        .await
+        .map_err(|err| err.to_string())?;
 
     Ok(sessions
         .into_iter()
         .map(|s| SessionSummary {
-            id: s.id,
+            id: s.session_id.clone(),
             session_id: s.session_id,
             title: s.title,
-            root_dir: s.root_dir,
+            project_dir: s.project_dir,
         })
         .collect())
 }
@@ -174,11 +173,14 @@ pub async fn bootstrap_chat(
 ) -> Result<SessionBootstrap, String> {
     let mut guard = state.lock().await;
     let app_state = guard.as_mut().ok_or_else(|| "registry is not initialized".to_string())?;
-    let project = require_project(app_state)?;
+    let project_dir = require_project_dir(app_state)?;
 
     let sid = session_id.unwrap_or_else(|| nanoid::nanoid!());
-    let session =
-        app_state.registry.get_session(project, sid).await.map_err(|err| err.to_string())?;
+    let session = app_state
+        .registry
+        .get_session(&project_dir, &sid)
+        .await
+        .map_err(|err| err.to_string())?;
 
     let bootstrap = session_to_bootstrap(app_state, &session);
     app_state.active_session = Some(session);

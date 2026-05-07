@@ -21,7 +21,7 @@ async fn ensure_registry(guard: &mut Option<AppState>) -> Result<&mut AppState, 
             registry,
             provider,
             model,
-            active_project: None,
+            active_project_dir: None,
             active_session: None,
         });
     }
@@ -40,6 +40,15 @@ fn detect_git_branch(project_path: &str) -> Option<String> {
     }
 }
 
+fn project_entry_from_dir(dir: String) -> ProjectEntry {
+    let name = Path::new(&dir)
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| dir.clone());
+    let branch = detect_git_branch(&dir);
+    ProjectEntry { id: dir.clone(), name, path: dir, branch }
+}
+
 #[tauri::command]
 pub async fn list_projects(
     state: tauri::State<'_, SharedState>,
@@ -49,13 +58,7 @@ pub async fn list_projects(
 
     let projects = app_state.registry.list_projects().await.map_err(|err| err.to_string())?;
 
-    let entries = projects
-        .into_iter()
-        .map(|p| {
-            let branch = detect_git_branch(&p.dir);
-            ProjectEntry { id: p.id, name: p.name, path: p.dir, branch }
-        })
-        .collect();
+    let entries = projects.into_iter().map(project_entry_from_dir).collect();
 
     Ok(entries)
 }
@@ -73,16 +76,9 @@ pub async fn activate_project(
     let mut guard = state.lock().await;
     let app_state = ensure_registry(&mut guard).await?;
 
-    let project = app_state.registry.active(&path).await.map_err(|err| err.to_string())?;
+    let entry = project_entry_from_dir(path.clone());
 
-    let entry = ProjectEntry {
-        id: project.id,
-        name: project.name.clone(),
-        path: project.dir.clone(),
-        branch: detect_git_branch(&project.dir),
-    };
-
-    app_state.active_project = Some(project);
+    app_state.active_project_dir = Some(path);
     app_state.active_session = None;
 
     Ok(entry)

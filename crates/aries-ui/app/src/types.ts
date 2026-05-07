@@ -1,15 +1,15 @@
 export type ProjectEntry = {
-  id: number;
+  id: string;
   name: string;
   path: string;
   branch: string | null;
 };
 
 export type SessionSummary = {
-  id: number;
+  id: string;
   sessionId: string;
-  title: string;
-  rootDir: string;
+  title: string | null;
+  projectDir: string;
 };
 
 export type ChatBlock = {

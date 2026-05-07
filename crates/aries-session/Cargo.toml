@@ -9,6 +9,7 @@ aries-config = { path = "../aries-config" }
 aries-context = { path = "../aries-context" }
 aries-core = { path = "../aries-core" }
 futures.workspace = true
+itertools.workspace = true
 jiff.workspace = true
 nanoid.workspace = true
 rig-core.workspace = true
