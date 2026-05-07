@@ -71,7 +71,7 @@ pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
 
 pub fn format_tool_result(raw_text: &str, theme: Theme) -> String {
     match serde_json::from_str::<ApplyPatchOutput>(raw_text) {
-        Ok(output) => theme.dimmed(&output.message).to_string(),
+        Ok(output) => theme.dimmed(&output.to_string()).to_string(),
         Err(_) => theme.red_text(raw_text).to_string(),
     }
 }

@@ -1,3 +1,4 @@
+use std::fmt::{self, Display};
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -16,6 +17,12 @@ pub struct ReadFileArgs {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ReadFileOutput {
     pub content: String,
+}
+
+impl Display for ReadFileOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.content)
+    }
 }
 
 #[derive(thiserror::Error, Debug)]

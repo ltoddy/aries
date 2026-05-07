@@ -1,3 +1,4 @@
+use std::fmt::{self, Display};
 use std::process::Stdio;
 
 use anyhow::Result;
@@ -16,6 +17,24 @@ pub struct ShellCommandOutput {
     pub stdout: String,
     pub stderr: String,
     pub exit_code: i32,
+}
+
+impl Display for ShellCommandOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if !self.stdout.is_empty() {
+            write!(f, "{}", self.stdout)?;
+        }
+        if !self.stderr.is_empty() {
+            if !self.stdout.is_empty() {
+                writeln!(f)?;
+            }
+            write!(f, "stderr: {}", self.stderr)?;
+        }
+        if self.exit_code != 0 {
+            write!(f, "\nexit_code: {}", self.exit_code)?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(thiserror::Error, Debug)]

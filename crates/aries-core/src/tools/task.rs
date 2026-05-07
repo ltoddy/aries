@@ -1,3 +1,5 @@
+use std::fmt::{self, Display};
+
 use anyhow::Result;
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
@@ -23,6 +25,12 @@ pub struct TaskArgs {
 pub struct TaskOutput {
     pub task_id: String,
     pub result: String,
+}
+
+impl Display for TaskOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.result)
+    }
 }
 
 #[derive(thiserror::Error, Debug)]

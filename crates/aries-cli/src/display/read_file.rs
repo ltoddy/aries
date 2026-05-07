@@ -22,7 +22,7 @@ pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
 
 pub fn format_tool_result(result: &str, theme: Theme) -> String {
     match serde_json::from_str::<ReadFileOutput>(result) {
-        Ok(output) => theme.dimmed(&preview(output.content)).to_string(),
+        Ok(output) => theme.dimmed(&preview(output.to_string())).to_string(),
         Err(_) => theme.red_text(result).to_string(),
     }
 }

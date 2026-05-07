@@ -18,19 +18,7 @@ pub fn format_tool_result(result: &str, theme: Theme) -> String {
     let output = serde_json::from_str::<ShellCommandOutput>(result);
 
     match output {
-        Ok(output) => {
-            let mut out = String::new();
-            if !output.stdout.is_empty() {
-                out.push_str(&output.stdout);
-            }
-            if !output.stderr.is_empty() {
-                if !out.is_empty() {
-                    out.push('\n');
-                }
-                out.push_str(&output.stderr);
-            }
-            theme.dimmed(&preview(out)).to_string()
-        },
+        Ok(output) => theme.dimmed(&preview(output.to_string())).to_string(),
         Err(_) => theme.red_text(result).to_string(),
     }
 }

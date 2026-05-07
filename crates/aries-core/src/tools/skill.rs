@@ -1,3 +1,4 @@
+use std::fmt::{self, Display};
 use std::io;
 use std::path::PathBuf;
 
@@ -20,6 +21,12 @@ pub struct SkillOutput {
     pub title: String,
     pub output: String,
     pub metadata: SkillMetadata,
+}
+
+impl Display for SkillOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.output)
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]

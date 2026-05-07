@@ -1,3 +1,4 @@
+use std::fmt::{self, Display};
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -19,6 +20,12 @@ pub struct EditArgs {
 pub struct EditOutput {
     pub success: bool,
     pub message: String,
+}
+
+impl Display for EditOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
 }
 
 #[derive(thiserror::Error, Debug)]

@@ -1,3 +1,5 @@
+use std::fmt::{self, Display};
+
 use anyhow::Result;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
@@ -12,6 +14,12 @@ pub struct CodeSearchArgs {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CodeSearchOutput {
     pub results: String,
+}
+
+impl Display for CodeSearchOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.results)
+    }
 }
 
 #[derive(thiserror::Error, Debug)]

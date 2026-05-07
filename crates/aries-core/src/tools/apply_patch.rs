@@ -1,3 +1,4 @@
+use std::fmt::{self, Display};
 use std::path::Path;
 
 use anyhow::Result;
@@ -16,6 +17,12 @@ pub struct ApplyPatchArgs {
 pub struct ApplyPatchOutput {
     pub success: bool,
     pub message: String,
+}
+
+impl Display for ApplyPatchOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
 }
 
 #[derive(thiserror::Error, Debug)]

@@ -1,3 +1,4 @@
+use std::fmt::{self, Display};
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -24,6 +25,12 @@ pub struct MultiEditArgs {
 pub struct MultiEditOutput {
     pub success: bool,
     pub message: String,
+}
+
+impl Display for MultiEditOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
 }
 
 #[derive(thiserror::Error, Debug)]

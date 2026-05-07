@@ -24,7 +24,7 @@ pub fn format_tool_result(raw_text: &str, theme: Theme) -> String {
     let output = serde_json::from_str::<CodeSearchOutput>(raw_text);
 
     match output {
-        Ok(output) => theme.dimmed(&preview(output.results)).to_string(),
+        Ok(output) => theme.dimmed(&preview(output.to_string())).to_string(),
         Err(_) => theme.red_text(raw_text).to_string(),
     }
 }

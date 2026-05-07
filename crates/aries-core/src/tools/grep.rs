@@ -1,3 +1,5 @@
+use std::fmt::{self, Display};
+
 use anyhow::Result;
 use aries_context::GlobalContext;
 use globset::GlobBuilder;
@@ -17,6 +19,12 @@ pub struct GrepArgs {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GrepOutput {
     pub matches: Vec<String>,
+}
+
+impl Display for GrepOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.matches.join("\n"))
+    }
 }
 
 #[derive(thiserror::Error, Debug)]

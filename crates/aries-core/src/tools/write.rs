@@ -1,3 +1,4 @@
+use std::fmt::{self, Display};
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -15,6 +16,16 @@ pub struct WriteFileArgs {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WriteFileOutput {
     pub success: bool,
+}
+
+impl Display for WriteFileOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.success {
+            write!(f, "File written successfully")
+        } else {
+            write!(f, "Failed to write file")
+        }
+    }
 }
 
 #[derive(thiserror::Error, Debug)]

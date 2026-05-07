@@ -1,3 +1,5 @@
+use std::fmt::{self, Display};
+
 use anyhow::Result;
 use aries_context::GlobalContext;
 use futures::future::join_all;
@@ -40,6 +42,12 @@ pub struct BatchArgs {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BatchOutput {
     pub results: Vec<Value>,
+}
+
+impl Display for BatchOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} results", self.results.len())
+    }
 }
 
 #[derive(thiserror::Error, Debug)]

@@ -1,3 +1,5 @@
+use std::fmt::{self, Display};
+
 use anyhow::Result;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input, MultiSelect, Select};
@@ -28,6 +30,12 @@ fn default_custom() -> bool {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct QuestionOutput {
     pub answers: Vec<String>,
+}
+
+impl Display for QuestionOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.answers.join("\n"))
+    }
 }
 
 #[derive(thiserror::Error, Debug)]

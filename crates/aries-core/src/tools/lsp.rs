@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter};
+use std::fmt::{self, Display, Formatter};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
@@ -52,6 +52,96 @@ pub struct LspArgs {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LspOutput {
     pub result: LspResult,
+}
+
+impl Display for LspOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let content = match &self.result {
+            LspResult::Definition(locations)
+            | LspResult::References(locations)
+            | LspResult::Implementation(locations) => locations
+                .iter()
+                .map(|loc| {
+                    format!(
+                        "{}:{}:{}",
+                        loc.uri.strip_prefix("file://").unwrap_or(&loc.uri),
+                        loc.range.start.line + 1,
+                        loc.range.start.character + 1
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
+            LspResult::Hover(hover) => extract_hover_text(&hover.contents),
+            LspResult::DocumentSymbol(symbols) | LspResult::WorkspaceSymbol(symbols) => symbols
+                .iter()
+                .map(|s| {
+                    let loc = format!(
+                        "{}:{}",
+                        s.location.uri.strip_prefix("file://").unwrap_or(&s.location.uri),
+                        s.location.range.start.line + 1
+                    );
+                    format!("{} [{}] {}", s.name, s.kind, loc)
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
+            LspResult::PrepareCallHierarchy(items) => items
+                .iter()
+                .map(|item| {
+                    format!(
+                        "{} [{}] {}",
+                        item.name,
+                        item.kind,
+                        item.uri.strip_prefix("file://").unwrap_or(&item.uri)
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
+            LspResult::IncomingCalls(calls) => calls
+                .iter()
+                .map(|c| {
+                    format!(
+                        "{} [{}] {}",
+                        c.from.name,
+                        c.from.kind,
+                        c.from.uri.strip_prefix("file://").unwrap_or(&c.from.uri)
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
+            LspResult::OutgoingCalls(calls) => calls
+                .iter()
+                .map(|c| {
+                    format!(
+                        "{} [{}] {}",
+                        c.to.name,
+                        c.to.kind,
+                        c.to.uri.strip_prefix("file://").unwrap_or(&c.to.uri)
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
+        };
+        write!(f, "{}", content)
+    }
+}
+
+fn extract_hover_text(contents: &serde_json::Value) -> String {
+    match contents {
+        serde_json::Value::String(s) => s.clone(),
+        serde_json::Value::Object(obj) => {
+            obj.get("value").and_then(|v| v.as_str()).unwrap_or_default().to_string()
+        },
+        serde_json::Value::Array(arr) => arr
+            .iter()
+            .filter_map(|item| match item {
+                serde_json::Value::String(s) => Some(s.as_str()),
+                serde_json::Value::Object(obj) => obj.get("value").and_then(|v| v.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
+        _ => String::new(),
+    }
 }
 
 #[derive(thiserror::Error, Debug)]

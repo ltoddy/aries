@@ -18,13 +18,7 @@ pub fn format_tool_result(result: &str, theme: Theme) -> String {
     let output = serde_json::from_str::<SkillOutput>(result);
 
     match output {
-        Ok(output) => {
-            let mut out = format!("{} at {}", output.metadata.name, output.metadata.dir.display());
-            out.push('\n');
-            out.push_str(&output.output);
-
-            theme.dimmed(&preview(out)).to_string()
-        },
+        Ok(output) => theme.dimmed(&preview(output.to_string())).to_string(),
         Err(_) => theme.red_text(result).to_string(),
     }
 }

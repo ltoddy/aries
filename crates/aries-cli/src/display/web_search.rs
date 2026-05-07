@@ -18,7 +18,7 @@ pub fn format_tool_result(result: &str, theme: Theme) -> String {
     let output = serde_json::from_str::<WebSearchOutput>(result);
 
     match output {
-        Ok(output) => theme.dimmed(&preview(output.results)).to_string(),
+        Ok(output) => theme.dimmed(&preview(output.to_string())).to_string(),
         Err(_) => theme.red_text(result).to_string(),
     }
 }

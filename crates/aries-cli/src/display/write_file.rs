@@ -23,10 +23,11 @@ pub fn format_tool_result(result: &str, theme: Theme) -> String {
 
     match output {
         Ok(output) => {
+            let text = output.to_string();
             if output.success {
-                theme.green_text("File written successfully").to_string()
+                theme.green_text(&text).to_string()
             } else {
-                theme.red_text("Failed to write file").to_string()
+                theme.red_text(&text).to_string()
             }
         },
         Err(_) => theme.red_text(result).to_string(),

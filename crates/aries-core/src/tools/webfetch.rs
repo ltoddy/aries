@@ -1,3 +1,5 @@
+use std::fmt::{self, Display};
+
 use anyhow::Result;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
@@ -12,6 +14,12 @@ pub struct WebFetchArgs {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WebFetchOutput {
     pub content: String,
+}
+
+impl Display for WebFetchOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.content)
+    }
 }
 
 #[derive(thiserror::Error, Debug)]

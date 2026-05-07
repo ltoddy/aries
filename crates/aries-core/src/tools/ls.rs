@@ -1,3 +1,4 @@
+use std::fmt::{self, Display};
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -17,6 +18,12 @@ pub struct LsArgs {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LsOutput {
     pub entries: Vec<String>,
+}
+
+impl Display for LsOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.entries.join("\n"))
+    }
 }
 
 #[derive(thiserror::Error, Debug)]

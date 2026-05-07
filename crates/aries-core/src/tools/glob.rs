@@ -1,3 +1,4 @@
+use std::fmt::{self, Display};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
@@ -16,6 +17,12 @@ pub struct GlobArgs {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GlobOutput {
     pub files: Vec<String>,
+}
+
+impl Display for GlobOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.files.join("\n"))
+    }
 }
 
 #[derive(thiserror::Error, Debug)]
