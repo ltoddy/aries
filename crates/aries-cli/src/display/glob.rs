@@ -1,4 +1,5 @@
-use aries_core::tools::glob::{GlobArgs, GlobOutput, NAME};
+use aries_core::tools::glob::NAME;
+use aries_core::tools::{GlobArgs, GlobOutput};
 
 use crate::display::preview;
 use crate::theme::Theme;

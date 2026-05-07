@@ -1,4 +1,5 @@
-use aries_core::tools::grep::{GrepArgs, GrepOutput, NAME};
+use aries_core::tools::grep::NAME;
+use aries_core::tools::{GrepArgs, GrepOutput};
 
 use crate::display::preview;
 use crate::theme::Theme;

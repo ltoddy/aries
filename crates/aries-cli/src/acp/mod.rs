@@ -1,5 +1,7 @@
 use std::cell::Cell;
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex as StdMutex};
 
 use agent_client_protocol::{
     AuthenticateRequest, AuthenticateResponse, CancelNotification, ContentBlock, ContentChunk,
@@ -10,6 +12,7 @@ use agent_client_protocol::{
 };
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
+use aries_core::tools::format_tool_output;
 use aries_session::SessionRegistry;
 use async_trait::async_trait;
 use rig::agent::{MultiTurnStreamItem, Text};
@@ -102,14 +105,18 @@ impl agent_client_protocol::Agent for AcpImpl {
         let current_dir = self.current_dir.display().to_string();
 
         let mut session = registry.get_session(&current_dir, &session_id).await?;
+        let tool_names: Arc<StdMutex<HashMap<String, String>>> =
+            Arc::new(StdMutex::new(HashMap::new()));
+
         session
             .prompt(
                 &promot,
                 Some(|item| {
                     let sender = self.sender.clone();
                     let session_id = args.session_id.clone();
+                    let tool_names = tool_names.clone();
                     async move {
-                        let updates = stream_item_to_updates(item);
+                        let updates = stream_item_to_updates(item, &tool_names);
                         for update in updates {
                             let (tx, rx) = oneshot::channel();
                             if sender
@@ -138,16 +145,24 @@ impl agent_client_protocol::Agent for AcpImpl {
     }
 }
 
-fn stream_item_to_updates(item: MultiTurnStreamItem<()>) -> Vec<SessionUpdate> {
+fn stream_item_to_updates(
+    item: MultiTurnStreamItem<()>,
+    tool_names: &Arc<StdMutex<HashMap<String, String>>>,
+) -> Vec<SessionUpdate> {
     match item {
-        MultiTurnStreamItem::StreamAssistantItem(assistant) => assistant_to_updates(assistant),
-        MultiTurnStreamItem::StreamUserItem(user) => user_to_updates(user),
+        MultiTurnStreamItem::StreamAssistantItem(assistant) => {
+            assistant_to_updates(assistant, tool_names)
+        },
+        MultiTurnStreamItem::StreamUserItem(user) => user_to_updates(user, tool_names),
         MultiTurnStreamItem::FinalResponse(_) => Vec::new(),
         _ => Vec::new(),
     }
 }
 
-fn assistant_to_updates(content: StreamedAssistantContent<()>) -> Vec<SessionUpdate> {
+fn assistant_to_updates(
+    content: StreamedAssistantContent<()>,
+    tool_names: &Arc<StdMutex<HashMap<String, String>>>,
+) -> Vec<SessionUpdate> {
     match content {
         StreamedAssistantContent::Text(Text { text }) => {
             vec![SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::Text(
@@ -175,7 +190,9 @@ fn assistant_to_updates(content: StreamedAssistantContent<()>) -> Vec<SessionUpd
                 TextContent::new(reasoning),
             )))]
         },
-        StreamedAssistantContent::ToolCall { tool_call, .. } => {
+        StreamedAssistantContent::ToolCall { tool_call, internal_call_id, .. } => {
+            tool_names.lock().unwrap().insert(internal_call_id, tool_call.function.name.clone());
+
             let arguments = tool_call.function.arguments.to_string();
             let tool_call = agent_client_protocol::ToolCall::new(
                 ToolCallId::new(&*tool_call.id),
@@ -189,10 +206,13 @@ fn assistant_to_updates(content: StreamedAssistantContent<()>) -> Vec<SessionUpd
     }
 }
 
-fn user_to_updates(content: StreamedUserContent) -> Vec<SessionUpdate> {
+fn user_to_updates(
+    content: StreamedUserContent,
+    tool_names: &Arc<StdMutex<HashMap<String, String>>>,
+) -> Vec<SessionUpdate> {
     match content {
-        StreamedUserContent::ToolResult { tool_result, .. } => {
-            let content = tool_result
+        StreamedUserContent::ToolResult { tool_result, internal_call_id } => {
+            let raw_content = tool_result
                 .content
                 .iter()
                 .filter_map(|c| match c {
@@ -201,9 +221,16 @@ fn user_to_updates(content: StreamedUserContent) -> Vec<SessionUpdate> {
                 })
                 .collect::<Vec<_>>()
                 .join("\n");
+
+            let tool_name = tool_names.lock().unwrap().get(&internal_call_id).cloned();
+            let formatted = match tool_name {
+                Some(name) => format_tool_output(&name, &raw_content),
+                None => raw_content,
+            };
+
             let fields = ToolCallUpdateFields::new()
                 .status(ToolCallStatus::Completed)
-                .raw_output(serde_json::Value::String(content));
+                .raw_output(serde_json::Value::String(formatted));
             vec![SessionUpdate::ToolCallUpdate(ToolCallUpdate::new(
                 ToolCallId::new(&*tool_result.id),
                 fields,

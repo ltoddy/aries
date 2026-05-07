@@ -1,4 +1,5 @@
-use aries_core::tools::write::{NAME, WriteArgs, WriteOutput};
+use aries_core::tools::write::NAME;
+use aries_core::tools::{WriteArgs, WriteOutput};
 
 use crate::display::preview;
 use crate::theme::Theme;

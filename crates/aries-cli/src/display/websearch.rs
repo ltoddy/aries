@@ -1,4 +1,5 @@
-use aries_core::tools::websearch::{NAME, WebSearchArgs, WebSearchOutput};
+use aries_core::tools::websearch::NAME;
+use aries_core::tools::{WebSearchArgs, WebSearchOutput};
 
 use crate::display::preview;
 use crate::theme::Theme;

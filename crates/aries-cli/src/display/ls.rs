@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
-use aries_core::tools::ls::{LsArgs, LsOutput, NAME};
+use aries_core::tools::ls::NAME;
+use aries_core::tools::{LsArgs, LsOutput};
 
 use crate::display::preview;
 use crate::theme::Theme;

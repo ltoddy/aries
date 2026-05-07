@@ -1,4 +1,5 @@
-use aries_core::tools::skill::{NAME, SkillArgs, SkillOutput};
+use aries_core::tools::skill::NAME;
+use aries_core::tools::{SkillArgs, SkillOutput};
 
 use crate::display::preview;
 use crate::theme::Theme;

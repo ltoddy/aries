@@ -1,4 +1,5 @@
-use aries_core::tools::lsp::{LspArgs, LspOutput, NAME};
+use aries_core::tools::lsp::NAME;
+use aries_core::tools::{LspArgs, LspOutput};
 
 use crate::display::preview;
 use crate::theme::Theme;

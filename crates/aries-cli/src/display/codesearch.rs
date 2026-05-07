@@ -1,4 +1,5 @@
-use aries_core::tools::codesearch::{CodeSearchArgs, CodeSearchOutput, NAME};
+use aries_core::tools::codesearch::NAME;
+use aries_core::tools::{CodeSearchArgs, CodeSearchOutput};
 
 use crate::display::preview;
 use crate::theme::Theme;

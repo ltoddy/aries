@@ -1,4 +1,5 @@
-use aries_core::tools::read::{NAME, ReadArgs, ReadOutput};
+use aries_core::tools::read::NAME;
+use aries_core::tools::{ReadArgs, ReadOutput};
 
 use crate::display::preview;
 use crate::theme::Theme;

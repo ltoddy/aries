@@ -1,4 +1,5 @@
-use aries_core::tools::multiedit::{MultiEditArgs, MultiEditOutput, NAME};
+use aries_core::tools::multiedit::NAME;
+use aries_core::tools::{MultiEditArgs, MultiEditOutput};
 
 use crate::display::preview;
 use crate::theme::Theme;

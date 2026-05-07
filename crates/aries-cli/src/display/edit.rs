@@ -1,4 +1,5 @@
-use aries_core::tools::edit::{EditArgs, EditOutput, NAME};
+use aries_core::tools::edit::NAME;
+use aries_core::tools::{EditArgs, EditOutput};
 
 use crate::display::preview;
 use crate::theme::Theme;

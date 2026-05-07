@@ -1,4 +1,5 @@
-use aries_core::tools::bash::{BashArgs, BashOutput, NAME};
+use aries_core::tools::bash::NAME;
+use aries_core::tools::{BashArgs, BashOutput};
 
 use crate::display::preview;
 use crate::theme::Theme;

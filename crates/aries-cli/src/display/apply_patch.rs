@@ -1,4 +1,5 @@
-use aries_core::tools::apply_patch::{ApplyPatchArgs, ApplyPatchOutput, NAME};
+use aries_core::tools::apply_patch::NAME;
+use aries_core::tools::{ApplyPatchArgs, ApplyPatchOutput};
 
 use crate::theme::Theme;
 

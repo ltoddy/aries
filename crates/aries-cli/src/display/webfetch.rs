@@ -1,4 +1,5 @@
-use aries_core::tools::webfetch::{NAME, WebFetchArgs, WebFetchOutput};
+use aries_core::tools::webfetch::NAME;
+use aries_core::tools::{WebFetchArgs, WebFetchOutput};
 
 use crate::display::preview;
 use crate::theme::Theme;

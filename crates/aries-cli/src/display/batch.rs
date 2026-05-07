@@ -1,4 +1,5 @@
-use aries_core::tools::batch::{BatchArgs, BatchOutput, NAME};
+use aries_core::tools::batch::NAME;
+use aries_core::tools::{BatchArgs, BatchOutput};
 
 use crate::display::preview;
 use crate::theme::Theme;

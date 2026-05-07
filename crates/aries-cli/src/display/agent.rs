@@ -1,4 +1,5 @@
-use aries_core::tools::agent::{AgentArgs, AgentOutput, NAME};
+use aries_core::tools::agent::NAME;
+use aries_core::tools::{AgentArgs, AgentOutput};
 
 use crate::theme::Theme;
 
