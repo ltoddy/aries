@@ -4,10 +4,10 @@ pub mod title;
 
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
-use rig::agent::{Agent, PromptHook, StreamingResult};
+use futures::StreamExt;
+use rig::agent::{Agent, FinalResponse, MultiTurnStreamItem, PromptHook, StreamingResult};
 use rig::client::CompletionClient;
-use rig::completion;
-use rig::completion::{Message, Prompt};
+use rig::completion::{self, Message};
 use rig::streaming::StreamingPrompt;
 use rig::tool::ToolDyn;
 use rig::wasm_compat::WasmCompatSend;
@@ -94,16 +94,27 @@ where
     where
         P: PromptHook<M> + 'static,
     {
-        self.inner.stream_prompt(prompt).with_history(history.to_vec()).with_hook(hook).await
+        self.inner.stream_prompt(prompt).with_history(history).with_hook(hook).await
     }
 
-    pub async fn prompt(
+    pub async fn complete(
         &mut self,
         prompt: impl Into<Message> + WasmCompatSend,
         history: &[Message],
     ) -> anyhow::Result<String> {
-        let res = self.inner.prompt(prompt).with_history(history.to_vec()).await?;
-        Ok(res)
+        let stream = self.inner.stream_prompt(prompt).with_history(history).await;
+        futures::pin_mut!(stream);
+
+        let mut final_res = FinalResponse::empty();
+        while let Some(item) = stream.next().await {
+            let item = item?;
+
+            if let MultiTurnStreamItem::FinalResponse(res) = item {
+                final_res = res;
+            }
+        }
+
+        Ok(final_res.response().to_owned())
     }
 
     #[inline]

@@ -50,8 +50,8 @@ impl SessionRegistry {
             return Ok(session.to_owned());
         }
 
-        match self.session_repo.find_last_by_session_id(&session_id).await {
-            Ok(s) => self.load_session(session_id).await,
+        match self.session_repo.find_last_by_session_id(session_id).await {
+            Ok(_) => self.load_session(session_id).await,
             Err(_) => self.create_session(project_dir).await,
         }
     }

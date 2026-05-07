@@ -132,7 +132,7 @@ where
         save_transcript(messages, transcript_dir.as_ref()).await?;
 
         let compacted = compress(messages);
-        let summary = self.inner.prompt(&compacted, &[]).await?;
+        let summary = self.inner.complete(&compacted, &[]).await?;
 
         if summary.is_empty() {
             return Ok(None);

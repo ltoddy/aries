@@ -1,5 +1,5 @@
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use aries_core::fs::jsonl;
 use rig::completion::Message;
@@ -15,14 +15,14 @@ pub struct ChatHistory {
 impl ChatHistory {
     pub async fn new(file_path: impl AsRef<Path>) -> Self {
         let file_path = file_path.as_ref();
-        if let Some(parent) = file_path.parent() {
-            if let Err(err) = tokio::fs::create_dir_all(parent).await {
-                error!("failed to create chat history parent directory: {err}");
-            }
+        if let Some(parent) = file_path.parent()
+            && let Err(err) = tokio::fs::create_dir_all(parent).await
+        {
+            error!("failed to create chat history parent directory: {err}");
         }
 
         let mut history = vec![];
-        match Self::load(file_path).await {
+        match Self::load(&file_path).await {
             Ok(prior) => history = prior,
             Err(err) => warn!("failed to load chat history: {err}"),
         }
@@ -73,10 +73,9 @@ impl ChatHistory {
     }
 }
 
-async fn refresh_history(mut rx: UnboundedReceiver<Vec<Message>>, file_path: impl AsRef<Path>) {
-    let file_path = file_path.as_ref();
+async fn refresh_history(mut rx: UnboundedReceiver<Vec<Message>>, file_path: PathBuf) {
     while let Some(messages) = rx.recv().await {
-        if let Err(err) = jsonl::write(file_path, messages).await {
+        if let Err(err) = jsonl::write(&file_path, messages).await {
             error!("failed to write chat history to {}: {err}", file_path.display());
         }
     }

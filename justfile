@@ -1,5 +1,3 @@
-nightly_toolchain := "nightly"
-
 install:
     @cargo install --path crates/aries-cli
 
@@ -16,14 +14,14 @@ clippy:
     @cargo clippy
 
 fmt:
-    @cargo +{{nightly_toolchain}} fmt
+    @cargo +nightly fmt
 
 fmt-check:
-    @cargo +{{nightly_toolchain}} fmt -- --check
+    @cargo +nightly fmt -- --check
 
 fix:
     @cargo clippy --fix --allow-dirty --all
-    @cargo +{{nightly_toolchain}} fmt
+    @cargo +nightly fmt
 
 lint: fmt-check clippy
 

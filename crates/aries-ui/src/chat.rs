@@ -149,11 +149,8 @@ pub async fn list_sessions(
     let app_state = guard.as_mut().ok_or_else(|| "registry is not initialized".to_string())?;
     let project_dir = require_project_dir(app_state)?;
 
-    let sessions = app_state
-        .registry
-        .list_sessions(&project_dir)
-        .await
-        .map_err(|err| err.to_string())?;
+    let sessions =
+        app_state.registry.list_sessions(&project_dir).await.map_err(|err| err.to_string())?;
 
     Ok(sessions
         .into_iter()
@@ -176,11 +173,8 @@ pub async fn bootstrap_chat(
     let project_dir = require_project_dir(app_state)?;
 
     let sid = session_id.unwrap_or_else(|| nanoid::nanoid!());
-    let session = app_state
-        .registry
-        .get_session(&project_dir, &sid)
-        .await
-        .map_err(|err| err.to_string())?;
+    let session =
+        app_state.registry.get_session(&project_dir, &sid).await.map_err(|err| err.to_string())?;
 
     let bootstrap = session_to_bootstrap(app_state, &session);
     app_state.active_session = Some(session);
