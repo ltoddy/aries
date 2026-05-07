@@ -21,6 +21,6 @@ pub fn format_tool_result(result: &str, theme: Theme) -> String {
 
     match output {
         Ok(output) => theme.dimmed(&preview(output.entries.join("\n"))).to_string(),
-        Err(err) => theme.red_text(&format!("Error as follow: {err}")).to_string(),
+        Err(_) => theme.red_text(result).to_string(),
     }
 }

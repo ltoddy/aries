@@ -1,4 +1,4 @@
-use aries_core::tools::batch::{BatchArgs, NAME};
+use aries_core::tools::batch::{BatchArgs, BatchOutput, NAME};
 
 use crate::display::preview;
 use crate::theme::Theme;
@@ -43,5 +43,8 @@ pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
 }
 
 pub fn format_tool_result(raw_text: &str, theme: Theme) -> String {
-    theme.dimmed(raw_text).to_string()
+    match serde_json::from_str::<BatchOutput>(raw_text) {
+        Ok(output) => theme.dimmed(&format!("{} results", output.results.len())).to_string(),
+        Err(_) => theme.dimmed(raw_text).to_string(),
+    }
 }

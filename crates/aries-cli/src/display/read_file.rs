@@ -21,10 +21,8 @@ pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
 }
 
 pub fn format_tool_result(result: &str, theme: Theme) -> String {
-    let output = serde_json::from_str::<ReadFileOutput>(result);
-
-    match output {
+    match serde_json::from_str::<ReadFileOutput>(result) {
         Ok(output) => theme.dimmed(&preview(output.content)).to_string(),
-        Err(err) => theme.red_text(&format!("Error as follow: {err}")).to_string(),
+        Err(_) => theme.red_text(result).to_string(),
     }
 }
