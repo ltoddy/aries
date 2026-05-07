@@ -8,17 +8,17 @@ use serde::{Deserialize, Serialize};
 use tokio::fs;
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct WriteFileArgs {
+pub struct WriteArgs {
     pub file_path: PathBuf,
     pub content: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct WriteFileOutput {
+pub struct WriteOutput {
     pub success: bool,
 }
 
-impl Display for WriteFileOutput {
+impl Display for WriteOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.success {
             write!(f, "File written successfully")
@@ -29,20 +29,20 @@ impl Display for WriteFileOutput {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum WriteFileError {
+pub enum WriteError {
     #[error("Failed to write file: {0}")]
     IoError(#[from] std::io::Error),
 }
 
-pub const NAME: &str = "write_file";
+pub const NAME: &str = "Write";
 
-pub struct WriteFileTool;
+pub struct WriteTool;
 
-impl Tool for WriteFileTool {
+impl Tool for WriteTool {
     const NAME: &'static str = NAME;
-    type Error = WriteFileError;
-    type Args = WriteFileArgs;
-    type Output = WriteFileOutput;
+    type Error = WriteError;
+    type Args = WriteArgs;
+    type Output = WriteOutput;
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
@@ -72,6 +72,6 @@ impl Tool for WriteFileTool {
 
         fs::write(&args.file_path, args.content).await?;
 
-        Ok(WriteFileOutput { success: true })
+        Ok(WriteOutput { success: true })
     }
 }

@@ -8,18 +8,18 @@ use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct ShellCommandArgs {
+pub struct BashArgs {
     pub command: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct ShellCommandOutput {
+pub struct BashOutput {
     pub stdout: String,
     pub stderr: String,
     pub exit_code: i32,
 }
 
-impl Display for ShellCommandOutput {
+impl Display for BashOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if !self.stdout.is_empty() {
             write!(f, "{}", self.stdout)?;
@@ -38,20 +38,20 @@ impl Display for ShellCommandOutput {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum ShellCommandError {
+pub enum BashError {
     #[error("Failed to execute command: {0}")]
     ExecutionFailed(String),
 }
 
-pub const NAME: &str = "shell_command";
+pub const NAME: &str = "Bash";
 
-pub struct ShellCommandTool;
+pub struct BashTool;
 
-impl Tool for ShellCommandTool {
+impl Tool for BashTool {
     const NAME: &'static str = NAME;
-    type Error = ShellCommandError;
-    type Args = ShellCommandArgs;
-    type Output = ShellCommandOutput;
+    type Error = BashError;
+    type Args = BashArgs;
+    type Output = BashOutput;
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
@@ -80,7 +80,7 @@ impl Tool for ShellCommandTool {
             .stderr(Stdio::piped())
             .output()
             .await
-            .map_err(|e| ShellCommandError::ExecutionFailed(e.to_string()))?;
+            .map_err(|e| BashError::ExecutionFailed(e.to_string()))?;
 
         let mut stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let mut stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -102,6 +102,6 @@ impl Tool for ShellCommandTool {
         truncate_lines(&mut stdout, 200);
         truncate_lines(&mut stderr, 200);
 
-        Ok(ShellCommandOutput { stdout, stderr, exit_code: output.status.code().unwrap_or(-1) })
+        Ok(BashOutput { stdout, stderr, exit_code: output.status.code().unwrap_or(-1) })
     }
 }

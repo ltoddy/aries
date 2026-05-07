@@ -199,8 +199,8 @@ where
         let gctx = self.gctx.clone();
 
         let mut tools: Vec<Box<dyn ToolDyn>> = vec![
-            Box::new(tools::bash::ShellCommandTool),
-            Box::new(tools::read::ReadFileTool),
+            Box::new(tools::bash::BashTool),
+            Box::new(tools::read::ReadTool),
             Box::new(tools::glob::GlobTool::new(gctx.clone())),
             Box::new(tools::grep::GrepTool::new(gctx.clone())),
             Box::new(tools::ls::LsTool::new(gctx.clone())),
@@ -208,12 +208,12 @@ where
         ];
 
         if matches!(agent_type, AgentType::Build | AgentType::General) {
-            tools.push(Box::new(tools::write::WriteFileTool));
+            tools.push(Box::new(tools::write::WriteTool));
             tools.push(Box::new(tools::apply_patch::ApplyPatchTool));
             tools.push(Box::new(tools::multiedit::MultiEditTool));
             tools.push(Box::new(tools::edit::EditTool));
             tools.push(Box::new(tools::batch::BatchTool::new(gctx.clone())));
-            tools.push(Box::new(tools::task::TaskTool::<C>::new(
+            tools.push(Box::new(tools::agent::AgentTool::<C>::new(
                 client.clone(),
                 config.clone(),
                 gctx.clone(),
@@ -221,7 +221,7 @@ where
         }
 
         if matches!(agent_type, AgentType::Build | AgentType::General | AgentType::Plan) {
-            tools.push(Box::new(tools::question::QuestionTool));
+            tools.push(Box::new(tools::question::AskUserQuestionTool));
         }
 
         if matches!(agent_type, AgentType::Build | AgentType::General) {

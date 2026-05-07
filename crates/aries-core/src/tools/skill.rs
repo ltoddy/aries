@@ -55,7 +55,7 @@ impl SkillError {
     }
 }
 
-pub const NAME: &str = "skill";
+pub const NAME: &str = "Skill";
 
 pub struct SkillTool {
     skills: Vec<SkillInfo>,

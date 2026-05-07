@@ -154,7 +154,7 @@ pub enum LspError {
     IO(#[from] std::io::Error),
 }
 
-pub const NAME: &str = "lsp";
+pub const NAME: &str = "Lsp";
 
 pub struct LspTool {
     client: SharedLspClient,

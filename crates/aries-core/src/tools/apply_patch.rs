@@ -31,7 +31,7 @@ pub enum ApplyPatchError {
     PatchError(String),
 }
 
-pub const NAME: &str = "apply_patch";
+pub const NAME: &str = "ApplyPatch";
 
 pub struct ApplyPatchTool;
 

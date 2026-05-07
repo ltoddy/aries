@@ -9,24 +9,24 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::tools::apply_patch::ApplyPatchTool;
-use crate::tools::bash::ShellCommandTool;
+use crate::tools::bash::BashTool;
 use crate::tools::codesearch::CodeSearchTool;
 use crate::tools::edit::EditTool;
 use crate::tools::glob::GlobTool;
 use crate::tools::grep::GrepTool;
 use crate::tools::ls::LsTool;
 use crate::tools::multiedit::MultiEditTool;
-use crate::tools::question::QuestionTool;
-use crate::tools::read::ReadFileTool;
+use crate::tools::question::AskUserQuestionTool;
+use crate::tools::read::ReadTool;
 use crate::tools::webfetch::WebFetchTool;
 use crate::tools::websearch::WebSearchTool;
-use crate::tools::write::WriteFileTool;
+use crate::tools::write::WriteTool;
 use crate::tools::{
-    apply_patch, bash, codesearch, edit, glob, grep, ls, multiedit, question, read, task, webfetch,
-    websearch, write,
+    agent, apply_patch, bash, codesearch, edit, glob, grep, ls, multiedit, question, read,
+    webfetch, websearch, write,
 };
 
-pub const NAME: &str = "batch";
+pub const NAME: &str = "Batch";
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BatchCall {
@@ -111,21 +111,21 @@ impl Tool for BatchTool {
                 if tool_name == bash::NAME {
                     let parsed_args =
                         serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
-                    Tool::call(&ShellCommandTool, parsed_args)
+                    Tool::call(&BashTool, parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
                 } else if tool_name == read::NAME {
                     let parsed_args =
                         serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
-                    Tool::call(&ReadFileTool, parsed_args)
+                    Tool::call(&ReadTool, parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
                 } else if tool_name == write::NAME {
                     let parsed_args =
                         serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
-                    Tool::call(&WriteFileTool, parsed_args)
+                    Tool::call(&WriteTool, parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
@@ -174,12 +174,12 @@ impl Tool for BatchTool {
                 } else if tool_name == question::NAME {
                     let parsed_args =
                         serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
-                    Tool::call(&QuestionTool, parsed_args)
+                    Tool::call(&AskUserQuestionTool, parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
-                } else if tool_name == task::NAME {
-                    Err("TaskTool is not allowed in batch".to_string())
+                } else if tool_name == agent::NAME {
+                    Err("AgentTool is not allowed in batch".to_string())
                 } else if tool_name == webfetch::NAME {
                     let parsed_args =
                         serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;

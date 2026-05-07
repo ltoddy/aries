@@ -1,10 +1,10 @@
-use aries_core::tools::write::{NAME, WriteFileArgs, WriteFileOutput};
+use aries_core::tools::write::{NAME, WriteArgs, WriteOutput};
 
 use crate::display::preview;
 use crate::theme::Theme;
 
 pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
-    let args = serde_json::from_str::<WriteFileArgs>(args);
+    let args = serde_json::from_str::<WriteArgs>(args);
 
     let (first, rest) = match args {
         Ok(args) => {
@@ -19,7 +19,7 @@ pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
 }
 
 pub fn format_tool_result(result: &str, theme: Theme) -> String {
-    let output = serde_json::from_str::<WriteFileOutput>(result);
+    let output = serde_json::from_str::<WriteOutput>(result);
 
     match output {
         Ok(output) => {

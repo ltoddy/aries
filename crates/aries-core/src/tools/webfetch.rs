@@ -28,7 +28,7 @@ pub enum WebFetchError {
     FetchError(String),
 }
 
-pub const NAME: &str = "web_fetch";
+pub const NAME: &str = "WebFetch";
 
 pub struct WebFetchTool;
 

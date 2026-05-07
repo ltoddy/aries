@@ -34,7 +34,7 @@ pub enum EditError {
     EditError(String),
 }
 
-pub const NAME: &str = "edit";
+pub const NAME: &str = "Edit";
 
 pub struct EditTool;
 

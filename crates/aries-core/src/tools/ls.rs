@@ -32,7 +32,7 @@ pub enum LsError {
     Io(#[from] std::io::Error),
 }
 
-pub const NAME: &str = "ls";
+pub const NAME: &str = "Ls";
 
 pub struct LsTool {
     gctx: GlobalContext,

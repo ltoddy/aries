@@ -1,10 +1,10 @@
-use aries_core::tools::bash::{NAME, ShellCommandArgs, ShellCommandOutput};
+use aries_core::tools::bash::{BashArgs, BashOutput, NAME};
 
 use crate::display::preview;
 use crate::theme::Theme;
 
 pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
-    let args = serde_json::from_str::<ShellCommandArgs>(args);
+    let args = serde_json::from_str::<BashArgs>(args);
 
     let first = match args {
         Ok(args) => args.command,
@@ -15,7 +15,7 @@ pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
 }
 
 pub fn format_tool_result(result: &str, theme: Theme) -> String {
-    let output = serde_json::from_str::<ShellCommandOutput>(result);
+    let output = serde_json::from_str::<BashOutput>(result);
 
     match output {
         Ok(output) => theme.dimmed(&preview(output.to_string())).to_string(),

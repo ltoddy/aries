@@ -3,7 +3,7 @@
 使用批处理工具会让用户感到高兴。
 
 负载格式（JSON数组）：
-[{"tool": "read_file", "parameters": {"file_path": "src/index.ts", "offset": 1}},{"tool": "grep", "parameters": {"pattern": "Session\\.updatePart", "include": "src/**/*.ts"}},{"tool": "shell_command", "parameters": {"command": "git status"}}]
+[{"tool": "Read", "parameters": {"file_path": "src/index.ts", "offset": 1}},{"tool": "Grep", "parameters": {"pattern": "Session\\.updatePart", "include": "src/**/*.ts"}},{"tool": "Bash", "parameters": {"command": "git status"}}]
 
 注意事项：
 - 每个批次 1-25 个工具调用

@@ -35,7 +35,7 @@ pub enum GlobError {
     Walk(String),
 }
 
-pub const NAME: &str = "glob";
+pub const NAME: &str = "Glob";
 
 pub struct GlobTool {
     gctx: GlobalContext,

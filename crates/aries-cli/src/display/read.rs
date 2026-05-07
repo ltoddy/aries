@@ -1,10 +1,10 @@
-use aries_core::tools::read::{NAME, ReadFileArgs, ReadFileOutput};
+use aries_core::tools::read::{NAME, ReadArgs, ReadOutput};
 
 use crate::display::preview;
 use crate::theme::Theme;
 
 pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
-    let args = serde_json::from_str::<ReadFileArgs>(args);
+    let args = serde_json::from_str::<ReadArgs>(args);
 
     let first = match args {
         Ok(args) => {
@@ -21,7 +21,7 @@ pub fn format_tool_call(args: &str, theme: &Theme) -> (String, Option<String>) {
 }
 
 pub fn format_tool_result(result: &str, theme: Theme) -> String {
-    match serde_json::from_str::<ReadFileOutput>(result) {
+    match serde_json::from_str::<ReadOutput>(result) {
         Ok(output) => theme.dimmed(&preview(output.to_string())).to_string(),
         Err(_) => theme.red_text(result).to_string(),
     }

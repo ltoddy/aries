@@ -39,7 +39,7 @@ pub enum MultiEditError {
     EditError(String),
 }
 
-pub const NAME: &str = "multiedit";
+pub const NAME: &str = "MultiEdit";
 
 pub struct MultiEditTool;
 

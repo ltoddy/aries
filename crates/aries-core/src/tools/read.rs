@@ -9,37 +9,37 @@ use serde::{Deserialize, Serialize};
 use tokio::fs;
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct ReadFileArgs {
+pub struct ReadArgs {
     pub file_path: PathBuf,
     pub offset: Option<usize>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct ReadFileOutput {
+pub struct ReadOutput {
     pub content: String,
 }
 
-impl Display for ReadFileOutput {
+impl Display for ReadOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.content)
     }
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum ReadFileError {
+pub enum ReadError {
     #[error("Failed to read file: {0}")]
     Io(#[from] std::io::Error),
 }
 
-pub const NAME: &str = "read_file";
+pub const NAME: &str = "Read";
 
-pub struct ReadFileTool;
+pub struct ReadTool;
 
-impl Tool for ReadFileTool {
+impl Tool for ReadTool {
     const NAME: &'static str = NAME;
-    type Error = ReadFileError;
-    type Args = ReadFileArgs;
-    type Output = ReadFileOutput;
+    type Error = ReadError;
+    type Args = ReadArgs;
+    type Output = ReadOutput;
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
@@ -70,6 +70,6 @@ impl Tool for ReadFileTool {
             content = content.lines().skip(offset).join("\n");
         }
 
-        Ok(ReadFileOutput { content })
+        Ok(ReadOutput { content })
     }
 }

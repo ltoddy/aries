@@ -8,15 +8,15 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct QuestionOption {
+pub struct AskUserQuestionOption {
     pub label: String,
     pub description: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct QuestionArgs {
+pub struct AskUserQuestionArgs {
     pub question: String,
-    pub options: Option<Vec<QuestionOption>>,
+    pub options: Option<Vec<AskUserQuestionOption>>,
     #[serde(default)]
     pub multiple: bool,
     #[serde(default = "default_custom")]
@@ -28,31 +28,31 @@ fn default_custom() -> bool {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct QuestionOutput {
+pub struct AskUserQuestionOutput {
     pub answers: Vec<String>,
 }
 
-impl Display for QuestionOutput {
+impl Display for AskUserQuestionOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.answers.join("\n"))
     }
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum QuestionError {
+pub enum AskUserQuestionError {
     #[error("Failed to ask question: {0}")]
     InteractionError(String),
 }
 
-pub const NAME: &str = "question";
+pub const NAME: &str = "AskUserQuestion";
 
-pub struct QuestionTool;
+pub struct AskUserQuestionTool;
 
-impl Tool for QuestionTool {
+impl Tool for AskUserQuestionTool {
     const NAME: &'static str = NAME;
-    type Error = QuestionError;
-    type Args = QuestionArgs;
-    type Output = QuestionOutput;
+    type Error = AskUserQuestionError;
+    type Args = AskUserQuestionArgs;
+    type Output = AskUserQuestionOutput;
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
@@ -116,14 +116,14 @@ impl Tool for QuestionTool {
                     .with_prompt(&args.question)
                     .items(&labels)
                     .interact()
-                    .map_err(|e| QuestionError::InteractionError(e.to_string()))?;
+                    .map_err(|e| AskUserQuestionError::InteractionError(e.to_string()))?;
 
                 for &idx in &selections {
                     if args.custom && idx == labels.len() - 1 {
                         let custom_answer: String = Input::with_theme(&theme)
                             .with_prompt("Your answer")
                             .interact_text()
-                            .map_err(|e| QuestionError::InteractionError(e.to_string()))?;
+                            .map_err(|e| AskUserQuestionError::InteractionError(e.to_string()))?;
                         answers.push(custom_answer);
                     } else {
                         answers.push(options[idx].label.clone());
@@ -135,13 +135,13 @@ impl Tool for QuestionTool {
                     .items(&labels)
                     .default(0)
                     .interact()
-                    .map_err(|e| QuestionError::InteractionError(e.to_string()))?;
+                    .map_err(|e| AskUserQuestionError::InteractionError(e.to_string()))?;
 
                 if args.custom && selection == labels.len() - 1 {
                     let custom_answer: String = Input::with_theme(&theme)
                         .with_prompt("Your answer")
                         .interact_text()
-                        .map_err(|e| QuestionError::InteractionError(e.to_string()))?;
+                        .map_err(|e| AskUserQuestionError::InteractionError(e.to_string()))?;
                     answers.push(custom_answer);
                 } else {
                     answers.push(options[selection].label.clone());
@@ -151,10 +151,10 @@ impl Tool for QuestionTool {
             let answer: String = Input::with_theme(&theme)
                 .with_prompt(&args.question)
                 .interact_text()
-                .map_err(|e| QuestionError::InteractionError(e.to_string()))?;
+                .map_err(|e| AskUserQuestionError::InteractionError(e.to_string()))?;
             answers.push(answer);
         }
 
-        Ok(QuestionOutput { answers })
+        Ok(AskUserQuestionOutput { answers })
     }
 }

@@ -11,10 +11,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::agents::{AgentBuilder, AgentType};
 
-pub const NAME: &str = "task";
+pub const NAME: &str = "Agent";
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct TaskArgs {
+pub struct AgentArgs {
     pub description: String,
     pub prompt: String,
     pub subagent_type: String,
@@ -22,24 +22,24 @@ pub struct TaskArgs {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct TaskOutput {
+pub struct AgentOutput {
     pub task_id: String,
     pub result: String,
 }
 
-impl Display for TaskOutput {
+impl Display for AgentOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.result)
     }
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum TaskError {
+pub enum AgentError {
     #[error("Task execution failed: {0}")]
     ExecutionError(String),
 }
 
-pub struct TaskTool<C>
+pub struct AgentTool<C>
 where
     C: CompletionClient,
 {
@@ -48,7 +48,7 @@ where
     gctx: GlobalContext,
 }
 
-impl<C> TaskTool<C>
+impl<C> AgentTool<C>
 where
     C: CompletionClient,
 {
@@ -57,19 +57,19 @@ where
     }
 }
 
-impl<C> Tool for TaskTool<C>
+impl<C> Tool for AgentTool<C>
 where
     C: CompletionClient + Clone + Send + Sync + 'static,
 {
     const NAME: &'static str = NAME;
-    type Error = TaskError;
-    type Args = TaskArgs;
-    type Output = TaskOutput;
+    type Error = AgentError;
+    type Args = AgentArgs;
+    type Output = AgentOutput;
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
             name: Self::NAME.to_string(),
-            description: include_str!("descriptions/task.txt").to_string(),
+            description: include_str!("descriptions/agent.txt").to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -122,12 +122,14 @@ where
         while let Some(chunk) = stream.next().await {
             match chunk {
                 Ok(rig::agent::MultiTurnStreamItem::FinalResponse(res)) => final_res = res,
-                Err(e) => return Err(TaskError::ExecutionError(format!("Subagent failed: {}", e))),
+                Err(e) => {
+                    return Err(AgentError::ExecutionError(format!("Subagent failed: {}", e)));
+                },
                 Ok(_) => {},
             }
         }
 
         let res = final_res.response();
-        Ok(TaskOutput { task_id, result: res.to_owned() })
+        Ok(AgentOutput { task_id, result: res.to_owned() })
     }
 }

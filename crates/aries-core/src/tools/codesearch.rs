@@ -28,7 +28,7 @@ pub enum CodeSearchError {
     SearchError(String),
 }
 
-pub const NAME: &str = "code_search";
+pub const NAME: &str = "CodeSearch";
 
 pub struct CodeSearchTool;
 

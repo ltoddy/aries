@@ -37,7 +37,7 @@ pub enum GrepError {
     Globset(#[from] globset::Error),
 }
 
-pub const NAME: &str = "grep";
+pub const NAME: &str = "Grep";
 
 pub struct GrepTool {
     gctx: GlobalContext,
