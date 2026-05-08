@@ -91,6 +91,14 @@ impl agent_client_protocol::Agent for AgentClientProtocolImpl {
     async fn prompt(&self, args: PromptRequest) -> agent_client_protocol::Result<PromptResponse> {
         info!("Received prompt request {args:?}");
 
+        let session_id = args.session_id.to_string();
+        let mut session = {
+            let registry = self.registry.lock().await;
+            registry
+                .get_session(&session_id)
+                .ok_or_else(|| Error::resource_not_found(Some(session_id.clone())))?
+        };
+
         let promot = args
             .prompt
             .iter()
@@ -100,14 +108,7 @@ impl agent_client_protocol::Agent for AgentClientProtocolImpl {
             .collect::<Vec<_>>()
             .join("\n");
 
-        let registry = self.registry.lock().await;
-        let session_id = args.session_id.to_string();
-
-        let mut session =
-            registry.get_session(&session_id).ok_or_else(|| Error::invalid_params())?;
-
-        let tool_names: Arc<StdMutex<HashMap<String, String>>> =
-            Arc::new(StdMutex::new(HashMap::new()));
+        let tool_names = Arc::new(StdMutex::new(HashMap::new()));
 
         session
             .prompt(
@@ -134,6 +135,11 @@ impl agent_client_protocol::Agent for AgentClientProtocolImpl {
             )
             .await
             .map_err(|_| Error::internal_error())?;
+
+        {
+            let mut registry = self.registry.lock().await;
+            registry.putback_session(session);
+        }
 
         let resp = PromptResponse::new(StopReason::EndTurn);
         Ok(resp)
@@ -238,7 +244,9 @@ fn assistant_to_updates(
             )))]
         },
         StreamedAssistantContent::ToolCall { tool_call, internal_call_id, .. } => {
-            tool_names.lock().unwrap().insert(internal_call_id, tool_call.function.name.clone());
+            if let Ok(mut tool_names) = tool_names.lock() {
+                tool_names.insert(internal_call_id, tool_call.function.name.clone());
+            }
 
             let arguments = tool_call.function.arguments.to_string();
             let tool_call = agent_client_protocol::ToolCall::new(
@@ -269,7 +277,10 @@ fn user_to_updates(
                 .collect::<Vec<_>>()
                 .join("\n");
 
-            let tool_name = tool_names.lock().unwrap().get(&internal_call_id).cloned();
+            let tool_name = match tool_names.lock() {
+                Ok(mut tool_names) => tool_names.remove(&internal_call_id),
+                Err(_) => None,
+            };
             let formatted = match tool_name {
                 Some(name) => format_tool_output(&name, &raw_content),
                 None => raw_content,

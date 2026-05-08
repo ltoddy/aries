@@ -175,10 +175,9 @@ pub async fn bootstrap_chat(
 ) -> Result<SessionBootstrap, String> {
     let mut guard = state.lock().await;
     let app_state = guard.as_mut().ok_or_else(|| "registry is not initialized".to_string())?;
-    let project_dir = require_project_dir(app_state)?;
 
     let sid = session_id.unwrap_or_else(|| nanoid::nanoid!());
-    let session = app_state.registry.get_session(&sid).await.map_err(|err| err.to_string())?;
+    let session = app_state.registry.get_session(&sid).unwrap();
 
     let bootstrap = session_to_bootstrap(app_state, &session);
     app_state.active_session = Some(session);
