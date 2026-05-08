@@ -22,7 +22,7 @@ async fn ensure_registry(guard: &mut Option<AppState>) -> Result<&mut AppState, 
             provider,
             model,
             active_project_dir: None,
-            active_session: None,
+            active_session_id: None,
         });
     }
     Ok(guard.as_mut().expect("registry initialized"))
@@ -79,7 +79,7 @@ pub async fn activate_project(
     let entry = project_entry_from_dir(path.clone());
 
     app_state.active_project_dir = Some(path);
-    app_state.active_session = None;
+    app_state.active_session_id = None;
 
     Ok(entry)
 }

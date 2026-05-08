@@ -1,5 +1,4 @@
-use std::path::PathBuf;
-
+use aries_core::tools::format_tool_output;
 use aries_session::Session;
 use rig::agent::MultiTurnStreamItem;
 use rig::completion::Message;
@@ -7,27 +6,66 @@ use rig::message::{AssistantContent, ToolResultContent, UserContent};
 use rig::streaming::{StreamedAssistantContent, StreamedUserContent};
 use tauri::{AppHandle, Emitter};
 
+use crate::session_service::{
+    get_session, list_sessions as list_ui_sessions, load_session, putback_session,
+};
 use crate::state::{AppState, SharedState, CHAT_STREAM_EVENT};
 use crate::types::{
     ChatBlock, ChatMessage, ChatRequest, ChatResponse, ChatStreamPayload, SessionBootstrap,
     SessionSummary,
 };
 
+/// Extract tool name from a tool-call block content (format: "[Tool]
+/// <name>\n<args>").
+fn extract_tool_name(tool_call_content: &str) -> &str {
+    tool_call_content
+        .lines()
+        .next()
+        .and_then(|line| line.strip_prefix("[Tool] "))
+        .unwrap_or("unknown")
+}
+
+/// Interleave tool-result blocks after their corresponding unpaired tool-call
+/// blocks. Also formats each tool-result using `format_tool_output`.
+fn merge_tool_results(blocks: &mut Vec<ChatBlock>, tool_result_blocks: Vec<ChatBlock>) {
+    let mut result_iter = tool_result_blocks.into_iter();
+    let mut i = 0;
+    while i < blocks.len() {
+        if blocks[i].kind == "tool-call" {
+            // Check if next block is already a tool-result (already paired)
+            let already_paired =
+                blocks.get(i + 1).map(|b| b.kind == "tool-result").unwrap_or(false);
+            if !already_paired {
+                if let Some(mut tr) = result_iter.next() {
+                    let tool_name = extract_tool_name(&blocks[i].content);
+                    tr.content = format_tool_output(tool_name, &tr.content);
+                    blocks.insert(i + 1, tr);
+                    i += 2;
+                    continue;
+                }
+            }
+        }
+        i += 1;
+    }
+    // Append any remaining tool-results that didn't find a pair
+    for tr in result_iter {
+        blocks.push(tr);
+    }
+}
+
 fn convert_history(history: &[Message]) -> Vec<ChatMessage> {
-    history
-        .iter()
-        .filter_map(|msg| match msg {
+    let mut result: Vec<ChatMessage> = Vec::new();
+
+    for msg in history {
+        match msg {
             Message::User { content } => {
                 let mut text_parts: Vec<String> = Vec::new();
-                let mut blocks: Vec<ChatBlock> = Vec::new();
+                let mut tool_result_blocks: Vec<ChatBlock> = Vec::new();
+
                 for c in content.iter() {
                     match c {
                         UserContent::Text(t) => {
                             text_parts.push(t.text.clone());
-                            blocks.push(ChatBlock {
-                                kind: "text".to_string(),
-                                content: t.text.clone(),
-                            });
                         },
                         UserContent::ToolResult(tr) => {
                             let result_text: String = tr
@@ -40,7 +78,7 @@ fn convert_history(history: &[Message]) -> Vec<ChatMessage> {
                                 .collect::<Vec<_>>()
                                 .join("\n");
                             if !result_text.trim().is_empty() {
-                                blocks.push(ChatBlock {
+                                tool_result_blocks.push(ChatBlock {
                                     kind: "tool-result".to_string(),
                                     content: result_text,
                                 });
@@ -49,25 +87,34 @@ fn convert_history(history: &[Message]) -> Vec<ChatMessage> {
                         _ => {},
                     }
                 }
-                if text_parts.is_empty() && blocks.is_empty() {
-                    None
-                } else if blocks.iter().all(|b| b.kind == "text") {
-                    Some(ChatMessage {
-                        role: "user".to_string(),
-                        content: text_parts.join("\n"),
-                        blocks: None,
-                    })
-                } else {
-                    Some(ChatMessage {
-                        role: "user".to_string(),
-                        content: text_parts.join("\n"),
-                        blocks: Some(blocks),
-                    })
+
+                // If user message only contains tool results (no user text),
+                // merge them into the preceding assistant message's blocks,
+                // interleaving after their corresponding tool-call blocks.
+                if text_parts.is_empty() && !tool_result_blocks.is_empty() {
+                    if let Some(last) = result.last_mut() {
+                        if last.role == "assistant" {
+                            let blocks = last.blocks.get_or_insert_with(Vec::new);
+                            merge_tool_results(blocks, tool_result_blocks);
+                            continue;
+                        }
+                    }
                 }
+
+                if text_parts.is_empty() && tool_result_blocks.is_empty() {
+                    continue;
+                }
+
+                result.push(ChatMessage {
+                    role: "user".to_string(),
+                    content: text_parts.join("\n"),
+                    blocks: None,
+                });
             },
             Message::Assistant { content, .. } => {
                 let mut text_parts: Vec<String> = Vec::new();
                 let mut blocks: Vec<ChatBlock> = Vec::new();
+
                 for c in content.iter() {
                     match c {
                         AssistantContent::Text(t) => {
@@ -105,25 +152,52 @@ fn convert_history(history: &[Message]) -> Vec<ChatMessage> {
                         _ => {},
                     }
                 }
+
                 if text_parts.is_empty() && blocks.is_empty() {
-                    None
-                } else if blocks.iter().all(|b| b.kind == "text") {
-                    Some(ChatMessage {
+                    continue;
+                }
+
+                // If the previous message is an assistant with tool-call/tool-result blocks,
+                // this is a continuation of the same turn — merge into it.
+                if let Some(last) = result.last_mut() {
+                    if last.role == "assistant" {
+                        if let Some(ref prev_blocks) = last.blocks {
+                            if prev_blocks
+                                .iter()
+                                .any(|b| b.kind == "tool-call" || b.kind == "tool-result")
+                            {
+                                let merged_blocks = last.blocks.get_or_insert_with(Vec::new);
+                                merged_blocks.extend(blocks);
+                                if !text_parts.is_empty() {
+                                    let sep = if last.content.is_empty() { "" } else { "\n" };
+                                    last.content =
+                                        format!("{}{}{}", last.content, sep, text_parts.join("\n"));
+                                }
+                                continue;
+                            }
+                        }
+                    }
+                }
+
+                if blocks.iter().all(|b| b.kind == "text") {
+                    result.push(ChatMessage {
                         role: "assistant".to_string(),
                         content: text_parts.join("\n"),
                         blocks: None,
-                    })
+                    });
                 } else {
-                    Some(ChatMessage {
+                    result.push(ChatMessage {
                         role: "assistant".to_string(),
                         content: text_parts.join("\n"),
                         blocks: Some(blocks),
-                    })
+                    });
                 }
             },
-            _ => None,
-        })
-        .collect()
+            _ => {},
+        }
+    }
+
+    result
 }
 
 fn session_to_bootstrap(app_state: &AppState, session: &Session) -> SessionBootstrap {
@@ -139,48 +213,27 @@ fn session_to_bootstrap(app_state: &AppState, session: &Session) -> SessionBoots
     }
 }
 
-fn require_project_dir(app_state: &AppState) -> Result<String, String> {
-    app_state.active_project_dir.clone().ok_or_else(|| "no active project".to_string())
-}
-
 #[tauri::command]
 pub async fn list_sessions(
     state: tauri::State<'_, SharedState>,
 ) -> Result<Vec<SessionSummary>, String> {
     let mut guard = state.lock().await;
     let app_state = guard.as_mut().ok_or_else(|| "registry is not initialized".to_string())?;
-    let project_dir = require_project_dir(app_state)?;
-
-    let sessions = app_state
-        .registry
-        .list_sessions(Some(PathBuf::from(project_dir)))
-        .await
-        .map_err(|err| err.to_string())?;
-
-    Ok(sessions
-        .into_iter()
-        .map(|s| SessionSummary {
-            id: s.session_id.clone(),
-            session_id: s.session_id,
-            title: s.title,
-            project_dir: s.cwd,
-        })
-        .collect())
+    list_ui_sessions(app_state).await
 }
 
 #[tauri::command]
-pub async fn bootstrap_chat(
+pub async fn load_session_view(
     session_id: Option<String>,
     state: tauri::State<'_, SharedState>,
 ) -> Result<SessionBootstrap, String> {
     let mut guard = state.lock().await;
     let app_state = guard.as_mut().ok_or_else(|| "registry is not initialized".to_string())?;
 
-    let sid = session_id.unwrap_or_else(|| nanoid::nanoid!());
-    let session = app_state.registry.get_session(&sid).unwrap();
-
+    let session = load_session(app_state, session_id).await?;
     let bootstrap = session_to_bootstrap(app_state, &session);
-    app_state.active_session = Some(session);
+    putback_session(&mut app_state.registry, session);
+
     Ok(bootstrap)
 }
 
@@ -188,28 +241,28 @@ pub async fn bootstrap_chat(
 pub async fn clear_history(state: tauri::State<'_, SharedState>) -> Result<(), String> {
     let mut guard = state.lock().await;
     let app_state = guard.as_mut().ok_or_else(|| "registry is not initialized".to_string())?;
-    let session =
-        app_state.active_session.as_mut().ok_or_else(|| "active session not found".to_string())?;
+    let mut session = get_session(app_state).await?;
     session.clear_history();
+    putback_session(&mut app_state.registry, session);
     Ok(())
 }
 
 #[tauri::command]
-pub async fn send_chat_message(
+pub async fn prompt(
     request: ChatRequest,
     app_handle: AppHandle,
     state: tauri::State<'_, SharedState>,
 ) -> Result<ChatResponse, String> {
     let mut guard = state.lock().await;
     let app_state = guard.as_mut().ok_or_else(|| "registry is not initialized".to_string())?;
-    let session =
-        app_state.active_session.as_mut().ok_or_else(|| "active session not found".to_string())?;
+    let mut session = get_session(app_state).await?;
     let session_id = session.id();
 
     let stream_app_handle = app_handle.clone();
     let stream_session_id = session_id.clone();
     let mut answer = String::new();
     let mut seq: u64 = 0;
+    let mut last_tool_name = String::new();
     let start_time = std::time::Instant::now();
 
     session
@@ -261,6 +314,7 @@ pub async fn send_chat_message(
                             emit("reasoning", reasoning)
                         },
                         StreamedAssistantContent::ToolCall { tool_call, .. } => {
+                            last_tool_name = tool_call.function.name.clone();
                             let delta = format!(
                                 "[Tool] {}\n{}",
                                 tool_call.function.name, tool_call.function.arguments
@@ -271,7 +325,7 @@ pub async fn send_chat_message(
                     },
                     MultiTurnStreamItem::StreamUserItem(user) => match user {
                         StreamedUserContent::ToolResult { tool_result, .. } => {
-                            let content: String = tool_result
+                            let raw_content: String = tool_result
                                 .content
                                 .iter()
                                 .filter_map(|c| match c {
@@ -280,8 +334,9 @@ pub async fn send_chat_message(
                                 })
                                 .collect::<Vec<_>>()
                                 .join("\n");
-                            if !content.trim().is_empty() {
-                                emit("tool-result", content)
+                            if !raw_content.trim().is_empty() {
+                                let formatted = format_tool_output(&last_tool_name, &raw_content);
+                                emit("tool-result", formatted)
                             } else {
                                 Ok(())
                             }
@@ -309,6 +364,8 @@ pub async fn send_chat_message(
         .await
         .map_err(|err| err.to_string())?;
 
+    putback_session(&mut app_state.registry, session);
+
     let content = if answer.trim().is_empty() { "Done.".to_string() } else { answer };
 
     Ok(ChatResponse {
@@ -319,9 +376,10 @@ pub async fn send_chat_message(
 
 #[tauri::command]
 pub async fn get_system_prompt(state: tauri::State<'_, SharedState>) -> Result<String, String> {
-    let guard = state.lock().await;
-    let app_state = guard.as_ref().ok_or_else(|| "registry is not initialized".to_string())?;
-    let session =
-        app_state.active_session.as_ref().ok_or_else(|| "active session not found".to_string())?;
-    Ok(session.system_prompt().to_string())
+    let mut guard = state.lock().await;
+    let app_state = guard.as_mut().ok_or_else(|| "registry is not initialized".to_string())?;
+    let session = get_session(app_state).await?;
+    let system_prompt = session.system_prompt().to_string();
+    putback_session(&mut app_state.registry, session);
+    Ok(system_prompt)
 }

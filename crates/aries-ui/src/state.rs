@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use aries_session::{Session, SessionRegistry};
+use aries_session::SessionRegistry;
 use tokio::sync::Mutex;
 
 pub type SharedState = Arc<Mutex<Option<AppState>>>;
@@ -11,5 +11,5 @@ pub struct AppState {
     pub provider: String,
     pub model: String,
     pub active_project_dir: Option<String>,
-    pub active_session: Option<Session>,
+    pub active_session_id: Option<String>,
 }

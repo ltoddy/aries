@@ -5,9 +5,8 @@ use anyhow::Result;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
-use crate::language_server::{LspResult, SharedLspClient};
+use crate::language_server::{DocumentSymbolItem, LspResult, SharedLspClient};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -70,8 +69,26 @@ impl Display for LspOutput {
                 })
                 .collect::<Vec<_>>()
                 .join("\n"),
-            LspResult::Hover(hover) => extract_hover_text(&hover.contents),
-            LspResult::DocumentSymbol(symbols) | LspResult::WorkspaceSymbol(symbols) => symbols
+            LspResult::Hover(Some(hover)) => extract_hover_text(&hover.contents),
+            LspResult::Hover(None) => String::new(),
+            LspResult::DocumentSymbol(symbols) => symbols
+                .iter()
+                .map(|s| match s {
+                    DocumentSymbolItem::Flat(s) => {
+                        let loc = format!(
+                            "{}:{}",
+                            s.location.uri.strip_prefix("file://").unwrap_or(&s.location.uri),
+                            s.location.range.start.line + 1
+                        );
+                        format!("{} [{}] {}", s.name, s.kind, loc)
+                    },
+                    DocumentSymbolItem::Hierarchical(s) => {
+                        format!("{} [{}] line {}", s.name, s.kind, s.range.start.line + 1)
+                    },
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
+            LspResult::WorkspaceSymbol(symbols) => symbols
                 .iter()
                 .map(|s| {
                     let loc = format!(
@@ -294,10 +311,10 @@ impl Tool for LspTool {
                             serde_json::to_value(first_item)
                                 .map_err(|e| LspError::OperationFailed(e.to_string()))?
                         } else {
-                            Value::Null
+                            return Ok(LspOutput { result: LspResult::IncomingCalls(vec![]) });
                         }
                     },
-                    _ => Value::Null,
+                    _ => return Ok(LspOutput { result: LspResult::IncomingCalls(vec![]) }),
                 };
                 self.client.incoming_calls(item).await
             },
@@ -314,10 +331,10 @@ impl Tool for LspTool {
                             serde_json::to_value(first_item)
                                 .map_err(|e| LspError::OperationFailed(e.to_string()))?
                         } else {
-                            Value::Null
+                            return Ok(LspOutput { result: LspResult::OutgoingCalls(vec![]) });
                         }
                     },
-                    _ => Value::Null,
+                    _ => return Ok(LspOutput { result: LspResult::OutgoingCalls(vec![]) }),
                 };
                 self.client.outgoing_calls(item).await
             },

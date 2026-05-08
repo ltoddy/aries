@@ -102,7 +102,7 @@ function ChatView({
     setError(null);
     lastProcessedSeqRef.current = 0;
     try {
-      const data = await invoke<SessionBootstrap>("bootstrap_chat", { sessionId: sid ?? null });
+      const data = await invoke<SessionBootstrap>("load_session_view", { sessionId: sid ?? null });
       setMessages(data.messages);
       setSessionId(data.sessionId);
       setSessionDirName(data.sessionDirName);

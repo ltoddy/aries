@@ -14,17 +14,24 @@ use tokio::sync::oneshot;
 
 use crate::fs::path_to_uri;
 use crate::language_server::{
-    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, Hover, Location,
-    LspServerInfo, SymbolInformation,
+    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, DocumentSymbol, Hover,
+    Location, LspServerInfo, SymbolInformation,
 };
 use crate::rpc::{JsonRpcMessage, Notification, Request, RequestId, Response};
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum DocumentSymbolItem {
+    Flat(SymbolInformation),
+    Hierarchical(DocumentSymbol),
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum LspResult {
     Definition(Vec<Location>),
     References(Vec<Location>),
-    Hover(Hover),
-    DocumentSymbol(Vec<SymbolInformation>),
+    Hover(Option<Hover>),
+    DocumentSymbol(Vec<DocumentSymbolItem>),
     WorkspaceSymbol(Vec<SymbolInformation>),
     Implementation(Vec<Location>),
     PrepareCallHierarchy(Vec<CallHierarchyItem>),
@@ -168,7 +175,8 @@ impl LspClient {
     ) -> anyhow::Result<LspResult> {
         let params = text_document_position_params(file_path, line, character);
         let result = self.send_request("textDocument/definition", params).await?;
-        let locations: Vec<Location> = serde_json::from_value(result)?;
+        let locations =
+            serde_json::from_value::<Option<Vec<Location>>>(result)?.unwrap_or_default();
         Ok(LspResult::Definition(locations))
     }
 
@@ -181,7 +189,8 @@ impl LspClient {
         let mut params = text_document_position_params(file_path, line, character);
         params["context"] = serde_json::json!({ "includeDeclaration": true });
         let result = self.send_request("textDocument/references", params).await?;
-        let locations: Vec<Location> = serde_json::from_value(result)?;
+        let locations =
+            serde_json::from_value::<Option<Vec<Location>>>(result)?.unwrap_or_default();
         Ok(LspResult::References(locations))
     }
 
@@ -193,7 +202,7 @@ impl LspClient {
     ) -> anyhow::Result<LspResult> {
         let params = text_document_position_params(file_path, line, character);
         let result = self.send_request("textDocument/hover", params).await?;
-        let hover: Hover = serde_json::from_value(result)?;
+        let hover = serde_json::from_value::<Option<Hover>>(result)?;
         Ok(LspResult::Hover(hover))
     }
 
@@ -204,14 +213,16 @@ impl LspClient {
             }
         });
         let result = self.send_request("textDocument/documentSymbol", params).await?;
-        let symbols: Vec<SymbolInformation> = serde_json::from_value(result)?;
+        let symbols =
+            serde_json::from_value::<Option<Vec<DocumentSymbolItem>>>(result)?.unwrap_or_default();
         Ok(LspResult::DocumentSymbol(symbols))
     }
 
     pub async fn workspace_symbol(&self, query: &str) -> anyhow::Result<LspResult> {
         let params = serde_json::json!({ "query": query });
         let result = self.send_request("workspace/symbol", params).await?;
-        let symbols: Vec<SymbolInformation> = serde_json::from_value(result)?;
+        let symbols =
+            serde_json::from_value::<Option<Vec<SymbolInformation>>>(result)?.unwrap_or_default();
         Ok(LspResult::WorkspaceSymbol(symbols))
     }
 
@@ -223,7 +234,8 @@ impl LspClient {
     ) -> anyhow::Result<LspResult> {
         let params = text_document_position_params(file_path, line, character);
         let result = self.send_request("textDocument/implementation", params).await?;
-        let locations: Vec<Location> = serde_json::from_value(result)?;
+        let locations =
+            serde_json::from_value::<Option<Vec<Location>>>(result)?.unwrap_or_default();
         Ok(LspResult::Implementation(locations))
     }
 
@@ -235,21 +247,24 @@ impl LspClient {
     ) -> anyhow::Result<LspResult> {
         let params = text_document_position_params(file_path, line, character);
         let result = self.send_request("textDocument/prepareCallHierarchy", params).await?;
-        let items: Vec<CallHierarchyItem> = serde_json::from_value(result)?;
+        let items =
+            serde_json::from_value::<Option<Vec<CallHierarchyItem>>>(result)?.unwrap_or_default();
         Ok(LspResult::PrepareCallHierarchy(items))
     }
 
     pub async fn incoming_calls(&self, item: Value) -> anyhow::Result<LspResult> {
         let params = serde_json::json!({ "item": item });
         let result = self.send_request("callHierarchy/incomingCalls", params).await?;
-        let calls: Vec<CallHierarchyIncomingCall> = serde_json::from_value(result)?;
+        let calls = serde_json::from_value::<Option<Vec<CallHierarchyIncomingCall>>>(result)?
+            .unwrap_or_default();
         Ok(LspResult::IncomingCalls(calls))
     }
 
     pub async fn outgoing_calls(&self, item: Value) -> anyhow::Result<LspResult> {
         let params = serde_json::json!({ "item": item });
         let result = self.send_request("callHierarchy/outgoingCalls", params).await?;
-        let calls: Vec<CallHierarchyOutgoingCall> = serde_json::from_value(result)?;
+        let calls = serde_json::from_value::<Option<Vec<CallHierarchyOutgoingCall>>>(result)?
+            .unwrap_or_default();
         Ok(LspResult::OutgoingCalls(calls))
     }
 

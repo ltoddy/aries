@@ -98,6 +98,17 @@ pub struct SymbolInformation {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentSymbol {
+    pub name: String,
+    pub detail: Option<String>,
+    pub kind: SymbolKind,
+    pub range: Range,
+    pub selection_range: Range,
+    pub children: Option<Vec<DocumentSymbol>>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Hover {
     pub contents: Value,
     pub range: Option<Range>,

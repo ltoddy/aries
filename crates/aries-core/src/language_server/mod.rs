@@ -5,11 +5,11 @@ mod schema;
 use std::path::Path;
 use std::sync::Arc;
 
-pub use self::client::{LspClient, LspResult};
+pub use self::client::{DocumentSymbolItem, LspClient, LspResult};
 pub use self::detection::LspServerInfo;
 pub use self::schema::{
-    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, Hover, Location,
-    Position, Range, SymbolInformation, SymbolKind,
+    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, DocumentSymbol, Hover,
+    Location, Position, Range, SymbolInformation, SymbolKind,
 };
 use crate::fs::path_to_uri;
 

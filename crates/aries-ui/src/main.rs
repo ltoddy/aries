@@ -8,12 +8,13 @@ use tokio::sync::Mutex;
 
 mod chat;
 mod projects;
+mod session_service;
 mod state;
 mod types;
 
 use aries_config::AriesConfigLoader;
 use aries_context::GlobalContext;
-use chat::{bootstrap_chat, clear_history, get_system_prompt, list_sessions, send_chat_message};
+use chat::{clear_history, get_system_prompt, list_sessions, load_session_view, prompt};
 use projects::{activate_project, list_projects};
 use state::SharedState;
 use types::ConfigFormData;
@@ -63,8 +64,8 @@ fn main() {
         })
         .manage(Arc::new(Mutex::new(None::<state::AppState>)) as SharedState)
         .invoke_handler(tauri::generate_handler![
-            bootstrap_chat,
-            send_chat_message,
+            load_session_view,
+            prompt,
             get_system_prompt,
             clear_history,
             list_projects,
