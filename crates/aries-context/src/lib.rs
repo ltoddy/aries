@@ -4,7 +4,6 @@ use std::{env, io};
 #[derive(Debug, Clone)]
 pub struct GlobalContext {
     pub current_dir: PathBuf,
-    pub home_dir: PathBuf,
     pub config_dir: PathBuf,
     pub user: String,
 }
@@ -22,7 +21,7 @@ impl GlobalContext {
 
         let user = whoami::realname().unwrap_or_default();
 
-        Ok(Self { current_dir, home_dir, config_dir, user })
+        Ok(Self { current_dir, config_dir, user })
     }
 
     pub fn with_current_dir(current_dir: PathBuf) -> io::Result<Self> {
@@ -36,6 +35,6 @@ impl GlobalContext {
 
         let user = whoami::realname().unwrap_or_default();
 
-        Ok(Self { current_dir, home_dir, config_dir, user })
+        Ok(Self { current_dir, config_dir, user })
     }
 }

@@ -2,8 +2,9 @@ pub mod compaction;
 pub mod summary;
 pub mod title;
 
+use std::path::PathBuf;
+
 use aries_config::AriesConfig;
-use aries_context::GlobalContext;
 use futures::StreamExt;
 use rig::agent::{Agent, FinalResponse, MultiTurnStreamItem, PromptHook, StreamingResult};
 use rig::client::CompletionClient;
@@ -130,7 +131,7 @@ where
     pub(crate) client: C,
     pub(crate) config: AriesConfig,
     pub(crate) agent_type: AgentType,
-    pub(crate) gctx: GlobalContext,
+    pub(crate) cwd: PathBuf,
 }
 
 impl<C> AgentBuilder<C>
@@ -138,8 +139,8 @@ where
     C: CompletionClient + Clone + Send + Sync + 'static,
     C::CompletionModel: completion::CompletionModel + 'static,
 {
-    pub fn new(client: C, config: AriesConfig, agent_type: AgentType, gctx: GlobalContext) -> Self {
-        Self { client, config, agent_type, gctx }
+    pub fn new(client: C, config: AriesConfig, agent_type: AgentType, cwd: PathBuf) -> Self {
+        Self { client, config, agent_type, cwd }
     }
 
     pub fn build(self) -> AriesAgent<C::CompletionModel> {
@@ -167,11 +168,11 @@ where
         let model = self.config.model().to_owned();
         let agent_type = self.agent_type;
 
-        let skillloader = SkillFilesLoader::new(&self.gctx);
+        let skillloader = SkillFilesLoader::new(&self.cwd);
         let available_skills = skillloader.load().await.unwrap_or_default();
 
         let preamble =
-            crate::preamble::render(&self.gctx, agent_type, &model, &available_skills).await;
+            crate::preamble::render(&self.cwd, agent_type, &model, &available_skills).await;
 
         let tools = self.build_tools(lsp_client, available_skills);
 
@@ -196,14 +197,13 @@ where
         let agent_type = self.agent_type;
         let config = self.config.clone();
         let client = self.client.clone();
-        let gctx = self.gctx.clone();
 
         let mut tools: Vec<Box<dyn ToolDyn>> = vec![
             Box::new(tools::bash::BashTool),
             Box::new(tools::read::ReadTool),
-            Box::new(tools::glob::GlobTool::new(gctx.clone())),
-            Box::new(tools::grep::GrepTool::new(gctx.clone())),
-            Box::new(tools::ls::LsTool::new(gctx.clone())),
+            Box::new(tools::glob::GlobTool::new(self.cwd.clone())),
+            Box::new(tools::grep::GrepTool::new(self.cwd.clone())),
+            Box::new(tools::ls::LsTool::new(self.cwd.clone())),
             Box::new(tools::codesearch::CodeSearchTool),
         ];
 
@@ -212,11 +212,11 @@ where
             tools.push(Box::new(tools::apply_patch::ApplyPatchTool));
             tools.push(Box::new(tools::multiedit::MultiEditTool));
             tools.push(Box::new(tools::edit::EditTool));
-            tools.push(Box::new(tools::batch::BatchTool::new(gctx.clone())));
+            tools.push(Box::new(tools::batch::BatchTool::new(self.cwd.clone())));
             tools.push(Box::new(tools::agent::AgentTool::<C>::new(
                 client.clone(),
                 config.clone(),
-                gctx.clone(),
+                self.cwd.clone(),
             )));
         }
 
@@ -229,7 +229,7 @@ where
                 tools.push(Box::new(tools::skill::SkillTool::new(available_skills)));
             }
             if let Some(lsp_client) = lsp_client {
-                tools.push(Box::new(tools::lsp::LspTool::new(lsp_client, gctx.clone())));
+                tools.push(Box::new(tools::lsp::LspTool::new(lsp_client, self.cwd.clone())));
             }
         }
 

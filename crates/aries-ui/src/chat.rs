@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use aries_session::Session;
 use rig::agent::MultiTurnStreamItem;
 use rig::completion::Message;
@@ -149,8 +151,11 @@ pub async fn list_sessions(
     let app_state = guard.as_mut().ok_or_else(|| "registry is not initialized".to_string())?;
     let project_dir = require_project_dir(app_state)?;
 
-    let sessions =
-        app_state.registry.list_sessions(&project_dir).await.map_err(|err| err.to_string())?;
+    let sessions = app_state
+        .registry
+        .list_sessions(Some(PathBuf::from(project_dir)))
+        .await
+        .map_err(|err| err.to_string())?;
 
     Ok(sessions
         .into_iter()
@@ -158,7 +163,7 @@ pub async fn list_sessions(
             id: s.session_id.clone(),
             session_id: s.session_id,
             title: s.title,
-            project_dir: s.project_dir,
+            project_dir: s.cwd,
         })
         .collect())
 }
@@ -173,8 +178,7 @@ pub async fn bootstrap_chat(
     let project_dir = require_project_dir(app_state)?;
 
     let sid = session_id.unwrap_or_else(|| nanoid::nanoid!());
-    let session =
-        app_state.registry.get_session(&project_dir, &sid).await.map_err(|err| err.to_string())?;
+    let session = app_state.registry.get_session(&sid).await.map_err(|err| err.to_string())?;
 
     let bootstrap = session_to_bootstrap(app_state, &session);
     app_state.active_session = Some(session);

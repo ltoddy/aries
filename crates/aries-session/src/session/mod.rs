@@ -1,10 +1,8 @@
 use std::future::Future;
-use std::io;
 use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 use aries_config::AriesConfig;
-use aries_context::GlobalContext;
 use aries_core::agents::{AgentBuilder, AgentType, AriesAgent, CompactionAgent};
 use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
 use futures::{StreamExt, pin_mut};
@@ -13,7 +11,6 @@ use rig::completion::Message;
 use rig::providers::{azure, deepseek, openai};
 use rig::streaming::StreamedAssistantContent;
 use tokio::fs::create_dir_all;
-use tracing::error;
 
 use crate::session::history::ChatHistory;
 
@@ -27,8 +24,7 @@ pub struct Session {
     lsp_client: Option<SharedLspClient>,
     chat_history: ChatHistory,
     transcript_dir: PathBuf,
-    root: PathBuf, // session 的数据存放的目录
-    gctx: GlobalContext,
+    root_dir: PathBuf, // session 的数据存放的目录
 }
 
 #[derive(Clone)]
@@ -46,45 +42,52 @@ enum ProviderAgents {
 impl Session {
     const FILENAME: &str = "chat-history.jsonl";
 
-    pub async fn new(id: String, gctx: GlobalContext, config: AriesConfig) -> anyhow::Result<Self> {
-        let (root, transcript_dir) = Self::setup_directories(&gctx.config_dir, &id).await;
-
-        let lsp_client = Self::warm_up_lsp(&gctx.current_dir).await;
-
-        let agents = Self::create_agents(&gctx, config, lsp_client.clone()).await?;
-
-        let chat_history = ChatHistory::new(root.join(Self::FILENAME)).await;
-
-        let s = Self { id, agents, lsp_client, chat_history, transcript_dir, root, gctx };
-        s.save_current_dir().await;
-
-        Ok(s)
-    }
-
-    pub async fn load(
+    pub async fn new(
         id: String,
-        root: impl AsRef<Path>,
         config: AriesConfig,
+        root_dir: impl AsRef<Path>,
+        cwd: impl AsRef<Path>,
     ) -> anyhow::Result<Self> {
-        let root = root.as_ref();
+        let root_dir = root_dir.as_ref();
+        if !root_dir.exists() {
+            create_dir_all(&root_dir).await.with_context(|| {
+                format!("Failed to created session directory: {}", root_dir.display())
+            })?;
+        }
 
-        let current_dir = Self::load_current_dir(root).await?;
-        let gctx = GlobalContext::with_current_dir(current_dir)?;
-
-        let lsp_client = Self::warm_up_lsp(&gctx.current_dir).await;
-
-        let agents = Self::create_agents(&gctx, config, lsp_client.clone()).await?;
-
-        let chat_history = ChatHistory::new(root.join(Self::FILENAME)).await;
+        let lsp_client = Self::warm_up_lsp(&cwd).await;
+        let agents = Self::create_agents(config, &cwd, lsp_client.clone()).await?;
+        let chat_history = ChatHistory::new(root_dir.join(Self::FILENAME)).await;
 
         Ok(Self {
             id,
             agents,
             lsp_client,
             chat_history,
-            transcript_dir: root.join("transcripts"),
-            root: root.to_path_buf(),
-            gctx,
+            transcript_dir: root_dir.join("transcripts"),
+            root_dir: root_dir.to_path_buf(),
+        })
+    }
+
+    pub async fn load(
+        id: String,
+        config: AriesConfig,
+        root_dir: impl AsRef<Path>,
+        cwd: impl AsRef<Path>,
+    ) -> anyhow::Result<Self> {
+        let root_dir = root_dir.as_ref();
+
+        let lsp_client = Self::warm_up_lsp(&cwd).await;
+        let agents = Self::create_agents(config, &cwd, lsp_client.clone()).await?;
+        let chat_history = ChatHistory::new(root_dir.join(Self::FILENAME)).await;
+
+        Ok(Self {
+            id,
+            agents,
+            lsp_client,
+            chat_history,
+            transcript_dir: root_dir.join("transcripts"),
+            root_dir: root_dir.to_path_buf(),
         })
     }
 }
@@ -103,10 +106,6 @@ impl Session {
         }
     }
 
-    pub fn current_dir(&self) -> PathBuf {
-        self.gctx.current_dir.clone()
-    }
-
     pub fn history(&self) -> &[Message] {
         self.chat_history.history()
     }
@@ -116,7 +115,7 @@ impl Session {
     }
 
     pub fn dir(&self) -> PathBuf {
-        self.root.clone()
+        self.root_dir.clone()
     }
 
     pub async fn prompt<F, Fut, P>(
@@ -217,10 +216,12 @@ impl Session {
     }
 
     async fn create_agents(
-        gctx: &GlobalContext,
         config: AriesConfig,
+        cwd: impl AsRef<Path>,
         lsp_client: Option<SharedLspClient>,
     ) -> anyhow::Result<ProviderAgents> {
+        let cwd = cwd.as_ref();
+
         let agents = match config.clone() {
             AriesConfig::OpenAICompatible(ref conf) => {
                 let client = openai::CompletionsClient::builder()
@@ -233,7 +234,7 @@ impl Session {
                     client.clone(),
                     config.clone(),
                     AgentType::Build,
-                    gctx.clone(),
+                    cwd.to_path_buf(),
                 )
                 .with_tools(lsp_client)
                 .await;
@@ -252,7 +253,7 @@ impl Session {
                     client.clone(),
                     config.clone(),
                     AgentType::Build,
-                    gctx.clone(),
+                    cwd.to_path_buf(),
                 )
                 .with_tools(lsp_client)
                 .await;
@@ -262,45 +263,6 @@ impl Session {
         };
 
         Ok(agents)
-    }
-
-    async fn save_current_dir(&self) {
-        let file_path = self.root.join("current_dir");
-
-        if let Err(err) =
-            tokio::fs::write(&file_path, self.gctx.current_dir.display().to_string()).await
-        {
-            error!("failed to save current directory: {err}")
-        }
-    }
-
-    async fn load_current_dir(dir: impl AsRef<Path>) -> io::Result<PathBuf> {
-        let dir = dir.as_ref();
-        let file_path = dir.join("current_dir");
-
-        let current_dir =
-            tokio::fs::read_to_string(&file_path).await.map(|path| PathBuf::from(path.trim()))?;
-        Ok(current_dir)
-    }
-
-    async fn setup_directories(root: impl AsRef<Path>, id: &str) -> (PathBuf, PathBuf) {
-        let root = root.as_ref();
-
-        let dir = root.join(format!("{}{}", Self::PREFIX, id));
-        if !dir.exists()
-            && let Err(err) = create_dir_all(&dir).await
-        {
-            error!("Failed to create session directory: {err}");
-        };
-
-        let transcript_dir = dir.join("transcripts");
-        if !transcript_dir.exists()
-            && let Err(err) = create_dir_all(&transcript_dir).await
-        {
-            error!("Failed to create session transcript directory: {err}");
-        }
-
-        (dir, transcript_dir)
     }
 
     async fn warm_up_lsp(dir: impl AsRef<Path>) -> Option<SharedLspClient> {

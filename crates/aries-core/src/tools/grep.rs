@@ -1,7 +1,7 @@
 use std::fmt::{self, Display};
+use std::path::PathBuf;
 
 use anyhow::Result;
-use aries_context::GlobalContext;
 use globset::GlobBuilder;
 use ignore::WalkBuilder;
 use regex_lite::Regex;
@@ -40,12 +40,12 @@ pub enum GrepError {
 pub const NAME: &str = "Grep";
 
 pub struct GrepTool {
-    gctx: GlobalContext,
+    cwd: PathBuf,
 }
 
 impl GrepTool {
-    pub fn new(gctx: GlobalContext) -> Self {
-        Self { gctx }
+    pub fn new(cwd: PathBuf) -> Self {
+        Self { cwd }
     }
 }
 
@@ -80,13 +80,13 @@ impl Tool for GrepTool {
         let re = Regex::new(&args.pattern)?;
         let mut matches = Vec::new();
 
-        let mut builder = WalkBuilder::new(&self.gctx.current_dir);
+        let mut builder = WalkBuilder::new(&self.cwd);
         builder.hidden(false);
 
         if let Some(include) = &args.include {
             let glob = GlobBuilder::new(include).literal_separator(true).build()?;
             let glob = glob.compile_matcher();
-            let prefix = self.gctx.current_dir.clone();
+            let prefix = self.cwd.clone();
             builder.filter_entry(move |entry| {
                 entry.file_type().is_some_and(|ft| ft.is_dir())
                     || entry

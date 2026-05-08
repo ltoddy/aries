@@ -2,13 +2,13 @@ mod env;
 mod instruction;
 mod skill;
 
-use aries_context::GlobalContext;
+use std::path::Path;
 
 use crate::agents::AgentType;
 use crate::ext::skill::SkillInfo;
 
 pub async fn render(
-    gctx: &GlobalContext,
+    cwd: impl AsRef<Path>,
     agent_type: AgentType,
     model: &str,
     available_skills: &[SkillInfo],
@@ -18,7 +18,7 @@ pub async fn render(
             let mut preamble = agent_type.bare_preamble().to_string();
 
             preamble.push('\n');
-            preamble.push_str(&env::render(gctx, model));
+            preamble.push_str(&env::render(&cwd, model));
             preamble.push('\n');
 
             if !available_skills.is_empty() {
@@ -27,7 +27,7 @@ pub async fn render(
                 preamble.push('\n');
             }
 
-            let loader = instruction::AgentsmdFileLoader::new(&gctx.current_dir);
+            let loader = instruction::AgentsmdFileLoader::new(&cwd);
             if let Some(content) = loader.read().await {
                 preamble.push('\n');
                 preamble.push_str(&format!("Instructions from: {}", loader.file_path().display()));

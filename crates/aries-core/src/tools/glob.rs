@@ -2,7 +2,6 @@ use std::fmt::{self, Display};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
-use aries_context::GlobalContext;
 use ignore::WalkBuilder;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
@@ -38,12 +37,12 @@ pub enum GlobError {
 pub const NAME: &str = "Glob";
 
 pub struct GlobTool {
-    gctx: GlobalContext,
+    cwd: PathBuf,
 }
 
 impl GlobTool {
-    pub fn new(gctx: GlobalContext) -> Self {
-        Self { gctx }
+    pub fn new(cwd: PathBuf) -> Self {
+        Self { cwd }
     }
 }
 
@@ -75,7 +74,7 @@ impl Tool for GlobTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        let base_dir = args.base_dir.unwrap_or_else(|| self.gctx.current_dir.clone());
+        let base_dir = args.base_dir.unwrap_or_else(|| self.cwd.clone());
 
         let pattern = if Path::new(&args.pattern).is_absolute() {
             match Path::new(&args.pattern).strip_prefix(&base_dir) {

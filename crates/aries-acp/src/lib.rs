@@ -1,14 +1,15 @@
-use std::cell::Cell;
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex as StdMutex};
 
 use agent_client_protocol::{
-    AuthenticateRequest, AuthenticateResponse, CancelNotification, ContentBlock, ContentChunk,
-    Error, Implementation, InitializeRequest, InitializeResponse, NewSessionRequest,
-    NewSessionResponse, PromptRequest, PromptResponse, ProtocolVersion, SessionNotification,
-    SessionUpdate, StopReason, TextContent, ToolCallId, ToolCallStatus, ToolCallUpdate,
-    ToolCallUpdateFields,
+    AgentCapabilities, AuthenticateRequest, AuthenticateResponse, CancelNotification, ContentBlock,
+    ContentChunk, Error, ExtNotification, ExtRequest, ExtResponse, Implementation,
+    InitializeRequest, InitializeResponse, ListSessionsRequest, ListSessionsResponse,
+    LoadSessionRequest, LoadSessionResponse, McpCapabilities, NewSessionRequest,
+    NewSessionResponse, PromptCapabilities, PromptRequest, PromptResponse, ProtocolVersion,
+    SessionCapabilities, SessionInfo, SessionListCapabilities, SessionNotification, SessionUpdate,
+    SetSessionModeRequest, SetSessionModeResponse, StopReason, TextContent, ToolCallId,
+    ToolCallStatus, ToolCallUpdate, ToolCallUpdateFields,
 };
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
@@ -18,44 +19,47 @@ use async_trait::async_trait;
 use rig::agent::{MultiTurnStreamItem, Text};
 use rig::message::{ReasoningContent, ToolResultContent};
 use rig::streaming::{StreamedAssistantContent, StreamedUserContent};
+use serde_json::value::RawValue;
 use tokio::sync::{Mutex, mpsc, oneshot};
 use tracing::info;
 
-pub struct AcpImpl {
-    current_dir: PathBuf,
+pub struct AgentClientProtocolImpl {
     registry: Mutex<SessionRegistry>,
     sender: mpsc::UnboundedSender<(SessionNotification, oneshot::Sender<()>)>,
-    next_session_id: Cell<String>,
 }
 
-impl AcpImpl {
+impl AgentClientProtocolImpl {
     pub async fn new(
         gctx: GlobalContext,
         config: AriesConfig,
         sender: mpsc::UnboundedSender<(SessionNotification, oneshot::Sender<()>)>,
     ) -> anyhow::Result<Self> {
-        let next_session_id = Cell::new(nanoid::nanoid!());
         let registry = SessionRegistry::new(gctx.clone(), config).await?;
 
-        Ok(Self {
-            current_dir: gctx.current_dir,
-            registry: Mutex::new(registry),
-            sender,
-            next_session_id,
-        })
+        Ok(Self { registry: Mutex::new(registry), sender })
     }
 }
 
 #[async_trait(?Send)]
-impl agent_client_protocol::Agent for AcpImpl {
+impl agent_client_protocol::Agent for AgentClientProtocolImpl {
     async fn initialize(
         &self,
         args: InitializeRequest,
     ) -> agent_client_protocol::Result<InitializeResponse> {
         info!("Received initialize request {args:?}");
 
-        let info = Implementation::new("aries", "0.1.0").title("Aries Agent");
-        let resp = InitializeResponse::new(ProtocolVersion::LATEST).agent_info(info);
+        let info = Implementation::new("Aries", "0.0.1").title("Aries Agent");
+
+        let capabilities = AgentCapabilities::new()
+            .load_session(true)
+            .prompt_capabilities(PromptCapabilities::new())
+            .mcp_capabilities(McpCapabilities::new().http(true).sse(true))
+            .session_capabilities(SessionCapabilities::new().list(SessionListCapabilities::new()));
+
+        let resp = InitializeResponse::new(ProtocolVersion::LATEST)
+            .agent_info(info)
+            .agent_capabilities(capabilities);
+
         Ok(resp)
     }
 
@@ -75,14 +79,10 @@ impl agent_client_protocol::Agent for AcpImpl {
     ) -> agent_client_protocol::Result<NewSessionResponse> {
         info!("Received new session request {args:?}");
 
-        let current_dir = self.current_dir.display().to_string();
         let mut registry = self.registry.lock().await;
-        let session_id = nanoid::nanoid!();
-        let session = registry
-            .get_session(&current_dir, &session_id)
-            .await
-            .map_err(|_| Error::internal_error())?;
-        self.next_session_id.set(session.id());
+
+        let cwd = args.cwd.display().to_string();
+        let session = registry.new_session(cwd).await?;
 
         let resp = NewSessionResponse::new(session.id());
         Ok(resp)
@@ -100,11 +100,12 @@ impl agent_client_protocol::Agent for AcpImpl {
             .collect::<Vec<_>>()
             .join("\n");
 
-        let mut registry = self.registry.lock().await;
+        let registry = self.registry.lock().await;
         let session_id = args.session_id.to_string();
-        let current_dir = self.current_dir.display().to_string();
 
-        let mut session = registry.get_session(&current_dir, &session_id).await?;
+        let mut session =
+            registry.get_session(&session_id).ok_or_else(|| Error::invalid_params())?;
+
         let tool_names: Arc<StdMutex<HashMap<String, String>>> =
             Arc::new(StdMutex::new(HashMap::new()));
 
@@ -113,7 +114,7 @@ impl agent_client_protocol::Agent for AcpImpl {
                 &promot,
                 Some(|item| {
                     let sender = self.sender.clone();
-                    let session_id = args.session_id.clone();
+                    let session_id = session_id.clone();
                     let tool_names = tool_names.clone();
                     async move {
                         let updates = stream_item_to_updates(item, &tool_names);
@@ -141,6 +142,52 @@ impl agent_client_protocol::Agent for AcpImpl {
     async fn cancel(&self, args: CancelNotification) -> agent_client_protocol::Result<()> {
         info!("Received cancel request {args:?}");
 
+        Ok(())
+    }
+
+    async fn load_session(
+        &self,
+        args: LoadSessionRequest,
+    ) -> agent_client_protocol::Result<LoadSessionResponse> {
+        let mut registry = self.registry.lock().await;
+        let _ = registry.load_session(&args.session_id.to_string()).await?;
+
+        let resp = LoadSessionResponse::new();
+        Ok(resp)
+    }
+
+    async fn set_session_mode(
+        &self,
+        _args: SetSessionModeRequest,
+    ) -> agent_client_protocol::Result<SetSessionModeResponse> {
+        todo!()
+    }
+
+    async fn list_sessions(
+        &self,
+        args: ListSessionsRequest,
+    ) -> agent_client_protocol::Result<ListSessionsResponse> {
+        let mut registry = self.registry.lock().await;
+
+        let sessions = registry.list_sessions(args.cwd).await?;
+        let sessions = sessions
+            .into_iter()
+            .map(|s| {
+                SessionInfo::new(s.session_id, s.cwd)
+                    .title(s.title)
+                    .updated_at(s.updated_at.to_string())
+            })
+            .collect();
+
+        let resp = ListSessionsResponse::new(sessions);
+        Ok(resp)
+    }
+
+    async fn ext_method(&self, _args: ExtRequest) -> agent_client_protocol::Result<ExtResponse> {
+        Ok(ExtResponse::new(RawValue::NULL.to_owned().into()))
+    }
+
+    async fn ext_notification(&self, _args: ExtNotification) -> agent_client_protocol::Result<()> {
         Ok(())
     }
 }

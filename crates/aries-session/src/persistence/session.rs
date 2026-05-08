@@ -1,6 +1,7 @@
 use itertools::Itertools;
 use jiff::Timestamp;
 use toasty::Db;
+use toasty::stmt::IntoExpr;
 
 #[derive(Debug, Clone, toasty::Model)]
 #[table = "sessions"]
@@ -15,11 +16,15 @@ pub struct Session {
     pub title: Option<String>,
 
     #[index]
-    pub project_dir: String,
+    pub cwd: String,
+
+    pub root_dir: String,
 
     #[index]
     #[auto]
     pub created_at: Timestamp,
+
+    pub updated_at: Timestamp,
 }
 
 pub struct SessionRepository {
@@ -31,8 +36,19 @@ impl SessionRepository {
         Self { db }
     }
 
-    pub async fn create(&mut self, session_id: &str, project_dir: &str) -> toasty::Result<Session> {
-        Session::create().session_id(session_id).project_dir(project_dir).exec(&mut self.db).await
+    pub async fn create(
+        &mut self,
+        session_id: impl IntoExpr<String>,
+        cwd: impl IntoExpr<String>,
+        root_dir: impl IntoExpr<String>,
+    ) -> toasty::Result<Session> {
+        Session::create()
+            .session_id(session_id)
+            .cwd(cwd)
+            .root_dir(root_dir)
+            .updated_at(Timestamp::now())
+            .exec(&mut self.db)
+            .await
     }
 
     pub async fn find_projects(&mut self) -> toasty::Result<Vec<String>> {
@@ -43,36 +59,55 @@ impl SessionRepository {
             .exec(&mut self.db)
             .await?
             .into_iter()
-            .map(|v| v.project_dir)
+            .map(|v| v.cwd)
             .unique()
             .collect::<Vec<_>>();
         Ok(values)
     }
 
-    pub async fn find_by_project_dir(&mut self, project_dir: &str) -> toasty::Result<Vec<Session>> {
-        Session::filter(Session::fields().project_dir().eq(project_dir))
+    pub async fn find_by_cwd(
+        &mut self,
+        cwd: impl IntoExpr<String>,
+    ) -> toasty::Result<Vec<Session>> {
+        Session::filter(Session::fields().cwd().eq(cwd))
             .order_by(Session::fields().created_at().desc())
             .exec(&mut self.db)
             .await
     }
 
-    pub async fn find_last_by_session_id(&mut self, session_id: &str) -> toasty::Result<Session> {
+    pub async fn find(&mut self) -> toasty::Result<Vec<Session>> {
+        Session::all().order_by(Session::fields().updated_at().desc()).exec(&mut self.db).await
+    }
+
+    pub async fn find_last_by_session_id(
+        &mut self,
+        session_id: impl IntoExpr<String>,
+    ) -> toasty::Result<Session> {
         Session::filter(Session::fields().session_id().eq(session_id))
-            .order_by(Session::fields().created_at().desc())
             .one()
             .exec(&mut self.db)
             .await
     }
 
-    pub async fn update_title_by_id(&mut self, id: u64, title: &str) -> toasty::Result<()> {
-        Session::update_by_id(id).title(title).exec(&mut self.db).await
+    pub async fn update_title_by_id(
+        &mut self,
+        id: impl IntoExpr<u64>,
+        title: String,
+    ) -> toasty::Result<()> {
+        Session::update_by_id(id).title(title).updated_at(Timestamp::now()).exec(&mut self.db).await
     }
 
-    pub async fn delete_by_session_id(&mut self, session_id: &str) -> toasty::Result<()> {
+    pub async fn delete_by_session_id(
+        &mut self,
+        session_id: impl IntoExpr<String>,
+    ) -> toasty::Result<()> {
         Session::delete_by_session_id(&mut self.db, session_id).await
     }
 
-    pub async fn delete_by_session_id_in(&mut self, session_ids: &[&str]) -> toasty::Result<()> {
+    pub async fn delete_by_session_id_in(
+        &mut self,
+        session_ids: &[impl IntoExpr<String>],
+    ) -> toasty::Result<()> {
         Session::filter(Session::fields().session_id().in_list(session_ids))
             .delete()
             .exec(&mut self.db)

@@ -1,8 +1,8 @@
 use std::fmt::{self, Display};
+use std::path::PathBuf;
 
 use anyhow::Result;
 use aries_config::AriesConfig;
-use aries_context::GlobalContext;
 use futures::StreamExt;
 use rig::client::CompletionClient;
 use rig::completion::ToolDefinition;
@@ -45,15 +45,15 @@ where
 {
     client: C,
     config: AriesConfig,
-    gctx: GlobalContext,
+    cwd: PathBuf,
 }
 
 impl<C> AgentTool<C>
 where
     C: CompletionClient,
 {
-    pub fn new(client: C, config: AriesConfig, gctx: GlobalContext) -> Self {
-        Self { client, config, gctx }
+    pub fn new(client: C, config: AriesConfig, cwd: PathBuf) -> Self {
+        Self { client, config, cwd }
     }
 }
 
@@ -110,7 +110,7 @@ where
             self.client.clone(),
             self.config.clone(),
             agent_type,
-            self.gctx.clone(),
+            self.cwd.clone(),
         )
         .build();
 

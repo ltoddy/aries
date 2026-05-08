@@ -1,7 +1,7 @@
 use std::fmt::{self, Display};
+use std::path::PathBuf;
 
 use anyhow::Result;
-use aries_context::GlobalContext;
 use futures::future::join_all;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
@@ -45,12 +45,12 @@ pub enum BatchError {
 }
 
 pub struct BatchTool {
-    gctx: GlobalContext,
+    cwd: PathBuf,
 }
 
 impl BatchTool {
-    pub fn new(gctx: GlobalContext) -> Self {
-        Self { gctx }
+    pub fn new(cwd: PathBuf) -> Self {
+        Self { cwd }
     }
 }
 
@@ -120,21 +120,21 @@ impl Tool for BatchTool {
                 } else if tool_name == glob::NAME {
                     let parsed_args =
                         serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
-                    Tool::call(&GlobTool::new(self.gctx.clone()), parsed_args)
+                    Tool::call(&GlobTool::new(self.cwd.clone()), parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
                 } else if tool_name == grep::NAME {
                     let parsed_args =
                         serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
-                    Tool::call(&GrepTool::new(self.gctx.clone()), parsed_args)
+                    Tool::call(&GrepTool::new(self.cwd.clone()), parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())
                 } else if tool_name == ls::NAME {
                     let parsed_args =
                         serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
-                    Tool::call(&LsTool::new(self.gctx.clone()), parsed_args)
+                    Tool::call(&LsTool::new(self.cwd.clone()), parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())

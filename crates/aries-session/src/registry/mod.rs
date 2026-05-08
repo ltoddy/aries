@@ -35,13 +35,17 @@ impl SessionRegistry {
 
     pub async fn list_sessions(
         &mut self,
-        project_dir: &str,
+        cwd: Option<PathBuf>,
     ) -> anyhow::Result<Vec<crate::persistence::Session>> {
-        let sessions = self.session_repo.find_by_project_dir(project_dir).await?;
+        let sessions = match cwd {
+            Some(cwd) => self.session_repo.find_by_cwd(cwd.display().to_string()).await?,
+            None => self.session_repo.find().await?,
+        };
+
         Ok(sessions)
     }
 
-    pub async fn get_session(
+    pub async fn try_session(
         &mut self,
         project_dir: &str,
         session_id: &str,
@@ -52,25 +56,43 @@ impl SessionRegistry {
 
         match self.session_repo.find_last_by_session_id(session_id).await {
             Ok(_) => self.load_session(session_id).await,
-            Err(_) => self.create_session(project_dir).await,
+            Err(_) => self.new_session(project_dir).await,
         }
     }
 
-    pub async fn create_session(&mut self, project_dir: &str) -> anyhow::Result<Session> {
-        let gctx = GlobalContext { current_dir: PathBuf::from(project_dir), ..self.gctx.clone() };
+    pub fn get_session(&self, session_id: impl Into<String>) -> Option<Session> {
+        let session_id = session_id.into();
+        let session = self.active_sessions.get(&session_id)?;
+        Some(session.to_owned())
+    }
+
+    pub async fn new_session(&mut self, cwd: impl Into<String>) -> anyhow::Result<Session> {
+        let cwd = cwd.into();
 
         let session_id = nanoid::nanoid!();
-        let session = Session::new(session_id, gctx, self.config.clone()).await?;
+        let root_dir = self.gctx.config_dir.join(format!("session-{session_id}"));
+
+        let session = Session::new(session_id, self.config.clone(), &root_dir, &cwd).await?;
         self.active_sessions.insert(session.id(), session.clone());
 
-        let _ = self.session_repo.create(&session.id(), project_dir).await;
+        let _ = self.session_repo.create(&session.id(), &cwd, root_dir.display().to_string()).await;
 
         Ok(session)
     }
 
-    async fn load_session(&mut self, session_id: &str) -> anyhow::Result<Session> {
-        let root = self.gctx.config_dir.join(format!("{}-{}", Session::PREFIX, session_id));
-        let session = Session::load(session_id.to_owned(), root, self.config.clone()).await?;
+    pub async fn load_session(&mut self, session_id: &str) -> anyhow::Result<Session> {
+        let session = self.session_repo.find_last_by_session_id(session_id).await?;
+
+        let root_dir = self.gctx.config_dir.join(format!("session-{session_id}"));
+
+        let session = Session::load(
+            session.session_id,
+            self.config.clone(),
+            root_dir,
+            PathBuf::from(session.cwd),
+        )
+        .await?;
+
         self.active_sessions.insert(session.id(), session.clone());
 
         Ok(session)

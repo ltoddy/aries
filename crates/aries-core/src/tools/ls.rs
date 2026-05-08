@@ -2,7 +2,6 @@ use std::fmt::{self, Display};
 use std::path::PathBuf;
 
 use anyhow::Result;
-use aries_context::GlobalContext;
 use globset::{Glob, GlobSetBuilder};
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
@@ -35,12 +34,12 @@ pub enum LsError {
 pub const NAME: &str = "Ls";
 
 pub struct LsTool {
-    gctx: GlobalContext,
+    cwd: PathBuf,
 }
 
 impl LsTool {
-    pub fn new(gctx: GlobalContext) -> Self {
-        Self { gctx }
+    pub fn new(cwd: PathBuf) -> Self {
+        Self { cwd }
     }
 }
 
@@ -76,7 +75,7 @@ impl Tool for LsTool {
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         let dir_path = match args.path {
             Some(p) => p,
-            None => self.gctx.current_dir.clone(),
+            None => self.cwd.clone(),
         };
 
         let mut builder = GlobSetBuilder::new();

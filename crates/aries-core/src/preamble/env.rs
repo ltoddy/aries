@@ -1,16 +1,15 @@
 use std::env::consts::OS;
+use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use aries_context::GlobalContext;
-
-pub fn render(gctx: &GlobalContext, model: &str) -> String {
+pub fn render(cwd: impl AsRef<Path>, model: &str) -> String {
     let today = today();
-    let current_dir = gctx.current_dir.display();
+    let cwd = cwd.as_ref().display();
 
     [
         "<env>",
         format!("  Model: {}", model).as_str(),
-        format!("  Working directory: {current_dir}").as_str(),
+        format!("  Working directory: {cwd}").as_str(),
         format!("  Platform: {OS}").as_str(),
         format!("  Today's date: {today}").as_str(),
         "</env>",

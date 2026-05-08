@@ -6,7 +6,6 @@ edition = "2024"
 [dependencies]
 anyhow.workspace = true
 aries-config = { path = "../aries-config" }
-aries-context = { path = "../aries-context" }
 dialoguer.workspace = true
 diffy.workspace = true
 futures.workspace = true

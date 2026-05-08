@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use aries_context::GlobalContext;
 use futures::stream::{self, StreamExt};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -17,8 +16,10 @@ pub struct SkillFilesLoader {
 impl SkillFilesLoader {
     pub const FILENAME: &str = "SKILL.md";
 
-    pub fn new(gctx: &GlobalContext) -> Self {
-        let roots = vec![gctx.home_dir.join(".agents").join("skills"), gctx.current_dir.clone()];
+    pub fn new(cwd: impl AsRef<Path>) -> Self {
+        let cwd = cwd.as_ref();
+        let home_dir = std::env::home_dir().unwrap_or_else(|| PathBuf::from("~"));
+        let roots = vec![home_dir.join(".agents").join("skills"), cwd.to_path_buf()];
 
         Self { roots }
     }

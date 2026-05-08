@@ -2,7 +2,6 @@ use std::fmt::{self, Display, Formatter};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
-use aries_context::GlobalContext;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
@@ -158,12 +157,12 @@ pub const NAME: &str = "Lsp";
 
 pub struct LspTool {
     client: SharedLspClient,
-    gctx: GlobalContext,
+    cwd: PathBuf,
 }
 
 impl LspTool {
-    pub fn new(client: SharedLspClient, gctx: GlobalContext) -> Self {
-        Self { client, gctx }
+    pub fn new(client: SharedLspClient, cwd: PathBuf) -> Self {
+        Self { client, cwd }
     }
 
     fn extract_position_args(
@@ -248,18 +247,15 @@ impl Tool for LspTool {
 
         let result = match args.operation {
             LspOperation::GoToDefinition => {
-                let (file_path, line, character) =
-                    Self::extract_position_args(&args, &self.gctx.current_dir)?;
+                let (file_path, line, character) = Self::extract_position_args(&args, &self.cwd)?;
                 self.client.goto_definition(file_path, line, character).await
             },
             LspOperation::FindReferences => {
-                let (file_path, line, character) =
-                    Self::extract_position_args(&args, &self.gctx.current_dir)?;
+                let (file_path, line, character) = Self::extract_position_args(&args, &self.cwd)?;
                 self.client.find_references(file_path, line, character).await
             },
             LspOperation::Hover => {
-                let (file_path, line, character) =
-                    Self::extract_position_args(&args, &self.gctx.current_dir)?;
+                let (file_path, line, character) = Self::extract_position_args(&args, &self.cwd)?;
                 self.client.hover(file_path, line, character).await
             },
             LspOperation::DocumentSymbol => {
@@ -269,7 +265,7 @@ impl Tool for LspTool {
                 let abs_path = if file_path.is_absolute() {
                     file_path.clone()
                 } else {
-                    self.gctx.current_dir.join(file_path)
+                    self.cwd.join(file_path)
                 };
                 self.client.document_symbol(abs_path).await
             },
@@ -278,18 +274,15 @@ impl Tool for LspTool {
                 self.client.workspace_symbol(query).await
             },
             LspOperation::GoToImplementation => {
-                let (file_path, line, character) =
-                    Self::extract_position_args(&args, &self.gctx.current_dir)?;
+                let (file_path, line, character) = Self::extract_position_args(&args, &self.cwd)?;
                 self.client.goto_implementation(file_path, line, character).await
             },
             LspOperation::PrepareCallHierarchy => {
-                let (file_path, line, character) =
-                    Self::extract_position_args(&args, &self.gctx.current_dir)?;
+                let (file_path, line, character) = Self::extract_position_args(&args, &self.cwd)?;
                 self.client.prepare_call_hierarchy(file_path, line, character).await
             },
             LspOperation::IncomingCalls => {
-                let (file_path, line, character) =
-                    Self::extract_position_args(&args, &self.gctx.current_dir)?;
+                let (file_path, line, character) = Self::extract_position_args(&args, &self.cwd)?;
                 let items = self
                     .client
                     .prepare_call_hierarchy(file_path, line, character)
@@ -309,8 +302,7 @@ impl Tool for LspTool {
                 self.client.incoming_calls(item).await
             },
             LspOperation::OutgoingCalls => {
-                let (file_path, line, character) =
-                    Self::extract_position_args(&args, &self.gctx.current_dir)?;
+                let (file_path, line, character) = Self::extract_position_args(&args, &self.cwd)?;
                 let items = self
                     .client
                     .prepare_call_hierarchy(file_path, line, character)

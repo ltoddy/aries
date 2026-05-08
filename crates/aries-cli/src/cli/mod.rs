@@ -1,10 +1,12 @@
 pub mod acp;
 pub mod init;
+pub mod session;
 pub mod setup;
 
 use clap::{Parser, Subcommand};
 
 use crate::cli::init::InitCommand;
+use crate::cli::session::SessionCommand;
 
 #[derive(Parser, Debug, Clone)]
 pub struct Args {
@@ -19,8 +21,10 @@ pub enum Subcommands {
         #[command(subcommand)]
         command: InitCommand,
     },
-    Setup,
-    Resume {
-        session_id: String,
+    Session {
+        #[command(subcommand)]
+        command: SessionCommand,
     },
+    Setup,
+    Doctor,
 }

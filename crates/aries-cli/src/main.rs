@@ -1,4 +1,3 @@
-mod acp;
 mod cli;
 mod commands;
 mod display;
@@ -17,12 +16,14 @@ use clap::Parser;
 use rustyline::error::ReadlineError;
 use terminal_size::{Width, terminal_size};
 
+use crate::cli::session::SessionCommand;
 use crate::theme::Theme;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let gctx = GlobalContext::new()?;
     let args = cli::Args::parse();
+
+    let gctx = GlobalContext::new()?;
 
     let mut session_id = nanoid::nanoid!();
     match args.command {
@@ -31,7 +32,11 @@ async fn main() -> anyhow::Result<()> {
         },
         Some(cli::Subcommands::Setup) => return cli::setup::execute(gctx).await,
         Some(cli::Subcommands::Acp) => return cli::acp::execute(gctx).await,
-        Some(cli::Subcommands::Resume { session_id: id }) => session_id = id,
+        Some(cli::Subcommands::Session { command }) => match command {
+            SessionCommand::List => {},
+            SessionCommand::Prune { session_ids: _, all: _ } => {},
+            SessionCommand::Resume { session_id: sid } => session_id = sid,
+        },
         _ => {},
     }
 
@@ -41,8 +46,8 @@ async fn main() -> anyhow::Result<()> {
     let mut registry = SessionRegistry::new(gctx.clone(), config.clone()).await?;
 
     let current_dir = gctx.current_dir.display().to_string();
-    let mut session = registry.get_session(&current_dir, &session_id).await?;
-    let _guard = logger::init(session.dir());
+    let mut session = registry.try_session(&current_dir, &session_id).await?;
+    let _guard = logger::init(session.dir()).await;
 
     let mut reader = input::InputReader::new(session.dir())?;
     welcome::welcome(config.provider(), config.model(), &session.id(), &gctx);
