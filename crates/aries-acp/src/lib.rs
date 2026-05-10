@@ -59,7 +59,6 @@ impl agent_client_protocol::Agent for AgentClientProtocolImpl {
         let resp = InitializeResponse::new(ProtocolVersion::LATEST)
             .agent_info(info)
             .agent_capabilities(capabilities);
-
         Ok(resp)
     }
 
@@ -148,6 +147,15 @@ impl agent_client_protocol::Agent for AgentClientProtocolImpl {
     async fn cancel(&self, args: CancelNotification) -> agent_client_protocol::Result<()> {
         info!("Received cancel request {args:?}");
 
+        let session_id = args.session_id.to_string();
+        let session = {
+            let registry = self.registry.lock().await;
+            registry
+                .get_session(&session_id)
+                .ok_or_else(|| Error::resource_not_found(Some(session_id.clone())))?
+        };
+        session.cancel();
+
         Ok(())
     }
 
@@ -155,8 +163,12 @@ impl agent_client_protocol::Agent for AgentClientProtocolImpl {
         &self,
         args: LoadSessionRequest,
     ) -> agent_client_protocol::Result<LoadSessionResponse> {
+        info!("Received load session request {args:?}");
+
+        let session_id = args.session_id.to_string();
+
         let mut registry = self.registry.lock().await;
-        let _ = registry.load_session(&args.session_id.to_string()).await?;
+        let _ = registry.load_session(&session_id).await?;
 
         let resp = LoadSessionResponse::new();
         Ok(resp)
@@ -164,15 +176,21 @@ impl agent_client_protocol::Agent for AgentClientProtocolImpl {
 
     async fn set_session_mode(
         &self,
-        _args: SetSessionModeRequest,
+        args: SetSessionModeRequest,
     ) -> agent_client_protocol::Result<SetSessionModeResponse> {
-        todo!()
+        info!("Received set session mode request {args:?}");
+
+        // todo!()
+        let resp = SetSessionModeResponse::new();
+        Ok(resp)
     }
 
     async fn list_sessions(
         &self,
         args: ListSessionsRequest,
     ) -> agent_client_protocol::Result<ListSessionsResponse> {
+        info!("Received list sessions request {args:?}");
+
         let mut registry = self.registry.lock().await;
 
         let sessions = registry.list_sessions(args.cwd).await?;
@@ -189,11 +207,16 @@ impl agent_client_protocol::Agent for AgentClientProtocolImpl {
         Ok(resp)
     }
 
-    async fn ext_method(&self, _args: ExtRequest) -> agent_client_protocol::Result<ExtResponse> {
-        Ok(ExtResponse::new(RawValue::NULL.to_owned().into()))
+    async fn ext_method(&self, args: ExtRequest) -> agent_client_protocol::Result<ExtResponse> {
+        info!("Received ext method request {args:?}");
+
+        let resp = ExtResponse::new(RawValue::NULL.to_owned().into());
+        Ok(resp)
     }
 
-    async fn ext_notification(&self, _args: ExtNotification) -> agent_client_protocol::Result<()> {
+    async fn ext_notification(&self, args: ExtNotification) -> agent_client_protocol::Result<()> {
+        info!("Received ext notification request {args:?}");
+
         Ok(())
     }
 }
