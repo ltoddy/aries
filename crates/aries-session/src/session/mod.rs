@@ -11,6 +11,7 @@ use rig::completion::Message;
 use rig::providers::{azure, deepseek, openai};
 use rig::streaming::StreamedAssistantContent;
 use tokio::fs::create_dir_all;
+use tokio_util::sync::CancellationToken;
 
 use crate::session::history::ChatHistory;
 
@@ -24,7 +25,8 @@ pub struct Session {
     lsp_client: Option<SharedLspClient>,
     chat_history: ChatHistory,
     transcript_dir: PathBuf,
-    root_dir: PathBuf, // session 的数据存放的目录
+    root_dir: PathBuf,
+    cancel_token: CancellationToken,
 }
 
 #[derive(Clone)]
@@ -58,6 +60,7 @@ impl Session {
         let lsp_client = Self::warm_up_lsp(&cwd).await;
         let agents = Self::create_agents(config, &cwd, lsp_client.clone()).await?;
         let chat_history = ChatHistory::new(root_dir.join(Self::FILENAME)).await;
+        let cancel_token = CancellationToken::new();
 
         Ok(Self {
             id,
@@ -66,6 +69,7 @@ impl Session {
             chat_history,
             transcript_dir: root_dir.join("transcripts"),
             root_dir: root_dir.to_path_buf(),
+            cancel_token,
         })
     }
 
@@ -80,6 +84,7 @@ impl Session {
         let lsp_client = Self::warm_up_lsp(&cwd).await;
         let agents = Self::create_agents(config, &cwd, lsp_client.clone()).await?;
         let chat_history = ChatHistory::new(root_dir.join(Self::FILENAME)).await;
+        let cancel_token = CancellationToken::new();
 
         Ok(Self {
             id,
@@ -88,6 +93,7 @@ impl Session {
             chat_history,
             transcript_dir: root_dir.join("transcripts"),
             root_dir: root_dir.to_path_buf(),
+            cancel_token,
         })
     }
 }
@@ -114,6 +120,10 @@ impl Session {
         self.chat_history.clear();
     }
 
+    pub fn cancel(&self) {
+        self.cancel_token.cancel();
+    }
+
     pub fn dir(&self) -> PathBuf {
         self.root_dir.clone()
     }
@@ -132,6 +142,9 @@ impl Session {
             + PromptHook<azure::CompletionModel>
             + 'static,
     {
+        self.cancel_token = CancellationToken::new();
+        let cancel_token = self.cancel_token.clone();
+
         let final_res = match &mut self.agents {
             ProviderAgents::OpenAICompatible { agent, compaction_agent } => {
                 CompactionAgent::<openai::CompletionModel>::micro_compact(
@@ -145,7 +158,7 @@ impl Session {
                 }
                 let snapshot = self.chat_history.history().to_vec();
                 let stream = agent.stream_prompt(prompt, &snapshot, hook).await;
-                Self::consume_stream(stream, &mut cb).await?
+                Self::consume_stream(stream, &mut cb, cancel_token).await?
             },
             ProviderAgents::Azure { agent, compaction_agent } => {
                 CompactionAgent::<azure::CompletionModel>::micro_compact(
@@ -159,7 +172,7 @@ impl Session {
                 }
                 let snapshot = self.chat_history.history().to_vec();
                 let stream = agent.stream_prompt(prompt, &snapshot, hook).await;
-                Self::consume_stream(stream, &mut cb).await?
+                Self::consume_stream(stream, &mut cb, cancel_token).await?
             },
         };
 
@@ -193,6 +206,7 @@ impl Session {
     async fn consume_stream<F, Fut, R>(
         stream: rig::agent::StreamingResult<R>,
         cb: &mut Option<F>,
+        cancel_token: CancellationToken,
     ) -> anyhow::Result<FinalResponse>
     where
         F: FnMut(MultiTurnStreamItem<()>) -> Fut,
@@ -201,14 +215,27 @@ impl Session {
         pin_mut!(stream);
         let mut final_res = FinalResponse::empty();
 
-        while let Some(Ok(chunk)) = stream.next().await {
-            if let MultiTurnStreamItem::FinalResponse(response) = &chunk {
-                final_res = response.clone();
-            }
-            if let Some(cb) = cb
-                && let Some(stripped) = erase_provider_type(chunk)
-            {
-                cb(stripped).await?;
+        loop {
+            tokio::select! {
+                biased;
+                _ = cancel_token.cancelled() => {
+                    break;
+                }
+                item = stream.next() => {
+                    match item {
+                        Some(Ok(chunk)) => {
+                            if let MultiTurnStreamItem::FinalResponse(response) = &chunk {
+                                final_res = response.clone();
+                            }
+                            if let Some(cb) = cb
+                                && let Some(stripped) = erase_provider_type(chunk)
+                            {
+                                cb(stripped).await?;
+                            }
+                        }
+                        Some(Err(_)) | None => break,
+                    }
+                }
             }
         }
 
