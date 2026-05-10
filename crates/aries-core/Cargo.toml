@@ -24,4 +24,5 @@ serde_repr.workspace = true
 serde_yaml.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["fs", "process", "sync"] }
+tracing.workspace = true
 url.workspace = true

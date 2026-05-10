@@ -9,7 +9,7 @@ use rig::{completion, message};
 
 use crate::agents::{AGENT_LOOP_MAX_TURNS, AriesAgent};
 
-const KEEP_RECENT_TOOL_RESULTS: usize = 3;
+const KEEP_RECENT_TOOL_RESULTS: usize = 8;
 
 const PREAMBLE: &str = include_str!("prompts/compaction.txt");
 const NAME: &str = "Archivist";
@@ -40,7 +40,7 @@ where
             .preamble(PREAMBLE)
             .default_max_turns(AGENT_LOOP_MAX_TURNS)
             .build();
-        Self { inner: AriesAgent::new(agent, PREAMBLE.to_owned()) }
+        Self { inner: AriesAgent::new(agent, NAME, PREAMBLE) }
     }
 
     pub fn micro_compact(messages: &mut [Message]) {

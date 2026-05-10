@@ -69,15 +69,20 @@ where
     M: completion::CompletionModel,
 {
     inner: Agent<M>,
+
     preamble: String,
+    name: String,
 }
 
 impl<M> AriesAgent<M>
 where
     M: completion::CompletionModel,
 {
-    pub fn new(inner: Agent<M>, preamble: String) -> Self {
-        Self { inner, preamble }
+    pub fn new(inner: Agent<M>, name: impl Into<String>, preamble: impl Into<String>) -> Self {
+        let name = name.into();
+        let preamble = preamble.into();
+
+        Self { inner, preamble, name }
     }
 }
 
@@ -121,6 +126,10 @@ where
     pub fn system_prompt(&self) -> &str {
         &self.preamble
     }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
 }
 
 pub struct AgentBuilder<C>
@@ -147,18 +156,19 @@ where
         let model = self.config.model().to_owned();
         let agent_type = self.agent_type;
 
+        let name = agent_type.name();
         let preamble = agent_type.bare_preamble().to_owned();
 
         let inner = self
             .client
             .agent(model)
-            .name(agent_type.name())
+            .name(name)
             .description(agent_type.description())
             .preamble(&preamble)
             .default_max_turns(AGENT_LOOP_MAX_TURNS)
             .build();
 
-        AriesAgent::new(inner, preamble)
+        AriesAgent::new(inner, name, preamble)
     }
 
     pub async fn with_tools(
@@ -171,6 +181,7 @@ where
         let skillloader = SkillFilesLoader::new(&self.cwd);
         let available_skills = skillloader.load().await.unwrap_or_default();
 
+        let name = agent_type.name();
         let preamble =
             crate::preamble::render(&self.cwd, agent_type, &model, &available_skills).await;
 
@@ -179,14 +190,14 @@ where
         let inner = self
             .client
             .agent(model)
-            .name(agent_type.name())
+            .name(name)
             .description(agent_type.description())
             .preamble(&preamble)
             .tools(tools)
             .default_max_turns(AGENT_LOOP_MAX_TURNS)
             .build();
 
-        AriesAgent::new(inner, preamble)
+        AriesAgent::new(inner, name, preamble)
     }
 
     fn build_tools(

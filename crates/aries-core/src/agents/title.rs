@@ -30,7 +30,7 @@ where
             .default_max_turns(AGENT_LOOP_MAX_TURNS)
             .build();
 
-        Self { inner: AriesAgent::new(agent, PREAMBLE.to_owned()) }
+        Self { inner: AriesAgent::new(agent, NAME, PREAMBLE) }
     }
 
     pub async fn generate(&mut self, input: &str, history: &[Message]) -> anyhow::Result<String> {

@@ -1,27 +1,28 @@
 install:
-    @cargo install --path crates/aries-cli
+    @cargo install --path crates/aries-cli -Zbuild-dir-new-layout
+
+run:
+    @cargo run -Zbuild-dir-new-layout
+
 
 build:
-    @cargo build --all
+    @cargo build --all -Zbuild-dir-new-layout
 
 check:
-    @cargo check --all
-
-test:
-    @cargo test
+    @cargo check --all -Zbuild-dir-new-layout
 
 clippy:
-    @cargo clippy
+    @cargo clippy -Zbuild-dir-new-layout
 
 fmt:
-    @cargo +nightly fmt
+    @cargo fmt
 
 fmt-check:
-    @cargo +nightly fmt -- --check
+    @cargo fmt -- --check
 
 fix:
     @cargo clippy --fix --allow-dirty --all
-    @cargo +nightly fmt
+    @cargo fmt
 
 lint: fmt-check clippy
 

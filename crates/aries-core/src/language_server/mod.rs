@@ -5,6 +5,8 @@ mod schema;
 use std::path::Path;
 use std::sync::Arc;
 
+use tracing::error;
+
 pub use self::client::{DocumentSymbolItem, LspClient, LspResult};
 pub use self::detection::LspServerInfo;
 pub use self::schema::{
@@ -20,7 +22,7 @@ pub async fn warm_up(
     project_dir: impl AsRef<Path>,
 ) -> anyhow::Result<SharedLspClient> {
     let lsp = LspClient::start(info.clone()).await.map_err(|err| {
-        eprintln!("Failed to start {}: {err}", info.binary);
+        error!("Failed to start {}: {err}", info.binary);
         err
     })?;
 
@@ -30,7 +32,7 @@ pub async fn warm_up(
     let init = shared.clone();
     tokio::task::spawn(async move {
         if let Err(err) = init.initialize(&root_uri).await {
-            eprintln!("Failed to initialize language server: {err}")
+            error!("Failed to initialize language server: {err}")
         }
     });
 
