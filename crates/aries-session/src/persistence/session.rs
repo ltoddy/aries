@@ -1,6 +1,7 @@
 use itertools::Itertools;
 use jiff::Timestamp;
 use toasty::Db;
+use toasty::codegen_support::List;
 use toasty::stmt::IntoExpr;
 
 #[derive(Debug, Clone, toasty::Model)]
@@ -89,6 +90,15 @@ impl SessionRepository {
             .await
     }
 
+    pub async fn find_by_session_id_in(
+        &mut self,
+        session_ids: impl IntoExpr<List<String>>,
+    ) -> toasty::Result<Vec<Session>> {
+        Session::filter(Session::fields().session_id().in_list(session_ids))
+            .exec(&mut self.db)
+            .await
+    }
+
     pub async fn update_title_by_id(
         &mut self,
         id: impl IntoExpr<u64>,
@@ -106,7 +116,7 @@ impl SessionRepository {
 
     pub async fn delete_by_session_id_in(
         &mut self,
-        session_ids: &[impl IntoExpr<String>],
+        session_ids: impl IntoExpr<List<String>>,
     ) -> toasty::Result<()> {
         Session::filter(Session::fields().session_id().in_list(session_ids))
             .delete()

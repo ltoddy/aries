@@ -1,9 +1,7 @@
-// pub mod project;
 pub mod session;
 
 use std::path::Path;
 
-// pub use self::project::{Project, ProjectRepository};
 pub use self::session::{Session, SessionRepository};
 
 pub async fn connect(dir: impl AsRef<Path>) -> toasty::Result<toasty::Db> {

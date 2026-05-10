@@ -16,13 +16,14 @@ aries-config = { path = "../aries-config" }
 aries-context = { path = "../aries-context" }
 aries-core = { path = "../aries-core" }
 aries-session = { path = "../aries-session" }
-async-trait.workspace = true
 clap = { workspace = true, features = ["derive"] }
 colored.workspace = true
 dark-light.workspace = true
 dialoguer.workspace = true
+futures.workspace = true
 itertools.workspace = true
 nanoid.workspace = true
+prettytable-rs.workspace = true
 rig-core.workspace = true
 rustyline.workspace = true
 rustyline-derive.workspace = true
