@@ -1,4 +1,3 @@
-use std::fmt::{self, Display};
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -6,6 +5,8 @@ use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
+
+use crate::tools::{RenderError, ToolArgsRender, ToolOutputRender};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EditOperation {
@@ -21,15 +22,37 @@ pub struct MultiEditArgs {
     pub edits: Vec<EditOperation>,
 }
 
+impl ToolArgsRender for MultiEditArgs {
+    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+        let args: Self = serde_json::from_str(raw)?;
+
+        let first = format!("{}", args.file_path.display());
+
+        let mut rest_lines = Vec::new();
+        for edit in args.edits {
+            let old_lines = edit.old_string.lines().map(|line| format!("- {}", line));
+            let new_lines = edit.new_string.lines().map(|line| format!("+ {}", line));
+            let diff = old_lines.chain(new_lines).collect::<Vec<_>>().join("\n");
+            if !diff.is_empty() {
+                rest_lines.push(diff);
+            }
+        }
+
+        let rest = if rest_lines.is_empty() { None } else { Some(rest_lines.join("\n")) };
+        Ok((first, rest))
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MultiEditOutput {
     pub success: bool,
     pub message: String,
 }
 
-impl Display for MultiEditOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.message)
+impl ToolOutputRender for MultiEditOutput {
+    fn render_output(raw: &str) -> std::result::Result<String, RenderError> {
+        let output = serde_json::from_str::<MultiEditOutput>(raw)?;
+        Ok(output.message)
     }
 }
 

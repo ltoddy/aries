@@ -1,4 +1,3 @@
-use std::fmt::{self, Display};
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -10,6 +9,7 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 
 use crate::agents::{AgentBuilder, AgentType};
+use crate::tools::{RenderError, ToolArgsRender, ToolOutputRender};
 
 pub const NAME: &str = "Agent";
 
@@ -21,15 +21,30 @@ pub struct AgentArgs {
     pub task_id: Option<String>,
 }
 
+impl ToolArgsRender for AgentArgs {
+    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+        let args: Self = serde_json::from_str(raw)?;
+
+        let mut first = args.description;
+        first.push_str(&format!(", subagent_type = {}", args.subagent_type));
+        if let Some(task_id) = &args.task_id {
+            first.push_str(&format!(", task_id = {}", task_id));
+        }
+
+        Ok((first, Some(args.prompt)))
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AgentOutput {
     pub task_id: String,
     pub result: String,
 }
 
-impl Display for AgentOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.result)
+impl ToolOutputRender for AgentOutput {
+    fn render_output(raw: &str) -> Result<String, RenderError> {
+        let output: Self = serde_json::from_str(raw)?;
+        Ok(output.result)
     }
 }
 

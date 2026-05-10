@@ -1,4 +1,3 @@
-use std::fmt::{self, Display};
 use std::process::Stdio;
 
 use anyhow::Result;
@@ -7,9 +6,19 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 
+use crate::tools::{RenderError, ToolArgsRender, ToolOutputRender};
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BashArgs {
     pub command: String,
+}
+
+impl ToolArgsRender for BashArgs {
+    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+        let args: Self = serde_json::from_str(raw)?;
+        let first = args.command;
+        Ok((first, None))
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -19,21 +28,26 @@ pub struct BashOutput {
     pub exit_code: i32,
 }
 
-impl Display for BashOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !self.stdout.is_empty() {
-            write!(f, "{}", self.stdout)?;
+impl ToolOutputRender for BashOutput {
+    fn render_output(raw: &str) -> Result<String, RenderError> {
+        let output: Self = serde_json::from_str(raw)?;
+        let mut text = String::new();
+        if !output.stdout.is_empty() {
+            text.push_str(&output.stdout);
         }
-        if !self.stderr.is_empty() {
-            if !self.stdout.is_empty() {
-                writeln!(f)?;
+        if !output.stderr.is_empty() {
+            if !text.is_empty() {
+                text.push('\n');
             }
-            write!(f, "stderr: {}", self.stderr)?;
+            text.push_str(&format!("stderr: {}", output.stderr));
         }
-        if self.exit_code != 0 {
-            write!(f, "\nexit_code: {}", self.exit_code)?;
+        if output.exit_code != 0 {
+            if !text.is_empty() {
+                text.push('\n');
+            }
+            text.push_str(&format!("exit_code: {}", output.exit_code));
         }
-        Ok(())
+        Ok(text)
     }
 }
 

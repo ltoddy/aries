@@ -58,7 +58,7 @@ impl Theme {
     }
 
     pub fn dimmed(&self, s: &str) -> colored::ColoredString {
-        if self.is_dark() { s.bright_black() } else { s.dimmed() }
+        s.dimmed()
     }
 
     pub fn cyan_text(&self, s: &str) -> colored::ColoredString {

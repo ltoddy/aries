@@ -1,9 +1,9 @@
-use std::fmt::{self, Display};
-
 use anyhow::Result;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
+
+use super::{RenderError, ToolArgsRender, ToolOutputRender};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CodeSearchArgs {
@@ -11,14 +11,28 @@ pub struct CodeSearchArgs {
     pub tokens_num: Option<i32>,
 }
 
+impl ToolArgsRender for CodeSearchArgs {
+    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+        let args: Self = serde_json::from_str(raw)?;
+
+        let mut first = args.query;
+        if let Some(token) = args.tokens_num {
+            first.push_str(&format!(" token = {token}"));
+        }
+
+        Ok((first, None))
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CodeSearchOutput {
     pub results: String,
 }
 
-impl Display for CodeSearchOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.results)
+impl ToolOutputRender for CodeSearchOutput {
+    fn render_output(raw: &str) -> Result<String, RenderError> {
+        let output: Self = serde_json::from_str(raw)?;
+        Ok(output.results)
     }
 }
 

@@ -1,21 +1,3 @@
-pub mod agent;
-pub mod apply_patch;
-pub mod bash;
-pub mod batch;
-pub mod codesearch;
-pub mod edit;
-pub mod glob;
-pub mod grep;
-pub mod ls;
-pub mod lsp;
-pub mod multiedit;
-pub mod question;
-pub mod read;
-pub mod skill;
-pub mod webfetch;
-pub mod websearch;
-pub mod write;
-
 use aries_core::tools;
 use itertools::Itertools;
 
@@ -26,51 +8,44 @@ pub fn format_tool_call_args(
     args: &str,
     theme: &Theme,
 ) -> (String, Option<String>) {
-    match tool_name {
-        tools::read::NAME => read::format_tool_call(args, theme),
-        tools::write::NAME => write::format_tool_call(args, theme),
-        tools::bash::NAME => bash::format_tool_call(args, theme),
-        tools::glob::NAME => glob::format_tool_call(args, theme),
-        tools::grep::NAME => grep::format_tool_call(args, theme),
-        tools::ls::NAME => ls::format_tool_call(args, theme),
-        tools::apply_patch::NAME => apply_patch::format_tool_call(args, theme),
-        tools::edit::NAME => edit::format_tool_call(args, theme),
-        tools::multiedit::NAME => multiedit::format_tool_call(args, theme),
-        tools::batch::NAME => batch::format_tool_call(args, theme),
-        tools::question::NAME => question::format_tool_call(args, theme),
-        tools::agent::NAME => agent::format_tool_call(args, theme),
-        tools::webfetch::NAME => webfetch::format_tool_call(args, theme),
-        tools::websearch::NAME => websearch::format_tool_call(args, theme),
-        tools::codesearch::NAME => codesearch::format_tool_call(args, theme),
-        tools::lsp::NAME => lsp::format_tool_call(args, theme),
-        tools::skill::NAME => skill::format_tool_call(args, theme),
-        _ => format_unknown_call(tool_name, args, theme),
+    if !is_known_tool(tool_name) {
+        return format_unknown_call(tool_name, args, theme);
     }
+
+    let (first, rest) = tools::format_tool_args(tool_name, args);
+
+    (format!("{} {}", theme.cyan_text(tool_name), theme.yellow_text(&first)), rest)
+}
+
+fn is_known_tool(tool_name: &str) -> bool {
+    matches!(
+        tool_name,
+        tools::agent::NAME
+            | tools::apply_patch::NAME
+            | tools::bash::NAME
+            | tools::batch::NAME
+            | tools::codesearch::NAME
+            | tools::edit::NAME
+            | tools::glob::NAME
+            | tools::grep::NAME
+            | tools::ls::NAME
+            | tools::lsp::NAME
+            | tools::multiedit::NAME
+            | tools::question::NAME
+            | tools::read::NAME
+            | tools::skill::NAME
+            | tools::webfetch::NAME
+            | tools::websearch::NAME
+            | tools::write::NAME
+    )
 }
 
 pub fn format_tool_result_output(tool_name: &str, result: &str, theme: Theme) -> String {
-    let output = match tool_name {
-        tools::read::NAME => read::format_tool_result(result, theme),
-        tools::write::NAME => write::format_tool_result(result, theme),
-        tools::bash::NAME => bash::format_tool_result(result, theme),
-        tools::glob::NAME => glob::format_tool_result(result, theme),
-        tools::grep::NAME => grep::format_tool_result(result, theme),
-        tools::ls::NAME => ls::format_tool_result(result, theme),
-        tools::apply_patch::NAME => apply_patch::format_tool_result(result, theme),
-        tools::edit::NAME => edit::format_tool_result(result, theme),
-        tools::multiedit::NAME => multiedit::format_tool_result(result, theme),
-        tools::batch::NAME => batch::format_tool_result(result, theme),
-        tools::question::NAME => question::format_tool_result(result, theme),
-        tools::agent::NAME => agent::format_tool_result(result, theme),
-        tools::webfetch::NAME => webfetch::format_tool_result(result, theme),
-        tools::websearch::NAME => websearch::format_tool_result(result, theme),
-        tools::codesearch::NAME => codesearch::format_tool_result(result, theme),
-        tools::lsp::NAME => lsp::format_tool_result(result, theme),
-        tools::skill::NAME => skill::format_tool_result(result, theme),
-        _ => result.to_string(),
-    };
+    let output = tools::format_tool_output(tool_name, result);
+    let output = if output.is_empty() { "No output".to_string() } else { output };
 
-    if output.is_empty() { "No output".to_string() } else { output }
+    let _ = tool_name;
+    theme.dimmed(&preview(output)).to_string()
 }
 
 pub fn display_token_usage(usage: &rig::completion::Usage, theme: &Theme) {
@@ -95,10 +70,10 @@ pub fn format_unknown_call(tool_name: &str, args: &str, theme: &Theme) -> (Strin
     )
 }
 
-pub fn preview(content: impl AsRef<str>) -> String {
+pub fn preview(content: impl Into<String>) -> String {
     const MAX_LINES: usize = 5;
 
-    let content = content.as_ref();
+    let content = content.into();
     let lines: Vec<_> = content.lines().map(|line| format!("| {line}")).collect();
     let len = lines.len();
 

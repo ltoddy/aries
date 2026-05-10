@@ -16,51 +16,84 @@ pub mod webfetch;
 pub mod websearch;
 pub mod write;
 
-pub use agent::{AgentArgs, AgentOutput, AgentTool};
-pub use apply_patch::{ApplyPatchArgs, ApplyPatchOutput, ApplyPatchTool};
-pub use bash::{BashArgs, BashOutput, BashTool};
-pub use batch::{BatchArgs, BatchOutput, BatchTool};
-pub use codesearch::{CodeSearchArgs, CodeSearchOutput, CodeSearchTool};
-pub use edit::{EditArgs, EditOutput, EditTool};
-pub use glob::{GlobArgs, GlobOutput, GlobTool};
-pub use grep::{GrepArgs, GrepOutput, GrepTool};
-pub use ls::{LsArgs, LsOutput, LsTool};
-pub use lsp::{LspArgs, LspOutput, LspTool};
-pub use multiedit::{MultiEditArgs, MultiEditOutput, MultiEditTool};
-pub use question::{AskUserQuestionArgs, AskUserQuestionOutput, AskUserQuestionTool};
-pub use read::{ReadArgs, ReadOutput, ReadTool};
-pub use skill::{SkillArgs, SkillOutput, SkillTool};
-pub use webfetch::{WebFetchArgs, WebFetchOutput, WebFetchTool};
-pub use websearch::{WebSearchArgs, WebSearchOutput, WebSearchTool};
-pub use write::{WriteArgs, WriteOutput, WriteTool};
+pub use self::agent::{AgentArgs, AgentOutput, AgentTool};
+pub use self::apply_patch::{ApplyPatchArgs, ApplyPatchOutput, ApplyPatchTool};
+pub use self::bash::{BashArgs, BashOutput, BashTool};
+pub use self::batch::{BatchArgs, BatchOutput, BatchTool};
+pub use self::codesearch::{CodeSearchArgs, CodeSearchOutput, CodeSearchTool};
+pub use self::edit::{EditArgs, EditOutput, EditTool};
+pub use self::glob::{GlobArgs, GlobOutput, GlobTool};
+pub use self::grep::{GrepArgs, GrepOutput, GrepTool};
+pub use self::ls::{LsArgs, LsOutput, LsTool};
+pub use self::lsp::{LspArgs, LspOutput, LspTool};
+pub use self::multiedit::{MultiEditArgs, MultiEditOutput, MultiEditTool};
+pub use self::question::{AskUserQuestionArgs, AskUserQuestionOutput, AskUserQuestionTool};
+pub use self::read::{ReadArgs, ReadOutput, ReadTool};
+pub use self::skill::{SkillArgs, SkillOutput, SkillTool};
+pub use self::webfetch::{WebFetchArgs, WebFetchOutput, WebFetchTool};
+pub use self::websearch::{WebSearchArgs, WebSearchOutput, WebSearchTool};
+pub use self::write::{WriteArgs, WriteOutput, WriteTool};
+
+pub fn format_tool_args(tool_name: &str, raw_json: &str) -> (String, Option<String>) {
+    let result = match tool_name {
+        agent::NAME => AgentArgs::render_args(raw_json),
+        apply_patch::NAME => ApplyPatchArgs::render_args(raw_json),
+        bash::NAME => BashArgs::render_args(raw_json),
+        batch::NAME => BatchArgs::render_args(raw_json),
+        codesearch::NAME => CodeSearchArgs::render_args(raw_json),
+        edit::NAME => EditArgs::render_args(raw_json),
+        glob::NAME => GlobArgs::render_args(raw_json),
+        grep::NAME => GrepArgs::render_args(raw_json),
+        ls::NAME => LsArgs::render_args(raw_json),
+        lsp::NAME => LspArgs::render_args(raw_json),
+        multiedit::NAME => MultiEditArgs::render_args(raw_json),
+        question::NAME => AskUserQuestionArgs::render_args(raw_json),
+        read::NAME => ReadArgs::render_args(raw_json),
+        skill::NAME => SkillArgs::render_args(raw_json),
+        webfetch::NAME => WebFetchArgs::render_args(raw_json),
+        websearch::NAME => WebSearchArgs::render_args(raw_json),
+        write::NAME => WriteArgs::render_args(raw_json),
+        _ => Ok((raw_json.to_string(), None)),
+    };
+
+    result.unwrap_or_else(|_| (raw_json.to_string(), None))
+}
 
 pub fn format_tool_output(tool_name: &str, raw_json: &str) -> String {
     let result = match tool_name {
-        agent::NAME => serde_json::from_str::<AgentOutput>(raw_json).map(|o| o.to_string()),
-        apply_patch::NAME => {
-            serde_json::from_str::<ApplyPatchOutput>(raw_json).map(|o| o.to_string())
-        },
-        bash::NAME => serde_json::from_str::<BashOutput>(raw_json).map(|o| o.to_string()),
-        batch::NAME => serde_json::from_str::<BatchOutput>(raw_json).map(|o| o.to_string()),
-        codesearch::NAME => {
-            serde_json::from_str::<CodeSearchOutput>(raw_json).map(|o| o.to_string())
-        },
-        edit::NAME => serde_json::from_str::<EditOutput>(raw_json).map(|o| o.to_string()),
-        glob::NAME => serde_json::from_str::<GlobOutput>(raw_json).map(|o| o.to_string()),
-        grep::NAME => serde_json::from_str::<GrepOutput>(raw_json).map(|o| o.to_string()),
-        ls::NAME => serde_json::from_str::<LsOutput>(raw_json).map(|o| o.to_string()),
-        lsp::NAME => serde_json::from_str::<LspOutput>(raw_json).map(|o| o.to_string()),
-        multiedit::NAME => serde_json::from_str::<MultiEditOutput>(raw_json).map(|o| o.to_string()),
-        question::NAME => {
-            serde_json::from_str::<AskUserQuestionOutput>(raw_json).map(|o| o.to_string())
-        },
-        read::NAME => serde_json::from_str::<ReadOutput>(raw_json).map(|o| o.to_string()),
-        skill::NAME => serde_json::from_str::<SkillOutput>(raw_json).map(|o| o.to_string()),
-        webfetch::NAME => serde_json::from_str::<WebFetchOutput>(raw_json).map(|o| o.to_string()),
-        websearch::NAME => serde_json::from_str::<WebSearchOutput>(raw_json).map(|o| o.to_string()),
-        write::NAME => serde_json::from_str::<WriteOutput>(raw_json).map(|o| o.to_string()),
+        agent::NAME => AgentOutput::render_output(raw_json),
+        apply_patch::NAME => ApplyPatchOutput::render_output(raw_json),
+        bash::NAME => BashOutput::render_output(raw_json),
+        batch::NAME => BatchOutput::render_output(raw_json),
+        codesearch::NAME => CodeSearchOutput::render_output(raw_json),
+        edit::NAME => EditOutput::render_output(raw_json),
+        glob::NAME => GlobOutput::render_output(raw_json),
+        grep::NAME => GrepOutput::render_output(raw_json),
+        ls::NAME => LsOutput::render_output(raw_json),
+        lsp::NAME => LspOutput::render_output(raw_json),
+        multiedit::NAME => MultiEditOutput::render_output(raw_json),
+        question::NAME => AskUserQuestionOutput::render_output(raw_json),
+        read::NAME => ReadOutput::render_output(raw_json),
+        skill::NAME => SkillOutput::render_output(raw_json),
+        webfetch::NAME => WebFetchOutput::render_output(raw_json),
+        websearch::NAME => WebSearchOutput::render_output(raw_json),
+        write::NAME => WriteOutput::render_output(raw_json),
         _ => Ok(raw_json.to_string()),
     };
 
     result.unwrap_or_else(|_| raw_json.to_string())
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum RenderError {
+    #[error("failed to deserialize tool data: {0}")]
+    Deserialize(#[from] serde_json::Error),
+}
+
+pub trait ToolArgsRender {
+    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError>;
+}
+
+pub trait ToolOutputRender {
+    fn render_output(raw: &str) -> Result<String, RenderError>;
 }

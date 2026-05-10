@@ -1,11 +1,11 @@
-use std::fmt::{self, Display};
-
 use anyhow::Result;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input, MultiSelect, Select};
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
+
+use super::{RenderError, ToolArgsRender, ToolOutputRender};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AskUserQuestionOption {
@@ -23,6 +23,14 @@ pub struct AskUserQuestionArgs {
     pub custom: bool,
 }
 
+impl ToolArgsRender for AskUserQuestionArgs {
+    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+        let args: Self = serde_json::from_str(raw)?;
+        let first = args.question;
+        Ok((first, None))
+    }
+}
+
 fn default_custom() -> bool {
     true
 }
@@ -32,9 +40,10 @@ pub struct AskUserQuestionOutput {
     pub answers: Vec<String>,
 }
 
-impl Display for AskUserQuestionOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.answers.join("\n"))
+impl ToolOutputRender for AskUserQuestionOutput {
+    fn render_output(raw: &str) -> Result<String, RenderError> {
+        let output: Self = serde_json::from_str(raw)?;
+        Ok(output.answers.join("\n"))
     }
 }
 

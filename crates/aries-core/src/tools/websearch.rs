@@ -1,9 +1,9 @@
-use std::fmt::{self, Display};
-
 use anyhow::Result;
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
+
+use crate::tools::{RenderError, ToolArgsRender, ToolOutputRender};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WebSearchArgs {
@@ -11,14 +11,23 @@ pub struct WebSearchArgs {
     pub num: Option<i32>,
 }
 
+impl ToolArgsRender for WebSearchArgs {
+    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+        let args: Self = serde_json::from_str(raw)?;
+        let first = args.query;
+        Ok((first, None))
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WebSearchOutput {
     pub results: String,
 }
 
-impl Display for WebSearchOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.results)
+impl ToolOutputRender for WebSearchOutput {
+    fn render_output(raw: &str) -> Result<String, RenderError> {
+        let output: Self = serde_json::from_str(raw)?;
+        Ok(output.results)
     }
 }
 

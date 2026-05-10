@@ -1,4 +1,3 @@
-use std::fmt::{self, Display};
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -6,6 +5,8 @@ use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
+
+use super::{RenderError, ToolArgsRender, ToolOutputRender};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EditArgs {
@@ -16,15 +17,34 @@ pub struct EditArgs {
     pub replace_all: bool,
 }
 
+impl ToolArgsRender for EditArgs {
+    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+        let args: Self = serde_json::from_str(raw)?;
+
+        let mut first = format!("{}", args.file_path.display());
+        if args.replace_all {
+            first.push_str(" replace_all = true");
+        }
+
+        let old_lines = args.old_string.lines().map(|line| format!("- {}", line));
+        let new_lines = args.new_string.lines().map(|line| format!("+ {}", line));
+        let diff = old_lines.chain(new_lines).collect::<Vec<_>>().join("\n");
+        let rest = if diff.is_empty() { None } else { Some(diff) };
+
+        Ok((first, rest))
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EditOutput {
     pub success: bool,
     pub message: String,
 }
 
-impl Display for EditOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.message)
+impl ToolOutputRender for EditOutput {
+    fn render_output(raw: &str) -> Result<String, RenderError> {
+        let output: Self = serde_json::from_str(raw)?;
+        Ok(output.message)
     }
 }
 

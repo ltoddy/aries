@@ -1,4 +1,3 @@
-use std::fmt::{self, Display};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
@@ -7,10 +6,25 @@ use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 
+use super::{RenderError, ToolArgsRender, ToolOutputRender};
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GlobArgs {
     pub pattern: String,
     pub base_dir: Option<PathBuf>,
+}
+
+impl ToolArgsRender for GlobArgs {
+    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+        let args: Self = serde_json::from_str(raw)?;
+
+        let mut first = args.pattern;
+        if let Some(base_dir) = args.base_dir {
+            first.push_str(&format!(", base_dir = {}", base_dir.display()));
+        }
+
+        Ok((first, None))
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -18,9 +32,10 @@ pub struct GlobOutput {
     pub files: Vec<String>,
 }
 
-impl Display for GlobOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.files.join("\n"))
+impl ToolOutputRender for GlobOutput {
+    fn render_output(raw: &str) -> Result<String, RenderError> {
+        let output: Self = serde_json::from_str(raw)?;
+        Ok(output.files.join("\n"))
     }
 }
 

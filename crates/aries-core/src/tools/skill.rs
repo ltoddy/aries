@@ -1,4 +1,3 @@
-use std::fmt::{self, Display};
 use std::io;
 use std::path::PathBuf;
 
@@ -10,10 +9,19 @@ use serde::{Deserialize, Serialize};
 
 use crate::ext::skill::SkillInfo;
 use crate::fs::{path_to_uri, walk_dir};
+use crate::tools::{RenderError, ToolArgsRender, ToolOutputRender};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SkillArgs {
     pub name: String,
+}
+
+impl ToolArgsRender for SkillArgs {
+    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+        let args: Self = serde_json::from_str(raw)?;
+        let first = args.name;
+        Ok((first, None))
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -23,9 +31,10 @@ pub struct SkillOutput {
     pub metadata: SkillMetadata,
 }
 
-impl Display for SkillOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.output)
+impl ToolOutputRender for SkillOutput {
+    fn render_output(raw: &str) -> Result<String, RenderError> {
+        let output: Self = serde_json::from_str(raw)?;
+        Ok(output.output)
     }
 }
 

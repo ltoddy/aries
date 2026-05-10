@@ -1,4 +1,3 @@
-use std::fmt::{self, Display};
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -10,8 +9,9 @@ use serde_json::Value;
 
 use crate::tools::{
     ApplyPatchTool, AskUserQuestionTool, BashTool, CodeSearchTool, EditTool, GlobTool, GrepTool,
-    LsTool, MultiEditTool, ReadTool, WebFetchTool, WebSearchTool, WriteTool, agent, apply_patch,
-    bash, codesearch, edit, glob, grep, ls, multiedit, question, read, webfetch, websearch, write,
+    LsTool, MultiEditTool, ReadTool, RenderError, ToolArgsRender, ToolOutputRender, WebFetchTool,
+    WebSearchTool, WriteTool, agent, apply_patch, bash, codesearch, edit, format_tool_args, glob,
+    grep, ls, multiedit, question, read, webfetch, websearch, write,
 };
 
 pub const NAME: &str = "Batch";
@@ -27,14 +27,43 @@ pub struct BatchArgs {
     pub calls: Vec<BatchCall>,
 }
 
+impl ToolArgsRender for BatchArgs {
+    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+        let args: Self = serde_json::from_str(raw)?;
+
+        let first = format!("{} tool calls", args.calls.len());
+        if args.calls.is_empty() {
+            return Ok((first, None));
+        }
+
+        let mut rest = Vec::<String>::new();
+        for call in args.calls {
+            if call.tool == NAME {
+                rest.push(format!("{} (nested batch not allowed)", NAME));
+                continue;
+            }
+
+            let (formatted, detail) = format_tool_args(&call.tool, &call.parameters.to_string());
+            let mut line = formatted;
+            if let Some(detail) = detail {
+                line.push_str(&format!("\n{detail}"));
+            }
+            rest.push(line);
+        }
+
+        Ok((first, Some(rest.join("\n"))))
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BatchOutput {
     pub results: Vec<Value>,
 }
 
-impl Display for BatchOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} results", self.results.len())
+impl ToolOutputRender for BatchOutput {
+    fn render_output(raw: &str) -> Result<String, RenderError> {
+        let output: Self = serde_json::from_str(raw)?;
+        Ok(format!("{} results", output.results.len()))
     }
 }
 

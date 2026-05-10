@@ -1,4 +1,3 @@
-use std::fmt::{self, Display};
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -8,10 +7,20 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
+use crate::tools::{RenderError, ToolArgsRender, ToolOutputRender};
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LsArgs {
     pub path: Option<PathBuf>,
     pub ignore: Option<Vec<String>>,
+}
+
+impl ToolArgsRender for LsArgs {
+    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+        let args: Self = serde_json::from_str(raw)?;
+        let first = args.path.unwrap_or_else(|| PathBuf::from(".")).display().to_string();
+        Ok((first, None))
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -19,9 +28,10 @@ pub struct LsOutput {
     pub entries: Vec<String>,
 }
 
-impl Display for LsOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.entries.join("\n"))
+impl ToolOutputRender for LsOutput {
+    fn render_output(raw: &str) -> Result<String, RenderError> {
+        let output: Self = serde_json::from_str(raw)?;
+        Ok(output.entries.join("\n"))
     }
 }
 

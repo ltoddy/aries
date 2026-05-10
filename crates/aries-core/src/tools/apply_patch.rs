@@ -1,4 +1,3 @@
-use std::fmt::{self, Display};
 use std::path::Path;
 
 use anyhow::Result;
@@ -8,9 +7,26 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
+use super::{RenderError, ToolArgsRender, ToolOutputRender};
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ApplyPatchArgs {
     pub patch: String,
+}
+
+impl ToolArgsRender for ApplyPatchArgs {
+    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+        let args: Self = serde_json::from_str(raw)?;
+
+        let first = args
+            .patch
+            .lines()
+            .find_map(|line| line.strip_prefix("+++ b/").or_else(|| line.strip_prefix("--- a/")))
+            .map(ToString::to_string)
+            .unwrap_or_else(|| "?".to_string());
+
+        Ok((first, Some(args.patch)))
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -19,9 +35,10 @@ pub struct ApplyPatchOutput {
     pub message: String,
 }
 
-impl Display for ApplyPatchOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.message)
+impl ToolOutputRender for ApplyPatchOutput {
+    fn render_output(raw: &str) -> Result<String, RenderError> {
+        let output: Self = serde_json::from_str(raw)?;
+        Ok(output.message)
     }
 }
 

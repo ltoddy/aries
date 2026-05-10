@@ -1,4 +1,3 @@
-use std::fmt::{self, Display};
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -8,10 +7,25 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
+use super::{RenderError, ToolArgsRender, ToolOutputRender};
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ReadArgs {
     pub file_path: PathBuf,
     pub offset: Option<usize>,
+}
+
+impl ToolArgsRender for ReadArgs {
+    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+        let args: Self = serde_json::from_str(raw)?;
+
+        let mut first = format!("{}", args.file_path.display());
+        if let Some(offset) = args.offset {
+            first.push_str(&format!(", offset = {offset}"));
+        }
+
+        Ok((first, None))
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -19,9 +33,10 @@ pub struct ReadOutput {
     pub content: String,
 }
 
-impl Display for ReadOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.content)
+impl ToolOutputRender for ReadOutput {
+    fn render_output(raw: &str) -> Result<String, RenderError> {
+        let output: Self = serde_json::from_str(raw)?;
+        Ok(output.content)
     }
 }
 

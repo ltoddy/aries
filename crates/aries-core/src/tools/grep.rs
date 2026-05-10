@@ -1,4 +1,3 @@
-use std::fmt::{self, Display};
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -10,10 +9,25 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
+use crate::tools::{RenderError, ToolArgsRender, ToolOutputRender};
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GrepArgs {
     pub pattern: String,
     pub include: Option<String>,
+}
+
+impl ToolArgsRender for GrepArgs {
+    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+        let args: Self = serde_json::from_str(raw)?;
+
+        let mut first = args.pattern;
+        if let Some(include) = args.include {
+            first.push_str(&format!(", include = {include}"));
+        }
+
+        Ok((first, None))
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -21,9 +35,10 @@ pub struct GrepOutput {
     pub matches: Vec<String>,
 }
 
-impl Display for GrepOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.matches.join("\n"))
+impl ToolOutputRender for GrepOutput {
+    fn render_output(raw: &str) -> Result<String, RenderError> {
+        let output: Self = serde_json::from_str(raw)?;
+        Ok(output.matches.join("\n"))
     }
 }
 

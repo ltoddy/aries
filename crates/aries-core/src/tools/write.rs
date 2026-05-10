@@ -1,4 +1,3 @@
-use std::fmt::{self, Display};
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -7,10 +6,21 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
+use crate::tools::{RenderError, ToolArgsRender, ToolOutputRender};
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WriteArgs {
     pub file_path: PathBuf,
     pub content: String,
+}
+
+impl ToolArgsRender for WriteArgs {
+    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+        let args: Self = serde_json::from_str(raw)?;
+        let first = args.file_path.display().to_string();
+        let rest = Some(args.content);
+        Ok((first, rest))
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -18,13 +28,14 @@ pub struct WriteOutput {
     pub success: bool,
 }
 
-impl Display for WriteOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.success {
-            write!(f, "File written successfully")
+impl ToolOutputRender for WriteOutput {
+    fn render_output(raw: &str) -> Result<String, RenderError> {
+        let output: Self = serde_json::from_str(raw)?;
+        Ok(if output.success {
+            "File written successfully".to_string()
         } else {
-            write!(f, "Failed to write file")
-        }
+            "Failed to write file".to_string()
+        })
     }
 }
 

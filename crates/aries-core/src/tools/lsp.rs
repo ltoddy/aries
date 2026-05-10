@@ -1,4 +1,4 @@
-use std::fmt::{self, Display, Formatter};
+use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
@@ -7,6 +7,7 @@ use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 
 use crate::language_server::{DocumentSymbolItem, LspResult, SharedLspClient};
+use crate::tools::{RenderError, ToolArgsRender, ToolOutputRender};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -47,14 +48,37 @@ pub struct LspArgs {
     pub query: Option<String>,
 }
 
+impl ToolArgsRender for LspArgs {
+    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+        let args: Self = serde_json::from_str(raw)?;
+
+        let mut first = format!("{}", args.operation);
+        if let Some(path) = args.file_path {
+            first.push_str(&format!(" {}", path.display()));
+        }
+        if let Some(line) = args.line {
+            first.push_str(&format!(":{line}"));
+        }
+        if let Some(character) = args.character {
+            first.push_str(&format!(":{character}"));
+        }
+        if let Some(query) = args.query {
+            first.push_str(&format!(" query = {query}"));
+        }
+
+        Ok((first, None))
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LspOutput {
     pub result: LspResult,
 }
 
-impl Display for LspOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let content = match &self.result {
+impl ToolOutputRender for LspOutput {
+    fn render_output(raw: &str) -> Result<String, RenderError> {
+        let output: Self = serde_json::from_str(raw)?;
+        let content = match &output.result {
             LspResult::Definition(locations)
             | LspResult::References(locations)
             | LspResult::Implementation(locations) => locations
@@ -137,7 +161,7 @@ impl Display for LspOutput {
                 .collect::<Vec<_>>()
                 .join("\n"),
         };
-        write!(f, "{}", content)
+        Ok(content)
     }
 }
 
