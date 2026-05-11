@@ -150,9 +150,9 @@ impl Session {
             ProviderAgents::OpenAICompatible { agent, compaction_agent } => {
                 micro_compact(self.chat_history.history_mut());
                 if let Some(compressed) =
-                    compaction_agent.auto_compact(self.chat_history.history()).await?
+                    compaction_agent.compact(self.chat_history.history()).await?
                 {
-                    self.chat_history.extend(compressed);
+                    self.chat_history.reset(&compressed);
                 }
                 let snapshot = self.chat_history.history().to_vec();
                 let stream = agent.stream_prompt(prompt, &snapshot, hook).await;
@@ -161,9 +161,9 @@ impl Session {
             ProviderAgents::Azure { agent, compaction_agent } => {
                 micro_compact(self.chat_history.history_mut());
                 if let Some(compressed) =
-                    compaction_agent.auto_compact(self.chat_history.history()).await?
+                    compaction_agent.compact(self.chat_history.history()).await?
                 {
-                    self.chat_history.extend(compressed);
+                    self.chat_history.reset(&compressed);
                 }
                 let snapshot = self.chat_history.history().to_vec();
                 let stream = agent.stream_prompt(prompt, &snapshot, hook).await;
@@ -182,10 +182,10 @@ impl Session {
     pub async fn compact(&mut self) -> anyhow::Result<()> {
         let compressed = match &mut self.agents {
             ProviderAgents::OpenAICompatible { compaction_agent, .. } => {
-                compaction_agent.force_compact(self.chat_history.history()).await?
+                compaction_agent.compact(self.chat_history.history()).await?
             },
             ProviderAgents::Azure { compaction_agent, .. } => {
-                compaction_agent.force_compact(self.chat_history.history()).await?
+                compaction_agent.compact(self.chat_history.history()).await?
             },
         };
         if let Some(compressed) = compressed {

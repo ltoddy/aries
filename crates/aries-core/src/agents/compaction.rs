@@ -1,11 +1,12 @@
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use anyhow::Context;
 use rig::client::CompletionClient;
 use rig::completion::Message;
 use rig::message::{AssistantContent, ReasoningContent, UserContent};
 use rig::{completion, message};
-use tracing::error;
+use tracing::{error, info};
 
 use crate::agents::{AGENT_LOOP_MAX_TURNS, AriesAgent};
 
@@ -45,24 +46,10 @@ where
         Self { inner: AriesAgent::new(agent, NAME, PREAMBLE), transcript_dir }
     }
 
-    pub async fn auto_compact(
-        &mut self,
-        messages: &[Message],
-    ) -> anyhow::Result<Option<Vec<Message>>> {
-        self.compact(messages).await
-    }
+    pub async fn compact(&mut self, messages: &[Message]) -> anyhow::Result<Option<Vec<Message>>> {
+        info!("🔄 触发上下文压缩...");
 
-    pub async fn force_compact(
-        &mut self,
-        messages: &[Message],
-    ) -> anyhow::Result<Option<Vec<Message>>> {
-        self.compact(messages).await
-    }
-
-    async fn compact(&mut self, messages: &[Message]) -> anyhow::Result<Option<Vec<Message>>> {
-        println!("\n🔄 触发上下文压缩...");
-
-        self.save_transcript(messages).await;
+        let file_path = self.save_transcript(messages).await?;
 
         let compacted = compress(messages);
         let summary = self.inner.complete(&compacted, &[]).await?;
@@ -79,12 +66,11 @@ where
         Ok(Some(compressed_messages))
     }
 
-    async fn save_transcript(&mut self, messages: &[Message]) {
-        if !self.transcript_dir.exists()
-            && let Err(err) = tokio::fs::create_dir_all(&self.transcript_dir).await
-        {
-            error!("Failed to create transcript directory {:?}: {err}", self.transcript_dir);
-            return;
+    async fn save_transcript(&mut self, messages: &[Message]) -> anyhow::Result<PathBuf> {
+        if !self.transcript_dir.exists() {
+            tokio::fs::create_dir_all(&self.transcript_dir).await.with_context(|| {
+                format!("Failed to create transcript directory `{}`", self.transcript_dir.display())
+            })?
         }
 
         let now = SystemTime::now();
@@ -92,17 +78,14 @@ where
 
         let file_path = self.transcript_dir.join(format!("transcript_{timestamp}.json"));
 
-        let content = match serde_json::to_string(messages) {
-            Ok(content) => content,
-            Err(err) => {
-                error!("Failed to serialize transcript messages: {err}");
-                return;
-            },
-        };
+        let content = serde_json::to_string(messages)
+            .with_context(|| "Failed to serialize transcript messages")?;
 
-        if let Err(err) = tokio::fs::write(&file_path, &content).await {
-            error!("Failed to write transcript file {}: {err}", file_path.display());
-        }
+        tokio::fs::write(&file_path, &content)
+            .await
+            .with_context(|| format!("Failed to write transcript file {}", file_path.display()))?;
+
+        Ok(file_path)
     }
 }
 
