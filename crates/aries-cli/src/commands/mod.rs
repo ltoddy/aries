@@ -7,7 +7,6 @@ use crate::theme::Theme;
 pub mod compact;
 pub mod completer;
 pub mod exit;
-pub mod save_history;
 pub mod setup;
 pub mod shell;
 
@@ -29,8 +28,6 @@ pub enum Command {
     },
     /// Open configuration setup
     Setup,
-    /// Save chat history to file
-    SaveHistory,
     /// Clear chat history
     ClearHistory,
     /// Force compact conversation context
@@ -85,9 +82,6 @@ pub async fn execute(input: &str, theme: &Theme, gctx: &GlobalContext, session: 
             if let Err(e) = setup::execute(theme, &gctx.config_dir).await {
                 eprintln!("Error: {}", e);
             }
-        },
-        Command::SaveHistory => {
-            save_history::execute(session.history(), theme).await;
         },
         Command::ClearHistory => {
             session.clear_history();

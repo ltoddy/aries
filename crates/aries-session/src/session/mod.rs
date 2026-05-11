@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use anyhow::Context;
 use aries_config::AriesConfig;
 use aries_core::agents::{AgentBuilder, AgentType, AriesAgent, CompactionAgent};
+use aries_core::compact::micro_compact;
 use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
 use futures::{StreamExt, pin_mut};
 use rig::agent::{FinalResponse, MultiTurnStreamItem, PromptHook};
@@ -24,7 +25,6 @@ pub struct Session {
     #[allow(unused)]
     lsp_client: Option<SharedLspClient>,
     chat_history: ChatHistory,
-    transcript_dir: PathBuf,
     root_dir: PathBuf,
     cancel_token: CancellationToken,
 }
@@ -57,8 +57,10 @@ impl Session {
             })?;
         }
 
+        let transcript_dir = root_dir.join("transcripts");
+
         let lsp_client = Self::warm_up_lsp(&cwd).await;
-        let agents = Self::create_agents(config, &cwd, lsp_client.clone()).await?;
+        let agents = Self::create_agents(config, &cwd, transcript_dir, lsp_client.clone()).await?;
         let chat_history = ChatHistory::new(root_dir.join(Self::FILENAME)).await;
         let cancel_token = CancellationToken::new();
 
@@ -67,7 +69,6 @@ impl Session {
             agents,
             lsp_client,
             chat_history,
-            transcript_dir: root_dir.join("transcripts"),
             root_dir: root_dir.to_path_buf(),
             cancel_token,
         })
@@ -80,9 +81,10 @@ impl Session {
         cwd: impl AsRef<Path>,
     ) -> anyhow::Result<Self> {
         let root_dir = root_dir.as_ref();
+        let transcript_dir = root_dir.join("transcripts");
 
         let lsp_client = Self::warm_up_lsp(&cwd).await;
-        let agents = Self::create_agents(config, &cwd, lsp_client.clone()).await?;
+        let agents = Self::create_agents(config, &cwd, transcript_dir, lsp_client.clone()).await?;
         let chat_history = ChatHistory::new(root_dir.join(Self::FILENAME)).await;
         let cancel_token = CancellationToken::new();
 
@@ -91,7 +93,6 @@ impl Session {
             agents,
             lsp_client,
             chat_history,
-            transcript_dir: root_dir.join("transcripts"),
             root_dir: root_dir.to_path_buf(),
             cancel_token,
         })
@@ -147,12 +148,9 @@ impl Session {
 
         let final_res = match &mut self.agents {
             ProviderAgents::OpenAICompatible { agent, compaction_agent } => {
-                CompactionAgent::<openai::CompletionModel>::micro_compact(
-                    self.chat_history.history_mut(),
-                );
-                if let Some(compressed) = compaction_agent
-                    .auto_compact(self.chat_history.history(), &self.transcript_dir)
-                    .await?
+                micro_compact(self.chat_history.history_mut());
+                if let Some(compressed) =
+                    compaction_agent.auto_compact(self.chat_history.history()).await?
                 {
                     self.chat_history.extend(compressed);
                 }
@@ -161,12 +159,9 @@ impl Session {
                 Self::consume_stream(stream, &mut cb, cancel_token).await?
             },
             ProviderAgents::Azure { agent, compaction_agent } => {
-                CompactionAgent::<azure::CompletionModel>::micro_compact(
-                    self.chat_history.history_mut(),
-                );
-                if let Some(compressed) = compaction_agent
-                    .auto_compact(self.chat_history.history(), &self.transcript_dir)
-                    .await?
+                micro_compact(self.chat_history.history_mut());
+                if let Some(compressed) =
+                    compaction_agent.auto_compact(self.chat_history.history()).await?
                 {
                     self.chat_history.extend(compressed);
                 }
@@ -187,18 +182,14 @@ impl Session {
     pub async fn compact(&mut self) -> anyhow::Result<()> {
         let compressed = match &mut self.agents {
             ProviderAgents::OpenAICompatible { compaction_agent, .. } => {
-                compaction_agent
-                    .force_compact(self.chat_history.history(), &self.transcript_dir)
-                    .await?
+                compaction_agent.force_compact(self.chat_history.history()).await?
             },
             ProviderAgents::Azure { compaction_agent, .. } => {
-                compaction_agent
-                    .force_compact(self.chat_history.history(), &self.transcript_dir)
-                    .await?
+                compaction_agent.force_compact(self.chat_history.history()).await?
             },
         };
         if let Some(compressed) = compressed {
-            self.chat_history.extend(compressed);
+            self.chat_history.reset(&compressed);
         }
         Ok(())
     }
@@ -245,6 +236,7 @@ impl Session {
     async fn create_agents(
         config: AriesConfig,
         cwd: impl AsRef<Path>,
+        transcript_dir: impl AsRef<Path>,
         lsp_client: Option<SharedLspClient>,
     ) -> anyhow::Result<ProviderAgents> {
         let cwd = cwd.as_ref();
@@ -265,7 +257,7 @@ impl Session {
                 )
                 .with_tools(lsp_client)
                 .await;
-                let compaction_agent = CompactionAgent::new(client, config.model());
+                let compaction_agent = CompactionAgent::new(client, config.model(), transcript_dir);
                 ProviderAgents::OpenAICompatible { agent, compaction_agent }
             },
             AriesConfig::Azure(ref conf) => {
@@ -284,7 +276,7 @@ impl Session {
                 )
                 .with_tools(lsp_client)
                 .await;
-                let compaction_agent = CompactionAgent::new(client, config.model());
+                let compaction_agent = CompactionAgent::new(client, config.model(), transcript_dir);
                 ProviderAgents::Azure { agent, compaction_agent }
             },
         };

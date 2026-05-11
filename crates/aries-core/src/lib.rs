@@ -1,4 +1,5 @@
 pub mod agents;
+pub mod compact;
 pub mod ext;
 pub mod fs;
 pub mod language_server;

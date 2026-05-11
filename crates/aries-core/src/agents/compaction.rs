@@ -1,15 +1,13 @@
-use std::collections::{HashMap, HashSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use rig::client::CompletionClient;
 use rig::completion::Message;
-use rig::message::{AssistantContent, ReasoningContent, ToolResultContent, UserContent};
-use rig::one_or_many::OneOrMany;
+use rig::message::{AssistantContent, ReasoningContent, UserContent};
 use rig::{completion, message};
+use tracing::error;
 
 use crate::agents::{AGENT_LOOP_MAX_TURNS, AriesAgent};
-
-const KEEP_RECENT_TOOL_RESULTS: usize = 8;
 
 const PREAMBLE: &str = include_str!("prompts/compaction.txt");
 const NAME: &str = "Archivist";
@@ -21,18 +19,21 @@ where
     M: completion::CompletionModel,
 {
     inner: AriesAgent<M>,
+    transcript_dir: PathBuf,
 }
+
+pub const TOKEN_THRESHOLD: u64 = 50_000;
 
 impl<M> CompactionAgent<M>
 where
     M: completion::CompletionModel + 'static,
 {
-    pub const TOKEN_THRESHOLD: usize = 80_000;
-
-    pub fn new<C>(client: C, model: &str) -> Self
+    pub fn new<C>(client: C, model: &str, transcript_dir: impl AsRef<Path>) -> Self
     where
         C: CompletionClient<CompletionModel = M>,
     {
+        let transcript_dir = transcript_dir.as_ref().to_path_buf();
+
         let agent = client
             .agent(model)
             .name(NAME)
@@ -40,96 +41,28 @@ where
             .preamble(PREAMBLE)
             .default_max_turns(AGENT_LOOP_MAX_TURNS)
             .build();
-        Self { inner: AriesAgent::new(agent, NAME, PREAMBLE) }
-    }
 
-    pub fn micro_compact(messages: &mut [Message]) {
-        let tool_name_map = build_tool_name_map(messages);
-
-        let mut tool_result_ids: Vec<String> = Vec::new();
-        for msg in messages.iter() {
-            if let Message::User { content } = msg {
-                for part in content.iter() {
-                    if let UserContent::ToolResult(tr) = part {
-                        tool_result_ids.push(tr.id.clone());
-                    }
-                }
-            }
-        }
-
-        if tool_result_ids.len() <= KEEP_RECENT_TOOL_RESULTS {
-            return;
-        }
-
-        let to_replace_ids: HashSet<&str> = tool_result_ids
-            [..tool_result_ids.len() - KEEP_RECENT_TOOL_RESULTS]
-            .iter()
-            .map(|s| s.as_str())
-            .collect();
-
-        for msg in messages.iter_mut() {
-            if let Message::User { content } = msg {
-                for item in content.iter_mut() {
-                    if let UserContent::ToolResult(tr) = item {
-                        if !to_replace_ids.contains(tr.id.as_str()) {
-                            continue;
-                        }
-
-                        let text_len: usize = tr
-                            .content
-                            .iter()
-                            .map(|c| match c {
-                                ToolResultContent::Text(t) => t.text.len(),
-                                _ => 0,
-                            })
-                            .sum();
-
-                        if text_len <= 100 {
-                            continue;
-                        }
-
-                        let tool_name =
-                            tool_name_map.get(&tr.id).map(|s| s.as_str()).unwrap_or("unknown");
-
-                        let placeholder = format!("[Previous: used {}]", tool_name);
-                        *item = UserContent::tool_result(
-                            tr.id.clone(),
-                            OneOrMany::one(ToolResultContent::text(placeholder)),
-                        );
-                    }
-                }
-            }
-        }
+        Self { inner: AriesAgent::new(agent, NAME, PREAMBLE), transcript_dir }
     }
 
     pub async fn auto_compact(
         &mut self,
         messages: &[Message],
-        transcript_dir: impl AsRef<Path>,
     ) -> anyhow::Result<Option<Vec<Message>>> {
-        if !estimate_tokens_exceeds(messages, Self::TOKEN_THRESHOLD) {
-            return Ok(None);
-        }
-
-        self.compact_inner(messages, transcript_dir.as_ref()).await
+        self.compact(messages).await
     }
 
     pub async fn force_compact(
         &mut self,
         messages: &[Message],
-        transcript_dir: impl AsRef<Path>,
     ) -> anyhow::Result<Option<Vec<Message>>> {
-        self.compact_inner(messages, transcript_dir.as_ref()).await
+        self.compact(messages).await
     }
 
-    async fn compact_inner(
-        &mut self,
-        messages: &[Message],
-        transcript_dir: impl AsRef<Path>,
-    ) -> anyhow::Result<Option<Vec<Message>>> {
+    async fn compact(&mut self, messages: &[Message]) -> anyhow::Result<Option<Vec<Message>>> {
         println!("\n🔄 触发上下文压缩...");
 
-        save_transcript(messages, transcript_dir.as_ref()).await?;
+        self.save_transcript(messages).await;
 
         let compacted = compress(messages);
         let summary = self.inner.complete(&compacted, &[]).await?;
@@ -145,39 +78,32 @@ where
 
         Ok(Some(compressed_messages))
     }
-}
 
-fn build_tool_name_map(messages: &[Message]) -> HashMap<String, String> {
-    let mut map = HashMap::new();
-    for msg in messages {
-        if let Message::Assistant { content, .. } = msg {
-            for c in content.iter() {
-                if let AssistantContent::ToolCall(tc) = c {
-                    map.insert(tc.id.clone(), tc.function.name.clone());
-                }
-            }
+    async fn save_transcript(&mut self, messages: &[Message]) {
+        if !self.transcript_dir.exists()
+            && let Err(err) = tokio::fs::create_dir_all(&self.transcript_dir).await
+        {
+            error!("Failed to create transcript directory {:?}: {err}", self.transcript_dir);
+            return;
+        }
+
+        let now = SystemTime::now();
+        let timestamp = now.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+
+        let file_path = self.transcript_dir.join(format!("transcript_{timestamp}.json"));
+
+        let content = match serde_json::to_string(messages) {
+            Ok(content) => content,
+            Err(err) => {
+                error!("Failed to serialize transcript messages: {err}");
+                return;
+            },
+        };
+
+        if let Err(err) = tokio::fs::write(&file_path, &content).await {
+            error!("Failed to write transcript file {}: {err}", file_path.display());
         }
     }
-    map
-}
-
-async fn save_transcript(
-    messages: &[Message],
-    transcript_dir: impl AsRef<Path>,
-) -> anyhow::Result<()> {
-    let transcript_dir = transcript_dir.as_ref();
-    tokio::fs::create_dir_all(transcript_dir).await?;
-
-    let timestamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-    let path = transcript_dir.join(format!("transcript_{}.json", timestamp));
-
-    let content = serde_json::to_string_pretty(messages)?;
-    tokio::fs::write(path, content).await?;
-
-    Ok(())
 }
 
 fn compress(messages: &[Message]) -> String {
@@ -235,48 +161,4 @@ fn compress(messages: &[Message]) -> String {
 
     prompt.push_str("\n\n--- 对话结束 ---\n\n请提供简洁但全面的摘要");
     prompt
-}
-
-fn estimate_tokens_exceeds(messages: &[Message], threshold: usize) -> bool {
-    let mut total_chars: usize = 0;
-
-    for message in messages {
-        match message {
-            Message::User { content } => {
-                for c in content.iter() {
-                    if let UserContent::Text(message::Text { text }) = c {
-                        total_chars += text.chars().count();
-                    }
-                }
-            },
-            Message::Assistant { content, .. } => {
-                for c in content.iter() {
-                    match c {
-                        AssistantContent::Text(message::Text { text }) => {
-                            total_chars += text.chars().count()
-                        },
-                        AssistantContent::Reasoning(message::Reasoning { content, .. }) => {
-                            for rc in content {
-                                total_chars += match rc {
-                                    ReasoningContent::Text { text, .. } => text.chars().count(),
-                                    ReasoningContent::Encrypted(s) => s.chars().count(),
-                                    ReasoningContent::Redacted { data } => data.chars().count(),
-                                    ReasoningContent::Summary(s) => s.chars().count(),
-                                    _ => 0,
-                                };
-                            }
-                        },
-                        _ => {},
-                    }
-                }
-            },
-            _ => {},
-        }
-
-        if total_chars.div_ceil(4) >= threshold {
-            return true;
-        }
-    }
-
-    false
 }
