@@ -21,7 +21,6 @@ fn is_known_tool(tool_name: &str) -> bool {
     matches!(
         tool_name,
         tools::agent::NAME
-            | tools::apply_patch::NAME
             | tools::bash::NAME
             | tools::batch::NAME
             | tools::codesearch::NAME

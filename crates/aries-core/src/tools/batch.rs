@@ -8,10 +8,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::tools::{
-    ApplyPatchTool, AskUserQuestionTool, BashTool, CodeSearchTool, EditTool, GlobTool, GrepTool,
-    LsTool, MultiEditTool, ReadTool, RenderError, ToolArgsRender, ToolOutputRender, WebFetchTool,
-    WebSearchTool, WriteTool, agent, apply_patch, bash, codesearch, edit, format_tool_args, glob,
-    grep, ls, multiedit, question, read, webfetch, websearch, write,
+    AskUserQuestionTool, BashTool, CodeSearchTool, EditTool, GlobTool, GrepTool, LsTool,
+    MultiEditTool, ReadTool, RenderError, ToolArgsRender, ToolOutputRender, WebFetchTool,
+    WebSearchTool, WriteTool, agent, bash, codesearch, edit, format_tool_args, glob, grep, ls,
+    multiedit, question, read, webfetch, websearch, write,
 };
 
 pub const NAME: &str = "Batch";
@@ -164,13 +164,6 @@ impl Tool for BatchTool {
                     let parsed_args =
                         serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
                     Tool::call(&LsTool::new(self.cwd.clone()), parsed_args)
-                        .await
-                        .map(|res| serde_json::to_value(res).unwrap())
-                        .map_err(|e| e.to_string())
-                } else if tool_name == apply_patch::NAME {
-                    let parsed_args =
-                        serde_json::from_value(call.parameters).map_err(|e| e.to_string())?;
-                    Tool::call(&ApplyPatchTool, parsed_args)
                         .await
                         .map(|res| serde_json::to_value(res).unwrap())
                         .map_err(|e| e.to_string())

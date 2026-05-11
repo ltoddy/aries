@@ -6,7 +6,7 @@ use rig::client::CompletionClient;
 use rig::completion::Message;
 use rig::message::{AssistantContent, ReasoningContent, UserContent};
 use rig::{completion, message};
-use tracing::{error, info};
+use tracing::info;
 
 use crate::agents::{AGENT_LOOP_MAX_TURNS, AriesAgent};
 
@@ -49,7 +49,7 @@ where
     pub async fn compact(&mut self, messages: &[Message]) -> anyhow::Result<Option<Vec<Message>>> {
         info!("🔄 触发上下文压缩...");
 
-        let file_path = self.save_transcript(messages).await?;
+        let _ = self.save_transcript(messages).await?;
 
         let compacted = compress(messages);
         let summary = self.inner.complete(&compacted, &[]).await?;

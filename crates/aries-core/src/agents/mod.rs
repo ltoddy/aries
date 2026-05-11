@@ -220,7 +220,6 @@ where
 
         if matches!(agent_type, AgentType::Build | AgentType::General) {
             tools.push(Box::new(tools::write::WriteTool));
-            tools.push(Box::new(tools::apply_patch::ApplyPatchTool));
             tools.push(Box::new(tools::multiedit::MultiEditTool));
             tools.push(Box::new(tools::edit::EditTool));
             tools.push(Box::new(tools::batch::BatchTool::new(self.cwd.clone())));

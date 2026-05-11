@@ -1,5 +1,4 @@
 pub mod agent;
-pub mod apply_patch;
 pub mod bash;
 pub mod batch;
 pub mod codesearch;
@@ -17,7 +16,6 @@ pub mod websearch;
 pub mod write;
 
 pub use self::agent::{AgentArgs, AgentOutput, AgentTool};
-pub use self::apply_patch::{ApplyPatchArgs, ApplyPatchOutput, ApplyPatchTool};
 pub use self::bash::{BashArgs, BashOutput, BashTool};
 pub use self::batch::{BatchArgs, BatchOutput, BatchTool};
 pub use self::codesearch::{CodeSearchArgs, CodeSearchOutput, CodeSearchTool};
@@ -37,7 +35,6 @@ pub use self::write::{WriteArgs, WriteOutput, WriteTool};
 pub fn format_tool_args(tool_name: &str, raw_json: &str) -> (String, Option<String>) {
     let result = match tool_name {
         agent::NAME => AgentArgs::render_args(raw_json),
-        apply_patch::NAME => ApplyPatchArgs::render_args(raw_json),
         bash::NAME => BashArgs::render_args(raw_json),
         batch::NAME => BatchArgs::render_args(raw_json),
         codesearch::NAME => CodeSearchArgs::render_args(raw_json),
@@ -62,7 +59,6 @@ pub fn format_tool_args(tool_name: &str, raw_json: &str) -> (String, Option<Stri
 pub fn format_tool_output(tool_name: &str, raw_json: &str) -> String {
     let result = match tool_name {
         agent::NAME => AgentOutput::render_output(raw_json),
-        apply_patch::NAME => ApplyPatchOutput::render_output(raw_json),
         bash::NAME => BashOutput::render_output(raw_json),
         batch::NAME => BatchOutput::render_output(raw_json),
         codesearch::NAME => CodeSearchOutput::render_output(raw_json),
