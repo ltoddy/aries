@@ -29,12 +29,31 @@ pub enum AgentType {
 }
 
 impl AgentType {
+    pub fn from_id(id: &str) -> Self {
+        match id {
+            "build" => Self::Build,
+            "plan" => Self::Plan,
+            "general" => Self::General,
+            "explore" => Self::Explore,
+            _ => Self::Build,
+        }
+    }
+
     pub const fn bare_preamble(self) -> &'static str {
         match self {
             Self::Build => include_str!("prompts/build.txt"),
             Self::Plan => include_str!("prompts/plan.txt"),
             Self::General => include_str!("prompts/generate.txt"),
             Self::Explore => include_str!("prompts/explore.txt"),
+        }
+    }
+
+    pub const fn id(self) -> &'static str {
+        match self {
+            Self::Build => "build",
+            Self::Plan => "plan",
+            Self::General => "general",
+            Self::Explore => "explore",
         }
     }
 

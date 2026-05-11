@@ -5,6 +5,7 @@ use rig::message::{AssistantContent, Message, ToolResultContent, UserContent};
 use serde_json::Value;
 
 pub const KEEP_RECENT_TOOLS: usize = 5;
+pub const TOKEN_THRESHOLD: u64 = 80_000;
 
 pub fn micro_compact(messages: &mut [Message]) {
     let tool_map = build_tool_name_map(messages);

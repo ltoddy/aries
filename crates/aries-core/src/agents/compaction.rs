@@ -46,24 +46,26 @@ where
         Self { inner: AriesAgent::new(agent, NAME, PREAMBLE), transcript_dir }
     }
 
-    pub async fn compact(&mut self, messages: &[Message]) -> anyhow::Result<Option<Vec<Message>>> {
-        info!("🔄 触发上下文压缩...");
+    pub async fn compact(&mut self, messages: &[Message]) -> Option<Vec<Message>> {
+        info!("触发上下文压缩");
 
-        let _ = self.save_transcript(messages).await?;
-
+        let file_path = self.save_transcript(messages).await.ok()?;
         let compacted = compress(messages);
-        let summary = self.inner.complete(&compacted, &[]).await?;
-
+        let summary = self.inner.complete(&compacted, &[]).await.ok()?;
         if summary.is_empty() {
-            return Ok(None);
+            return None;
         }
 
         let compressed_messages = vec![
             Message::user(format!("[Compressed]\n\n{}", summary)),
+            Message::user(format!(
+                "The full conversation transcript has been saved to: {}",
+                file_path.display()
+            )),
             Message::assistant("Understood. Continuing."),
         ];
 
-        Ok(Some(compressed_messages))
+        Some(compressed_messages)
     }
 
     async fn save_transcript(&mut self, messages: &[Message]) -> anyhow::Result<PathBuf> {

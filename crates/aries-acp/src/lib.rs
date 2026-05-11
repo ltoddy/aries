@@ -7,12 +7,14 @@ use agent_client_protocol::{
     InitializeRequest, InitializeResponse, ListSessionsRequest, ListSessionsResponse,
     LoadSessionRequest, LoadSessionResponse, McpCapabilities, NewSessionRequest,
     NewSessionResponse, PromptCapabilities, PromptRequest, PromptResponse, ProtocolVersion,
-    SessionCapabilities, SessionInfo, SessionListCapabilities, SessionNotification, SessionUpdate,
-    SetSessionModeRequest, SetSessionModeResponse, StopReason, TextContent, ToolCallId,
-    ToolCallStatus, ToolCallUpdate, ToolCallUpdateFields,
+    SessionCapabilities, SessionInfo, SessionListCapabilities, SessionMode, SessionModeId,
+    SessionModeState, SessionNotification, SessionUpdate, SetSessionModeRequest,
+    SetSessionModeResponse, StopReason, TextContent, ToolCallId, ToolCallStatus, ToolCallUpdate,
+    ToolCallUpdateFields,
 };
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
+use aries_core::agents::AgentType;
 use aries_core::tools::format_tool_output;
 use aries_session::SessionRegistry;
 use async_trait::async_trait;
@@ -83,7 +85,29 @@ impl agent_client_protocol::Agent for AgentClientProtocolImpl {
         let cwd = args.cwd.display().to_string();
         let session = registry.new_session(cwd).await?;
 
-        let resp = NewSessionResponse::new(session.id());
+        let modes = Some(SessionModeState::new(
+            SessionModeId::new(AgentType::Build.id()),
+            vec![
+                SessionMode::new(
+                    SessionModeId::new(AgentType::Build.id()),
+                    AgentType::Build.name(),
+                )
+                .description(Some(AgentType::Build.description().to_owned())),
+                SessionMode::new(SessionModeId::new(AgentType::Plan.id()), AgentType::Plan.name())
+                    .description(Some(AgentType::Plan.description().to_owned())),
+                SessionMode::new(
+                    SessionModeId::new(AgentType::General.id()),
+                    AgentType::General.name(),
+                )
+                .description(Some(AgentType::General.description().to_owned())),
+                SessionMode::new(
+                    SessionModeId::new(AgentType::Explore.id()),
+                    AgentType::Explore.name(),
+                )
+                .description(Some(AgentType::Explore.description().to_owned())),
+            ],
+        ));
+        let resp = NewSessionResponse::new(session.id()).modes(modes);
         Ok(resp)
     }
 
@@ -170,7 +194,29 @@ impl agent_client_protocol::Agent for AgentClientProtocolImpl {
         let mut registry = self.registry.lock().await;
         let _ = registry.load_session(&session_id).await?;
 
-        let resp = LoadSessionResponse::new();
+        let modes = Some(SessionModeState::new(
+            SessionModeId::new(AgentType::Build.id()),
+            vec![
+                SessionMode::new(
+                    SessionModeId::new(AgentType::Build.id()),
+                    AgentType::Build.name(),
+                )
+                .description(Some(AgentType::Build.description().to_owned())),
+                SessionMode::new(SessionModeId::new(AgentType::Plan.id()), AgentType::Plan.name())
+                    .description(Some(AgentType::Plan.description().to_owned())),
+                SessionMode::new(
+                    SessionModeId::new(AgentType::General.id()),
+                    AgentType::General.name(),
+                )
+                .description(Some(AgentType::General.description().to_owned())),
+                SessionMode::new(
+                    SessionModeId::new(AgentType::Explore.id()),
+                    AgentType::Explore.name(),
+                )
+                .description(Some(AgentType::Explore.description().to_owned())),
+            ],
+        ));
+        let resp = LoadSessionResponse::new().modes(modes);
         Ok(resp)
     }
 
@@ -180,7 +226,19 @@ impl agent_client_protocol::Agent for AgentClientProtocolImpl {
     ) -> agent_client_protocol::Result<SetSessionModeResponse> {
         info!("Received set session mode request {args:?}");
 
-        // todo!()
+        let session_id = args.session_id.to_string();
+        let mut session = {
+            let registry = self.registry.lock().await;
+            registry
+                .get_session(&session_id)
+                .ok_or_else(|| Error::resource_not_found(Some(session_id.clone())))?
+        };
+
+        let mode_id = args.mode_id.to_string();
+        let agent_type = AgentType::from_id(&mode_id);
+
+        session.switch_agent(agent_type).await?;
+
         let resp = SetSessionModeResponse::new();
         Ok(resp)
     }
