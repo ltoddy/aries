@@ -13,6 +13,7 @@ glob.workspace = true
 globset.workspace = true
 ignore.workspace = true
 itertools.workspace = true
+lazy_static.workspace = true
 nanoid.workspace = true
 parking_lot.workspace = true
 regex-lite.workspace = true

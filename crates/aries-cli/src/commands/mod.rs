@@ -32,6 +32,7 @@ pub enum Command {
     ClearHistory,
     /// Force compact conversation context
     Compact,
+    SystemPrompt,
 }
 
 impl Command {
@@ -89,6 +90,9 @@ pub async fn execute(input: &str, theme: &Theme, gctx: &GlobalContext, session: 
         },
         Command::Compact => {
             compact::execute(session, theme).await;
+        },
+        Command::SystemPrompt => {
+            println!("{}", session.system_prompt());
         },
     }
 }

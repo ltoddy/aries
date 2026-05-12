@@ -190,6 +190,7 @@ impl Session {
                 let final_res = Self::consume_stream(stream, &mut cb, cancel_token).await?;
 
                 if final_res.usage().total_tokens > TOKEN_THRESHOLD {
+                    println!("\n🔄 触发上下文压缩...");
                     if let Some(compressed) =
                         compaction_agent.compact(self.chat_history.history()).await
                     {
@@ -206,6 +207,7 @@ impl Session {
                 let final_res = Self::consume_stream(stream, &mut cb, cancel_token).await?;
 
                 if final_res.usage().total_tokens > TOKEN_THRESHOLD {
+                    println!("\n🔄 触发上下文压缩...");
                     if let Some(compressed) =
                         compaction_agent.compact(self.chat_history.history()).await
                     {

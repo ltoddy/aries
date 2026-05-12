@@ -5,4 +5,5 @@ pub mod fs;
 pub mod language_server;
 pub mod preamble;
 pub mod rpc;
+pub mod simple_cloc;
 pub mod tools;
