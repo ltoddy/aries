@@ -6,6 +6,7 @@ use std::path::Path;
 
 use futures::stream::{self, StreamExt};
 use lazy_static::lazy_static;
+use tokio::io::{AsyncBufReadExt, BufReader};
 
 use crate::fs::walk_dir;
 
@@ -35,6 +36,16 @@ pub async fn calc(root: impl AsRef<Path>) -> io::Result<File> {
 
 async fn calculate_file(file_path: impl AsRef<Path>, info: &Rule) -> io::Result<File> {
     let file_path = file_path.as_ref();
+
+    let file = tokio::fs::File::open(file_path).await?;
+    let mut reader = BufReader::new(file);
+
+    let mut first_line = String::new();
+    reader.read_line(&mut first_line).await?;
+
+    if first_line.contains("Code generated") {
+        return Ok(File::new("Generated", 0, 0, 0, 0, 0));
+    }
 
     let Rule { language, single, multi, .. } = info;
 
