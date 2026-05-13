@@ -26,6 +26,7 @@ async fn main() -> anyhow::Result<()> {
             SessionCommand::Prune(args) => cli::prune_sessions::execute(args, gctx).await,
             SessionCommand::Resume(args) => cli::resume_session::execute(args, gctx).await,
         },
+        Some(cli::Subcommands::Prompt(args)) => cli::prompt::execute(args, gctx).await,
         _ => cli::session::run_session(gctx, nanoid::nanoid!()).await,
     }
 }

@@ -1,17 +1,18 @@
 pub mod acp;
 pub mod init;
 pub mod list_sessions;
+pub mod prompt;
 pub mod prune_sessions;
 pub mod resume_session;
 pub mod session;
 pub mod setup;
 
 use clap::{Parser, Subcommand};
-
-use crate::cli::init::InitCommand;
-use crate::cli::list_sessions::ListSessionsArgs;
-use crate::cli::prune_sessions::PruneSessionsArgs;
-use crate::cli::resume_session::ResumeSessionsArgs;
+use init::InitCommand;
+use list_sessions::ListSessionsArgs;
+use prompt::PromptArgs;
+use prune_sessions::PruneSessionsArgs;
+use resume_session::ResumeSessionsArgs;
 
 #[derive(Parser, Debug, Clone)]
 pub struct Args {
@@ -26,6 +27,7 @@ pub enum Subcommands {
         #[command(subcommand)]
         command: InitCommand,
     },
+    Prompt(PromptArgs),
     Session {
         #[command(subcommand)]
         command: SessionCommand,
