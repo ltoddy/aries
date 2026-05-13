@@ -1,5 +1,8 @@
+use std::collections::HashMap;
+
 /// see more: https://code.claude.com/docs/en/hooks-guide
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 /// Hook events fire at specific points in the Claude Code lifecycle.
 ///
@@ -14,7 +17,7 @@ use serde::{Deserialize, Serialize};
 /// - `*Failure`: after an action fails
 /// - `*Start` / `*Stop` / `*Completed`: lifecycle boundaries for longer-running
 ///   work
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Deserialize, Serialize)]
 pub enum HookEvent {
     /// Fires when a session starts.
     SessionStart,
@@ -117,4 +120,136 @@ pub enum HookEvent {
 
     /// Fires when a session ends.
     SessionEnd,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ShellType {
+    Bash,
+    Powershell,
+    Sh,
+    Zsh,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum HookCommand {
+    Command(BashCommandHook),
+    Prompt(PromptHook),
+    Agent(AgentHook),
+    Http(HttpHook),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BashCommandHook {
+    /// 要执行的 shell 命令
+    pub command: String,
+
+    /// 权限规则语法过滤，例如 "Bash(git *)"
+    #[serde(default, rename = "if", skip_serializing_if = "Option::is_none")]
+    pub if_condition: Option<String>,
+
+    /// shell 解释器，默认 bash
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shell: Option<ShellType>,
+
+    /// 单个命令超时时间（秒）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<f64>,
+
+    /// 自定义状态条提示文案
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status_message: Option<String>,
+
+    /// true 时执行一次后被移除
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub once: Option<bool>,
+
+    /// true 时后台运行，不阻塞
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub r#async: Option<bool>,
+
+    /// true 时后台运行，并在 exit code 2 时唤醒模型；隐含 async
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub async_rewake: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromptHook {
+    /// 用 LLM 评估的 Prompt，可使用 $ARGUMENTS 占位符
+    pub prompt: String,
+
+    #[serde(default, rename = "if", skip_serializing_if = "Option::is_none")]
+    pub if_condition: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<f64>,
+
+    /// 模型 ID，例如 "claude-sonnet-4-6"
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status_message: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub once: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentHook {
+    /// 描述要验证什么的 Prompt
+    pub prompt: String,
+
+    #[serde(default, rename = "if", skip_serializing_if = "Option::is_none")]
+    pub if_condition: Option<String>,
+
+    /// 默认 60 秒
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<f64>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status_message: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub once: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HttpHook {
+    /// POST 目标 URL
+    pub url: String,
+
+    #[serde(default, rename = "if", skip_serializing_if = "Option::is_none")]
+    pub if_condition: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<f64>,
+
+    /// 额外 header，值支持 $VAR / ${VAR} 插值
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub headers: Option<HashMap<String, String>>,
+
+    /// 允许插值的环境变量白名单
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allowed_env_vars: Option<Vec<String>>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status_message: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub once: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HookMatcher {
+    /// 匹配模式，例如工具名 "Write"、"Bash"
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matcher: Option<String>,
+
+    /// 匹配命中时执行的 hooks
+    pub hooks: Vec<HookCommand>,
 }
