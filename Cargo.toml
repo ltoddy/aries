@@ -5,6 +5,7 @@ members = [
     "crates/aries-config",
     "crates/aries-context",
     "crates/aries-core",
+    "crates/aries-harness",
     "crates/aries-session",
     "crates/aries-ui",
 ]
