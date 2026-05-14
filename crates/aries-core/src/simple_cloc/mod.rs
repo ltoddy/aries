@@ -5,12 +5,18 @@ use std::ops::{Add, AddAssign};
 use std::path::Path;
 
 use futures::stream::{self, StreamExt};
+use git2::Repository;
 use lazy_static::lazy_static;
 use tokio::io::{AsyncBufReadExt, BufReader};
 
 use crate::fs::walk_dir;
 
 pub async fn calc(root: impl AsRef<Path>) -> io::Result<File> {
+    let root = root.as_ref();
+
+    let _ = Repository::discover(root)
+        .map_err(|err| io::Error::new(io::ErrorKind::Unsupported, err))?;
+
     let entries = walk_dir(root, true, false)?;
     let file_paths = entries.into_iter().filter(|e| e.is_file()).collect::<Vec<_>>();
 

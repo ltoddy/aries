@@ -102,6 +102,14 @@ impl ConfigFormData {
                 azure_endpoint: Some(c.azure_endpoint.clone()),
                 api_version: Some(c.api_version.clone()),
             },
+            aries_config::AriesConfig::DeepSeek(c) => Self {
+                provider: "deepseek-v4".to_string(),
+                api_key: c.api_key.clone(),
+                model: c.model.clone(),
+                base_url: None,
+                azure_endpoint: None,
+                api_version: None,
+            },
         }
     }
 

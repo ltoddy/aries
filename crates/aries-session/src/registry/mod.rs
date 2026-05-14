@@ -16,6 +16,7 @@ pub struct SessionRegistry {
     active_sessions: HashMap<String, Session>,
     session_repo: SessionRepository,
 
+    #[allow(unused)]
     hooks: Vec<HooksPreset>,
 }
 

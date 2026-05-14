@@ -232,7 +232,10 @@ impl Session {
 
                 let final_res = Self::consume_stream(stream, &mut cb, cancel_token).await?;
                 if final_res.usage().total_tokens > compact::TOKEN_THRESHOLD {
-                    println!("\n🔄 触发上下文压缩...");
+                    println!(
+                        "\n🔄 total token: {} 触发上下文压缩...",
+                        final_res.usage().total_tokens
+                    );
                     if let Some(compressed) =
                         compaction_agent.compact(self.chat_history.history()).await
                     {
