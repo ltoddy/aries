@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use anyhow::Context;
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
+use aries_core::ext::hook::{HooksFileLoader, HooksPreset};
 
 use crate::Session;
 use crate::persistence::SessionRepository;
@@ -14,6 +15,8 @@ pub struct SessionRegistry {
 
     active_sessions: HashMap<String, Session>,
     session_repo: SessionRepository,
+
+    hooks: Vec<HooksPreset>,
 }
 
 impl SessionRegistry {
@@ -25,7 +28,10 @@ impl SessionRegistry {
 
         let session_repo = SessionRepository::new(db.clone());
 
-        Ok(Self { gctx, config, active_sessions: Default::default(), session_repo })
+        let mut hooks_loader = HooksFileLoader::new(&gctx.current_dir);
+        let hooks = hooks_loader.load().await.unwrap_or_default();
+
+        Ok(Self { gctx, config, active_sessions: Default::default(), session_repo, hooks })
     }
 
     pub async fn list_projects(&mut self) -> anyhow::Result<Vec<String>> {

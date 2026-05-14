@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use anyhow::Context;
 use aries_config::AriesConfig;
 use aries_core::agents::{AgentBuilder, AgentType, AriesAgent, CompactionAgent};
-use aries_core::compact::{TOKEN_THRESHOLD, micro_compact};
+use aries_core::compact;
 use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
 use futures::{StreamExt, pin_mut};
 use rig::agent::{FinalResponse, MultiTurnStreamItem, PromptHook};
@@ -40,6 +40,10 @@ enum ProviderAgents {
     Azure {
         agent: AriesAgent<azure::CompletionModel>,
         compaction_agent: CompactionAgent<azure::CompletionModel>,
+    },
+    DeepSeek {
+        agent: AriesAgent<deepseek::CompletionModel>,
+        compaction_agent: CompactionAgent<deepseek::CompletionModel>,
     },
 }
 
@@ -132,6 +136,7 @@ impl Session {
         match &self.agents {
             ProviderAgents::OpenAICompatible { agent, .. } => agent.system_prompt(),
             ProviderAgents::Azure { agent, .. } => agent.system_prompt(),
+            ProviderAgents::DeepSeek { agent, .. } => agent.system_prompt(),
         }
     }
 
@@ -184,12 +189,13 @@ impl Session {
 
         let final_res = match &mut self.agents {
             ProviderAgents::OpenAICompatible { agent, compaction_agent } => {
-                micro_compact(self.chat_history.history_mut());
+                compact::micro_compact(self.chat_history.history_mut());
+
                 let snapshot = self.chat_history.history().to_vec();
                 let stream = agent.stream_prompt(prompt, &snapshot, hook).await;
                 let final_res = Self::consume_stream(stream, &mut cb, cancel_token).await?;
 
-                if final_res.usage().total_tokens > TOKEN_THRESHOLD {
+                if final_res.usage().total_tokens > compact::TOKEN_THRESHOLD {
                     println!("\n🔄 触发上下文压缩...");
                     if let Some(compressed) =
                         compaction_agent.compact(self.chat_history.history()).await
@@ -201,12 +207,31 @@ impl Session {
                 final_res
             },
             ProviderAgents::Azure { agent, compaction_agent } => {
-                micro_compact(self.chat_history.history_mut());
+                compact::micro_compact(self.chat_history.history_mut());
+
                 let snapshot = self.chat_history.history().to_vec();
                 let stream = agent.stream_prompt(prompt, &snapshot, hook).await;
-                let final_res = Self::consume_stream(stream, &mut cb, cancel_token).await?;
 
-                if final_res.usage().total_tokens > TOKEN_THRESHOLD {
+                let final_res = Self::consume_stream(stream, &mut cb, cancel_token).await?;
+                if final_res.usage().total_tokens > compact::TOKEN_THRESHOLD {
+                    println!("\n🔄 触发上下文压缩...");
+                    if let Some(compressed) =
+                        compaction_agent.compact(self.chat_history.history()).await
+                    {
+                        self.chat_history.reset(&compressed);
+                    }
+                }
+
+                final_res
+            },
+            ProviderAgents::DeepSeek { agent, compaction_agent } => {
+                compact::micro_compact(self.chat_history.history_mut());
+
+                let snapshot = self.chat_history.history().to_vec();
+                let stream = agent.stream_prompt(prompt, &snapshot, hook).await;
+
+                let final_res = Self::consume_stream(stream, &mut cb, cancel_token).await?;
+                if final_res.usage().total_tokens > compact::TOKEN_THRESHOLD {
                     println!("\n🔄 触发上下文压缩...");
                     if let Some(compressed) =
                         compaction_agent.compact(self.chat_history.history()).await
@@ -233,6 +258,9 @@ impl Session {
                 compaction_agent.compact(self.chat_history.history()).await
             },
             ProviderAgents::Azure { compaction_agent, .. } => {
+                compaction_agent.compact(self.chat_history.history()).await
+            },
+            ProviderAgents::DeepSeek { compaction_agent, .. } => {
                 compaction_agent.compact(self.chat_history.history()).await
             },
         };
@@ -328,6 +356,23 @@ impl Session {
                 .await;
                 let compaction_agent = CompactionAgent::new(client, config.model(), transcript_dir);
                 ProviderAgents::Azure { agent, compaction_agent }
+            },
+            AriesConfig::DeepSeek(ref conf) => {
+                let client = deepseek::Client::builder()
+                    .api_key(&conf.api_key)
+                    .build()
+                    .with_context(|| "Failed to create llm client")?;
+
+                let agent = AgentBuilder::new(
+                    client.clone(),
+                    config.clone(),
+                    agent_type,
+                    cwd.to_path_buf(),
+                )
+                .with_tools(lsp_client)
+                .await;
+                let compaction_agent = CompactionAgent::new(client, config.model(), transcript_dir);
+                ProviderAgents::DeepSeek { agent, compaction_agent }
             },
         };
 

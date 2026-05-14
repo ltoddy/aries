@@ -1,8 +1,77 @@
-use std::collections::HashMap;
-
 /// see more: https://code.claude.com/docs/en/hooks-guide
+use std::collections::HashMap;
+use std::io;
+use std::path::{Path, PathBuf};
+
+use futures::stream::{self, StreamExt};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use thiserror::Error;
+use tracing::info;
+
+use crate::fs::walk_dirs;
+
+pub struct HooksFileLoader {
+    roots: Vec<PathBuf>,
+}
+
+impl HooksFileLoader {
+    pub const FILENAME: &str = "hook.json";
+
+    pub fn new(cwd: impl AsRef<Path>) -> Self {
+        let cwd = cwd.as_ref();
+        let home_dir = std::env::home_dir().unwrap_or_else(|| PathBuf::from("~"));
+
+        let roots = vec![cwd.join(".agents").join("hooks"), home_dir.join(".agents").join("hooks")];
+
+        Self { roots }
+    }
+
+    pub async fn load(&mut self) -> io::Result<Vec<HooksPreset>> {
+        let entries = walk_dirs(&self.roots, true, false)?;
+
+        let file_paths = entries
+            .iter()
+            .filter(|entry| entry.is_file() && entry.ends_with(".json"))
+            .collect::<Vec<_>>();
+
+        let presets = stream::iter(file_paths)
+            .filter_map(|file_path| async move { HooksPreset::parse(file_path).await.ok() })
+            .collect()
+            .await;
+
+        Ok(presets)
+    }
+}
+
+pub struct HooksExecutor {}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct HooksPreset {
+    pub description: Option<String>,
+    pub hooks: HooksSettings,
+}
+
+#[derive(Debug, Error)]
+pub enum ParseHooksFileError {
+    #[error("Failed to read hooks file: {0}")]
+    Io(#[from] io::Error),
+    #[error("Failed to parse hooks file: {0}")]
+    Json(#[from] serde_json::Error),
+}
+
+impl HooksPreset {
+    pub async fn parse(file_path: impl AsRef<Path>) -> Result<Self, ParseHooksFileError> {
+        let file_path = file_path.as_ref();
+        info!("Parsing hooks file: {}", file_path.display());
+
+        let content = tokio::fs::read_to_string(file_path).await?;
+        Ok(serde_json::from_str::<Self>(&content)?)
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(transparent)]
+pub struct HooksSettings(pub HashMap<HookEvent, Vec<HookMatcher>>);
 
 /// Hook events fire at specific points in the Claude Code lifecycle.
 ///
@@ -17,7 +86,7 @@ use serde_json::Value;
 /// - `*Failure`: after an action fails
 /// - `*Start` / `*Stop` / `*Completed`: lifecycle boundaries for longer-running
 ///   work
-#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialOrd, PartialEq, Deserialize, Serialize)]
 pub enum HookEvent {
     /// Fires when a session starts.
     SessionStart,

@@ -9,11 +9,13 @@ use serde::{Deserialize, Serialize};
 pub enum AriesConfig {
     OpenAICompatible(OpenAICompatibleConfig),
     Azure(AzureConfig),
+    DeepSeek(DeepSeekConfig),
 }
 
 enum Provider {
     OpenAICompatible,
     Azure,
+    DeepSeek,
 }
 
 impl Provider {
@@ -21,6 +23,7 @@ impl Provider {
         match self {
             Self::OpenAICompatible => "OpenAI Compatible",
             Self::Azure => "Azure",
+            Self::DeepSeek => "DeepSeek",
         }
     }
 }
@@ -40,11 +43,18 @@ pub struct AzureConfig {
     pub model: String,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DeepSeekConfig {
+    pub api_key: String,
+    pub model: String,
+}
+
 impl AriesConfig {
     pub fn provider(&self) -> &'static str {
         match self {
             Self::OpenAICompatible(_) => "OpenAI Compatible",
             Self::Azure(_) => "Azure",
+            Self::DeepSeek(_) => "DeepSeek",
         }
     }
 
@@ -52,6 +62,7 @@ impl AriesConfig {
         match self {
             Self::OpenAICompatible(config) => &config.model,
             Self::Azure(config) => &config.model,
+            AriesConfig::DeepSeek(config) => &config.model,
         }
     }
 }
@@ -107,7 +118,7 @@ pub fn setup() -> anyhow::Result<AriesConfig> {
     println!("Welcome to Aries! Let's set up your AI model configuration.");
     let theme = ColorfulTheme::default();
 
-    let providers = [Provider::OpenAICompatible, Provider::Azure];
+    let providers = [Provider::OpenAICompatible, Provider::Azure, Provider::DeepSeek];
     let labels: Vec<_> = providers.iter().map(Provider::label).collect();
     let provider = &providers[Select::with_theme(&theme)
         .with_prompt("provider")
@@ -130,6 +141,12 @@ pub fn setup() -> anyhow::Result<AriesConfig> {
             let model = prompt_required(&theme, "model")?;
 
             Ok(AriesConfig::Azure(AzureConfig { api_key, azure_endpoint, api_version, model }))
+        },
+        Provider::DeepSeek => {
+            let api_key = prompt_required(&theme, "api key")?;
+            let model = prompt_required(&theme, "model")?;
+
+            Ok(AriesConfig::DeepSeek(DeepSeekConfig { api_key, model }))
         },
     }
 }
