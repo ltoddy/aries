@@ -6,13 +6,13 @@ mod skill;
 use std::path::Path;
 
 use crate::agents::AgentType;
-use crate::ext::skill::SkillInfo;
+use crate::ext::skill::SkillDefinition;
 
 pub async fn render(
     cwd: impl AsRef<Path>,
     agent_type: AgentType,
     model: &str,
-    available_skills: &[SkillInfo],
+    available_skills: &[SkillDefinition],
 ) -> String {
     match agent_type {
         AgentType::Build | AgentType::General => {

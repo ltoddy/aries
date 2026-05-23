@@ -7,7 +7,7 @@ use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde::{Deserialize, Serialize};
 
-use crate::ext::skill::SkillInfo;
+use crate::ext::skill::SkillDefinition;
 use crate::fs::{path_to_uri, walk_dir};
 use crate::tools::{RenderError, ToolArgsRender, ToolOutputRender};
 
@@ -67,11 +67,11 @@ impl SkillError {
 pub const NAME: &str = "Skill";
 
 pub struct SkillTool {
-    skills: Vec<SkillInfo>,
+    skills: Vec<SkillDefinition>,
 }
 
 impl SkillTool {
-    pub fn new(skills: Vec<SkillInfo>) -> Self {
+    pub fn new(skills: Vec<SkillDefinition>) -> Self {
         Self { skills }
     }
 

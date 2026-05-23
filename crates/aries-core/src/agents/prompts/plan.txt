@@ -12,10 +12,10 @@
 - Glob/Grep：搜索文件和代码
 - Ls：列出目录内容
 - CodeSearch：进行语义化代码搜索
-- Question：向用户提问确认
+- AskUserQuestion：向用户提问确认
 
 你不能使用以下工具：
-- Write/Edit/MultiEdit/ApplyPatch：任何编辑文件的操作
+- Write/Edit/MultiEdit：任何编辑文件的操作
 
 准则：
 - 保持计划简洁明了

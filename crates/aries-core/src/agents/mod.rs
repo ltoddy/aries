@@ -16,7 +16,7 @@ use rig::wasm_compat::WasmCompatSend;
 pub use self::compaction::CompactionAgent;
 pub use self::summary::SummaryAgent;
 pub use self::title::TitleAgent;
-use crate::ext::skill::{SkillFilesLoader, SkillInfo};
+use crate::ext::skill::{SkillDefinition, SkillsLoader};
 use crate::language_server::SharedLspClient;
 use crate::tools;
 
@@ -197,7 +197,7 @@ where
         let model = self.config.model().to_owned();
         let agent_type = self.agent_type;
 
-        let skillloader = SkillFilesLoader::new(&self.cwd);
+        let skillloader = SkillsLoader::new(&self.cwd);
         let available_skills = skillloader.load().await.unwrap_or_default();
 
         let name = agent_type.name();
@@ -222,7 +222,7 @@ where
     fn build_tools(
         &self,
         lsp_client: Option<SharedLspClient>,
-        available_skills: Vec<SkillInfo>,
+        available_skills: Vec<SkillDefinition>,
     ) -> Vec<Box<dyn ToolDyn>> {
         let agent_type = self.agent_type;
         let config = self.config.clone();

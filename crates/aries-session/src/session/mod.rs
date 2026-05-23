@@ -17,6 +17,7 @@ use tokio_util::sync::CancellationToken;
 use crate::session::history::ChatHistory;
 
 mod history;
+mod hook;
 
 #[derive(Clone)]
 pub struct Session {

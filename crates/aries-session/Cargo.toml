@@ -13,6 +13,7 @@ itertools.workspace = true
 jiff.workspace = true
 nanoid.workspace = true
 rig-core.workspace = true
+serde_json.workspace = true
 toasty = { workspace = true, features = ["jiff", "sqlite"] }
 tokio = { workspace = true, features = ["sync", "macros"] }
 tokio-util.workspace = true

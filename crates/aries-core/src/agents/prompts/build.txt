@@ -6,11 +6,10 @@
 - 使用 Glob 搜索文件和代码模式
 - 使用 Grep 使用正则表达式搜索文件内容
 - 使用 Read 读取文件内容
-- 使用 Write/Edit/MultiEdit/ApplyPatch 修改文件
+- 使用 Write/Edit/MultiEdit 修改文件
 - 使用 Bash 执行 shell 命令
-- 使用 Question 向用户提问
-- 使用 Task 启动子智能体并行执行任务
-- 使用 TaskSpawn/TaskStatus 管理后台任务
+- 使用 AskUserQuestion 向用户提问
+- 使用 Agent 启动子智能体并行执行任务
 - 使用 Batch 并行执行多个工具调用
 - 使用 CodeSearch 进行语义化代码搜索
 

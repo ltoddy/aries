@@ -17,7 +17,7 @@ pub async fn calc(root: impl AsRef<Path>) -> io::Result<File> {
     let _ = Repository::discover(root)
         .map_err(|err| io::Error::new(io::ErrorKind::Unsupported, err))?;
 
-    let entries = walk_dir(root, true, false)?;
+    let entries = walk_dir(root, true, true)?;
     let file_paths = entries.into_iter().filter(|e| e.is_file()).collect::<Vec<_>>();
 
     let file_metas = file_paths
@@ -235,24 +235,6 @@ lazy_static! {
             };
         }
 
-        language!("ABAP", vec!["abap"], vec!["*", "\\\""]);
-        language!("ABNF", vec!["abnf"], vec![";"]);
-        language!("ActionScript", vec!["as"], vec!["//"], vec![("/*", "*/")]);
-        language!("Ada", vec!["ada", "adb", "ads", "pad"], vec!["--"]);
-        language!("Agda", vec!["agda"], vec!["--"], vec![("{-", "-}")]);
-        language!("Alloy", vec!["als"], vec!["--", "//"], vec![("/*", "*/")]);
-        language!("Arduino C++", vec!["ino"], vec!["//"], vec![("/*", "*/")]);
-        language!("Assembly", vec!["asm"], vec![";"]);
-        language!("GNU Style Assembly", vec!["s"], vec!["//"], vec![("/*", "*/")]);
-        language!("ASP", vec!["asa", "asp"], vec!["'", "REM"]);
-        language!(
-            "ASP.NET",
-            vec!["asax", "ascx", "asmx", "aspx", "master", "sitemap", "webinfo"],
-            vec![],
-            vec![("<!--", "-->"), ("<%--", "-->")]
-        );
-        language!("Autoconf", vec!["in"], vec!["#", "dnl"]);
-        language!("Automake", vec!["am"], vec!["#"]);
         language!("Bash", vec!["bash"], vec!["#"]);
         language!("Batch", vec!["bat", "btm", "cmd"], vec!["REM", "::"]);
         language!("Cabal", vec!["cabal"], vec!["--"], vec![("{-", "-}")]);
@@ -260,12 +242,6 @@ lazy_static! {
         language!("Ceylon", vec!["ceylon"], vec!["//"], vec![("/*", "*/")]);
         language!("C Header", vec!["h"], vec!["//"], vec![("/*", "*/")]);
         language!("Clojure", vec!["clj"], vec![";"]);
-        language!("ClojureScript", vec!["cljs"], vec![";"]);
-        language!("ClojureC", vec!["cljc"], vec![";"]);
-        language!("CMake", vec!["cmake"], vec!["#"]);
-        language!("Cobol", vec!["cob", "cbl", "ccp", "cobol", "cpy"], vec!["*"]);
-        language!("CoffeeScript", vec!["coffee", "cjsx"], vec!["#"], vec![("###", "###")]);
-        language!("Coq", vec!["v"], vec![], vec![("(*", "*)")]);
         language!(
             "C++",
             vec!["cc", "cpp", "cxx", "c++", "pcc", "tpp"],
@@ -288,11 +264,6 @@ lazy_static! {
         language!("Elixir", vec!["ex", "exs"], vec!["#"]);
         language!("Elm", vec!["elm"], vec!["--"], vec![("{-", "-}")]);
         language!("Erlang", vec!["erl", "hrl"], vec!["%"]);
-        language!(
-            "Fortran",
-            vec!["F", "f90", "f95", "f03", "f08", "f15", "f77", "f", "for", "ftn", "fpp"],
-            vec!["!"]
-        );
         language!("FreeMarker", vec!["ftl", "ftlh", "ftlx"], vec![], vec![("<#--", "-->")]);
         language!("F#", vec!["fs", "fsi", "fsx", "fsscript"], vec!["//"], vec![("(*", "*)")]);
         language!("Go", vec!["go"], vec!["//"], vec![("/*", "*/"), ("/**", "*/")]);
@@ -302,12 +273,10 @@ lazy_static! {
         language!("Gradle", vec!["gradle"], vec!["//"], vec![("/*", "*/"), ("/**", "*/")]);
         language!("Haskell", vec!["hs"], vec!["--"], vec![("{-", "-}")]);
         language!("Haxe", vec!["hx"], vec!["//"], vec![("/*", "*/")]);
-        language!("Html", vec!["html", "xhtml", "hml"], vec![], vec![("<!--", "-->")]);
         language!("Idris", vec!["idr", "lidr"], vec!["--"], vec![("{-", "-}")]);
         language!("Ini", vec!["ini"], vec![";", "#"]);
         language!("Java", vec!["java"], vec!["//"], vec![("/*", "*/")]);
         language!("JavaScript", vec!["js", "mjs"], vec!["//"], vec![("/*", "*/")]);
-        language!("JSON", vec!["json"]);
         language!("JSX", vec!["jsx"], vec!["//"], vec![("/*", "*/")]);
         language!("Julia", vec!["jl"], vec!["#"], vec![("#=", "=#")]);
         language!("Jupyter Notebooks", vec!["ipynb"]);
@@ -320,29 +289,14 @@ lazy_static! {
         language!("Mint", vec!["mint"]);
         language!("Nim", vec!["nim"], vec!["#"]);
         language!("Nix", vec!["nix"], vec![], vec![("/*", "*/")]);
-        language!("Objective-C", vec!["m"], vec!["//"], vec![("/*", "*/")]);
-        language!("Objective-C++", vec!["mm"], vec!["//"], vec![("/*", "*/")]);
         language!("OCaml", vec!["ml", "mli", "re", "rei"], vec![], vec![("/*", "*/")]);
         language!("Org", vec!["org"], vec!["#"]);
         language!("Pascal", vec!["pas", "pp"], vec!["//"], vec![("{", "}"), ("(*", "*)")]);
         language!("Perl", vec!["pl", "pm"], vec!["#"], vec![("=pod", "=cut")]);
         language!("Pest", vec!["pest"], vec!["//"]);
-        language!("Plain Text", vec!["text", "txt"]);
-        language!(
-            "Php",
-            vec!["php4", "php5", "php", "phtml"],
-            vec!["#", "//"],
-            vec![("/*", "*/"), ("/**", "*/")]
-        );
         language!("PostCSS", vec!["pcss", "sss"], vec!["//"], vec![("/*", "*/")]);
         language!("Prolog", vec!["p", "pro"], vec!["%"]);
         language!("Protocol Buffer", vec!["proto"], vec!["//"]);
-        language!(
-            "PowerShell",
-            vec!["ps1", "psm1", "psd1", "ps1xml", "cdxml", "pssc", "psc1"],
-            vec!["#"],
-            vec![("<#", "#>")]
-        );
         language!("PureScript", vec!["purs"], vec!["--"], vec![("{-", "-}")]);
         language!("Python", vec!["py"], vec!["#"], vec![("'''", "'''"), (r#"""#, r#"""#)]);
         language!("QCL", vec!["qcl"], vec!["//"], vec![("/*", "*/")]);
@@ -353,39 +307,16 @@ lazy_static! {
         language!("Rust", vec!["rs"], vec!["//", "///", "///!"], vec![("/*", "*/")]);
         language!("Ruby", vec!["rb"], vec!["#"], vec![("=begin", "=end")]);
         language!("Ruby HTML", vec!["erb", "rhtml"], vec![], vec![("<!--", "-->")]);
-        language!("ReStructuredText", vec!["rst"]);
         language!("Sass", vec!["sass", "scss"], vec!["//"], vec![("/*", "*/")]);
         language!("Scala", vec!["scala", "sc"], vec!["//"], vec![("/*", "*/")]);
         language!("Scheme", vec!["scm", "ss"], vec![";"], vec![("#|", "|#")]);
-        language!("Shell", vec!["sh"], vec!["#"]);
-        language!("Solidity", vec!["sol"], vec!["//"], vec![("/*", "*/")]);
-        language!("SQL", vec!["sql"], vec!["#", "--"], vec![("/*", "*/")]);
-        language!("Stylus", vec!["styl"], vec!["//"], vec![("/*", "*/")]);
-        language!("SVG", vec!["svg"], vec![], vec![("<!--", "-->")]);
         language!("Swift", vec!["swift"], vec!["//"], vec![("/*", "*/")]);
-        language!("TCL", vec!["tcl"], vec!["#"]);
-        language!("Terraform", vec!["tf", "tfvars"], vec!["#", "//"], vec![("/*", "*/")]);
-        language!("TeX", vec!["tex", "sty"], vec!["%"]);
         language!("Thrift", vec!["thrift"], vec!["#", "//"], vec![("/*", "*/")]);
-        language!("Toml", vec!["toml"], vec!["#"]);
         language!("TSX", vec!["tsx"], vec!["//"], vec![("/*", "*/")]);
         language!("TypeScript", vec!["ts"], vec!["//"], vec![("/*", "*/")]);
-        language!("VBScript", vec!["vbs"], vec!["'", "REM"]);
-        language!("Visual Basic", vec!["vb"], vec!["'"]);
-        language!("Visual Studio Solution", vec!["sln"]);
-        language!(
-            "Visual Studio Project",
-            vec!["vcproj", "vcxproj"],
-            vec![],
-            vec![("<!--", "-->")]
-        );
-        language!("Vim script", vec!["vim"], vec!["\\\""], vec![("\\\"", "\\\""), ("'", "'")]);
         language!("Vue", vec!["vue"], vec!["//"], vec![("<!--", "-->"), ("/*", "*/")]);
         language!("WebAssembly", vec!["wat", "wast"], vec![";;"]);
-        language!("XML", vec!["xml"], vec![], vec![("<!--", "-->"), ("<![CDATA[", "]]>")]);
-        language!("Yaml", vec!["yml", "yaml"], vec!["#"]);
         language!("Zig", vec!["zig"], vec!["//"]);
-        language!("Zsh", vec!["zsh"], vec!["#"]);
 
         Manager { languages, ext_to_language }
     };

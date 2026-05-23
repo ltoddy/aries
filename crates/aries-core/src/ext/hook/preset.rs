@@ -1,49 +1,11 @@
-/// see more: https://code.claude.com/docs/en/hooks-guide
 use std::collections::HashMap;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use futures::stream::{self, StreamExt};
+use regex_lite::Regex;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::info;
-
-use crate::fs::walk_dirs;
-
-pub struct HooksFileLoader {
-    roots: Vec<PathBuf>,
-}
-
-impl HooksFileLoader {
-    pub const FILENAME: &str = "hook.json";
-
-    pub fn new(cwd: impl AsRef<Path>) -> Self {
-        let cwd = cwd.as_ref();
-        let home_dir = std::env::home_dir().unwrap_or_else(|| PathBuf::from("~"));
-
-        let roots = vec![cwd.join(".agents").join("hooks"), home_dir.join(".agents").join("hooks")];
-
-        Self { roots }
-    }
-
-    pub async fn load(&mut self) -> io::Result<Vec<HooksPreset>> {
-        let entries = walk_dirs(&self.roots, true, false)?;
-
-        let file_paths = entries
-            .iter()
-            .filter(|entry| entry.is_file() && entry.ends_with(".json"))
-            .collect::<Vec<_>>();
-
-        let presets = stream::iter(file_paths)
-            .filter_map(|file_path| async move { HooksPreset::parse(file_path).await.ok() })
-            .collect()
-            .await;
-
-        Ok(presets)
-    }
-}
-
-pub struct HooksExecutor {}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct HooksPreset {
@@ -191,13 +153,25 @@ pub enum HookEvent {
     SessionEnd,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ShellType {
+    #[default]
     Bash,
     Powershell,
     Sh,
     Zsh,
+}
+
+impl ShellType {
+    pub fn invocation(&self) -> (&'static str, &'static str) {
+        match self {
+            ShellType::Bash => ("bash", "-c"),
+            ShellType::Sh => ("sh", "-c"),
+            ShellType::Zsh => ("zsh", "-c"),
+            ShellType::Powershell => ("powershell", "-Command"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -321,4 +295,36 @@ pub struct HookMatcher {
 
     /// 匹配命中时执行的 hooks
     pub hooks: Vec<HookCommand>,
+}
+
+#[derive(Debug, Error)]
+pub enum HookMatcherError {
+    #[error("Invalid hook matcher regex {pattern:?}: {source}")]
+    InvalidRegex {
+        pattern: String,
+        #[source]
+        source: regex_lite::Error,
+    },
+}
+
+impl HookMatcher {
+    pub fn matches(&self, tool_name: &str) -> Result<bool, HookMatcherError> {
+        let pattern = match self.matcher.as_deref() {
+            None => return Ok(true),
+            Some(p) => p.trim(),
+        };
+
+        if pattern.is_empty() || pattern == "*" {
+            return Ok(true);
+        }
+
+        // 完整匹配：用 `\A(?:...)\z` 显式锚定，避免 pattern 内部的 `|`
+        // 改变锚点优先级（例如 "Edit|Write" 应等价于 "\A(?:Edit|Write)\z"）。
+        let anchored = format!(r"\A(?:{})\z", pattern);
+        let re = Regex::new(&anchored).map_err(|err| HookMatcherError::InvalidRegex {
+            pattern: pattern.to_string(),
+            source: err,
+        })?;
+        Ok(re.is_match(tool_name))
+    }
 }

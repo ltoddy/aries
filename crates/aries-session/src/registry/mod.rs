@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use anyhow::Context;
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
-use aries_core::ext::hook::{HooksFileLoader, HooksPreset};
+use aries_core::ext::hook::{HooksLoader, HooksPreset};
 
 use crate::Session;
 use crate::persistence::SessionRepository;
@@ -29,7 +29,7 @@ impl SessionRegistry {
 
         let session_repo = SessionRepository::new(db.clone());
 
-        let mut hooks_loader = HooksFileLoader::new(&gctx.current_dir);
+        let mut hooks_loader = HooksLoader::new(&gctx.current_dir);
         let hooks = hooks_loader.load().await.unwrap_or_default();
 
         Ok(Self { gctx, config, active_sessions: Default::default(), session_repo, hooks })
