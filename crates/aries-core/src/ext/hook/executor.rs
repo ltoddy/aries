@@ -12,7 +12,7 @@ use tokio::time::error::Elapsed;
 use tracing::warn;
 
 use crate::ext::hook::HooksPreset;
-use crate::ext::hook::input::PostToolUseHookInput;
+use crate::ext::hook::input::{PostToolUseHookInput, PreToolUseHookInput};
 use crate::ext::hook::preset::{BashCommandHook, HookCommand, HookEvent, HookMatcher};
 
 const DEFAULT_HOOK_TIMEOUT_SECS: f64 = 60.0;
@@ -45,7 +45,64 @@ impl HooksExecutor {
         Self { hooks }
     }
 
-    pub async fn fire_pre_tool_use(&self, _tool_name: &str, _payload: &str) -> HookDecision {
+    pub async fn fire_pre_tool_use<ToolInput>(
+        &self,
+        input: &PreToolUseHookInput<ToolInput>,
+    ) -> HookDecision
+    where
+        ToolInput: Serialize + Clone + Debug,
+    {
+        let payload = match serde_json::to_string(input) {
+            Ok(s) => s,
+            Err(err) => {
+                warn!("failed to serialize PreToolUseHookInput: {err}");
+                return HookDecision::Continue;
+            },
+        };
+
+        let tool_name = input.tool_name.as_str();
+        let Some(matchers) = self.hooks.get(&HookEvent::PreToolUse) else {
+            return HookDecision::Continue;
+        };
+
+        for matcher in matchers {
+            match matcher.matches(tool_name) {
+                Ok(true) => {},
+                Ok(false) => continue,
+                Err(err) => {
+                    warn!("invalid hook matcher, skipped: {err}");
+                    continue;
+                },
+            }
+
+            for hook in &matcher.hooks {
+                match hook {
+                    HookCommand::Command(bash) => {
+                        match execute_bash_command_hook(bash, &payload).await {
+                            Ok(outcome) if outcome.blocked => {
+                                let reason = if outcome.stderr.trim().is_empty() {
+                                    format!(
+                                        "PreToolUse hook blocked tool {:?} (exit code 2)",
+                                        tool_name
+                                    )
+                                } else {
+                                    outcome.stderr.trim().to_string()
+                                };
+                                return HookDecision::Terminate { reason };
+                            },
+                            Ok(_) => {},
+                            Err(err) => {
+                                warn!("bash hook execution failed for tool {:?}: {err}", tool_name);
+                            },
+                        }
+                    },
+                    HookCommand::Prompt(_) => {},
+                    HookCommand::Agent(_) => {},
+                    HookCommand::Http(_) => {},
+                }
+            }
+        }
+
         HookDecision::Continue
     }
 
