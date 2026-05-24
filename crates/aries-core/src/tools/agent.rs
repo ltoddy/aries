@@ -121,7 +121,7 @@ where
             _ => AgentType::General,
         };
 
-        let mut agent = AgentBuilder::new(
+        let mut agent = AgentBuilder::<C, ()>::new(
             self.client.clone(),
             self.config.clone(),
             agent_type,

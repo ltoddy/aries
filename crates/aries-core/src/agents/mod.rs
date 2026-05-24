@@ -2,6 +2,7 @@ pub mod compaction;
 pub mod summary;
 pub mod title;
 
+use std::marker::PhantomData;
 use std::path::PathBuf;
 
 use aries_config::AriesConfig;
@@ -83,21 +84,23 @@ impl AgentType {
 pub const AGENT_LOOP_MAX_TURNS: usize = 200;
 
 #[derive(Clone)]
-pub struct AriesAgent<M>
+pub struct AriesAgent<M, P = ()>
 where
     M: completion::CompletionModel,
+    P: PromptHook<M>,
 {
-    inner: Agent<M>,
+    inner: Agent<M, P>,
 
     preamble: String,
     name: String,
 }
 
-impl<M> AriesAgent<M>
+impl<M, P> AriesAgent<M, P>
 where
     M: completion::CompletionModel,
+    P: PromptHook<M>,
 {
-    pub fn new(inner: Agent<M>, name: impl Into<String>, preamble: impl Into<String>) -> Self {
+    pub fn new(inner: Agent<M, P>, name: impl Into<String>, preamble: impl Into<String>) -> Self {
         let name = name.into();
         let preamble = preamble.into();
 
@@ -151,24 +154,26 @@ where
     }
 }
 
-pub struct AgentBuilder<C>
+pub struct AgentBuilder<C, P = ()>
 where
     C: CompletionClient,
     C::CompletionModel: completion::CompletionModel,
 {
-    pub(crate) client: C,
-    pub(crate) config: AriesConfig,
-    pub(crate) agent_type: AgentType,
-    pub(crate) cwd: PathBuf,
+    client: C,
+    config: AriesConfig,
+    agent_type: AgentType,
+    cwd: PathBuf,
+    _phantom: PhantomData<P>,
 }
 
-impl<C> AgentBuilder<C>
+impl<C, P> AgentBuilder<C, P>
 where
     C: CompletionClient + Clone + Send + Sync + 'static,
     C::CompletionModel: completion::CompletionModel + 'static,
+    P: PromptHook<C::CompletionModel>,
 {
     pub fn new(client: C, config: AriesConfig, agent_type: AgentType, cwd: PathBuf) -> Self {
-        Self { client, config, agent_type, cwd }
+        Self { client, config, agent_type, cwd, _phantom: Default::default() }
     }
 
     pub fn build(self) -> AriesAgent<C::CompletionModel> {

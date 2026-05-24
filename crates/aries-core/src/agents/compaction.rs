@@ -19,7 +19,7 @@ pub struct CompactionAgent<M>
 where
     M: completion::CompletionModel,
 {
-    inner: AriesAgent<M>,
+    inner: AriesAgent<M, ()>,
     transcript_dir: PathBuf,
 }
 

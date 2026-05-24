@@ -1,3 +1,6 @@
+mod history;
+mod hook;
+
 use std::future::Future;
 use std::path::{Path, PathBuf};
 
@@ -15,9 +18,6 @@ use tokio::fs::create_dir_all;
 use tokio_util::sync::CancellationToken;
 
 use crate::session::history::ChatHistory;
-
-mod history;
-mod hook;
 
 #[derive(Clone)]
 pub struct Session {
@@ -331,7 +331,7 @@ impl Session {
                     .build()
                     .with_context(|| "Failed to create llm client")?;
 
-                let agent = AgentBuilder::new(
+                let agent = AgentBuilder::<openai::CompletionsClient, ()>::new(
                     client.clone(),
                     config.clone(),
                     agent_type,
@@ -350,7 +350,7 @@ impl Session {
                     .build()
                     .with_context(|| "Failed to create llm client")?;
 
-                let agent = AgentBuilder::new(
+                let agent = AgentBuilder::<azure::Client, ()>::new(
                     client.clone(),
                     config.clone(),
                     agent_type,
@@ -367,7 +367,7 @@ impl Session {
                     .build()
                     .with_context(|| "Failed to create llm client")?;
 
-                let agent = AgentBuilder::new(
+                let agent = AgentBuilder::<deepseek::Client, ()>::new(
                     client.clone(),
                     config.clone(),
                     agent_type,
