@@ -34,6 +34,6 @@ where
     }
 
     pub async fn generate(&mut self, input: &str, history: &[Message]) -> anyhow::Result<String> {
-        self.inner.complete(input, history).await
+        self.inner.completion(input, history).await
     }
 }

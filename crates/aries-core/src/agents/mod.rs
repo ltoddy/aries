@@ -1,92 +1,27 @@
+pub mod agent_type;
+pub mod builder;
 pub mod compaction;
 pub mod summary;
 pub mod title;
 
-use std::marker::PhantomData;
-use std::path::PathBuf;
-
-use aries_config::AriesConfig;
 use futures::StreamExt;
 use rig::agent::{Agent, FinalResponse, MultiTurnStreamItem, PromptHook, StreamingResult};
-use rig::client::CompletionClient;
-use rig::completion::{self, Message};
+use rig::completion::{CompletionModel, Message};
 use rig::streaming::StreamingPrompt;
-use rig::tool::ToolDyn;
 use rig::wasm_compat::WasmCompatSend;
 
+pub use self::agent_type::AgentType;
+pub use self::builder::AgentBuilder;
 pub use self::compaction::CompactionAgent;
 pub use self::summary::SummaryAgent;
 pub use self::title::TitleAgent;
-use crate::ext::skill::{SkillDefinition, SkillsLoader};
-use crate::language_server::SharedLspClient;
-use crate::tools;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AgentType {
-    Build,
-    Plan,
-    General,
-    Explore,
-}
-
-impl AgentType {
-    pub fn from_id(id: &str) -> Self {
-        match id {
-            "build" => Self::Build,
-            "plan" => Self::Plan,
-            "general" => Self::General,
-            "explore" => Self::Explore,
-            _ => Self::Build,
-        }
-    }
-
-    pub const fn bare_preamble(self) -> &'static str {
-        match self {
-            Self::Build => include_str!("prompts/build.txt"),
-            Self::Plan => include_str!("prompts/plan.txt"),
-            Self::General => include_str!("prompts/generate.txt"),
-            Self::Explore => include_str!("prompts/explore.txt"),
-        }
-    }
-
-    pub const fn id(self) -> &'static str {
-        match self {
-            Self::Build => "build",
-            Self::Plan => "plan",
-            Self::General => "general",
-            Self::Explore => "explore",
-        }
-    }
-
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::Build => "Builder",
-            Self::Plan => "Planner",
-            Self::General => "Assistant",
-            Self::Explore => "Explorer",
-        }
-    }
-
-    pub const fn description(self) -> &'static str {
-        match self {
-            Self::Build => "默认主智能体。直接使用工具执行任务，并在需要时委托子智能体。",
-            Self::Plan => "计划模式。不允许使用所有编辑工具。",
-            Self::General => {
-                "用于研究复杂问题和执行多步任务的通用智能体。使用此智能体并行执行多个工作单元。"
-            },
-            Self::Explore => {
-                "专门用于探索代码库的快速智能体。当您需要通过模式快速查找文件、搜索关键字或回答有关代码库的问题时使用。"
-            },
-        }
-    }
-}
 
 pub const AGENT_LOOP_MAX_TURNS: usize = 200;
 
 #[derive(Clone)]
 pub struct AriesAgent<M, P = ()>
 where
-    M: completion::CompletionModel,
+    M: CompletionModel,
     P: PromptHook<M>,
 {
     inner: Agent<M, P>,
@@ -97,7 +32,7 @@ where
 
 impl<M, P> AriesAgent<M, P>
 where
-    M: completion::CompletionModel,
+    M: CompletionModel,
     P: PromptHook<M>,
 {
     pub fn new(inner: Agent<M, P>, name: impl Into<String>, preamble: impl Into<String>) -> Self {
@@ -110,7 +45,7 @@ where
 
 impl<M> AriesAgent<M>
 where
-    M: completion::CompletionModel + 'static,
+    M: CompletionModel + 'static,
 {
     pub async fn stream_prompt<P>(
         &mut self,
@@ -124,7 +59,7 @@ where
         self.inner.stream_prompt(prompt).with_history(history).with_hook(hook).await
     }
 
-    pub async fn complete(
+    pub async fn completion(
         &mut self,
         prompt: impl Into<Message> + WasmCompatSend,
         history: &[Message],
@@ -144,129 +79,11 @@ where
         Ok(final_res.response().to_owned())
     }
 
-    #[inline]
     pub fn system_prompt(&self) -> &str {
         &self.preamble
     }
 
     pub fn name(&self) -> &str {
         &self.name
-    }
-}
-
-pub struct AgentBuilder<C, P = ()>
-where
-    C: CompletionClient,
-    C::CompletionModel: completion::CompletionModel,
-{
-    client: C,
-    config: AriesConfig,
-    agent_type: AgentType,
-    cwd: PathBuf,
-    _phantom: PhantomData<P>,
-}
-
-impl<C, P> AgentBuilder<C, P>
-where
-    C: CompletionClient + Clone + Send + Sync + 'static,
-    C::CompletionModel: completion::CompletionModel + 'static,
-    P: PromptHook<C::CompletionModel>,
-{
-    pub fn new(client: C, config: AriesConfig, agent_type: AgentType, cwd: PathBuf) -> Self {
-        Self { client, config, agent_type, cwd, _phantom: Default::default() }
-    }
-
-    pub fn build(self) -> AriesAgent<C::CompletionModel> {
-        let model = self.config.model().to_owned();
-        let agent_type = self.agent_type;
-
-        let name = agent_type.name();
-        let preamble = agent_type.bare_preamble().to_owned();
-
-        let inner = self
-            .client
-            .agent(model)
-            .name(name)
-            .description(agent_type.description())
-            .preamble(&preamble)
-            .default_max_turns(AGENT_LOOP_MAX_TURNS)
-            .build();
-
-        AriesAgent::new(inner, name, preamble)
-    }
-
-    pub async fn with_tools(
-        self,
-        lsp_client: Option<SharedLspClient>,
-    ) -> AriesAgent<C::CompletionModel> {
-        let model = self.config.model().to_owned();
-        let agent_type = self.agent_type;
-
-        let skillloader = SkillsLoader::new(&self.cwd);
-        let available_skills = skillloader.load().await.unwrap_or_default();
-
-        let name = agent_type.name();
-        let preamble =
-            crate::preamble::render(&self.cwd, agent_type, &model, &available_skills).await;
-
-        let tools = self.build_tools(lsp_client, available_skills);
-
-        let inner = self
-            .client
-            .agent(model)
-            .name(name)
-            .description(agent_type.description())
-            .preamble(&preamble)
-            .tools(tools)
-            .default_max_turns(AGENT_LOOP_MAX_TURNS)
-            .build();
-
-        AriesAgent::new(inner, name, preamble)
-    }
-
-    fn build_tools(
-        &self,
-        lsp_client: Option<SharedLspClient>,
-        available_skills: Vec<SkillDefinition>,
-    ) -> Vec<Box<dyn ToolDyn>> {
-        let agent_type = self.agent_type;
-        let config = self.config.clone();
-        let client = self.client.clone();
-
-        let mut tools: Vec<Box<dyn ToolDyn>> = vec![
-            Box::new(tools::bash::BashTool),
-            Box::new(tools::read::ReadTool),
-            Box::new(tools::glob::GlobTool::new(self.cwd.clone())),
-            Box::new(tools::grep::GrepTool::new(self.cwd.clone())),
-            Box::new(tools::ls::LsTool::new(self.cwd.clone())),
-            Box::new(tools::codesearch::CodeSearchTool),
-        ];
-
-        if matches!(agent_type, AgentType::Build | AgentType::General) {
-            tools.push(Box::new(tools::write::WriteTool));
-            tools.push(Box::new(tools::multiedit::MultiEditTool));
-            tools.push(Box::new(tools::edit::EditTool));
-            tools.push(Box::new(tools::batch::BatchTool::new(self.cwd.clone())));
-            tools.push(Box::new(tools::agent::AgentTool::<C>::new(
-                client.clone(),
-                config.clone(),
-                self.cwd.clone(),
-            )));
-        }
-
-        if matches!(agent_type, AgentType::Build | AgentType::General | AgentType::Plan) {
-            tools.push(Box::new(tools::question::AskUserQuestionTool));
-        }
-
-        if matches!(agent_type, AgentType::Build | AgentType::General) {
-            if !available_skills.is_empty() {
-                tools.push(Box::new(tools::skill::SkillTool::new(available_skills)));
-            }
-            if let Some(lsp_client) = lsp_client {
-                tools.push(Box::new(tools::lsp::LspTool::new(lsp_client, self.cwd.clone())));
-            }
-        }
-
-        tools
     }
 }

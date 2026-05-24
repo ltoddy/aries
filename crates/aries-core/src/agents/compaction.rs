@@ -51,7 +51,7 @@ where
 
         let file_path = self.save_transcript(messages).await.ok()?;
         let compacted = compress(messages);
-        let summary = self.inner.complete(&compacted, &[]).await.ok()?;
+        let summary = self.inner.completion(&compacted, &[]).await.ok()?;
         if summary.is_empty() {
             return None;
         }

@@ -34,6 +34,6 @@ where
     }
 
     pub async fn summarize(&mut self, history: &[Message]) -> anyhow::Result<String> {
-        self.inner.complete("请总结这次对话。", history).await
+        self.inner.completion("请总结这次对话。", history).await
     }
 }

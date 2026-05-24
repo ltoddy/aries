@@ -336,6 +336,7 @@ impl Session {
                     config.clone(),
                     agent_type,
                     cwd.to_path_buf(),
+                    (),
                 )
                 .with_tools(lsp_client)
                 .await;
@@ -355,6 +356,7 @@ impl Session {
                     config.clone(),
                     agent_type,
                     cwd.to_path_buf(),
+                    (),
                 )
                 .with_tools(lsp_client)
                 .await;
@@ -372,6 +374,7 @@ impl Session {
                     config.clone(),
                     agent_type,
                     cwd.to_path_buf(),
+                    (),
                 )
                 .with_tools(lsp_client)
                 .await;
