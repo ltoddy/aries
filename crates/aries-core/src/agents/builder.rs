@@ -3,10 +3,8 @@ use std::path::PathBuf;
 use rig_core::client::CompletionClient;
 use rig_core::completion;
 use rig_core::tool::ToolDyn;
-use tokio::sync::mpsc::UnboundedReceiver;
 
-use crate::agents::{AGENT_LOOP_MAX_TURNS, AgentType, AriesAgent};
-use crate::event::AgentEvent;
+use crate::agents::{AGENT_LOOP_MAX_TURNS, AgentType, AriesAgent, Receiver};
 use crate::ext::skill::{SkillDefinition, SkillsLoader};
 use crate::language_server::SharedLspClient;
 use crate::tools;
@@ -54,7 +52,7 @@ where
     pub async fn with_tools(
         self,
         lsp_client: Option<SharedLspClient>,
-    ) -> AriesAgent<C::CompletionModel> {
+    ) -> (AriesAgent<C::CompletionModel>, Receiver<C>) {
         let agent_type = self.agent_type;
 
         let skillloader = SkillsLoader::new(&self.cwd);
@@ -76,21 +74,14 @@ where
             .default_max_turns(AGENT_LOOP_MAX_TURNS)
             .build();
 
-        AriesAgent::new(inner, name, preamble)
+        (AriesAgent::new(inner, name, preamble), receiver)
     }
 
     fn build_tools(
         &self,
         lsp_client: Option<SharedLspClient>,
         available_skills: Vec<SkillDefinition>,
-    ) -> (
-        Vec<Box<dyn ToolDyn>>,
-        UnboundedReceiver<
-            AgentEvent<
-                <<C as CompletionClient>::CompletionModel as completion::CompletionModel>::StreamingResponse,
-            >,
-        >,
-    ){
+    ) -> (Vec<Box<dyn ToolDyn>>, Receiver<C>) {
         let agent_type = self.agent_type;
         let client = self.client.clone();
         let cwd = self.cwd.clone();

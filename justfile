@@ -14,7 +14,7 @@ clippy:
     @cargo clippy
 
 fmt:
-    @cargo +nightly fmt
+    @cargo +nightly fmt --all
 
 fmt-check:
     @cargo +nightly fmt -- --check

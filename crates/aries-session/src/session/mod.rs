@@ -319,7 +319,7 @@ impl Session {
 
         let agents = match client {
             AriesClient::OpenAI(client) => {
-                let agent = AgentBuilder::<openai::CompletionsClient>::new(
+                let (agent, receiver) = AgentBuilder::<openai::CompletionsClient>::new(
                     client.clone(),
                     &model,
                     agent_type,
@@ -331,7 +331,7 @@ impl Session {
                 ProviderAgents::OpenAICompatible { agent, compaction_agent }
             },
             AriesClient::Azure(client) => {
-                let agent =
+                let (agent, receiver) =
                     AgentBuilder::<azure::Client>::new(client.clone(), &model, agent_type, cwd)
                         .with_tools(lsp_client)
                         .await;
@@ -339,7 +339,7 @@ impl Session {
                 ProviderAgents::Azure { agent, compaction_agent }
             },
             AriesClient::DeepSeek(client) => {
-                let agent =
+                let (agent, receiver) =
                     AgentBuilder::<deepseek::Client>::new(client.clone(), &model, agent_type, cwd)
                         .with_tools(lsp_client)
                         .await;
