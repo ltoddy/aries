@@ -4,7 +4,7 @@ use anyhow::Result;
 use futures::StreamExt;
 use rig_core::agent::MultiTurnStreamItem;
 use rig_core::client::CompletionClient;
-use rig_core::completion::{CompletionModel, ToolDefinition};
+use rig_core::completion::ToolDefinition;
 use rig_core::tool::Tool;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::UnboundedSender;
@@ -58,11 +58,7 @@ where
     client: C,
     model: String,
     cwd: PathBuf,
-    sender: UnboundedSender<
-        AgentEvent<
-            <<C as CompletionClient>::CompletionModel as CompletionModel>::StreamingResponse,
-        >,
-    >,
+    sender: UnboundedSender<AgentEvent>,
 }
 
 impl<C> AgentTool<C>
@@ -73,11 +69,7 @@ where
         client: C,
         model: impl Into<String>,
         cwd: PathBuf,
-        sender: UnboundedSender<
-            AgentEvent<
-                <<C as CompletionClient>::CompletionModel as CompletionModel>::StreamingResponse,
-            >,
-        >,
+        sender: UnboundedSender<AgentEvent>,
     ) -> Self {
         let model = model.into();
         Self { client, model, cwd, sender }

@@ -7,13 +7,13 @@ use std::path::{Path, PathBuf};
 use anyhow::Context;
 use aries_config::AriesConfig;
 use aries_core::agents::{AgentBuilder, AgentType, AriesAgent, CompactionAgent};
+use aries_core::event::earse;
 use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
 use aries_core::{AriesClient, compact, create_client};
 use futures::{StreamExt, pin_mut};
 use rig_core::agent::{FinalResponse, MultiTurnStreamItem};
 use rig_core::completion::Message;
 use rig_core::providers::{azure, deepseek, openai};
-use rig_core::streaming::StreamedAssistantContent;
 use tokio::fs::create_dir_all;
 use tokio_util::sync::CancellationToken;
 
@@ -290,9 +290,7 @@ impl Session {
                             if let MultiTurnStreamItem::FinalResponse(response) = &chunk {
                                 final_res = response.clone();
                             }
-                            if let Some(cb) = cb
-                                && let Some(stripped) = erase_provider_type(chunk)
-                            {
+                            if let Some(cb) = cb && let stripped = earse(chunk) {
                                 cb(stripped).await?;
                             }
                         }
@@ -361,46 +359,5 @@ impl Session {
         }
 
         None
-    }
-}
-
-/// 把 `MultiTurnStreamItem<R>` 中 provider 相关的泛型 `R` 擦除为 `()`。
-///
-/// `StreamedAssistantContent::Final(R)` 是 provider 内部的原始流结束负载，
-/// 上层不需要它（真正的最终结果是 `MultiTurnStreamItem::FinalResponse`）。
-/// 遇到 `Final(R)` 时返回 `None`，其余变体安全映射为
-/// `MultiTurnStreamItem<()>`。
-fn erase_provider_type<R>(item: MultiTurnStreamItem<R>) -> Option<MultiTurnStreamItem<()>> {
-    match item {
-        MultiTurnStreamItem::StreamAssistantItem(assistant) => match assistant {
-            StreamedAssistantContent::Final(_) => None,
-            StreamedAssistantContent::Text(t) => {
-                Some(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Text(t)))
-            },
-            StreamedAssistantContent::ToolCall { tool_call, internal_call_id } => {
-                Some(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::ToolCall {
-                    tool_call,
-                    internal_call_id,
-                }))
-            },
-            StreamedAssistantContent::ToolCallDelta { id, internal_call_id, content } => {
-                Some(MultiTurnStreamItem::StreamAssistantItem(
-                    StreamedAssistantContent::ToolCallDelta { id, internal_call_id, content },
-                ))
-            },
-            StreamedAssistantContent::Reasoning(r) => Some(
-                MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Reasoning(r)),
-            ),
-            StreamedAssistantContent::ReasoningDelta { id, reasoning } => {
-                Some(MultiTurnStreamItem::StreamAssistantItem(
-                    StreamedAssistantContent::ReasoningDelta { id, reasoning },
-                ))
-            },
-        },
-        MultiTurnStreamItem::StreamUserItem(user) => {
-            Some(MultiTurnStreamItem::StreamUserItem(user))
-        },
-        MultiTurnStreamItem::FinalResponse(resp) => Some(MultiTurnStreamItem::FinalResponse(resp)),
-        _ => None,
     }
 }

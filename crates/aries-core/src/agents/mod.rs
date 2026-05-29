@@ -6,11 +6,9 @@ pub mod title;
 
 use futures::StreamExt;
 use rig_core::agent::{Agent, FinalResponse, MultiTurnStreamItem, StreamingResult};
-use rig_core::client::CompletionClient;
 use rig_core::completion::{CompletionModel, Message};
 use rig_core::streaming::StreamingPrompt;
 use rig_core::wasm_compat::WasmCompatSend;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 pub use self::agent_type::AgentType;
 pub use self::builder::AgentBuilder;
@@ -19,14 +17,6 @@ pub use self::summary::SummaryAgent;
 pub use self::title::TitleAgent;
 use crate::AriesResult;
 use crate::error::AgentError;
-use crate::event::AgentEvent;
-
-pub type Sender<C> = UnboundedSender<
-    AgentEvent<<<C as CompletionClient>::CompletionModel as CompletionModel>::StreamingResponse>,
->;
-pub type Receiver<C> = UnboundedReceiver<
-    AgentEvent<<<C as CompletionClient>::CompletionModel as CompletionModel>::StreamingResponse>,
->;
 
 pub const AGENT_LOOP_MAX_TURNS: usize = 200;
 
