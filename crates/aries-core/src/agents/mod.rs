@@ -5,37 +5,36 @@ pub mod summary;
 pub mod title;
 
 use futures::StreamExt;
-use rig::agent::{Agent, FinalResponse, MultiTurnStreamItem, PromptHook, StreamingResult};
-use rig::completion::{CompletionModel, Message};
-use rig::streaming::StreamingPrompt;
-use rig::wasm_compat::WasmCompatSend;
+use rig_core::agent::{Agent, FinalResponse, MultiTurnStreamItem, StreamingResult};
+use rig_core::completion::{CompletionModel, Message};
+use rig_core::streaming::StreamingPrompt;
+use rig_core::wasm_compat::WasmCompatSend;
 
 pub use self::agent_type::AgentType;
 pub use self::builder::AgentBuilder;
 pub use self::compaction::CompactionAgent;
 pub use self::summary::SummaryAgent;
 pub use self::title::TitleAgent;
+use crate::error::{AgentError, AgentResult};
 
 pub const AGENT_LOOP_MAX_TURNS: usize = 200;
 
 #[derive(Clone)]
-pub struct AriesAgent<M, P = ()>
+pub struct AriesAgent<M>
 where
     M: CompletionModel,
-    P: PromptHook<M>,
 {
-    inner: Agent<M, P>,
+    inner: Agent<M>,
 
     preamble: String,
     name: String,
 }
 
-impl<M, P> AriesAgent<M, P>
+impl<M> AriesAgent<M>
 where
     M: CompletionModel,
-    P: PromptHook<M>,
 {
-    pub fn new(inner: Agent<M, P>, name: impl Into<String>, preamble: impl Into<String>) -> Self {
+    pub fn new(inner: Agent<M>, name: impl Into<String>, preamble: impl Into<String>) -> Self {
         let name = name.into();
         let preamble = preamble.into();
 
@@ -47,32 +46,33 @@ impl<M> AriesAgent<M>
 where
     M: CompletionModel + 'static,
 {
-    pub async fn stream_prompt<P>(
+    pub async fn stream_prompt(
         &mut self,
         prompt: impl Into<Message> + WasmCompatSend,
         history: &[Message],
-        hook: P,
-    ) -> StreamingResult<<M>::StreamingResponse>
-    where
-        P: PromptHook<M> + 'static,
-    {
-        self.inner.stream_prompt(prompt).with_history(history).with_hook(hook).await
+    ) -> StreamingResult<<M>::StreamingResponse> {
+        self.inner.stream_prompt(prompt).with_history(history).await
     }
 
     pub async fn completion(
         &mut self,
         prompt: impl Into<Message> + WasmCompatSend,
         history: &[Message],
-    ) -> anyhow::Result<String> {
+    ) -> AgentResult<String, AgentError> {
         let stream = self.inner.stream_prompt(prompt).with_history(history).await;
         futures::pin_mut!(stream);
 
         let mut final_res = FinalResponse::empty();
-        while let Some(item) = stream.next().await {
-            let item = item?;
-
-            if let MultiTurnStreamItem::FinalResponse(res) = item {
-                final_res = res;
+        while let Some(chunk) = stream.next().await {
+            match chunk {
+                Ok(item) => {
+                    if let MultiTurnStreamItem::FinalResponse(res) = item {
+                        final_res = res;
+                    }
+                },
+                Err(e) => {
+                    return Err(AgentError::ExecutionError(format!("Mainagent failed: {}", e)));
+                },
             }
         }
 

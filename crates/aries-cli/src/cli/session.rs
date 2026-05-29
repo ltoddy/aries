@@ -1,13 +1,16 @@
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use aries_config::AriesConfigLoader;
 use aries_context::GlobalContext;
-use aries_session::{NoCb, SessionRegistry};
+use aries_session::SessionRegistry;
 use rustyline::error::ReadlineError;
 use terminal_size::{Width, terminal_size};
 
+use crate::display::print_stream_item;
 use crate::theme::Theme;
-use crate::{commands, hook, input, logger, welcome};
+use crate::{commands, input, logger, welcome};
 
 pub async fn run_session(gctx: GlobalContext, session_id: impl Into<String>) -> anyhow::Result<()> {
     let loader = AriesConfigLoader::new(&gctx.config_dir);
@@ -41,8 +44,22 @@ pub async fn run_session(gctx: GlobalContext, session_id: impl Into<String>) -> 
 
                 print!("\n{}: ", theme.magenta_text("Aries"));
                 let start = Instant::now();
-                if let Err(err) =
-                    session.prompt(input, None::<NoCb>, hook::DisplayPromptHook::new(theme)).await
+                let tool_names: Arc<Mutex<HashMap<String, String>>> =
+                    Arc::new(Mutex::new(HashMap::new()));
+                if let Err(err) = session
+                    .prompt(
+                        input,
+                        Some(|item| {
+                            let tool_names = tool_names.clone();
+                            async move {
+                                if let Ok(mut map) = tool_names.lock() {
+                                    print_stream_item(item, theme, &mut map);
+                                }
+                                Ok(())
+                            }
+                        }),
+                    )
+                    .await
                 {
                     eprintln!("\n{}: {}", theme.red_text("Error streaming_chunk"), err);
                     continue;

@@ -1,7 +1,6 @@
 mod cli;
 mod commands;
 mod display;
-mod hook;
 mod input;
 mod logger;
 mod theme;

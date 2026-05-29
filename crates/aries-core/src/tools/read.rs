@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use itertools::Itertools;
-use rig::completion::ToolDefinition;
-use rig::tool::Tool;
+use rig_core::completion::ToolDefinition;
+use rig_core::tool::Tool;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use anyhow::Context;
 use aries_config::AriesConfig;
 use aries_context::GlobalContext;
-use aries_core::ext::hook::{HooksExecutor, HooksLoader, HooksPreset};
+use aries_core::ext::hook::{HooksExecutor, HooksLoader};
 
 use crate::Session;
 use crate::persistence::SessionRepository;

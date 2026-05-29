@@ -10,10 +10,10 @@ use aries_core::agents::{AgentBuilder, AgentType, AriesAgent, CompactionAgent};
 use aries_core::compact;
 use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
 use futures::{StreamExt, pin_mut};
-use rig::agent::{FinalResponse, MultiTurnStreamItem, PromptHook};
-use rig::completion::Message;
-use rig::providers::{azure, deepseek, openai};
-use rig::streaming::StreamedAssistantContent;
+use rig_core::agent::{FinalResponse, MultiTurnStreamItem};
+use rig_core::completion::Message;
+use rig_core::providers::{azure, deepseek, openai};
+use rig_core::streaming::StreamedAssistantContent;
 use tokio::fs::create_dir_all;
 use tokio_util::sync::CancellationToken;
 
@@ -171,19 +171,10 @@ impl Session {
         self.root_dir.clone()
     }
 
-    pub async fn prompt<F, Fut, P>(
-        &mut self,
-        prompt: &str,
-        mut cb: Option<F>,
-        hook: P,
-    ) -> anyhow::Result<()>
+    pub async fn prompt<F, Fut>(&mut self, prompt: &str, mut cb: Option<F>) -> anyhow::Result<()>
     where
         F: FnMut(MultiTurnStreamItem<()>) -> Fut,
         Fut: Future<Output = anyhow::Result<()>>,
-        P: PromptHook<deepseek::CompletionModel>
-            + PromptHook<openai::CompletionModel>
-            + PromptHook<azure::CompletionModel>
-            + 'static,
     {
         self.cancel_token = CancellationToken::new();
         let cancel_token = self.cancel_token.clone();
@@ -193,7 +184,7 @@ impl Session {
                 compact::micro_compact(self.chat_history.history_mut());
 
                 let snapshot = self.chat_history.history().to_vec();
-                let stream = agent.stream_prompt(prompt, &snapshot, hook).await;
+                let stream = agent.stream_prompt(prompt, &snapshot).await;
                 let final_res = Self::consume_stream(stream, &mut cb, cancel_token).await?;
 
                 if final_res.usage().total_tokens > compact::TOKEN_THRESHOLD {
@@ -211,7 +202,7 @@ impl Session {
                 compact::micro_compact(self.chat_history.history_mut());
 
                 let snapshot = self.chat_history.history().to_vec();
-                let stream = agent.stream_prompt(prompt, &snapshot, hook).await;
+                let stream = agent.stream_prompt(prompt, &snapshot).await;
 
                 let final_res = Self::consume_stream(stream, &mut cb, cancel_token).await?;
                 if final_res.usage().total_tokens > compact::TOKEN_THRESHOLD {
@@ -229,7 +220,7 @@ impl Session {
                 compact::micro_compact(self.chat_history.history_mut());
 
                 let snapshot = self.chat_history.history().to_vec();
-                let stream = agent.stream_prompt(prompt, &snapshot, hook).await;
+                let stream = agent.stream_prompt(prompt, &snapshot).await;
 
                 let final_res = Self::consume_stream(stream, &mut cb, cancel_token).await?;
                 if final_res.usage().total_tokens > compact::TOKEN_THRESHOLD {
@@ -276,7 +267,7 @@ impl Session {
     }
 
     async fn consume_stream<F, Fut, R>(
-        stream: rig::agent::StreamingResult<R>,
+        stream: rig_core::agent::StreamingResult<R>,
         cb: &mut Option<F>,
         cancel_token: CancellationToken,
     ) -> anyhow::Result<FinalResponse>
@@ -321,29 +312,30 @@ impl Session {
         transcript_dir: impl AsRef<Path>,
         lsp_client: Option<SharedLspClient>,
     ) -> anyhow::Result<ProviderAgents> {
-        let cwd = cwd.as_ref();
+        let cwd = cwd.as_ref().to_path_buf();
 
         let agents = match config.clone() {
             AriesConfig::OpenAICompatible(ref conf) => {
+                let model = config.model().to_owned();
                 let client = openai::CompletionsClient::builder()
                     .base_url(&conf.base_url)
                     .api_key(&conf.api_key)
                     .build()
                     .with_context(|| "Failed to create llm client")?;
 
-                let agent = AgentBuilder::<openai::CompletionsClient, ()>::new(
+                let agent = AgentBuilder::<openai::CompletionsClient>::new(
                     client.clone(),
-                    config.clone(),
+                    config,
                     agent_type,
-                    cwd.to_path_buf(),
-                    (),
+                    cwd,
                 )
                 .with_tools(lsp_client)
                 .await;
-                let compaction_agent = CompactionAgent::new(client, config.model(), transcript_dir);
+                let compaction_agent = CompactionAgent::new(client, model, transcript_dir);
                 ProviderAgents::OpenAICompatible { agent, compaction_agent }
             },
             AriesConfig::Azure(ref conf) => {
+                let model = config.model().to_owned();
                 let client = azure::Client::builder()
                     .api_key(&conf.api_key)
                     .azure_endpoint(conf.azure_endpoint.to_owned())
@@ -351,34 +343,25 @@ impl Session {
                     .build()
                     .with_context(|| "Failed to create llm client")?;
 
-                let agent = AgentBuilder::<azure::Client, ()>::new(
-                    client.clone(),
-                    config.clone(),
-                    agent_type,
-                    cwd.to_path_buf(),
-                    (),
-                )
-                .with_tools(lsp_client)
-                .await;
-                let compaction_agent = CompactionAgent::new(client, config.model(), transcript_dir);
+                let agent =
+                    AgentBuilder::<azure::Client>::new(client.clone(), config, agent_type, cwd)
+                        .with_tools(lsp_client)
+                        .await;
+                let compaction_agent = CompactionAgent::new(client, model, transcript_dir);
                 ProviderAgents::Azure { agent, compaction_agent }
             },
             AriesConfig::DeepSeek(ref conf) => {
+                let model = config.model().to_owned();
                 let client = deepseek::Client::builder()
                     .api_key(&conf.api_key)
                     .build()
                     .with_context(|| "Failed to create llm client")?;
 
-                let agent = AgentBuilder::<deepseek::Client, ()>::new(
-                    client.clone(),
-                    config.clone(),
-                    agent_type,
-                    cwd.to_path_buf(),
-                    (),
-                )
-                .with_tools(lsp_client)
-                .await;
-                let compaction_agent = CompactionAgent::new(client, config.model(), transcript_dir);
+                let agent =
+                    AgentBuilder::<deepseek::Client>::new(client.clone(), config, agent_type, cwd)
+                        .with_tools(lsp_client)
+                        .await;
+                let compaction_agent = CompactionAgent::new(client, model, transcript_dir);
                 ProviderAgents::DeepSeek { agent, compaction_agent }
             },
         };

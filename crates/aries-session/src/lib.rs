@@ -4,7 +4,7 @@ pub mod session;
 
 use std::future::Ready;
 
-use rig::agent::MultiTurnStreamItem;
+use rig_core::agent::MultiTurnStreamItem;
 
 pub use self::persistence::{connect, migrate};
 pub use self::registry::SessionRegistry;

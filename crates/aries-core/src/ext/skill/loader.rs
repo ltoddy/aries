@@ -20,8 +20,6 @@ impl SkillsLoader {
         let roots =
             vec![cwd.join(".agents").join("skills"), home_dir.join(".agents").join("skills")];
 
-        println!("roots: {:#?}", roots);
-
         Self { roots }
     }
 
@@ -32,8 +30,6 @@ impl SkillsLoader {
             .into_iter()
             .filter(|entry| entry.file_name().eq(&Some(OsStr::new(Self::FILENAME))))
             .collect::<Vec<_>>();
-
-        println!("file_paths is: {:#?}", file_paths);
 
         let skills = stream::iter(file_paths)
             .filter_map(|file_path| async move { SkillDefinition::parse(file_path).await.ok() })

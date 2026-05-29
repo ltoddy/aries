@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use rig::OneOrMany;
-use rig::message::{AssistantContent, Message, ToolResultContent, UserContent};
+use rig_core::OneOrMany;
+use rig_core::message::{AssistantContent, Message, ToolResultContent, UserContent};
 use serde_json::Value;
 
 pub const KEEP_RECENT_TOOLS: usize = 5;

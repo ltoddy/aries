@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use aries_core::ext::hook::input::{PostToolUseHookInput, PreToolUseHookInput};
 use aries_core::ext::hook::{HookDecision, HooksExecutor};
-use rig::agent::{HookAction, PromptHook, ToolCallHookAction};
-use rig::completion::CompletionModel;
+use rig_core::agent::{HookAction, PromptHook, ToolCallHookAction};
+use rig_core::completion::CompletionModel;
 use serde_json::Value;
 
 #[derive(Clone)]

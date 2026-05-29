@@ -1,7 +1,8 @@
-use rig::client::CompletionClient;
-use rig::completion::{self, Message};
+use rig_core::client::CompletionClient;
+use rig_core::completion::{self, Message};
 
 use crate::agents::{AGENT_LOOP_MAX_TURNS, AriesAgent};
+use crate::error::{AgentError, AgentResult};
 
 const PREAMBLE: &str = include_str!("prompts/summary.txt");
 const NAME: &str = "Summarizer";
@@ -33,7 +34,7 @@ where
         Self { inner: AriesAgent::new(agent, NAME, PREAMBLE) }
     }
 
-    pub async fn summarize(&mut self, history: &[Message]) -> anyhow::Result<String> {
+    pub async fn summarize(&mut self, history: &[Message]) -> AgentResult<String, AgentError> {
         self.inner.completion("请总结这次对话。", history).await
     }
 }

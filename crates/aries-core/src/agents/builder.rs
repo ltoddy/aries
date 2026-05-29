@@ -1,17 +1,18 @@
 use std::path::PathBuf;
 
 use aries_config::AriesConfig;
-use rig::agent::PromptHook;
-use rig::client::CompletionClient;
-use rig::completion;
-use rig::tool::ToolDyn;
+use rig_core::client::CompletionClient;
+use rig_core::completion;
+use rig_core::tool::ToolDyn;
+use tokio::sync::mpsc::UnboundedReceiver;
 
 use crate::agents::{AGENT_LOOP_MAX_TURNS, AgentType, AriesAgent};
+use crate::event::AgentEvent;
 use crate::ext::skill::{SkillDefinition, SkillsLoader};
 use crate::language_server::SharedLspClient;
 use crate::tools;
 
-pub struct AgentBuilder<C, P = ()>
+pub struct AgentBuilder<C>
 where
     C: CompletionClient,
     C::CompletionModel: completion::CompletionModel,
@@ -20,26 +21,18 @@ where
     config: AriesConfig,
     agent_type: AgentType,
     cwd: PathBuf,
-    hook: P,
 }
 
-impl<C, P> AgentBuilder<C, P>
+impl<C> AgentBuilder<C>
 where
     C: CompletionClient + Clone + Send + Sync + 'static,
     C::CompletionModel: completion::CompletionModel + 'static,
-    P: PromptHook<C::CompletionModel>,
 {
-    pub fn new(
-        client: C,
-        config: AriesConfig,
-        agent_type: AgentType,
-        cwd: PathBuf,
-        hook: P,
-    ) -> Self {
-        Self { client, config, agent_type, cwd, hook }
+    pub fn new(client: C, config: AriesConfig, agent_type: AgentType, cwd: PathBuf) -> Self {
+        Self { client, config, agent_type, cwd }
     }
 
-    pub fn build(self) -> AriesAgent<C::CompletionModel, P> {
+    pub fn build(self) -> AriesAgent<C::CompletionModel> {
         let model = self.config.model().to_owned();
         let agent_type = self.agent_type;
 
@@ -49,7 +42,6 @@ where
         let inner = self
             .client
             .agent(model)
-            .hook(self.hook)
             .name(name)
             .description(agent_type.description())
             .preamble(&preamble)
@@ -62,7 +54,7 @@ where
     pub async fn with_tools(
         self,
         lsp_client: Option<SharedLspClient>,
-    ) -> AriesAgent<C::CompletionModel, P> {
+    ) -> AriesAgent<C::CompletionModel> {
         let model = self.config.model().to_owned();
         let agent_type = self.agent_type;
 
@@ -73,12 +65,11 @@ where
         let preamble =
             crate::preamble::render(&self.cwd, agent_type, &model, &available_skills).await;
 
-        let tools = self.build_tools(lsp_client, available_skills);
+        let (tools, receiver) = self.build_tools(lsp_client, available_skills);
 
         let inner = self
             .client
             .agent(model)
-            .hook(self.hook)
             .name(name)
             .description(agent_type.description())
             .preamble(&preamble)
@@ -93,10 +84,19 @@ where
         &self,
         lsp_client: Option<SharedLspClient>,
         available_skills: Vec<SkillDefinition>,
-    ) -> Vec<Box<dyn ToolDyn>> {
+    ) -> (
+        Vec<Box<dyn ToolDyn>>,
+        UnboundedReceiver<
+            AgentEvent<
+                <<C as CompletionClient>::CompletionModel as completion::CompletionModel>::StreamingResponse,
+            >,
+        >,
+    ){
         let agent_type = self.agent_type;
         let config = self.config.clone();
         let client = self.client.clone();
+        let cwd = self.cwd.clone();
+        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
 
         let mut tools: Vec<Box<dyn ToolDyn>> = vec![
             Box::new(tools::bash::BashTool),
@@ -112,11 +112,7 @@ where
             tools.push(Box::new(tools::multiedit::MultiEditTool));
             tools.push(Box::new(tools::edit::EditTool));
             tools.push(Box::new(tools::batch::BatchTool::new(self.cwd.clone())));
-            tools.push(Box::new(tools::agent::AgentTool::<C>::new(
-                client.clone(),
-                config.clone(),
-                self.cwd.clone(),
-            )));
+            tools.push(Box::new(tools::agent::AgentTool::<C>::new(client, config, cwd, sender)));
         }
 
         if matches!(agent_type, AgentType::Build | AgentType::General | AgentType::Plan) {
@@ -132,6 +128,6 @@ where
             }
         }
 
-        tools
+        (tools, receiver)
     }
 }

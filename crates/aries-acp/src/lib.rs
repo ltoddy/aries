@@ -18,9 +18,9 @@ use aries_core::agents::AgentType;
 use aries_core::tools::format_tool_output;
 use aries_session::SessionRegistry;
 use async_trait::async_trait;
-use rig::agent::{MultiTurnStreamItem, Text};
-use rig::message::{ReasoningContent, ToolResultContent};
-use rig::streaming::{StreamedAssistantContent, StreamedUserContent};
+use rig_core::agent::{MultiTurnStreamItem, Text};
+use rig_core::message::{ReasoningContent, ToolResultContent};
+use rig_core::streaming::{StreamedAssistantContent, StreamedUserContent};
 use serde_json::value::RawValue;
 use tokio::sync::{Mutex, mpsc, oneshot};
 use tracing::info;
@@ -154,7 +154,6 @@ impl agent_client_protocol::Agent for AgentClientProtocolImpl {
                         Ok(())
                     }
                 }),
-                (),
             )
             .await
             .map_err(|_| Error::internal_error())?;

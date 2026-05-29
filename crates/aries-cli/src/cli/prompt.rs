@@ -1,10 +1,14 @@
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+
 use aries_config::AriesConfigLoader;
 use aries_context::GlobalContext;
-use aries_session::{NoCb, SessionRegistry};
+use aries_session::SessionRegistry;
 use clap::Parser;
 
+use crate::display::print_stream_item;
+use crate::logger;
 use crate::theme::Theme;
-use crate::{hook, logger};
 
 #[derive(Parser, Debug, Clone)]
 pub struct PromptArgs {
@@ -27,6 +31,21 @@ pub async fn execute(args: PromptArgs, gctx: GlobalContext) -> anyhow::Result<()
     let theme = Theme::default();
 
     print!("\n{}: ", theme.magenta_text("Aries"));
-    session.prompt(&args.prompt, None::<NoCb>, hook::DisplayPromptHook::new(theme)).await?;
+
+    let tool_names: Arc<Mutex<HashMap<String, String>>> = Arc::new(Mutex::new(HashMap::new()));
+    session
+        .prompt(
+            &args.prompt,
+            Some(|item| {
+                let tool_names = tool_names.clone();
+                async move {
+                    if let Ok(mut map) = tool_names.lock() {
+                        print_stream_item(item, theme, &mut map);
+                    }
+                    Ok(())
+                }
+            }),
+        )
+        .await?;
     Ok(())
 }

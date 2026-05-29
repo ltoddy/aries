@@ -1,9 +1,9 @@
 use aries_core::tools::format_tool_output;
 use aries_session::Session;
-use rig::agent::MultiTurnStreamItem;
-use rig::completion::Message;
-use rig::message::{AssistantContent, ToolResultContent, UserContent};
-use rig::streaming::{StreamedAssistantContent, StreamedUserContent};
+use rig_core::agent::MultiTurnStreamItem;
+use rig_core::completion::Message;
+use rig_core::message::{AssistantContent, ToolResultContent, UserContent};
+use rig_core::streaming::{StreamedAssistantContent, StreamedUserContent};
 use tauri::{AppHandle, Emitter};
 
 use crate::session_service::{
@@ -129,7 +129,7 @@ fn convert_history(history: &[Message]) -> Vec<ChatMessage> {
                                 .content
                                 .iter()
                                 .filter_map(|rc| match rc {
-                                    rig::message::ReasoningContent::Text { text, .. } => {
+                                    rig_core::message::ReasoningContent::Text { text, .. } => {
                                         Some(text.clone())
                                     },
                                     _ => None,
@@ -304,7 +304,9 @@ pub async fn prompt(
                                 .content
                                 .into_iter()
                                 .filter_map(|rc| match rc {
-                                    rig::message::ReasoningContent::Text { text, .. } => Some(text),
+                                    rig_core::message::ReasoningContent::Text { text, .. } => {
+                                        Some(text)
+                                    },
                                     _ => None,
                                 })
                                 .collect();

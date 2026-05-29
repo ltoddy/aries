@@ -2,7 +2,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use aries_core::fs::jsonl;
-use rig::completion::Message;
+use rig_core::completion::Message;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 use tracing::{error, warn};
 

@@ -1,7 +1,61 @@
+use std::collections::HashMap;
+use std::io::Write;
+
 use aries_core::tools;
 use itertools::Itertools;
+use rig_core::agent::MultiTurnStreamItem;
+use rig_core::message::ToolResultContent;
+use rig_core::streaming::{StreamedAssistantContent, StreamedUserContent};
 
 use crate::theme::Theme;
+
+pub fn print_stream_item(
+    item: MultiTurnStreamItem<()>,
+    theme: Theme,
+    tool_names: &mut HashMap<String, String>,
+) {
+    match item {
+        MultiTurnStreamItem::StreamAssistantItem(content) => match content {
+            StreamedAssistantContent::Text(text) => {
+                print!("{}", text.text);
+                let _ = std::io::stdout().flush();
+            },
+            StreamedAssistantContent::ToolCall { tool_call, internal_call_id } => {
+                tool_names.insert(internal_call_id, tool_call.function.name.clone());
+
+                let args = tool_call.function.arguments.to_string();
+                let (call_str, rest) =
+                    format_tool_call_args(&tool_call.function.name, &args, &theme);
+                println!("\n{} {}", theme.cyan_text("•"), call_str);
+                if let Some(rest) = rest {
+                    println!("{}", rest);
+                }
+            },
+            _ => {},
+        },
+        MultiTurnStreamItem::StreamUserItem(StreamedUserContent::ToolResult {
+            tool_result,
+            internal_call_id,
+        }) => {
+            let tool_name = tool_names.remove(&internal_call_id).unwrap_or_default();
+            let raw = tool_result
+                .content
+                .iter()
+                .filter_map(|c| match c {
+                    ToolResultContent::Text(text) => Some(text.text.as_str()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            let formatted = format_tool_result_output(&tool_name, &raw, theme);
+            println!("{}", formatted);
+        },
+        MultiTurnStreamItem::FinalResponse(res) => {
+            display_token_usage(&res.usage(), &theme);
+        },
+        _ => {},
+    }
+}
 
 pub fn format_tool_call_args(
     tool_name: &str,
@@ -47,7 +101,7 @@ pub fn format_tool_result_output(tool_name: &str, result: &str, theme: Theme) ->
     theme.dimmed(&preview(output)).to_string()
 }
 
-pub fn display_token_usage(usage: &rig::completion::Usage, theme: &Theme) {
+pub fn display_token_usage(usage: &rig_core::completion::Usage, theme: &Theme) {
     println!(
         "\n\n{} total={} input={} (cached={}) output={}",
         theme.dimmed("Token usage:"),

@@ -3,12 +3,16 @@ use std::path::PathBuf;
 use anyhow::Result;
 use aries_config::AriesConfig;
 use futures::StreamExt;
-use rig::client::CompletionClient;
-use rig::completion::ToolDefinition;
-use rig::tool::Tool;
+use rig_core::agent::MultiTurnStreamItem;
+use rig_core::client::CompletionClient;
+use rig_core::completion::{CompletionModel, ToolDefinition};
+use rig_core::tool::Tool;
 use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc::UnboundedSender;
 
 use crate::agents::{AgentBuilder, AgentType};
+use crate::error::AgentError;
+use crate::event::AgentEvent;
 use crate::tools::{RenderError, ToolArgsRender, ToolOutputRender};
 
 pub const NAME: &str = "Agent";
@@ -48,12 +52,6 @@ impl ToolOutputRender for AgentOutput {
     }
 }
 
-#[derive(thiserror::Error, Debug)]
-pub enum AgentError {
-    #[error("Task execution failed: {0}")]
-    ExecutionError(String),
-}
-
 pub struct AgentTool<C>
 where
     C: CompletionClient,
@@ -61,14 +59,28 @@ where
     client: C,
     config: AriesConfig,
     cwd: PathBuf,
+    sender: UnboundedSender<
+        AgentEvent<
+            <<C as CompletionClient>::CompletionModel as CompletionModel>::StreamingResponse,
+        >,
+    >,
 }
 
 impl<C> AgentTool<C>
 where
     C: CompletionClient,
 {
-    pub fn new(client: C, config: AriesConfig, cwd: PathBuf) -> Self {
-        Self { client, config, cwd }
+    pub fn new(
+        client: C,
+        config: AriesConfig,
+        cwd: PathBuf,
+        sender: UnboundedSender<
+            AgentEvent<
+                <<C as CompletionClient>::CompletionModel as CompletionModel>::StreamingResponse,
+            >,
+        >,
+    ) -> Self {
+        Self { client, config, cwd, sender }
     }
 }
 
@@ -121,31 +133,34 @@ where
             _ => AgentType::General,
         };
 
-        let mut agent = AgentBuilder::<C, ()>::new(
+        let mut agent = AgentBuilder::<C>::new(
             self.client.clone(),
             self.config.clone(),
             agent_type,
             self.cwd.clone(),
-            (),
         )
         .build();
 
-        // TODO: hook
-        let stream = agent.stream_prompt(&args.prompt, &[], ()).await;
+        let stream = agent.stream_prompt(&args.prompt, &[]).await;
         tokio::pin!(stream);
-        let mut final_res = rig::agent::FinalResponse::empty();
+        let mut final_res = rig_core::agent::FinalResponse::empty();
 
         while let Some(chunk) = stream.next().await {
             match chunk {
-                Ok(rig::agent::MultiTurnStreamItem::FinalResponse(res)) => final_res = res,
+                Ok(item) => {
+                    let event = AgentEvent::new(agent_type.name(), item.clone());
+                    let _ = self.sender.send(event);
+
+                    if let MultiTurnStreamItem::FinalResponse(res) = item {
+                        final_res = res;
+                    }
+                },
                 Err(e) => {
                     return Err(AgentError::ExecutionError(format!("Subagent failed: {}", e)));
                 },
-                Ok(_) => {},
             }
         }
 
-        let res = final_res.response();
-        Ok(AgentOutput { task_id, result: res.to_owned() })
+        Ok(AgentOutput { task_id, result: final_res.response().to_owned() })
     }
 }

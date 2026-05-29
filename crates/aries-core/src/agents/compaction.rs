@@ -2,10 +2,10 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Context;
-use rig::client::CompletionClient;
-use rig::completion::Message;
-use rig::message::{AssistantContent, ReasoningContent, UserContent};
-use rig::{completion, message};
+use rig_core::client::CompletionClient;
+use rig_core::completion::Message;
+use rig_core::message::{AssistantContent, ReasoningContent, UserContent};
+use rig_core::{completion, message};
 use tracing::info;
 
 use crate::agents::{AGENT_LOOP_MAX_TURNS, AriesAgent};
@@ -19,17 +19,17 @@ pub struct CompactionAgent<M>
 where
     M: completion::CompletionModel,
 {
-    inner: AriesAgent<M, ()>,
+    inner: AriesAgent<M>,
     transcript_dir: PathBuf,
 }
 
-pub const TOKEN_THRESHOLD: u64 = 50_000;
+pub const TOKEN_THRESHOLD: u64 = 120_000;
 
 impl<M> CompactionAgent<M>
 where
     M: completion::CompletionModel + 'static,
 {
-    pub fn new<C>(client: C, model: &str, transcript_dir: impl AsRef<Path>) -> Self
+    pub fn new<C>(client: C, model: impl Into<String>, transcript_dir: impl AsRef<Path>) -> Self
     where
         C: CompletionClient<CompletionModel = M>,
     {

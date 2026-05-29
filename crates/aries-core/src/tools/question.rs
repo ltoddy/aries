@@ -1,8 +1,8 @@
 use anyhow::Result;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input, MultiSelect, Select};
-use rig::completion::ToolDefinition;
-use rig::tool::Tool;
+use rig_core::completion::ToolDefinition;
+use rig_core::tool::Tool;
 use serde::{Deserialize, Serialize};
 
 use super::{RenderError, ToolArgsRender, ToolOutputRender};
