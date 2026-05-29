@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 use anyhow::Context;
 use aries_config::AriesConfig;
 use aries_core::agents::{AgentBuilder, AgentType, AriesAgent, CompactionAgent};
-use aries_core::compact;
 use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
+use aries_core::{AriesClient, compact, create_client};
 use futures::{StreamExt, pin_mut};
 use rig_core::agent::{FinalResponse, MultiTurnStreamItem};
 use rig_core::completion::Message;
@@ -312,60 +312,41 @@ impl Session {
         transcript_dir: impl AsRef<Path>,
         lsp_client: Option<SharedLspClient>,
     ) -> anyhow::Result<ProviderAgents> {
+        let model = config.model().to_owned();
         let cwd = cwd.as_ref().to_path_buf();
 
-        let agents = match config.clone() {
-            AriesConfig::OpenAICompatible(ref conf) => {
-                let model = config.model().to_owned();
-                let client = openai::CompletionsClient::builder()
-                    .base_url(&conf.base_url)
-                    .api_key(&conf.api_key)
-                    .build()
-                    .with_context(|| "Failed to create llm client")?;
+        let client = create_client(config.clone())?;
 
+        let agents = match client {
+            AriesClient::OpenAI(client) => {
                 let agent = AgentBuilder::<openai::CompletionsClient>::new(
                     client.clone(),
-                    config,
+                    &model,
                     agent_type,
                     cwd,
                 )
                 .with_tools(lsp_client)
                 .await;
-                let compaction_agent = CompactionAgent::new(client, model, transcript_dir);
+                let compaction_agent = CompactionAgent::new(client, &model, transcript_dir);
                 ProviderAgents::OpenAICompatible { agent, compaction_agent }
             },
-            AriesConfig::Azure(ref conf) => {
-                let model = config.model().to_owned();
-                let client = azure::Client::builder()
-                    .api_key(&conf.api_key)
-                    .azure_endpoint(conf.azure_endpoint.to_owned())
-                    .api_version(&conf.api_version)
-                    .build()
-                    .with_context(|| "Failed to create llm client")?;
-
+            AriesClient::Azure(client) => {
                 let agent =
-                    AgentBuilder::<azure::Client>::new(client.clone(), config, agent_type, cwd)
+                    AgentBuilder::<azure::Client>::new(client.clone(), &model, agent_type, cwd)
                         .with_tools(lsp_client)
                         .await;
-                let compaction_agent = CompactionAgent::new(client, model, transcript_dir);
+                let compaction_agent = CompactionAgent::new(client, &model, transcript_dir);
                 ProviderAgents::Azure { agent, compaction_agent }
             },
-            AriesConfig::DeepSeek(ref conf) => {
-                let model = config.model().to_owned();
-                let client = deepseek::Client::builder()
-                    .api_key(&conf.api_key)
-                    .build()
-                    .with_context(|| "Failed to create llm client")?;
-
+            AriesClient::DeepSeek(client) => {
                 let agent =
-                    AgentBuilder::<deepseek::Client>::new(client.clone(), config, agent_type, cwd)
+                    AgentBuilder::<deepseek::Client>::new(client.clone(), &model, agent_type, cwd)
                         .with_tools(lsp_client)
                         .await;
-                let compaction_agent = CompactionAgent::new(client, model, transcript_dir);
+                let compaction_agent = CompactionAgent::new(client, &model, transcript_dir);
                 ProviderAgents::DeepSeek { agent, compaction_agent }
             },
         };
-
         Ok(agents)
     }
 

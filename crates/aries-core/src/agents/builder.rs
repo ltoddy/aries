@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use aries_config::AriesConfig;
 use rig_core::client::CompletionClient;
 use rig_core::completion;
 use rig_core::tool::ToolDyn;
@@ -18,7 +17,7 @@ where
     C::CompletionModel: completion::CompletionModel,
 {
     client: C,
-    config: AriesConfig,
+    model: String,
     agent_type: AgentType,
     cwd: PathBuf,
 }
@@ -28,12 +27,13 @@ where
     C: CompletionClient + Clone + Send + Sync + 'static,
     C::CompletionModel: completion::CompletionModel + 'static,
 {
-    pub fn new(client: C, config: AriesConfig, agent_type: AgentType, cwd: PathBuf) -> Self {
-        Self { client, config, agent_type, cwd }
+    pub fn new(client: C, model: impl Into<String>, agent_type: AgentType, cwd: PathBuf) -> Self {
+        let model = model.into();
+
+        Self { client, model, agent_type, cwd }
     }
 
     pub fn build(self) -> AriesAgent<C::CompletionModel> {
-        let model = self.config.model().to_owned();
         let agent_type = self.agent_type;
 
         let name = agent_type.name();
@@ -41,7 +41,7 @@ where
 
         let inner = self
             .client
-            .agent(model)
+            .agent(self.model)
             .name(name)
             .description(agent_type.description())
             .preamble(&preamble)
@@ -55,7 +55,6 @@ where
         self,
         lsp_client: Option<SharedLspClient>,
     ) -> AriesAgent<C::CompletionModel> {
-        let model = self.config.model().to_owned();
         let agent_type = self.agent_type;
 
         let skillloader = SkillsLoader::new(&self.cwd);
@@ -63,13 +62,13 @@ where
 
         let name = agent_type.name();
         let preamble =
-            crate::preamble::render(&self.cwd, agent_type, &model, &available_skills).await;
+            crate::preamble::render(&self.cwd, agent_type, &self.model, &available_skills).await;
 
         let (tools, receiver) = self.build_tools(lsp_client, available_skills);
 
         let inner = self
             .client
-            .agent(model)
+            .agent(self.model)
             .name(name)
             .description(agent_type.description())
             .preamble(&preamble)
@@ -93,9 +92,9 @@ where
         >,
     ){
         let agent_type = self.agent_type;
-        let config = self.config.clone();
         let client = self.client.clone();
         let cwd = self.cwd.clone();
+        let model = self.model.clone();
         let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
 
         let mut tools: Vec<Box<dyn ToolDyn>> = vec![
@@ -112,7 +111,7 @@ where
             tools.push(Box::new(tools::multiedit::MultiEditTool));
             tools.push(Box::new(tools::edit::EditTool));
             tools.push(Box::new(tools::batch::BatchTool::new(self.cwd.clone())));
-            tools.push(Box::new(tools::agent::AgentTool::<C>::new(client, config, cwd, sender)));
+            tools.push(Box::new(tools::agent::AgentTool::<C>::new(client, model, cwd, sender)));
         }
 
         if matches!(agent_type, AgentType::Build | AgentType::General | AgentType::Plan) {

@@ -15,7 +15,8 @@ pub use self::builder::AgentBuilder;
 pub use self::compaction::CompactionAgent;
 pub use self::summary::SummaryAgent;
 pub use self::title::TitleAgent;
-use crate::error::{AgentError, AgentResult};
+use crate::AriesResult;
+use crate::error::AgentError;
 
 pub const AGENT_LOOP_MAX_TURNS: usize = 200;
 
@@ -58,7 +59,7 @@ where
         &mut self,
         prompt: impl Into<Message> + WasmCompatSend,
         history: &[Message],
-    ) -> AgentResult<String, AgentError> {
+    ) -> AriesResult<String, AgentError> {
         let stream = self.inner.stream_prompt(prompt).with_history(history).await;
         futures::pin_mut!(stream);
 

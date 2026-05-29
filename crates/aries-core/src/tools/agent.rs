@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use aries_config::AriesConfig;
 use futures::StreamExt;
 use rig_core::agent::MultiTurnStreamItem;
 use rig_core::client::CompletionClient;
@@ -57,7 +56,7 @@ where
     C: CompletionClient,
 {
     client: C,
-    config: AriesConfig,
+    model: String,
     cwd: PathBuf,
     sender: UnboundedSender<
         AgentEvent<
@@ -72,7 +71,7 @@ where
 {
     pub fn new(
         client: C,
-        config: AriesConfig,
+        model: impl Into<String>,
         cwd: PathBuf,
         sender: UnboundedSender<
             AgentEvent<
@@ -80,7 +79,8 @@ where
             >,
         >,
     ) -> Self {
-        Self { client, config, cwd, sender }
+        let model = model.into();
+        Self { client, model, cwd, sender }
     }
 }
 
@@ -133,13 +133,11 @@ where
             _ => AgentType::General,
         };
 
-        let mut agent = AgentBuilder::<C>::new(
-            self.client.clone(),
-            self.config.clone(),
-            agent_type,
-            self.cwd.clone(),
-        )
-        .build();
+        let client = self.client.clone();
+        let model = self.model.clone();
+        let cwd = self.cwd.clone();
+
+        let mut agent = AgentBuilder::<C>::new(client, model, agent_type, cwd).build();
 
         let stream = agent.stream_prompt(&args.prompt, &[]).await;
         tokio::pin!(stream);

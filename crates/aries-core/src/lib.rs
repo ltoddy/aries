@@ -1,7 +1,7 @@
 use aries_config::AriesConfig;
 use rig_core::providers::{azure, deepseek, openai};
 
-use crate::error::AgentResult;
+use crate::error::AgentError;
 
 pub mod agents;
 pub mod compact;
@@ -15,13 +15,15 @@ pub mod rpc;
 pub mod simple_cloc;
 pub mod tools;
 
+pub type AriesResult<T, E = AgentError> = Result<T, E>;
+
 pub enum AriesClient {
     OpenAI(openai::CompletionsClient),
     Azure(azure::Client),
     DeepSeek(deepseek::Client),
 }
 
-pub fn create_client(config: AriesConfig) -> AgentResult<AriesClient> {
+pub fn create_client(config: AriesConfig) -> AriesResult<AriesClient> {
     match config {
         AriesConfig::OpenAICompatible(c) => {
             let client = openai::CompletionsClient::builder()

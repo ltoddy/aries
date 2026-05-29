@@ -8,5 +8,3 @@ pub enum AgentError {
     #[error("Failed to create llm client: {0}")]
     Client(#[from] http_client::Error),
 }
-
-pub type AgentResult<T, E = AgentError> = Result<T, E>;

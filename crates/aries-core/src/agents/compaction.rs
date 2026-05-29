@@ -29,13 +29,13 @@ impl<M> CompactionAgent<M>
 where
     M: completion::CompletionModel + 'static,
 {
-    pub fn new<C>(client: C, model: impl Into<String>, transcript_dir: impl AsRef<Path>) -> Self
+    pub fn new<C>(c: C, model: impl Into<String>, transcript_dir: impl AsRef<Path>) -> Self
     where
         C: CompletionClient<CompletionModel = M>,
     {
         let transcript_dir = transcript_dir.as_ref().to_path_buf();
 
-        let agent = client
+        let agent = c
             .agent(model)
             .name(NAME)
             .description(DESCRIPTION)

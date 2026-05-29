@@ -1,8 +1,9 @@
 use rig_core::client::CompletionClient;
 use rig_core::completion::{self, Message};
 
+use crate::AriesResult;
 use crate::agents::{AGENT_LOOP_MAX_TURNS, AriesAgent};
-use crate::error::{AgentError, AgentResult};
+use crate::error::AgentError;
 
 const PREAMBLE: &str = include_str!("prompts/title.txt");
 const NAME: &str = "Namer";
@@ -38,7 +39,7 @@ where
         &mut self,
         input: &str,
         history: &[Message],
-    ) -> AgentResult<String, AgentError> {
+    ) -> AriesResult<String, AgentError> {
         self.inner.completion(input, history).await
     }
 }
