@@ -5,15 +5,16 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct AgentEvent {
+    pub main: bool,   // 是否是 main agent
     pub name: String, // agent name
     pub item: MultiTurnStreamItem<()>,
 }
 
 impl AgentEvent {
-    pub fn new<R>(name: impl Into<String>, item: MultiTurnStreamItem<R>) -> Self {
+    pub fn new<R>(main: bool, name: impl Into<String>, item: MultiTurnStreamItem<R>) -> Self {
         let name = name.into();
         let item = earse(item);
-        Self { name, item }
+        Self { main, name, item }
     }
 }
 
