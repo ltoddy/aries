@@ -82,10 +82,10 @@ async fn calculate_file(file_path: impl AsRef<Path>, info: &Rule) -> io::Result<
 
         // match multi line comments
         for (start, end) in multi {
-            if let Some(d) = in_comment {
-                if d != (*start, *end) {
-                    continue;
-                }
+            if let Some(d) = in_comment
+                && d != (*start, *end)
+            {
+                continue;
             }
 
             // multi line comments maybe in one line

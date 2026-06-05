@@ -8,7 +8,7 @@ use aries_session::SessionRegistry;
 use rustyline::error::ReadlineError;
 use terminal_size::{Width, terminal_size};
 
-use crate::display::print_stream_item;
+use crate::display::print_agent_event;
 use crate::theme::Theme;
 use crate::{commands, input, logger, welcome};
 
@@ -49,13 +49,12 @@ pub async fn run_session(gctx: GlobalContext, session_id: impl Into<String>) -> 
                 if let Err(err) = session
                     .prompt(
                         input,
-                        Some(|item| {
+                        Some(|event| {
                             let tool_names = tool_names.clone();
                             async move {
                                 if let Ok(mut map) = tool_names.lock() {
-                                    print_stream_item(item, theme, &mut map);
+                                    print_agent_event(event, theme, &mut map);
                                 }
-                                Ok(())
                             }
                         }),
                     )

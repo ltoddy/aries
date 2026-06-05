@@ -4,7 +4,7 @@ use anyhow::Result;
 use futures::StreamExt;
 use rig_core::agent::MultiTurnStreamItem;
 use rig_core::client::CompletionClient;
-use rig_core::completion::ToolDefinition;
+use rig_core::completion::{Message, ToolDefinition};
 use rig_core::tool::Tool;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::UnboundedSender;
@@ -72,6 +72,7 @@ where
         sender: UnboundedSender<AgentEvent>,
     ) -> Self {
         let model = model.into();
+
         Self { client, model, cwd, sender }
     }
 }
@@ -131,7 +132,7 @@ where
 
         let mut agent = AgentBuilder::<C>::new(client, model, agent_type, cwd).build();
 
-        let stream = agent.stream_prompt(&args.prompt, &[]).await;
+        let stream = agent.stream_prompt::<Vec<_>, Message>(&args.prompt, vec![]).await;
         tokio::pin!(stream);
         let mut final_res = rig_core::agent::FinalResponse::empty();
 

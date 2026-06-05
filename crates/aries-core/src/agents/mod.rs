@@ -9,6 +9,7 @@ use rig_core::agent::{Agent, FinalResponse, MultiTurnStreamItem, StreamingResult
 use rig_core::completion::{CompletionModel, Message};
 use rig_core::streaming::StreamingPrompt;
 use rig_core::wasm_compat::WasmCompatSend;
+use tokio::sync::mpsc::UnboundedSender;
 
 pub use self::agent_type::AgentType;
 pub use self::builder::AgentBuilder;
@@ -17,6 +18,7 @@ pub use self::summary::SummaryAgent;
 pub use self::title::TitleAgent;
 use crate::AriesResult;
 use crate::error::AgentError;
+use crate::event::AgentEvent;
 
 pub const AGENT_LOOP_MAX_TURNS: usize = 200;
 
@@ -29,17 +31,24 @@ where
 
     preamble: String,
     name: String,
+
+    sender: Option<UnboundedSender<AgentEvent>>,
 }
 
 impl<M> AriesAgent<M>
 where
     M: CompletionModel,
 {
-    pub fn new(inner: Agent<M>, name: impl Into<String>, preamble: impl Into<String>) -> Self {
+    pub fn new(
+        inner: Agent<M>,
+        name: impl Into<String>,
+        preamble: impl Into<String>,
+        sender: Option<UnboundedSender<AgentEvent>>,
+    ) -> Self {
         let name = name.into();
         let preamble = preamble.into();
 
-        Self { inner, preamble, name }
+        Self { inner, preamble, name, sender }
     }
 }
 
@@ -47,37 +56,50 @@ impl<M> AriesAgent<M>
 where
     M: CompletionModel + 'static,
 {
-    pub async fn stream_prompt(
+    pub async fn prompt<I, T>(
         &mut self,
         prompt: impl Into<Message> + WasmCompatSend,
-        history: &[Message],
-    ) -> StreamingResult<<M>::StreamingResponse> {
-        self.inner.stream_prompt(prompt).with_history(history).await
-    }
-
-    pub async fn completion(
-        &mut self,
-        prompt: impl Into<Message> + WasmCompatSend,
-        history: &[Message],
-    ) -> AriesResult<String, AgentError> {
+        history: I,
+    ) -> AriesResult<FinalResponse>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Message>,
+    {
         let stream = self.inner.stream_prompt(prompt).with_history(history).await;
-        futures::pin_mut!(stream);
+        tokio::pin!(stream);
 
         let mut final_res = FinalResponse::empty();
         while let Some(chunk) = stream.next().await {
             match chunk {
                 Ok(item) => {
+                    if let Some(ref sender) = self.sender {
+                        let event = AgentEvent::new(true, self.name.clone(), item.clone());
+                        let _ = sender.send(event);
+                    }
+
                     if let MultiTurnStreamItem::FinalResponse(res) = item {
                         final_res = res;
                     }
                 },
                 Err(e) => {
-                    return Err(AgentError::ExecutionError(format!("Mainagent failed: {}", e)));
+                    return Err(AgentError::ExecutionError(format!("Main agent failed: {}", e)));
                 },
             }
         }
 
-        Ok(final_res.response().to_owned())
+        Ok(final_res)
+    }
+
+    pub async fn stream_prompt<I, T>(
+        &mut self,
+        prompt: impl Into<Message> + WasmCompatSend,
+        history: I,
+    ) -> StreamingResult<<M>::StreamingResponse>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Message>,
+    {
+        self.inner.stream_prompt(prompt).with_history(history).await
     }
 
     pub fn system_prompt(&self) -> &str {

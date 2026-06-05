@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use rig_core::client::CompletionClient;
 use rig_core::completion;
 use rig_core::tool::ToolDyn;
-use tokio::sync::mpsc::UnboundedReceiver;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::agents::{AGENT_LOOP_MAX_TURNS, AgentType, AriesAgent};
 use crate::event::AgentEvent;
@@ -20,6 +20,9 @@ where
     model: String,
     agent_type: AgentType,
     cwd: PathBuf,
+
+    sender: UnboundedSender<AgentEvent>,
+    receiver: UnboundedReceiver<AgentEvent>,
 }
 
 impl<C> AgentBuilder<C>
@@ -29,8 +32,9 @@ where
 {
     pub fn new(client: C, model: impl Into<String>, agent_type: AgentType, cwd: PathBuf) -> Self {
         let model = model.into();
+        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
 
-        Self { client, model, agent_type, cwd }
+        Self { client, model, agent_type, cwd, sender, receiver }
     }
 
     pub fn build(self) -> AriesAgent<C::CompletionModel> {
@@ -48,7 +52,7 @@ where
             .default_max_turns(AGENT_LOOP_MAX_TURNS)
             .build();
 
-        AriesAgent::new(inner, name, preamble)
+        AriesAgent::new(inner, name, preamble, Some(self.sender))
     }
 
     pub async fn with_tools(
@@ -64,7 +68,7 @@ where
         let preamble =
             crate::preamble::render(&self.cwd, agent_type, &self.model, &available_skills).await;
 
-        let (tools, receiver) = self.build_tools(lsp_client, available_skills);
+        let tools = self.build_tools(lsp_client, available_skills);
 
         let inner = self
             .client
@@ -76,19 +80,18 @@ where
             .default_max_turns(AGENT_LOOP_MAX_TURNS)
             .build();
 
-        (AriesAgent::new(inner, name, preamble), receiver)
+        (AriesAgent::new(inner, name, preamble, Some(self.sender)), self.receiver)
     }
 
     fn build_tools(
         &self,
         lsp_client: Option<SharedLspClient>,
         available_skills: Vec<SkillDefinition>,
-    ) -> (Vec<Box<dyn ToolDyn>>, UnboundedReceiver<AgentEvent>) {
+    ) -> Vec<Box<dyn ToolDyn>> {
         let agent_type = self.agent_type;
         let client = self.client.clone();
         let cwd = self.cwd.clone();
         let model = self.model.clone();
-        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
 
         let mut tools: Vec<Box<dyn ToolDyn>> = vec![
             Box::new(tools::bash::BashTool),
@@ -104,7 +107,12 @@ where
             tools.push(Box::new(tools::multiedit::MultiEditTool));
             tools.push(Box::new(tools::edit::EditTool));
             tools.push(Box::new(tools::batch::BatchTool::new(self.cwd.clone())));
-            tools.push(Box::new(tools::agent::AgentTool::<C>::new(client, model, cwd, sender)));
+            tools.push(Box::new(tools::agent::AgentTool::<C>::new(
+                client,
+                model,
+                cwd,
+                self.sender.clone(),
+            )));
         }
 
         if matches!(agent_type, AgentType::Build | AgentType::General | AgentType::Plan) {
@@ -120,6 +128,6 @@ where
             }
         }
 
-        (tools, receiver)
+        tools
     }
 }

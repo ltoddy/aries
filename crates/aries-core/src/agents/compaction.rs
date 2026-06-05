@@ -43,7 +43,7 @@ where
             .default_max_turns(AGENT_LOOP_MAX_TURNS)
             .build();
 
-        Self { inner: AriesAgent::new(agent, NAME, PREAMBLE), transcript_dir }
+        Self { inner: AriesAgent::new(agent, NAME, PREAMBLE, None), transcript_dir }
     }
 
     pub async fn compact(&mut self, messages: &[Message]) -> Option<Vec<Message>> {
@@ -51,7 +51,8 @@ where
 
         let file_path = self.save_transcript(messages).await.ok()?;
         let compacted = compress(messages);
-        let summary = self.inner.completion(&compacted, &[]).await.ok()?;
+        let final_res = self.inner.prompt::<Vec<_>, Message>(&compacted, vec![]).await.ok()?;
+        let summary = final_res.response().to_owned();
         if summary.is_empty() {
             return None;
         }

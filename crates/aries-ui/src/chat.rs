@@ -1,3 +1,4 @@
+use aries_core::event::AgentEvent;
 use aries_core::tools::format_tool_output;
 use aries_session::Session;
 use rig_core::agent::MultiTurnStreamItem;
@@ -268,100 +269,104 @@ pub async fn prompt(
     session
         .prompt(
             request.prompt.trim(),
-            Some(|event: MultiTurnStreamItem<()>| {
+            Some(|event: AgentEvent| {
                 let app_handle = stream_app_handle.clone();
                 let session_id = stream_session_id.clone();
                 let elapsed_ms = start_time.elapsed().as_millis();
 
-                seq += 1;
-                let current_seq = seq;
-
-                let emit = move |kind: &str, delta: String| -> anyhow::Result<()> {
-                    if delta.is_empty() {
-                        return Ok(());
-                    }
-
-                    app_handle.emit(
-                        CHAT_STREAM_EVENT,
-                        ChatStreamPayload {
-                            seq: current_seq,
-                            session_id: session_id.clone(),
-                            kind: kind.to_string(),
-                            delta,
-                        },
-                    )?;
+                let result = if !event.main {
                     Ok(())
-                };
+                } else {
+                    seq += 1;
+                    let current_seq = seq;
 
-                let result = match event {
-                    MultiTurnStreamItem::StreamAssistantItem(assistant) => match assistant {
-                        StreamedAssistantContent::Text(t) => {
-                            answer.push_str(&t.text);
-                            emit("text", t.text)
+                    let emit = move |kind: &str, delta: String| -> anyhow::Result<()> {
+                        if delta.is_empty() {
+                            return Ok(());
+                        }
+
+                        app_handle.emit(
+                            CHAT_STREAM_EVENT,
+                            ChatStreamPayload {
+                                seq: current_seq,
+                                session_id: session_id.clone(),
+                                kind: kind.to_string(),
+                                delta,
+                            },
+                        )?;
+                        Ok(())
+                    };
+
+                    match event.item {
+                        MultiTurnStreamItem::StreamAssistantItem(assistant) => match assistant {
+                            StreamedAssistantContent::Text(t) => {
+                                answer.push_str(&t.text);
+                                emit("text", t.text)
+                            },
+                            StreamedAssistantContent::Reasoning(r) => {
+                                let text: String = r
+                                    .content
+                                    .into_iter()
+                                    .filter_map(|rc| match rc {
+                                        rig_core::message::ReasoningContent::Text {
+                                            text, ..
+                                        } => Some(text),
+                                        _ => None,
+                                    })
+                                    .collect();
+                                emit("reasoning", text)
+                            },
+                            StreamedAssistantContent::ReasoningDelta { reasoning, .. } => {
+                                emit("reasoning", reasoning)
+                            },
+                            StreamedAssistantContent::ToolCall { tool_call, .. } => {
+                                last_tool_name = tool_call.function.name.clone();
+                                let delta = format!(
+                                    "[Tool] {}\n{}",
+                                    tool_call.function.name, tool_call.function.arguments
+                                );
+                                emit("tool-call", delta)
+                            },
+                            _ => Ok(()),
                         },
-                        StreamedAssistantContent::Reasoning(r) => {
-                            let text: String = r
-                                .content
-                                .into_iter()
-                                .filter_map(|rc| match rc {
-                                    rig_core::message::ReasoningContent::Text { text, .. } => {
-                                        Some(text)
-                                    },
-                                    _ => None,
-                                })
-                                .collect();
-                            emit("reasoning", text)
+                        MultiTurnStreamItem::StreamUserItem(user) => match user {
+                            StreamedUserContent::ToolResult { tool_result, .. } => {
+                                let raw_content: String = tool_result
+                                    .content
+                                    .iter()
+                                    .filter_map(|c| match c {
+                                        ToolResultContent::Text(text) => Some(text.text.as_str()),
+                                        _ => None,
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join("\n");
+                                if !raw_content.trim().is_empty() {
+                                    let formatted =
+                                        format_tool_output(&last_tool_name, &raw_content);
+                                    emit("tool-result", formatted)
+                                } else {
+                                    Ok(())
+                                }
+                            },
                         },
-                        StreamedAssistantContent::ReasoningDelta { reasoning, .. } => {
-                            emit("reasoning", reasoning)
-                        },
-                        StreamedAssistantContent::ToolCall { tool_call, .. } => {
-                            last_tool_name = tool_call.function.name.clone();
-                            let delta = format!(
-                                "[Tool] {}\n{}",
-                                tool_call.function.name, tool_call.function.arguments
-                            );
-                            emit("tool-call", delta)
+                        MultiTurnStreamItem::FinalResponse(ref response) => {
+                            let usage = response.usage();
+                            let delta = serde_json::json!({
+                                "total_tokens": usage.total_tokens,
+                                "input_tokens": usage.input_tokens,
+                                "output_tokens": usage.output_tokens,
+                                "cached_input_tokens": usage.cached_input_tokens,
+                                "elapsed_ms": elapsed_ms,
+                            })
+                            .to_string();
+                            emit("usage", delta)
                         },
                         _ => Ok(()),
-                    },
-                    MultiTurnStreamItem::StreamUserItem(user) => match user {
-                        StreamedUserContent::ToolResult { tool_result, .. } => {
-                            let raw_content: String = tool_result
-                                .content
-                                .iter()
-                                .filter_map(|c| match c {
-                                    ToolResultContent::Text(text) => Some(text.text.as_str()),
-                                    _ => None,
-                                })
-                                .collect::<Vec<_>>()
-                                .join("\n");
-                            if !raw_content.trim().is_empty() {
-                                let formatted = format_tool_output(&last_tool_name, &raw_content);
-                                emit("tool-result", formatted)
-                            } else {
-                                Ok(())
-                            }
-                        },
-                    },
-                    MultiTurnStreamItem::FinalResponse(ref response) => {
-                        let usage = response.usage();
-                        let delta = serde_json::json!({
-                            "total_tokens": usage.total_tokens,
-                            "input_tokens": usage.input_tokens,
-                            "output_tokens": usage.output_tokens,
-                            "cached_input_tokens": usage.cached_input_tokens,
-                            "elapsed_ms": elapsed_ms,
-                        })
-                        .to_string();
-                        emit("usage", delta)
-                    },
-                    _ => Ok(()),
+                    }
                 };
 
                 async move { result }
             }),
-            (),
         )
         .await
         .map_err(|err| err.to_string())?;

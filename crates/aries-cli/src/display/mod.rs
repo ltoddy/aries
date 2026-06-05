@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::io::Write;
 
+use aries_core::event::AgentEvent;
 use aries_core::tools;
 use itertools::Itertools;
 use rig_core::agent::MultiTurnStreamItem;
@@ -9,16 +10,24 @@ use rig_core::streaming::{StreamedAssistantContent, StreamedUserContent};
 
 use crate::theme::Theme;
 
-pub fn print_stream_item(
-    item: MultiTurnStreamItem<()>,
+pub fn print_agent_event(
+    event: AgentEvent,
     theme: Theme,
     tool_names: &mut HashMap<String, String>,
 ) {
-    match item {
+    let prefix = if event.main {
+        String::new()
+    } else {
+        format!("{} ", theme.magenta_text(&format!("[{}]", event.name)))
+    };
+
+    match event.item {
         MultiTurnStreamItem::StreamAssistantItem(content) => match content {
             StreamedAssistantContent::Text(text) => {
-                print!("{}", text.text);
-                let _ = std::io::stdout().flush();
+                if !text.text.is_empty() {
+                    print!("{}{}", prefix, text.text);
+                    let _ = std::io::stdout().flush();
+                }
             },
             StreamedAssistantContent::ToolCall { tool_call, internal_call_id } => {
                 tool_names.insert(internal_call_id, tool_call.function.name.clone());
@@ -26,7 +35,7 @@ pub fn print_stream_item(
                 let args = tool_call.function.arguments.to_string();
                 let (call_str, rest) =
                     format_tool_call_args(&tool_call.function.name, &args, &theme);
-                println!("\n{} {}", theme.cyan_text("•"), call_str);
+                println!("\n{}{} {}", prefix, theme.cyan_text("•"), call_str);
                 if let Some(rest) = rest {
                     println!("{}", rest);
                 }
@@ -48,9 +57,9 @@ pub fn print_stream_item(
                 .collect::<Vec<_>>()
                 .join("\n");
             let formatted = format_tool_result_output(&tool_name, &raw, theme);
-            println!("{}", formatted);
+            println!("{}{}", prefix, formatted);
         },
-        MultiTurnStreamItem::FinalResponse(res) => {
+        MultiTurnStreamItem::FinalResponse(res) if event.main => {
             display_token_usage(&res.usage(), &theme);
         },
         _ => {},

@@ -1,3 +1,5 @@
+pub mod setting;
+
 use std::path::{Path, PathBuf};
 
 use dialoguer::theme::ColorfulTheme;

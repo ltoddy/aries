@@ -6,7 +6,7 @@ use aries_context::GlobalContext;
 use aries_session::SessionRegistry;
 use clap::Parser;
 
-use crate::display::print_stream_item;
+use crate::display::print_agent_event;
 use crate::logger;
 use crate::theme::Theme;
 
@@ -36,13 +36,12 @@ pub async fn execute(args: PromptArgs, gctx: GlobalContext) -> anyhow::Result<()
     session
         .prompt(
             &args.prompt,
-            Some(|item| {
+            Some(|event| {
                 let tool_names = tool_names.clone();
                 async move {
                     if let Ok(mut map) = tool_names.lock() {
-                        print_stream_item(item, theme, &mut map);
+                        print_agent_event(event, theme, &mut map);
                     }
-                    Ok(())
                 }
             }),
         )

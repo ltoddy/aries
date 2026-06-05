@@ -3,18 +3,22 @@ mod hook;
 
 use std::future::Future;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use anyhow::Context;
 use aries_config::AriesConfig;
 use aries_core::agents::{AgentBuilder, AgentType, AriesAgent, CompactionAgent};
-use aries_core::event::earse;
+use aries_core::event::AgentEvent;
 use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
 use aries_core::{AriesClient, compact, create_client};
-use futures::{StreamExt, pin_mut};
-use rig_core::agent::{FinalResponse, MultiTurnStreamItem};
+use futures::pin_mut;
+use rig_core::agent::FinalResponse;
 use rig_core::completion::Message;
 use rig_core::providers::{azure, deepseek, openai};
+use rig_core::wasm_compat::WasmCompatSend;
 use tokio::fs::create_dir_all;
+use tokio::sync::Mutex as AsyncMutex;
+use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_util::sync::CancellationToken;
 
 use crate::session::history::ChatHistory;
@@ -30,6 +34,7 @@ pub struct Session {
     chat_history: ChatHistory,
     root_dir: PathBuf,
     cancel_token: CancellationToken,
+    agent_events: Arc<AsyncMutex<UnboundedReceiver<AgentEvent>>>,
 }
 
 #[derive(Clone)]
@@ -68,7 +73,7 @@ impl Session {
         let transcript_dir = root_dir.join("transcripts");
 
         let lsp_client = Self::warm_up_lsp(cwd).await;
-        let agents = Self::create_agents(
+        let (agents, agent_events) = Self::create_agents(
             AgentType::Build,
             config.clone(),
             cwd,
@@ -88,6 +93,7 @@ impl Session {
             chat_history,
             root_dir: root_dir.to_path_buf(),
             cancel_token,
+            agent_events: Arc::new(AsyncMutex::new(agent_events)),
         })
     }
 
@@ -102,7 +108,7 @@ impl Session {
         let transcript_dir = root_dir.join("transcripts");
 
         let lsp_client = Self::warm_up_lsp(cwd).await;
-        let agents = Self::create_agents(
+        let (agents, agent_events) = Self::create_agents(
             AgentType::Build,
             config.clone(),
             cwd,
@@ -122,6 +128,7 @@ impl Session {
             chat_history,
             root_dir: root_dir.to_path_buf(),
             cancel_token,
+            agent_events: Arc::new(AsyncMutex::new(agent_events)),
         })
     }
 }
@@ -155,7 +162,7 @@ impl Session {
 
     pub async fn switch_agent(&mut self, agent_type: AgentType) -> anyhow::Result<()> {
         let transcript_dir = self.root_dir.join("transcripts");
-        let agents = Self::create_agents(
+        let (agents, agent_events) = Self::create_agents(
             agent_type,
             self.config.clone(),
             self.cwd.clone(),
@@ -164,6 +171,7 @@ impl Session {
         )
         .await?;
         self.agents = agents;
+        self.agent_events = Arc::new(AsyncMutex::new(agent_events));
         Ok(())
     }
 
@@ -171,21 +179,33 @@ impl Session {
         self.root_dir.clone()
     }
 
-    pub async fn prompt<F, Fut>(&mut self, prompt: &str, mut cb: Option<F>) -> anyhow::Result<()>
+    pub async fn prompt<F, Fut>(
+        &mut self,
+        prompt: impl Into<Message> + WasmCompatSend,
+        mut cb: Option<F>,
+    ) -> anyhow::Result<()>
     where
-        F: FnMut(MultiTurnStreamItem<()>) -> Fut,
-        Fut: Future<Output = anyhow::Result<()>>,
+        F: FnMut(AgentEvent) -> Fut,
+        Fut: Future<Output = ()>,
     {
         self.cancel_token = CancellationToken::new();
         let cancel_token = self.cancel_token.clone();
+        let agent_events = self.agent_events.clone();
 
         let final_res = match &mut self.agents {
             ProviderAgents::OpenAICompatible { agent, compaction_agent } => {
                 compact::micro_compact(self.chat_history.history_mut());
 
                 let snapshot = self.chat_history.history().to_vec();
-                let stream = agent.stream_prompt(prompt, &snapshot).await;
-                let final_res = Self::consume_stream(stream, &mut cb, cancel_token).await?;
+                let final_res = Self::run_prompt(
+                    agent,
+                    prompt,
+                    &snapshot,
+                    &mut cb,
+                    agent_events.clone(),
+                    cancel_token,
+                )
+                .await?;
 
                 if final_res.usage().total_tokens > compact::TOKEN_THRESHOLD {
                     println!("\n🔄 触发上下文压缩...");
@@ -202,9 +222,15 @@ impl Session {
                 compact::micro_compact(self.chat_history.history_mut());
 
                 let snapshot = self.chat_history.history().to_vec();
-                let stream = agent.stream_prompt(prompt, &snapshot).await;
-
-                let final_res = Self::consume_stream(stream, &mut cb, cancel_token).await?;
+                let final_res = Self::run_prompt(
+                    agent,
+                    prompt,
+                    &snapshot,
+                    &mut cb,
+                    agent_events.clone(),
+                    cancel_token,
+                )
+                .await?;
                 if final_res.usage().total_tokens > compact::TOKEN_THRESHOLD {
                     println!("\n🔄 触发上下文压缩...");
                     if let Some(compressed) =
@@ -220,9 +246,15 @@ impl Session {
                 compact::micro_compact(self.chat_history.history_mut());
 
                 let snapshot = self.chat_history.history().to_vec();
-                let stream = agent.stream_prompt(prompt, &snapshot).await;
-
-                let final_res = Self::consume_stream(stream, &mut cb, cancel_token).await?;
+                let final_res = Self::run_prompt(
+                    agent,
+                    prompt,
+                    &snapshot,
+                    &mut cb,
+                    agent_events.clone(),
+                    cancel_token,
+                )
+                .await?;
                 if final_res.usage().total_tokens > compact::TOKEN_THRESHOLD {
                     println!(
                         "\n🔄 total token: {} 触发上下文压缩...",
@@ -266,16 +298,23 @@ impl Session {
         false
     }
 
-    async fn consume_stream<F, Fut, R>(
-        stream: rig_core::agent::StreamingResult<R>,
+    async fn run_prompt<M, F, Fut>(
+        agent: &mut AriesAgent<M>,
+        prompt: impl Into<Message> + WasmCompatSend,
+        history: &[Message],
         cb: &mut Option<F>,
+        agent_events: Arc<AsyncMutex<UnboundedReceiver<AgentEvent>>>,
         cancel_token: CancellationToken,
     ) -> anyhow::Result<FinalResponse>
     where
-        F: FnMut(MultiTurnStreamItem<()>) -> Fut,
-        Fut: Future<Output = anyhow::Result<()>>,
+        M: rig_core::completion::CompletionModel + 'static,
+        F: FnMut(AgentEvent) -> Fut,
+        Fut: Future<Output = ()>,
     {
-        pin_mut!(stream);
+        let prompt_fut = agent.prompt(prompt, history.to_vec());
+        pin_mut!(prompt_fut);
+
+        let mut events_guard = agent_events.lock().await;
         let mut final_res = FinalResponse::empty();
 
         loop {
@@ -284,19 +323,29 @@ impl Session {
                 _ = cancel_token.cancelled() => {
                     break;
                 }
-                item = stream.next() => {
-                    match item {
-                        Some(Ok(chunk)) => {
-                            if let MultiTurnStreamItem::FinalResponse(response) = &chunk {
-                                final_res = response.clone();
-                            }
-                            if let Some(cb) = cb && let stripped = earse(chunk) {
-                                cb(stripped).await?;
+                event = events_guard.recv() => {
+                    match event {
+                        Some(event) => {
+                            if let Some(cb) = cb {
+                                cb(event).await;
                             }
                         }
-                        Some(Err(_)) | None => break,
+                        None => {
+                            // sender side dropped; ignore further agent events
+                        }
                     }
                 }
+                res = &mut prompt_fut => {
+                    final_res = res.map_err(|e| anyhow::anyhow!(e))?;
+                    break;
+                }
+            }
+        }
+
+        // Drain any remaining buffered agent events without blocking
+        while let Ok(event) = events_guard.try_recv() {
+            if let Some(cb) = cb {
+                cb(event).await;
             }
         }
 
@@ -309,13 +358,13 @@ impl Session {
         cwd: impl AsRef<Path>,
         transcript_dir: impl AsRef<Path>,
         lsp_client: Option<SharedLspClient>,
-    ) -> anyhow::Result<ProviderAgents> {
+    ) -> anyhow::Result<(ProviderAgents, UnboundedReceiver<AgentEvent>)> {
         let model = config.model().to_owned();
         let cwd = cwd.as_ref().to_path_buf();
 
         let client = create_client(config.clone())?;
 
-        let agents = match client {
+        let (agents, receiver) = match client {
             AriesClient::OpenAI(client) => {
                 let (agent, receiver) = AgentBuilder::<openai::CompletionsClient>::new(
                     client.clone(),
@@ -326,7 +375,7 @@ impl Session {
                 .with_tools(lsp_client)
                 .await;
                 let compaction_agent = CompactionAgent::new(client, &model, transcript_dir);
-                ProviderAgents::OpenAICompatible { agent, compaction_agent }
+                (ProviderAgents::OpenAICompatible { agent, compaction_agent }, receiver)
             },
             AriesClient::Azure(client) => {
                 let (agent, receiver) =
@@ -334,7 +383,7 @@ impl Session {
                         .with_tools(lsp_client)
                         .await;
                 let compaction_agent = CompactionAgent::new(client, &model, transcript_dir);
-                ProviderAgents::Azure { agent, compaction_agent }
+                (ProviderAgents::Azure { agent, compaction_agent }, receiver)
             },
             AriesClient::DeepSeek(client) => {
                 let (agent, receiver) =
@@ -342,10 +391,10 @@ impl Session {
                         .with_tools(lsp_client)
                         .await;
                 let compaction_agent = CompactionAgent::new(client, &model, transcript_dir);
-                ProviderAgents::DeepSeek { agent, compaction_agent }
+                (ProviderAgents::DeepSeek { agent, compaction_agent }, receiver)
             },
         };
-        Ok(agents)
+        Ok((agents, receiver))
     }
 
     async fn warm_up_lsp(dir: impl AsRef<Path>) -> Option<SharedLspClient> {

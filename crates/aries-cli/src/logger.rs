@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use tracing::level_filters::LevelFilter;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{EnvFilter, fmt};
@@ -19,7 +20,9 @@ pub async fn init(dir: impl AsRef<Path>) -> WorkerGuard {
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
 
     tracing_subscriber::registry()
-        .with(EnvFilter::from_default_env())
+        .with(
+            EnvFilter::builder().with_default_directive(LevelFilter::INFO.into()).from_env_lossy(),
+        )
         .with(fmt::layer().json().with_writer(non_blocking))
         .init();
 

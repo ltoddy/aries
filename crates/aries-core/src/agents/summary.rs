@@ -32,10 +32,12 @@ where
             .default_max_turns(AGENT_LOOP_MAX_TURNS)
             .build();
 
-        Self { inner: AriesAgent::new(agent, NAME, PREAMBLE) }
+        Self { inner: AriesAgent::new(agent, NAME, PREAMBLE, None) }
     }
 
     pub async fn summarize(&mut self, history: &[Message]) -> AriesResult<String, AgentError> {
-        self.inner.completion("请总结这次对话。", history).await
+        let final_res = self.inner.prompt("请总结这次对话。", history).await?;
+
+        Ok(final_res.response().to_owned())
     }
 }
