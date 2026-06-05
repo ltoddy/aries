@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use agent_client_protocol::schema::{
-    self, ContentBlock, ContentChunk, SessionUpdate, TextContent, ToolCallContent, ToolCallId,
-    ToolCallLocation, ToolCallStatus, ToolCallUpdate, ToolCallUpdateFields, ToolKind,
+    self, Content, ContentBlock, ContentChunk, Diff, SessionUpdate, TextContent, ToolCallContent,
+    ToolCallId, ToolCallLocation, ToolCallStatus, ToolCallUpdate, ToolCallUpdateFields, ToolKind,
 };
 use aries_core::event::AgentEvent;
 use aries_core::tools::{
@@ -64,7 +64,7 @@ impl SessionUpdates {
             StreamedAssistantContent::ToolCall { tool_call, internal_call_id, .. } => {
                 tool_calls.lock().insert(internal_call_id, tool_call.clone());
 
-                let title = title(tool_call.clone());
+                let (title, content) = title_and_content(tool_call.clone());
                 let locations = locations(tool_call.clone()).unwrap_or_default();
 
                 let ToolFunction { name, arguments } = tool_call.function;
@@ -72,6 +72,7 @@ impl SessionUpdates {
                 let acp_tool_call = schema::ToolCall::new(ToolCallId::new(tool_call.id), title)
                     .kind(tool_kind(&Some(name.clone())))
                     .status(ToolCallStatus::InProgress)
+                    .content(content)
                     .locations(locations)
                     .raw_input(arguments);
                 vec![SessionUpdate::ToolCall(acp_tool_call)]
@@ -132,10 +133,37 @@ impl IntoIterator for SessionUpdates {
     }
 }
 
-fn title(t: ToolCall) -> String {
+fn title_and_content(t: ToolCall) -> (String, Vec<ToolCallContent>) {
     let ToolFunction { name, arguments, .. } = t.function;
 
-    format!("{name}: {}", format_tool_args(&name, &arguments.to_string()).0)
+    let (args, _) = format_tool_args(&name, &arguments.to_string());
+
+    let title = format!("{name}: {args}");
+    let content = match name.as_str() {
+        agent::NAME => {
+            let args = serde_json::from_value::<agent::AgentArgs>(arguments);
+
+            args.map(|args| vec![ToolCallContent::Content(Content::new(args.prompt))])
+                .unwrap_or_default()
+        },
+        edit::NAME => {
+            let args = serde_json::from_value::<edit::EditArgs>(arguments);
+            args.map(|args| {
+                vec![ToolCallContent::Diff(
+                    Diff::new(args.file_path, args.new_string).old_text(args.old_string),
+                )]
+            })
+            .unwrap_or_default()
+        },
+        write::NAME => {
+            let args = serde_json::from_value::<write::WriteArgs>(arguments);
+            args.map(|args| vec![ToolCallContent::Diff(Diff::new(args.file_path, args.content))])
+                .unwrap_or_default()
+        },
+        _ => vec![],
+    };
+
+    (title, content)
 }
 
 fn tool_kind(tool_name: &Option<String>) -> ToolKind {

@@ -1,6 +1,7 @@
 pub mod authenticate;
 pub mod cancel;
 pub mod initialize;
+pub mod logout;
 pub mod prompt;
 pub mod session;
 
@@ -15,8 +16,12 @@ use tokio::sync::Mutex;
 use crate::authenticate::authenticate;
 use crate::cancel::cancel;
 use crate::initialize::initialize;
+use crate::logout::logout;
 use crate::prompt::prompt;
-use crate::session::{list_session, load_session, new_session, set_session_mode};
+use crate::session::{
+    close_session, list_session, load_session, new_session, resume_session,
+    set_session_config_option, set_session_mode,
+};
 
 type SharedRegistry = Arc<Mutex<SessionRegistry>>;
 
@@ -75,6 +80,10 @@ pub async fn run(
             },
             on_receive_request!(),
         )
+        .on_receive_request(close_session, on_receive_request!())
+        .on_receive_request(logout, on_receive_request!())
+        .on_receive_request(resume_session, on_receive_request!())
+        .on_receive_request(set_session_config_option, on_receive_request!())
         .on_receive_notification(
             async move |args, cx| cancel(args, cx, registry.clone()).await,
             on_receive_notification!(),

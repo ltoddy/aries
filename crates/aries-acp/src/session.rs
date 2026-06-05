@@ -1,7 +1,9 @@
 use agent_client_protocol::schema::{
-    ListSessionsRequest, ListSessionsResponse, LoadSessionRequest, LoadSessionResponse,
-    NewSessionRequest, NewSessionResponse, SessionInfo, SessionMode, SessionModeId,
-    SessionModeState, SetSessionModeRequest, SetSessionModeResponse,
+    CloseSessionRequest, CloseSessionResponse, ListSessionsRequest, ListSessionsResponse,
+    LoadSessionRequest, LoadSessionResponse, NewSessionRequest, NewSessionResponse,
+    ResumeSessionRequest, ResumeSessionResponse, SessionInfo, SessionMode, SessionModeId,
+    SessionModeState, SetSessionConfigOptionRequest, SetSessionConfigOptionResponse,
+    SetSessionModeRequest, SetSessionModeResponse,
 };
 use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
 use aries_core::agents::AgentType;
@@ -14,7 +16,7 @@ pub async fn new_session(
     responder: Responder<NewSessionResponse>,
     _: ConnectionTo<Client>,
     registry: SharedRegistry,
-) -> Result<(), agent_client_protocol::schema::Error> {
+) -> Result<(), Error> {
     info!("Received new session request {req:?}");
 
     let mut reg = registry.lock().await;
@@ -35,7 +37,7 @@ pub async fn load_session(
     responder: Responder<LoadSessionResponse>,
     _: ConnectionTo<Client>,
     registry: SharedRegistry,
-) -> Result<(), agent_client_protocol::schema::Error> {
+) -> Result<(), Error> {
     info!("Received list sessions request {req:?}");
 
     let session_id = req.session_id.to_string();
@@ -53,7 +55,7 @@ pub async fn list_session(
     responder: Responder<ListSessionsResponse>,
     _: ConnectionTo<Client>,
     registry: SharedRegistry,
-) -> Result<(), agent_client_protocol::schema::Error> {
+) -> Result<(), Error> {
     info!("Received list sessions request {req:?}");
 
     let mut reg = registry.lock().await;
@@ -80,7 +82,7 @@ pub async fn set_session_mode(
     responder: Responder<SetSessionModeResponse>,
     _: ConnectionTo<Client>,
     registry: SharedRegistry,
-) -> Result<(), agent_client_protocol::schema::Error> {
+) -> Result<(), Error> {
     info!("Received set session mode request {req:?}");
 
     let session_id = req.session_id.to_string();
@@ -101,6 +103,37 @@ pub async fn set_session_mode(
     }
 
     responder.respond(SetSessionModeResponse::new())
+}
+
+pub async fn close_session(
+    req: CloseSessionRequest,
+    responder: Responder<CloseSessionResponse>,
+    _: ConnectionTo<Client>,
+) -> Result<(), Error> {
+    let session_id = req.session_id.to_string();
+    info!("Received close session request for {session_id}");
+
+    responder.respond(CloseSessionResponse::new())
+}
+
+pub async fn set_session_config_option(
+    req: SetSessionConfigOptionRequest,
+    responder: Responder<SetSessionConfigOptionResponse>,
+    _: ConnectionTo<Client>,
+) -> Result<(), Error> {
+    info!("Received set session config option request {req:?}");
+
+    responder.respond(SetSessionConfigOptionResponse::new(vec![]))
+}
+
+pub async fn resume_session(
+    req: ResumeSessionRequest,
+    responder: Responder<ResumeSessionResponse>,
+    _: ConnectionTo<Client>,
+) -> Result<(), Error> {
+    info!("Received resume session request {req:?}");
+
+    responder.respond(ResumeSessionResponse::new())
 }
 
 fn modes() -> SessionModeState {
