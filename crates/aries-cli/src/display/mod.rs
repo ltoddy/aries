@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 use std::io::Write;
 
-use aries_core::event::AgentEvent;
+use aries_core::event::{AgentEvent, AgentSignal};
 use aries_core::tools;
+use aries_core::tools::update_plan::{PlanEntry, PlanEntryPriority, PlanEntryStatus};
 use itertools::Itertools;
 use rig_core::agent::MultiTurnStreamItem;
 use rig_core::message::ToolResultContent;
@@ -21,48 +22,51 @@ pub fn print_agent_event(
         format!("{} ", theme.magenta_text(&format!("[{}]", event.name)))
     };
 
-    match event.item {
-        MultiTurnStreamItem::StreamAssistantItem(content) => match content {
-            StreamedAssistantContent::Text(text) => {
-                if !text.text.is_empty() {
-                    print!("{}{}", prefix, text.text);
-                    let _ = std::io::stdout().flush();
-                }
-            },
-            StreamedAssistantContent::ToolCall { tool_call, internal_call_id } => {
-                tool_names.insert(internal_call_id, tool_call.function.name.clone());
+    match event.signal {
+        AgentSignal::Stream(item) => match item {
+            MultiTurnStreamItem::StreamAssistantItem(content) => match content {
+                StreamedAssistantContent::Text(text) => {
+                    if !text.text.is_empty() {
+                        print!("{}{}", prefix, text.text);
+                        let _ = std::io::stdout().flush();
+                    }
+                },
+                StreamedAssistantContent::ToolCall { tool_call, internal_call_id } => {
+                    tool_names.insert(internal_call_id, tool_call.function.name.clone());
 
-                let args = tool_call.function.arguments.to_string();
-                let (call_str, rest) =
-                    format_tool_call_args(&tool_call.function.name, &args, &theme);
-                println!("\n{}{} {}", prefix, theme.cyan_text("•"), call_str);
-                if let Some(rest) = rest {
-                    println!("{}", rest);
-                }
+                    let args = tool_call.function.arguments.to_string();
+                    let (call_str, rest) =
+                        format_tool_call_args(&tool_call.function.name, &args, &theme);
+                    println!("\n{}{} {}", prefix, theme.cyan_text("•"), call_str);
+                    if let Some(rest) = rest {
+                        println!("{}", rest);
+                    }
+                },
+                _ => {},
+            },
+            MultiTurnStreamItem::StreamUserItem(StreamedUserContent::ToolResult {
+                tool_result,
+                internal_call_id,
+            }) => {
+                let tool_name = tool_names.remove(&internal_call_id).unwrap_or_default();
+                let raw = tool_result
+                    .content
+                    .iter()
+                    .filter_map(|c| match c {
+                        ToolResultContent::Text(text) => Some(text.text.as_str()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                let formatted = format_tool_result_output(&tool_name, &raw, theme);
+                println!("{}{}", prefix, formatted);
+            },
+            MultiTurnStreamItem::FinalResponse(res) if event.main => {
+                display_token_usage(&res.usage(), &theme);
             },
             _ => {},
         },
-        MultiTurnStreamItem::StreamUserItem(StreamedUserContent::ToolResult {
-            tool_result,
-            internal_call_id,
-        }) => {
-            let tool_name = tool_names.remove(&internal_call_id).unwrap_or_default();
-            let raw = tool_result
-                .content
-                .iter()
-                .filter_map(|c| match c {
-                    ToolResultContent::Text(text) => Some(text.text.as_str()),
-                    _ => None,
-                })
-                .collect::<Vec<_>>()
-                .join("\n");
-            let formatted = format_tool_result_output(&tool_name, &raw, theme);
-            println!("{}{}", prefix, formatted);
-        },
-        MultiTurnStreamItem::FinalResponse(res) if event.main => {
-            display_token_usage(&res.usage(), &theme);
-        },
-        _ => {},
+        AgentSignal::PlanUpdate(entries) => print_plan_entries(&prefix, entries, &theme),
     }
 }
 
@@ -145,4 +149,29 @@ pub fn preview(content: impl Into<String>) -> String {
     } else {
         lines.join("\n")
     }
+}
+
+fn print_plan_entries(prefix: &str, entries: Vec<PlanEntry>, theme: &Theme) {
+    if entries.is_empty() {
+        println!("\n{}{} Plan cleared", prefix, theme.cyan_text("📋"));
+        return;
+    }
+    println!("\n{}{} Plan", prefix, theme.cyan_text("📋"));
+    for entry in entries {
+        println!("  {}", format_plan_entry(&entry, theme));
+    }
+}
+
+fn format_plan_entry(entry: &PlanEntry, theme: &Theme) -> String {
+    let mark = match entry.status {
+        PlanEntryStatus::Pending => "☐",
+        PlanEntryStatus::InProgress => "◐",
+        PlanEntryStatus::Completed => "☑",
+    };
+    let priority = match entry.priority {
+        PlanEntryPriority::High => "HIGH  ",
+        PlanEntryPriority::Medium => "MEDIUM",
+        PlanEntryPriority::Low => "LOW   ",
+    };
+    format!("{} {} {}", theme.cyan_text(mark), theme.dimmed(priority), entry.content)
 }

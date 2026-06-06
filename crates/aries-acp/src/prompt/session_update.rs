@@ -1,13 +1,14 @@
 use std::collections::HashMap;
 
 use agent_client_protocol::schema::{
-    self, Content, ContentBlock, ContentChunk, Diff, SessionUpdate, TextContent, ToolCallContent,
-    ToolCallId, ToolCallLocation, ToolCallStatus, ToolCallUpdate, ToolCallUpdateFields, ToolKind,
+    self, Content, ContentBlock, ContentChunk, Diff, Plan, SessionUpdate, TextContent,
+    ToolCallContent, ToolCallId, ToolCallLocation, ToolCallStatus, ToolCallUpdate,
+    ToolCallUpdateFields, ToolKind,
 };
-use aries_core::event::AgentEvent;
+use aries_core::event::{AgentEvent, AgentSignal};
 use aries_core::tools::{
     agent, bash, codesearch, edit, format_tool_args, format_tool_output, glob, grep, ls, multiedit,
-    read, skill, webfetch, websearch, write,
+    read, skill, update_plan, webfetch, websearch, write,
 };
 use itertools::Itertools;
 use parking_lot::Mutex;
@@ -15,19 +16,29 @@ use rig_core::agent::{MultiTurnStreamItem, Text};
 use rig_core::message::{ReasoningContent, ToolCall, ToolFunction, ToolResultContent};
 use rig_core::streaming::{StreamedAssistantContent, StreamedUserContent};
 
+use crate::prompt::plan::PlanEntry;
+
 pub struct SessionUpdates(Vec<SessionUpdate>);
 
 impl SessionUpdates {
     pub fn new(event: AgentEvent, tool_calls: &Mutex<HashMap<String, ToolCall>>) -> Self {
-        match event.item {
-            MultiTurnStreamItem::StreamAssistantItem(v) => {
-                Self(Self::from_stream_assistant_content(v, tool_calls))
+        match event.signal {
+            AgentSignal::Stream(item) => match item {
+                MultiTurnStreamItem::StreamAssistantItem(v) => {
+                    Self(Self::from_stream_assistant_content(v, tool_calls))
+                },
+                MultiTurnStreamItem::StreamUserItem(v) => {
+                    Self(Self::from_stream_user_content(v, tool_calls))
+                },
+                _ => Self(Vec::new()),
             },
-            MultiTurnStreamItem::StreamUserItem(v) => {
-                Self(Self::from_stream_user_content(v, tool_calls))
-            },
-            _ => Self(Vec::new()),
+            AgentSignal::PlanUpdate(entries) => Self(Self::from_plan_entries(entries)),
         }
+    }
+
+    fn from_plan_entries(entries: Vec<update_plan::PlanEntry>) -> Vec<SessionUpdate> {
+        let entries = entries.into_iter().map(|e| PlanEntry::new(e).into()).collect();
+        vec![SessionUpdate::Plan(Plan::new(entries))]
     }
 
     fn from_stream_assistant_content(

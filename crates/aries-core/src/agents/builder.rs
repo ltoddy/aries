@@ -107,6 +107,7 @@ where
             tools.push(Box::new(tools::multiedit::MultiEditTool));
             tools.push(Box::new(tools::edit::EditTool));
             tools.push(Box::new(tools::batch::BatchTool::new(self.cwd.clone())));
+            tools.push(Box::new(tools::update_plan::UpdatePlanTool::new(self.sender.clone())));
             tools.push(Box::new(tools::agent::AgentTool::<C>::new(
                 client,
                 model,

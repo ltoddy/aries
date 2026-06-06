@@ -73,7 +73,7 @@ where
             match chunk {
                 Ok(item) => {
                     if let Some(ref sender) = self.sender {
-                        let event = AgentEvent::new(true, self.name.clone(), item.clone());
+                        let event = AgentEvent::from_stream(true, self.name.clone(), item.clone());
                         let _ = sender.send(event);
                     }
 

@@ -1,4 +1,5 @@
 pub mod message;
+pub mod plan;
 pub mod session_update;
 
 use std::collections::HashMap;

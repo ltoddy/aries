@@ -139,7 +139,7 @@ where
         while let Some(chunk) = stream.next().await {
             match chunk {
                 Ok(item) => {
-                    let event = AgentEvent::new(false, agent_type.name(), item.clone());
+                    let event = AgentEvent::from_stream(false, agent_type.name(), item.clone());
                     let _ = self.sender.send(event);
 
                     if let MultiTurnStreamItem::FinalResponse(res) = item {

@@ -11,6 +11,7 @@ pub mod multiedit;
 pub mod question;
 pub mod read;
 pub mod skill;
+pub mod update_plan;
 pub mod webfetch;
 pub mod websearch;
 pub mod write;
@@ -28,6 +29,7 @@ pub use self::multiedit::{MultiEditArgs, MultiEditOutput, MultiEditTool};
 pub use self::question::{AskUserQuestionArgs, AskUserQuestionOutput, AskUserQuestionTool};
 pub use self::read::{ReadArgs, ReadOutput, ReadTool};
 pub use self::skill::{SkillArgs, SkillOutput, SkillTool};
+pub use self::update_plan::{UpdatePlanArgs, UpdatePlanOutput, UpdatePlanTool};
 pub use self::webfetch::{WebFetchArgs, WebFetchOutput, WebFetchTool};
 pub use self::websearch::{WebSearchArgs, WebSearchOutput, WebSearchTool};
 pub use self::write::{WriteArgs, WriteOutput, WriteTool};
@@ -47,6 +49,7 @@ pub fn format_tool_args(tool_name: &str, raw_json: &str) -> (String, Option<Stri
         question::NAME => AskUserQuestionArgs::render_args(raw_json),
         read::NAME => ReadArgs::render_args(raw_json),
         skill::NAME => SkillArgs::render_args(raw_json),
+        update_plan::NAME => UpdatePlanArgs::render_args(raw_json),
         webfetch::NAME => WebFetchArgs::render_args(raw_json),
         websearch::NAME => WebSearchArgs::render_args(raw_json),
         write::NAME => WriteArgs::render_args(raw_json),
@@ -71,6 +74,7 @@ pub fn format_tool_output(tool_name: &str, raw_json: &str) -> String {
         question::NAME => AskUserQuestionOutput::render_output(raw_json),
         read::NAME => ReadOutput::render_output(raw_json),
         skill::NAME => SkillOutput::render_output(raw_json),
+        update_plan::NAME => UpdatePlanOutput::render_output(raw_json),
         webfetch::NAME => WebFetchOutput::render_output(raw_json),
         websearch::NAME => WebSearchOutput::render_output(raw_json),
         write::NAME => WriteOutput::render_output(raw_json),

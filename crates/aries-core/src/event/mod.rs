@@ -1,21 +1,36 @@
 use rig_core::agent::MultiTurnStreamItem;
 use rig_core::message::Text;
 use rig_core::streaming::StreamedAssistantContent;
-use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+use crate::tools::update_plan::PlanEntry;
+
+#[derive(Debug, Clone)]
 pub struct AgentEvent {
     pub main: bool,   // 是否是 main agent
     pub name: String, // agent name
-    pub item: MultiTurnStreamItem<()>,
+    pub signal: AgentSignal,
 }
 
 impl AgentEvent {
-    pub fn new<R>(main: bool, name: impl Into<String>, item: MultiTurnStreamItem<R>) -> Self {
+    pub fn from_stream<R>(
+        main: bool,
+        name: impl Into<String>,
+        item: MultiTurnStreamItem<R>,
+    ) -> Self {
         let name = name.into();
         let item = earse(item);
-        Self { main, name, item }
+        Self { main, name, signal: AgentSignal::Stream(item) }
     }
+
+    pub fn from_plan(main: bool, name: impl Into<String>, entries: Vec<PlanEntry>) -> Self {
+        Self { main, name: name.into(), signal: AgentSignal::PlanUpdate(entries) }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum AgentSignal {
+    Stream(MultiTurnStreamItem<()>),
+    PlanUpdate(Vec<PlanEntry>),
 }
 
 pub fn earse<R>(item: MultiTurnStreamItem<R>) -> MultiTurnStreamItem<()> {
