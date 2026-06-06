@@ -38,13 +38,14 @@ impl Display for RepositorySize {
 }
 
 impl RepositorySize {
+    const SMALL_MAX: usize = 300;
+    const MEDIUM_MAX: usize = 1000;
+
     fn new(files: usize) -> Self {
-        if files > 1000 {
-            RepositorySize::Large
-        } else if files > 300 {
-            RepositorySize::Medium
-        } else {
-            RepositorySize::Small
+        match files {
+            n if n <= Self::SMALL_MAX => Self::Small,
+            n if n <= Self::MEDIUM_MAX => Self::Medium,
+            _ => Self::Large,
         }
     }
 
