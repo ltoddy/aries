@@ -11,8 +11,8 @@ pub mod ext;
 pub mod fs;
 pub mod language_server;
 pub mod preamble;
+pub mod repository;
 pub mod rpc;
-pub mod simple_cloc;
 pub mod tools;
 
 pub type AriesResult<T, E = AgentError> = Result<T, E>;
