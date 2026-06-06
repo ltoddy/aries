@@ -1,12 +1,9 @@
-- 使用代码搜索 API 获取任何编程任务的相关上下文
-- 为库、SDK 和 API 提供高质量和最新的上下文
-- 将此工具用于与编程相关的任何问题或任务
-- 返回全面的代码示例、文档和 API 参考
-- 针对查找特定的编程模式和解决方案进行了优化
+通过 Exa 的远程 MCP 服务（`https://mcp.exa.ai/mcp`）检索第三方库、SDK、API、框架的代码示例与文档上下文。**用于查询外部依赖与编程概念，而不是搜索本地代码库**——本地搜索请使用 `Grep` / `Glob`。
 
-使用说明：
-  - 可调整令牌数量（1000-50000），以获得重点或全面的结果
-  - 默认 5000 令牌为大多数查询提供平衡的上下文
-  - 针对特定问题使用较低的值，针对全面文档使用较高的值
-  - 支持关于框架、库、API 和编程概念的查询
-  - 示例：'React useState hook examples'，'Python pandas dataframe filtering'，'Express.js middleware'
+参数：
+- `query` 必需，自然语言或关键词查询，例如 `React useState hook examples`、`Python pandas dataframe filtering`。
+- `tokens_num` 可选（建议范围 1000-50000），用于控制返回上下文的规模；默认 5000。
+
+行为：
+- 以 JSON-RPC 形式调用 Exa MCP 的 `get_code_context_exa`，解析 SSE 响应并返回首个内容片段的文本。
+- 如果未匹配到内容，会返回一段提示，建议换个查询、明确库名或检查拼写。

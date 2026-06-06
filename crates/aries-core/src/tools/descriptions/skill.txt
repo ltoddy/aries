@@ -1,5 +1,8 @@
-当当前任务与系统提示词中列出的某个 skill 匹配时，加载对应的专用 skill。
+加载并注入一个由系统提示词中 `available_skills` 列出的专用 skill。
 
-使用此工具可以将该 skill 的说明和相关资源注入到当前对话中。输出可能包含详细的工作流程指导，以及与该 skill 位于同一目录下的脚本、文件等引用。
-
-skill 名称必须与系统提示词中的 available_skills 列表完全匹配。
+- `name` 必需，必须与 `available_skills` 中的某个 skill 名称完全一致；否则会以「未在 available_skills 中」的错误返回。
+- 调用后返回 `<skill_content>` 块，包含：
+  - skill 的正文（指令）；
+  - skill 所在目录的 base URI；
+  - 通过 `walk_dir` 列出的目录下文件清单（仅文件，目录被忽略），每项形如 `<file>...</file>`。
+- skill 内部以相对路径引用的脚本/资源（如 `scripts/`、`reference/`），都相对于 base 目录解析。

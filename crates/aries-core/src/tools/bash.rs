@@ -87,7 +87,7 @@ impl Tool for BashTool {
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         let command = args.command;
 
-        let output = Command::new("sh")
+        let output = Command::new("bash")
             .arg("-c")
             .arg(&command)
             .stdout(Stdio::piped())
