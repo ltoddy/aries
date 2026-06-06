@@ -31,7 +31,7 @@ where
 {
     pub fn new<C>(c: C, model: impl Into<String>, transcript_dir: impl AsRef<Path>) -> Self
     where
-        C: CompletionClient<CompletionModel = M>,
+        C: CompletionClient<CompletionModel = M> + 'static,
     {
         let transcript_dir = transcript_dir.as_ref().to_path_buf();
 

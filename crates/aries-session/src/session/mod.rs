@@ -33,24 +33,16 @@ pub struct Session {
     lsp_client: Option<SharedLspClient>,
     chat_history: ChatHistory,
     root_dir: PathBuf,
+    transcript_dir: PathBuf,
     cancel: CancellationToken,
     agent_events: Arc<AsyncMutex<UnboundedReceiver<AgentEvent>>>,
 }
 
 #[derive(Clone)]
 enum ProviderAgents {
-    OpenAICompatible {
-        agent: AriesAgent<openai::CompletionModel>,
-        compaction_agent: CompactionAgent<openai::CompletionModel>,
-    },
-    Azure {
-        agent: AriesAgent<azure::CompletionModel>,
-        compaction_agent: CompactionAgent<azure::CompletionModel>,
-    },
-    DeepSeek {
-        agent: AriesAgent<deepseek::CompletionModel>,
-        compaction_agent: CompactionAgent<deepseek::CompletionModel>,
-    },
+    OpenAICompatible { agent: AriesAgent<openai::CompletionModel> },
+    Azure { agent: AriesAgent<azure::CompletionModel> },
+    DeepSeek { agent: AriesAgent<deepseek::CompletionModel> },
 }
 
 impl Session {
@@ -79,14 +71,8 @@ impl Session {
 
         let lsp_client = Self::warm_up_lsp(cwd).await;
 
-        let (agents, agent_events) = Self::create_agents(
-            AgentType::Build,
-            config.clone(),
-            cwd,
-            transcript_dir,
-            lsp_client.clone(),
-        )
-        .await?;
+        let (agents, agent_events) =
+            Self::create_agents(AgentType::Build, config.clone(), cwd, lsp_client.clone()).await?;
         let chat_history = ChatHistory::new(root_dir.join(Self::FILENAME)).await;
         let cancel = CancellationToken::new();
 
@@ -99,6 +85,7 @@ impl Session {
             lsp_client,
             chat_history,
             root_dir: root_dir.to_path_buf(),
+            transcript_dir,
             cancel,
             agent_events: Arc::new(AsyncMutex::new(agent_events)),
         })
@@ -117,14 +104,8 @@ impl Session {
         let lsp_client = Self::warm_up_lsp(cwd).await;
         let client = aries_core::create_client(config.clone())?;
 
-        let (agents, agent_events) = Self::create_agents(
-            AgentType::Build,
-            config.clone(),
-            cwd,
-            transcript_dir,
-            lsp_client.clone(),
-        )
-        .await?;
+        let (agents, agent_events) =
+            Self::create_agents(AgentType::Build, config.clone(), cwd, lsp_client.clone()).await?;
         let chat_history = ChatHistory::new(root_dir.join(Self::FILENAME)).await;
         let cancel = CancellationToken::new();
 
@@ -137,6 +118,7 @@ impl Session {
             lsp_client,
             chat_history,
             root_dir: root_dir.to_path_buf(),
+            transcript_dir,
             cancel,
             agent_events: Arc::new(AsyncMutex::new(agent_events)),
         })
@@ -167,12 +149,10 @@ impl Session {
     }
 
     pub async fn switch_agent(&mut self, agent_type: AgentType) -> anyhow::Result<()> {
-        let transcript_dir = self.root_dir.join("transcripts");
         let (agents, agent_events) = Self::create_agents(
             agent_type,
             self.config.clone(),
             self.cwd.clone(),
-            transcript_dir,
             self.lsp_client.clone(),
         )
         .await?;
@@ -199,7 +179,7 @@ impl Session {
         let agent_events = self.agent_events.clone();
 
         let final_res = match &mut self.agents {
-            ProviderAgents::OpenAICompatible { agent, compaction_agent } => {
+            ProviderAgents::OpenAICompatible { agent } => {
                 compact::micro_compact(self.chat_history.history_mut());
 
                 let snapshot = self.chat_history.history().to_vec();
@@ -214,41 +194,16 @@ impl Session {
                 .await?;
 
                 if final_res.usage().total_tokens > compact::TOKEN_THRESHOLD {
-                    println!("\n🔄 触发上下文压缩...");
-                    if let Some(compressed) =
-                        compaction_agent.compact(self.chat_history.history()).await
-                    {
-                        self.chat_history.reset(&compressed);
-                    }
+                    println!(
+                        "\n🔄 total token: {} 触发上下文压缩...",
+                        final_res.usage().total_tokens
+                    );
+                    self.compact().await;
                 }
 
                 final_res
             },
-            ProviderAgents::Azure { agent, compaction_agent } => {
-                compact::micro_compact(self.chat_history.history_mut());
-
-                let snapshot = self.chat_history.history().to_vec();
-                let final_res = Self::run_prompt(
-                    agent,
-                    prompt,
-                    &snapshot,
-                    &mut cb,
-                    agent_events.clone(),
-                    cancel_token,
-                )
-                .await?;
-                if final_res.usage().total_tokens > compact::TOKEN_THRESHOLD {
-                    println!("\n🔄 触发上下文压缩...");
-                    if let Some(compressed) =
-                        compaction_agent.compact(self.chat_history.history()).await
-                    {
-                        self.chat_history.reset(&compressed);
-                    }
-                }
-
-                final_res
-            },
-            ProviderAgents::DeepSeek { agent, compaction_agent } => {
+            ProviderAgents::Azure { agent } => {
                 compact::micro_compact(self.chat_history.history_mut());
 
                 let snapshot = self.chat_history.history().to_vec();
@@ -266,11 +221,30 @@ impl Session {
                         "\n🔄 total token: {} 触发上下文压缩...",
                         final_res.usage().total_tokens
                     );
-                    if let Some(compressed) =
-                        compaction_agent.compact(self.chat_history.history()).await
-                    {
-                        self.chat_history.reset(&compressed);
-                    }
+                    self.compact().await;
+                }
+
+                final_res
+            },
+            ProviderAgents::DeepSeek { agent } => {
+                compact::micro_compact(self.chat_history.history_mut());
+
+                let snapshot = self.chat_history.history().to_vec();
+                let final_res = Self::run_prompt(
+                    agent,
+                    prompt,
+                    &snapshot,
+                    &mut cb,
+                    agent_events.clone(),
+                    cancel_token,
+                )
+                .await?;
+                if final_res.usage().total_tokens > compact::TOKEN_THRESHOLD {
+                    println!(
+                        "\n🔄 total token: {} 触发上下文压缩...",
+                        final_res.usage().total_tokens
+                    );
+                    self.compact().await;
                 }
 
                 final_res
@@ -286,21 +260,36 @@ impl Session {
     }
 
     pub async fn compact(&mut self) -> bool {
-        let compressed = match &mut self.agents {
-            ProviderAgents::OpenAICompatible { compaction_agent, .. } => {
-                compaction_agent.compact(self.chat_history.history()).await
+        match self.client.clone() {
+            AriesClient::OpenAI(client) => {
+                let mut compact_agent =
+                    CompactionAgent::new(client, self.config.model(), &self.transcript_dir);
+
+                if let Some(compressed) = compact_agent.compact(self.chat_history.history()).await {
+                    self.chat_history.reset(&compressed);
+                    return true;
+                }
             },
-            ProviderAgents::Azure { compaction_agent, .. } => {
-                compaction_agent.compact(self.chat_history.history()).await
+            AriesClient::Azure(client) => {
+                let mut compact_agent =
+                    CompactionAgent::new(client, self.config.model(), &self.transcript_dir);
+
+                if let Some(compressed) = compact_agent.compact(self.chat_history.history()).await {
+                    self.chat_history.reset(&compressed);
+                    return true;
+                }
             },
-            ProviderAgents::DeepSeek { compaction_agent, .. } => {
-                compaction_agent.compact(self.chat_history.history()).await
+            AriesClient::DeepSeek(client) => {
+                let mut compact_agent =
+                    CompactionAgent::new(client, self.config.model(), &self.transcript_dir);
+
+                if let Some(compressed) = compact_agent.compact(self.chat_history.history()).await {
+                    self.chat_history.reset(&compressed);
+                    return true;
+                }
             },
-        };
-        if let Some(compressed) = compressed {
-            self.chat_history.reset(&compressed);
-            return true;
         }
+
         false
     }
 
@@ -362,7 +351,6 @@ impl Session {
         agent_type: AgentType,
         config: AriesConfig,
         cwd: impl AsRef<Path>,
-        transcript_dir: impl AsRef<Path>,
         lsp_client: Option<SharedLspClient>,
     ) -> anyhow::Result<(ProviderAgents, UnboundedReceiver<AgentEvent>)> {
         let model = config.model().to_owned();
@@ -380,26 +368,24 @@ impl Session {
                 )
                 .with_tools(lsp_client)
                 .await;
-                let compaction_agent = CompactionAgent::new(client, &model, transcript_dir);
-                (ProviderAgents::OpenAICompatible { agent, compaction_agent }, receiver)
+                (ProviderAgents::OpenAICompatible { agent }, receiver)
             },
             AriesClient::Azure(client) => {
                 let (agent, receiver) =
                     AgentBuilder::<azure::Client>::new(client.clone(), &model, agent_type, cwd)
                         .with_tools(lsp_client)
                         .await;
-                let compaction_agent = CompactionAgent::new(client, &model, transcript_dir);
-                (ProviderAgents::Azure { agent, compaction_agent }, receiver)
+                (ProviderAgents::Azure { agent }, receiver)
             },
             AriesClient::DeepSeek(client) => {
                 let (agent, receiver) =
                     AgentBuilder::<deepseek::Client>::new(client.clone(), &model, agent_type, cwd)
                         .with_tools(lsp_client)
                         .await;
-                let compaction_agent = CompactionAgent::new(client, &model, transcript_dir);
-                (ProviderAgents::DeepSeek { agent, compaction_agent }, receiver)
+                (ProviderAgents::DeepSeek { agent }, receiver)
             },
         };
+
         Ok((agents, receiver))
     }
 
