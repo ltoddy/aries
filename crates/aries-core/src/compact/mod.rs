@@ -21,9 +21,13 @@ pub fn micro_compact(messages: &mut [Message]) {
 
 fn compact_tool_result(content: &mut OneOrMany<UserContent>, tool_map: &HashMap<String, String>) {
     for item in content.iter_mut() {
-        let UserContent::ToolResult(tool_result) = item else { continue };
+        let UserContent::ToolResult(tool_result) = item else {
+            continue;
+        };
 
-        let Some(tool_name) = tool_map.get(&tool_result.id) else { continue };
+        let Some(tool_name) = tool_map.get(&tool_result.id) else {
+            continue;
+        };
         let placeholder = format!("[Previous tool result: {tool_name}]");
 
         *item = UserContent::tool_result(
@@ -38,9 +42,13 @@ fn compact_tool_call(
     tool_map: &HashMap<String, String>,
 ) {
     for item in content.iter_mut() {
-        let AssistantContent::ToolCall(tool_call) = item else { continue };
+        let AssistantContent::ToolCall(tool_call) = item else {
+            continue;
+        };
 
-        let Some(tool_name) = tool_map.get(&tool_call.id) else { continue };
+        let Some(tool_name) = tool_map.get(&tool_call.id) else {
+            continue;
+        };
         let placeholder = format!("[Previous tool call: {tool_name}]");
 
         *item = AssistantContent::tool_call(

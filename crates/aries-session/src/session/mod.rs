@@ -10,7 +10,7 @@ use aries_config::AriesConfig;
 use aries_core::agents::{AgentBuilder, AgentType, AriesAgent, CompactionAgent};
 use aries_core::event::AgentEvent;
 use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
-use aries_core::{AriesClient, compact, create_client};
+use aries_core::{AriesClient, compact};
 use futures::pin_mut;
 use rig_core::agent::FinalResponse;
 use rig_core::completion::Message;
@@ -28,12 +28,12 @@ pub struct Session {
     id: String,
     config: AriesConfig,
     cwd: PathBuf,
+    client: AriesClient,
     agents: ProviderAgents,
-    #[allow(unused)]
     lsp_client: Option<SharedLspClient>,
     chat_history: ChatHistory,
     root_dir: PathBuf,
-    cancel_token: CancellationToken,
+    cancel: CancellationToken,
     agent_events: Arc<AsyncMutex<UnboundedReceiver<AgentEvent>>>,
 }
 
@@ -55,24 +55,30 @@ enum ProviderAgents {
 
 impl Session {
     const FILENAME: &str = "chat-history.jsonl";
+    pub const PREFIX: &str = "session-";
 
     pub async fn new(
-        id: String,
+        id: impl Into<String>,
         config: AriesConfig,
         root_dir: impl AsRef<Path>,
         cwd: impl AsRef<Path>,
     ) -> anyhow::Result<Self> {
         let cwd = cwd.as_ref();
+
         let root_dir = root_dir.as_ref();
-        if !root_dir.exists() {
-            create_dir_all(&root_dir).await.with_context(|| {
-                format!("Failed to created session directory: {}", root_dir.display())
-            })?;
-        }
+        create_dir_all(&root_dir).await.with_context(|| {
+            format!("failed to create session directory at: {}", root_dir.display())
+        })?;
 
         let transcript_dir = root_dir.join("transcripts");
 
+        let client = aries_core::create_client(config.clone())?;
+        create_dir_all(&transcript_dir).await.with_context(|| {
+            format!("failed to create session transcripts directory at: {}", root_dir.display())
+        })?;
+
         let lsp_client = Self::warm_up_lsp(cwd).await;
+
         let (agents, agent_events) = Self::create_agents(
             AgentType::Build,
             config.clone(),
@@ -82,17 +88,18 @@ impl Session {
         )
         .await?;
         let chat_history = ChatHistory::new(root_dir.join(Self::FILENAME)).await;
-        let cancel_token = CancellationToken::new();
+        let cancel = CancellationToken::new();
 
         Ok(Self {
-            id,
+            id: id.into(),
             config,
             cwd: cwd.to_path_buf(),
+            client,
             agents,
             lsp_client,
             chat_history,
             root_dir: root_dir.to_path_buf(),
-            cancel_token,
+            cancel,
             agent_events: Arc::new(AsyncMutex::new(agent_events)),
         })
     }
@@ -108,6 +115,8 @@ impl Session {
         let transcript_dir = root_dir.join("transcripts");
 
         let lsp_client = Self::warm_up_lsp(cwd).await;
+        let client = aries_core::create_client(config.clone())?;
+
         let (agents, agent_events) = Self::create_agents(
             AgentType::Build,
             config.clone(),
@@ -117,24 +126,21 @@ impl Session {
         )
         .await?;
         let chat_history = ChatHistory::new(root_dir.join(Self::FILENAME)).await;
-        let cancel_token = CancellationToken::new();
+        let cancel = CancellationToken::new();
 
         Ok(Self {
             id,
             config,
             cwd: cwd.to_path_buf(),
+            client,
             agents,
             lsp_client,
             chat_history,
             root_dir: root_dir.to_path_buf(),
-            cancel_token,
+            cancel,
             agent_events: Arc::new(AsyncMutex::new(agent_events)),
         })
     }
-}
-
-impl Session {
-    pub const PREFIX: &str = "session-";
 
     pub fn id(&self) -> String {
         self.id.clone()
@@ -157,7 +163,7 @@ impl Session {
     }
 
     pub fn cancel(&self) {
-        self.cancel_token.cancel();
+        self.cancel.cancel();
     }
 
     pub async fn switch_agent(&mut self, agent_type: AgentType) -> anyhow::Result<()> {
@@ -188,8 +194,8 @@ impl Session {
         F: FnMut(AgentEvent) -> Fut,
         Fut: Future<Output = ()>,
     {
-        self.cancel_token = CancellationToken::new();
-        let cancel_token = self.cancel_token.clone();
+        self.cancel = CancellationToken::new();
+        let cancel_token = self.cancel.clone();
         let agent_events = self.agent_events.clone();
 
         let final_res = match &mut self.agents {
@@ -362,7 +368,7 @@ impl Session {
         let model = config.model().to_owned();
         let cwd = cwd.as_ref().to_path_buf();
 
-        let client = create_client(config.clone())?;
+        let client = aries_core::create_client(config.clone())?;
 
         let (agents, receiver) = match client {
             AriesClient::OpenAI(client) => {

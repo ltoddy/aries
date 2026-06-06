@@ -17,6 +17,7 @@ pub mod tools;
 
 pub type AriesResult<T, E = AgentError> = Result<T, E>;
 
+#[derive(Clone)]
 pub enum AriesClient {
     OpenAI(openai::CompletionsClient),
     Azure(azure::Client),

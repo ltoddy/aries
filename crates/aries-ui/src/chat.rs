@@ -10,7 +10,7 @@ use tauri::{AppHandle, Emitter};
 use crate::session_service::{
     get_session, list_sessions as list_ui_sessions, load_session, putback_session,
 };
-use crate::state::{AppState, SharedState, CHAT_STREAM_EVENT};
+use crate::state::{AppState, CHAT_STREAM_EVENT, SharedState};
 use crate::types::{
     ChatBlock, ChatMessage, ChatRequest, ChatResponse, ChatStreamPayload, SessionBootstrap,
     SessionSummary,

@@ -1,8 +1,7 @@
+edition = "2024"
+style_edition = "2024"
 use_small_heuristics = "Max"
 group_imports = "StdExternalCrate"
 imports_granularity = "Module"
 use_field_init_shorthand = true
-format_code_in_doc_comments = true
-doc_comment_code_block_width = 100
 match_block_trailing_comma = true
-wrap_comments = true
