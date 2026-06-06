@@ -21,9 +21,10 @@ pub struct SessionRegistry {
 
 impl SessionRegistry {
     pub async fn new(gctx: GlobalContext, config: AriesConfig) -> anyhow::Result<Self> {
-        let mut db = crate::persistence::connect(&gctx.config_dir).await.with_context(|| {
-            format!("Failed to connect local storage: {}", gctx.config_dir.display())
-        })?;
+        #[rustfmt::skip]
+        let mut db = crate::persistence::connect(&gctx.config_dir)
+            .await
+            .with_context(|| format!("connecting to session database at {}", gctx.config_dir.display()))?;
         let _ = crate::migrate(&mut db).await;
 
         let session_repo = SessionRepository::new(db.clone());
@@ -53,6 +54,11 @@ impl SessionRegistry {
             None => self.session_repo.find().await,
         }
         .with_context(|| "Failed to find session info")?;
+
+        let sessions = sessions
+            .into_iter()
+            .filter(|s| PathBuf::from(&s.root_dir).exists())
+            .collect::<Vec<_>>();
 
         Ok(sessions)
     }

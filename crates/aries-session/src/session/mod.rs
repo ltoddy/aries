@@ -55,29 +55,32 @@ impl Session {
         root_dir: impl AsRef<Path>,
         cwd: impl AsRef<Path>,
     ) -> anyhow::Result<Self> {
+        let id = id.into();
         let cwd = cwd.as_ref();
 
+        let client = aries_core::create_client(config.clone())?;
+        let lsp_client = Self::warm_up_lsp(cwd).await;
+
         let root_dir = root_dir.as_ref();
-        create_dir_all(&root_dir).await.with_context(|| {
-            format!("failed to create session directory at: {}", root_dir.display())
-        })?;
+        #[rustfmt::skip]
+        tokio::fs::create_dir_all(&root_dir)
+            .await
+            .with_context(|| format!("failed to create session directory at: {}", root_dir.display()))?;
 
         let transcript_dir = root_dir.join("transcripts");
-
-        let client = aries_core::create_client(config.clone())?;
-        create_dir_all(&transcript_dir).await.with_context(|| {
-            format!("failed to create session transcripts directory at: {}", root_dir.display())
-        })?;
-
-        let lsp_client = Self::warm_up_lsp(cwd).await;
+        #[rustfmt::skip]
+        tokio::fs::create_dir_all(&transcript_dir)
+            .await
+            .with_context(|| format!("failed to create session transcripts directory at: {}", transcript_dir.display()))?;
 
         let (agents, agent_events) =
             Self::create_agents(AgentType::Build, config.clone(), cwd, lsp_client.clone()).await?;
+
         let chat_history = ChatHistory::new(root_dir.join(Self::FILENAME)).await;
         let cancel = CancellationToken::new();
 
         Ok(Self {
-            id: id.into(),
+            id,
             config,
             cwd: cwd.to_path_buf(),
             client,
