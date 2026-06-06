@@ -2,8 +2,8 @@
 
 用法：
 - `file_path` 必须指向一个已存在的文件；如果文件不存在，调用将失败。
-- `old_string` 必须与文件中的现有内容完全匹配，包括空格和缩进。
-- 如果在文件中找不到 `old_string`，编辑将失败并显示错误 `oldString not found in content`。
-- 如果在文件中多次找到 `old_string` 且未设置 `replace_all: true`，编辑将失败并显示错误 `Found multiple matches for oldString. Provide more surrounding lines in oldString to identify the correct match or use replaceAll.`。
-- 使用 `replace_all: true` 可以替换 `old_string` 的所有出现位置。
-- 如果 `old_string` 与 `new_string` 完全相同，调用将失败。
+- `old_text` 必须与文件中的现有内容完全匹配，包括空格和缩进。
+- 如果在文件中找不到 `old_text`，编辑将失败并显示错误 `oldString not found in content`。
+- 如果在文件中多次找到 `old_text` 且未设置 `replace_all: true`，编辑将失败并显示错误 `Found multiple matches for oldString. Provide more surrounding lines in oldString to identify the correct match or use replaceAll.`。
+- 使用 `replace_all: true` 可以替换 `old_text` 的所有出现位置。
+- 如果 `old_text` 与 `new_text` 完全相同，调用将失败。

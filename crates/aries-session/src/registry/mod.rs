@@ -96,14 +96,14 @@ impl SessionRegistry {
 
         let session = Session::new(session_id, self.config.clone(), &root_dir, &cwd)
             .await
-            .with_context(|| format!("Failed to new session at {}", root_dir.display()))?;
+            .with_context(|| format!("Failed to create session at {}", root_dir.display()))?;
 
         self.active_sessions.insert(session.id(), session.clone());
 
         self.session_repo
             .create(&session.id(), &cwd, root_dir.display().to_string())
             .await
-            .with_context(|| "Failed to create session info to local storage")?;
+            .with_context(|| "Failed to create session info in local storage")?;
 
         Ok(session)
     }
@@ -113,7 +113,7 @@ impl SessionRegistry {
             .session_repo
             .find_last_by_session_id(session_id)
             .await
-            .with_context(|| format!("Failed to find session info: {session_id}"))?;
+            .with_context(|| format!("Failed to load session {session_id} from database"))?;
 
         let root_dir = self.gctx.config_dir.join(format!("{}{session_id}", Session::PREFIX));
 

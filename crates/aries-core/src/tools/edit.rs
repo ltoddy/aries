@@ -11,8 +11,8 @@ use super::{RenderError, ToolArgsRender, ToolOutputRender};
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EditArgs {
     pub file_path: PathBuf,
-    pub old_string: String,
-    pub new_string: String,
+    pub old_text: String,
+    pub new_text: String,
     #[serde(default)]
     pub replace_all: bool,
 }
@@ -26,8 +26,8 @@ impl ToolArgsRender for EditArgs {
             first.push_str(" replace_all = true");
         }
 
-        let old_lines = args.old_string.lines().map(|line| format!("- {}", line));
-        let new_lines = args.new_string.lines().map(|line| format!("+ {}", line));
+        let old_lines = args.old_text.lines().map(|line| format!("- {}", line));
+        let new_lines = args.new_text.lines().map(|line| format!("+ {}", line));
         let diff = old_lines.chain(new_lines).collect::<Vec<_>>().join("\n");
         let rest = if diff.is_empty() { None } else { Some(diff) };
 
@@ -75,20 +75,20 @@ impl Tool for EditTool {
                         "type": "string",
                         "description": "The path to the file to modify"
                     },
-                    "old_string": {
+                    "old_text": {
                         "type": "string",
                         "description": "The text to replace"
                     },
-                    "new_string": {
+                    "new_text": {
                         "type": "string",
-                        "description": "The edited text to replace the old_string"
+                        "description": "The edited text to replace the old_text"
                     },
                     "replace_all": {
                         "type": "boolean",
-                        "description": "Replace all occurrences of old_string"
+                        "description": "Replace all occurrences of old_text"
                     }
                 },
-                "required": ["file_path", "old_string", "new_string"]
+                "required": ["file_path", "old_text", "new_text"]
             }),
         }
     }
@@ -104,25 +104,25 @@ impl Tool for EditTool {
             .await
             .map_err(|e| EditError::EditError(format!("Failed to read file: {}", e)))?;
 
-        if args.old_string == args.new_string {
+        if args.old_text == args.new_text {
             return Err(EditError::EditError(
                 "oldString and newString cannot be identical".to_string(),
             ));
         }
 
-        if !content.contains(&args.old_string) {
+        if !content.contains(&args.old_text) {
             return Err(EditError::EditError("oldString not found in content".to_string()));
         }
 
-        let occurrences = content.matches(&args.old_string).count();
+        let occurrences = content.matches(&args.old_text).count();
         if occurrences > 1 && !args.replace_all {
             return Err(EditError::EditError("Found multiple matches for oldString. Provide more surrounding lines in oldString to identify the correct match or use replaceAll.".to_string()));
         }
 
         let new_content = if args.replace_all {
-            content.replace(&args.old_string, &args.new_string)
+            content.replace(&args.old_text, &args.new_text)
         } else {
-            content.replacen(&args.old_string, &args.new_string, 1)
+            content.replacen(&args.old_text, &args.new_text, 1)
         };
 
         fs::write(&args.file_path, new_content)

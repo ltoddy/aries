@@ -10,8 +10,8 @@ use crate::tools::{RenderError, ToolArgsRender, ToolOutputRender};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EditOperation {
-    pub old_string: String,
-    pub new_string: String,
+    pub old_text: String,
+    pub new_text: String,
     #[serde(default)]
     pub replace_all: bool,
 }
@@ -30,8 +30,8 @@ impl ToolArgsRender for MultiEditArgs {
 
         let mut rest_lines = Vec::new();
         for edit in args.edits {
-            let old_lines = edit.old_string.lines().map(|line| format!("- {}", line));
-            let new_lines = edit.new_string.lines().map(|line| format!("+ {}", line));
+            let old_lines = edit.old_text.lines().map(|line| format!("- {}", line));
+            let new_lines = edit.new_text.lines().map(|line| format!("+ {}", line));
             let diff = old_lines.chain(new_lines).collect::<Vec<_>>().join("\n");
             if !diff.is_empty() {
                 rest_lines.push(diff);
@@ -88,20 +88,20 @@ impl Tool for MultiEditTool {
                         "items": {
                             "type": "object",
                             "properties": {
-                                "old_string": {
+                                "old_text": {
                                     "type": "string",
                                     "description": "The text to replace"
                                 },
-                                "new_string": {
+                                "new_text": {
                                     "type": "string",
-                                    "description": "The edited text to replace the old_string"
+                                    "description": "The edited text to replace the old_text"
                                 },
                                 "replace_all": {
                                     "type": "boolean",
-                                    "description": "Replace all occurrences of old_string"
+                                    "description": "Replace all occurrences of old_text"
                                 }
                             },
-                            "required": ["old_string", "new_string"]
+                            "required": ["old_text", "new_text"]
                         }
                     }
                 },
@@ -120,29 +120,29 @@ impl Tool for MultiEditTool {
         };
 
         for edit in args.edits {
-            if edit.old_string == edit.new_string {
+            if edit.old_text == edit.new_text {
                 return Err(MultiEditError::EditError(
-                    "old_string and new_string cannot be identical".to_string(),
+                    "old_text and new_text cannot be identical".to_string(),
                 ));
             }
 
-            if edit.old_string.is_empty() {
-                // If old_string is empty, we just append or initialize (simplified for MVP)
-                content = edit.new_string;
+            if edit.old_text.is_empty() {
+                // If old_text is empty, we just append or initialize (simplified for MVP)
+                content = edit.new_text;
                 continue;
             }
 
-            if !content.contains(&edit.old_string) {
+            if !content.contains(&edit.old_text) {
                 return Err(MultiEditError::EditError(format!(
-                    "old_string not found in file (must match exactly including whitespace): {:?}",
-                    edit.old_string
+                    "old_text not found in file (must match exactly including whitespace): {:?}",
+                    edit.old_text
                 )));
             }
 
             if edit.replace_all {
-                content = content.replace(&edit.old_string, &edit.new_string);
+                content = content.replace(&edit.old_text, &edit.new_text);
             } else {
-                content = content.replacen(&edit.old_string, &edit.new_string, 1);
+                content = content.replacen(&edit.old_text, &edit.new_text, 1);
             }
         }
 

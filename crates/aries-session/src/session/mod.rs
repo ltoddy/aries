@@ -16,7 +16,6 @@ use rig_core::agent::FinalResponse;
 use rig_core::completion::Message;
 use rig_core::providers::{azure, deepseek, openai};
 use rig_core::wasm_compat::WasmCompatSend;
-use tokio::fs::create_dir_all;
 use tokio::sync::Mutex as AsyncMutex;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_util::sync::CancellationToken;
@@ -72,6 +71,8 @@ impl Session {
         tokio::fs::create_dir_all(&transcript_dir)
             .await
             .with_context(|| format!("failed to create session transcripts directory at: {}", transcript_dir.display()))?;
+
+        let project_dir = root_dir.join(sanitize_dir(cwd));
 
         let (agents, agent_events) =
             Self::create_agents(AgentType::Build, config.clone(), cwd, lsp_client.clone()).await?;
@@ -404,4 +405,14 @@ impl Session {
 
         None
     }
+}
+
+#[inline]
+fn sanitize_dir(dir: impl AsRef<Path>) -> String {
+    dir.as_ref()
+        .display()
+        .to_string()
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect()
 }

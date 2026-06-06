@@ -140,26 +140,31 @@ fn title_and_content(t: ToolCall) -> (String, Vec<ToolCallContent>) {
 
     let title = format!("{name}: {args}");
     let content = match name.as_str() {
-        agent::NAME => {
-            let args = serde_json::from_value::<agent::AgentArgs>(arguments);
-
-            args.map(|args| vec![ToolCallContent::Content(Content::new(args.prompt))])
-                .unwrap_or_default()
-        },
-        edit::NAME => {
-            let args = serde_json::from_value::<edit::EditArgs>(arguments);
-            args.map(|args| {
+        agent::NAME => serde_json::from_value::<agent::AgentArgs>(arguments)
+            .map(|args| vec![ToolCallContent::Content(Content::new(args.prompt))])
+            .unwrap_or_default(),
+        edit::NAME => serde_json::from_value::<edit::EditArgs>(arguments)
+            .map(|args| {
                 vec![ToolCallContent::Diff(
-                    Diff::new(args.file_path, args.new_string).old_text(args.old_string),
+                    Diff::new(args.file_path, args.new_text).old_text(args.old_text),
                 )]
             })
-            .unwrap_or_default()
-        },
-        write::NAME => {
-            let args = serde_json::from_value::<write::WriteArgs>(arguments);
-            args.map(|args| vec![ToolCallContent::Diff(Diff::new(args.file_path, args.content))])
-                .unwrap_or_default()
-        },
+            .unwrap_or_default(),
+        multiedit::NAME => serde_json::from_value::<multiedit::MultiEditArgs>(arguments)
+            .map(|args| {
+                args.edits
+                    .into_iter()
+                    .map(|e| {
+                        ToolCallContent::Diff(
+                            Diff::new(args.file_path.clone(), e.new_text).old_text(e.old_text),
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default(),
+        write::NAME => serde_json::from_value::<write::WriteArgs>(arguments)
+            .map(|args| vec![ToolCallContent::Diff(Diff::new(args.file_path, args.content))])
+            .unwrap_or_default(),
         _ => vec![],
     };
 
