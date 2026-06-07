@@ -8,6 +8,7 @@ use std::sync::Arc;
 use anyhow::Context;
 use aries_config::AriesConfig;
 use aries_core::agents::{AgentBuilder, AgentType, AriesAgent, CompactionAgent};
+use aries_core::compact::TokenEstimator;
 use aries_core::event::AgentEvent;
 use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
 use aries_core::{AriesClient, compact};
@@ -182,82 +183,83 @@ impl Session {
         let cancel_token = self.cancel.clone();
         let agent_events = self.agent_events.clone();
 
+        let prompt_msg: Message = prompt.into();
+
+        // 1) 廉价的就地占位符替换（不调 LLM）
+        compact::micro_compact(self.chat_history.history_mut());
+
+        // 2) 事前估算：history + 即将发送的 prompt 是否已经接近上下文窗口上限
+        //    用模型派生的阈值；若超过则先做 LLM 摘要，再把 prompt 发出去，
+        //    避免被 provider 返回 prompt_too_long 才触发的"先失败再压缩"。
+        let window = compact::ContextWindow::for_model(self.config.model());
+        let auto_threshold = window.auto_compact_threshold();
+        let pre_tokens = self
+            .chat_history
+            .history()
+            .estimate_tokens()
+            .saturating_add(std::slice::from_ref(&prompt_msg).estimate_tokens());
+
+        if pre_tokens >= auto_threshold {
+            println!(
+                "\n🔄 estimated tokens: {} >= threshold: {}（窗口 {}）, 提前触发上下文压缩...",
+                pre_tokens, auto_threshold, window.total
+            );
+            self.compact().await;
+        }
+
         let final_res = match &mut self.agents {
             ProviderAgents::OpenAICompatible { agent } => {
-                compact::micro_compact(self.chat_history.history_mut());
-
                 let snapshot = self.chat_history.history().to_vec();
-                let final_res = Self::run_prompt(
+                Self::run_prompt(
                     agent,
-                    prompt,
+                    prompt_msg,
                     &snapshot,
                     &mut cb,
                     agent_events.clone(),
                     cancel_token,
                 )
-                .await?;
-
-                if final_res.usage().total_tokens > compact::TOKEN_THRESHOLD {
-                    println!(
-                        "\n🔄 total token: {} 触发上下文压缩...",
-                        final_res.usage().total_tokens
-                    );
-                    self.compact().await;
-                }
-
-                final_res
+                .await?
             },
             ProviderAgents::Azure { agent } => {
-                compact::micro_compact(self.chat_history.history_mut());
-
                 let snapshot = self.chat_history.history().to_vec();
-                let final_res = Self::run_prompt(
+                Self::run_prompt(
                     agent,
-                    prompt,
+                    prompt_msg,
                     &snapshot,
                     &mut cb,
                     agent_events.clone(),
                     cancel_token,
                 )
-                .await?;
-                if final_res.usage().total_tokens > compact::TOKEN_THRESHOLD {
-                    println!(
-                        "\n🔄 total token: {} 触发上下文压缩...",
-                        final_res.usage().total_tokens
-                    );
-                    self.compact().await;
-                }
-
-                final_res
+                .await?
             },
             ProviderAgents::DeepSeek { agent } => {
-                compact::micro_compact(self.chat_history.history_mut());
-
                 let snapshot = self.chat_history.history().to_vec();
-                let final_res = Self::run_prompt(
+                Self::run_prompt(
                     agent,
-                    prompt,
+                    prompt_msg,
                     &snapshot,
                     &mut cb,
                     agent_events.clone(),
                     cancel_token,
                 )
-                .await?;
-                if final_res.usage().total_tokens > compact::TOKEN_THRESHOLD {
-                    println!(
-                        "\n🔄 total token: {} 触发上下文压缩...",
-                        final_res.usage().total_tokens
-                    );
-                    self.compact().await;
-                }
-
-                final_res
+                .await?
             },
         };
 
         if let Some(his) = final_res.history() {
             self.chat_history.extend(his.iter().cloned());
             self.chat_history.persist();
+        }
+
+        // 3) 事后兜底：provider 实际返回的 usage 若已超阈值，仍然主动压缩，
+        //    保证下一轮 prompt 不会立即被推到边界。
+        if final_res.usage().total_tokens > auto_threshold {
+            println!(
+                "\n🔄 actual tokens: {} >= threshold: {}, 触发上下文压缩...",
+                final_res.usage().total_tokens,
+                auto_threshold
+            );
+            self.compact().await;
         }
 
         Ok(())

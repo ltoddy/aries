@@ -23,8 +23,6 @@ where
     transcript_dir: PathBuf,
 }
 
-pub const TOKEN_THRESHOLD: u64 = 120_000;
-
 impl<M> CompactionAgent<M>
 where
     M: completion::CompletionModel + 'static,
