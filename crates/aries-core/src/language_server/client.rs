@@ -13,11 +13,11 @@ use tokio::process::{Child, Command};
 use tokio::sync::oneshot;
 
 use crate::fs::path_to_uri;
+use crate::jsonrpc::{JsonRpcMessage, Notification, Request, RequestId, Response};
 use crate::language_server::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, DocumentSymbol, Hover,
     Location, LspServerInfo, SymbolInformation,
 };
-use crate::rpc::{JsonRpcMessage, Notification, Request, RequestId, Response};
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(untagged)]

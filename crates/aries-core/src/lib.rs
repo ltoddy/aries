@@ -9,10 +9,10 @@ pub mod error;
 pub mod event;
 pub mod ext;
 pub mod fs;
+pub mod jsonrpc;
 pub mod language_server;
 pub mod preamble;
 pub mod repository;
-pub mod rpc;
 pub mod tools;
 
 pub type AriesResult<T, E = AgentError> = Result<T, E>;
