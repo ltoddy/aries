@@ -8,3 +8,20 @@ pub enum AgentError {
     #[error("Failed to create llm client: {0}")]
     Client(#[from] http_client::Error),
 }
+
+impl AgentError {
+    pub fn is_context_exceeded(&self) -> bool {
+        let content = self.to_string().to_lowercase();
+
+        const PATTERNS: [&str; 6] = [
+            "prompt_too_long",
+            "context_length_exceeded",
+            "maximum context length",
+            "context length exceeded",
+            "too many tokens",
+            "input is too long",
+        ];
+
+        PATTERNS.iter().any(|p| content.contains(p))
+    }
+}

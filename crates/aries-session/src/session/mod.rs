@@ -7,8 +7,8 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use aries_config::AriesConfig;
-use aries_core::agents::{AgentBuilder, AgentType, AriesAgent, CompactionAgent};
-use aries_core::compact::TokenEstimator;
+use aries_core::agents::{AgentBuilder, AgentType, AriesAgent, CompactAgent, CompactOutcome};
+use aries_core::compact::{AutoCompactBreaker, Decision, TokenEstimator};
 use aries_core::event::AgentEvent;
 use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
 use aries_core::{AriesClient, compact};
@@ -36,6 +36,7 @@ pub struct Session {
     transcript_dir: PathBuf,
     cancel: CancellationToken,
     agent_events: Arc<AsyncMutex<UnboundedReceiver<AgentEvent>>>,
+    compact_breaker: AutoCompactBreaker,
 }
 
 #[derive(Clone)]
@@ -93,6 +94,7 @@ impl Session {
             transcript_dir,
             cancel,
             agent_events: Arc::new(AsyncMutex::new(agent_events)),
+            compact_breaker: AutoCompactBreaker::new(),
         })
     }
 
@@ -126,6 +128,7 @@ impl Session {
             transcript_dir,
             cancel,
             agent_events: Arc::new(AsyncMutex::new(agent_events)),
+            compact_breaker: AutoCompactBreaker::new(),
         })
     }
 
@@ -179,30 +182,23 @@ impl Session {
         F: FnMut(AgentEvent) -> Fut,
         Fut: Future<Output = ()>,
     {
+        let prompt: Message = prompt.into();
         self.cancel = CancellationToken::new();
+
         let cancel_token = self.cancel.clone();
         let agent_events = self.agent_events.clone();
 
-        let prompt_msg: Message = prompt.into();
-
-        // 1) 廉价的就地占位符替换（不调 LLM）
         compact::micro_compact(self.chat_history.history_mut());
 
-        // 2) 事前估算：history + 即将发送的 prompt 是否已经接近上下文窗口上限
-        //    用模型派生的阈值；若超过则先做 LLM 摘要，再把 prompt 发出去，
-        //    避免被 provider 返回 prompt_too_long 才触发的"先失败再压缩"。
         let window = compact::ContextWindow::for_model(self.config.model());
-        let auto_threshold = window.auto_compact_threshold();
-        let pre_tokens = self
-            .chat_history
-            .history()
-            .estimate_tokens()
-            .saturating_add(std::slice::from_ref(&prompt_msg).estimate_tokens());
+        let compact_threshold = window.auto_compact_threshold();
+        let estimate_tokens =
+            self.chat_history.history().estimate_tokens().saturating_add(prompt.estimate_tokens());
 
-        if pre_tokens >= auto_threshold {
+        if estimate_tokens >= compact_threshold {
             println!(
-                "\n🔄 estimated tokens: {} >= threshold: {}（窗口 {}）, 提前触发上下文压缩...",
-                pre_tokens, auto_threshold, window.total
+                "\n🔄 预估 tokens {} 已达阈值 {}（上下文窗口 {}），提前触发压缩...",
+                estimate_tokens, compact_threshold, window.total
             );
             self.compact().await;
         }
@@ -212,7 +208,7 @@ impl Session {
                 let snapshot = self.chat_history.history().to_vec();
                 Self::run_prompt(
                     agent,
-                    prompt_msg,
+                    prompt,
                     &snapshot,
                     &mut cb,
                     agent_events.clone(),
@@ -224,7 +220,7 @@ impl Session {
                 let snapshot = self.chat_history.history().to_vec();
                 Self::run_prompt(
                     agent,
-                    prompt_msg,
+                    prompt,
                     &snapshot,
                     &mut cb,
                     agent_events.clone(),
@@ -236,7 +232,7 @@ impl Session {
                 let snapshot = self.chat_history.history().to_vec();
                 Self::run_prompt(
                     agent,
-                    prompt_msg,
+                    prompt,
                     &snapshot,
                     &mut cb,
                     agent_events.clone(),
@@ -251,13 +247,11 @@ impl Session {
             self.chat_history.persist();
         }
 
-        // 3) 事后兜底：provider 实际返回的 usage 若已超阈值，仍然主动压缩，
-        //    保证下一轮 prompt 不会立即被推到边界。
-        if final_res.usage().total_tokens > auto_threshold {
+        if final_res.usage().total_tokens > compact_threshold {
             println!(
-                "\n🔄 actual tokens: {} >= threshold: {}, 触发上下文压缩...",
+                "\n🔄 实际 tokens {} 已达阈值 {}，触发压缩...",
                 final_res.usage().total_tokens,
-                auto_threshold
+                compact_threshold
             );
             self.compact().await;
         }
@@ -266,37 +260,81 @@ impl Session {
     }
 
     pub async fn compact(&mut self) -> bool {
-        match self.client.clone() {
-            AriesClient::OpenAI(client) => {
-                let mut compact_agent =
-                    CompactionAgent::new(client, self.config.model(), &self.transcript_dir);
-
-                if let Some(compressed) = compact_agent.compact(self.chat_history.history()).await {
-                    self.chat_history.reset(&compressed);
-                    return true;
-                }
+        match self.compact_breaker.decide() {
+            Decision::Skip { wait, consecutive_failures } => {
+                println!(
+                    "\n⏳ 压缩处于冷却期（已连续失败 {} 次），约 {} 秒后重试，本次跳过。",
+                    consecutive_failures,
+                    wait.as_secs(),
+                );
+                return false;
             },
-            AriesClient::Azure(client) => {
-                let mut compact_agent =
-                    CompactionAgent::new(client, self.config.model(), &self.transcript_dir);
-
-                if let Some(compressed) = compact_agent.compact(self.chat_history.history()).await {
-                    self.chat_history.reset(&compressed);
-                    return true;
-                }
-            },
-            AriesClient::DeepSeek(client) => {
-                let mut compact_agent =
-                    CompactionAgent::new(client, self.config.model(), &self.transcript_dir);
-
-                if let Some(compressed) = compact_agent.compact(self.chat_history.history()).await {
-                    self.chat_history.reset(&compressed);
-                    return true;
+            Decision::Allow { half_open } => {
+                if half_open {
+                    println!("\n🔁 冷却结束，尝试恢复压缩...");
                 }
             },
         }
 
-        false
+        let outcome = match self.client.clone() {
+            AriesClient::OpenAI(client) => {
+                let mut compact_agent =
+                    CompactAgent::new(client, self.config.model(), &self.transcript_dir);
+                compact_agent.compact(self.chat_history.history()).await
+            },
+            AriesClient::Azure(client) => {
+                let mut compact_agent =
+                    CompactAgent::new(client, self.config.model(), &self.transcript_dir);
+                compact_agent.compact(self.chat_history.history()).await
+            },
+            AriesClient::DeepSeek(client) => {
+                let mut compact_agent =
+                    CompactAgent::new(client, self.config.model(), &self.transcript_dir);
+                compact_agent.compact(self.chat_history.history()).await
+            },
+        };
+
+        match outcome {
+            CompactOutcome::Success(compressed) => {
+                self.chat_history.reset(&compressed);
+
+                let window = compact::ContextWindow::for_model(self.config.model());
+                let post_tokens = self.chat_history.history().estimate_tokens();
+                let threshold = window.auto_compact_threshold();
+                if post_tokens >= threshold {
+                    println!(
+                        "\n⚠️  压缩后 tokens {} 仍高于阈值 {}，本次压缩无效。",
+                        post_tokens, threshold,
+                    );
+                    self.compact_breaker.on_failure();
+                    return false;
+                }
+
+                self.compact_breaker.on_success();
+                true
+            },
+            CompactOutcome::Transient(err) => {
+                println!("\n🌐 压缩遇到临时错误（不计入失败）：{}", err);
+                false
+            },
+            CompactOutcome::PromptTooLong => {
+                println!("\n🛑 上下文过长，压缩请求被拒，进入冷却以避免反复重试。");
+                self.compact_breaker.trip();
+                false
+            },
+            CompactOutcome::Empty => {
+                self.compact_breaker.on_failure();
+                let failures = self.compact_breaker.consecutive_failures();
+                if failures >= AutoCompactBreaker::MAX_CONSECUTIVE_AUTOCOMPACT_FAILURES {
+                    println!(
+                        "\n⛔ 连续 {} 次压缩失败，进入 {} 分钟冷却。",
+                        failures,
+                        AutoCompactBreaker::AUTOCOMPACT_FAILURE_COOLDOWN.as_secs() / 60,
+                    );
+                }
+                false
+            },
+        }
     }
 
     async fn run_prompt<M, F, Fut>(

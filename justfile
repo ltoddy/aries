@@ -1,5 +1,5 @@
 install:
-    @cargo install --path crates/aries-cli
+    @cargo +stable install --path crates/aries-cli --locked
 
 run:
     @cargo run
@@ -25,22 +25,3 @@ fix:
 
 lint: fmt-check clippy
 
-ui-install:
-    @cd crates/aries-ui/app && npm install
-
-ui-dev:
-    @cd crates/aries-ui/app && npm run dev
-
-ui-build:
-    @cd crates/aries-ui/app && npm run build
-
-ui-tauri-dev:
-    @cd crates/aries-ui && cargo tauri dev
-
-ui-tauri-build:
-    @cd crates/aries-ui/app && npm run build
-    @cd crates/aries-ui && cargo tauri build
-
-ui-macos-package:
-    @cd crates/aries-ui/app && npm run build
-    @cd crates/aries-ui && cargo tauri build --bundles app,dmg

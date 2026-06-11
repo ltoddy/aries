@@ -96,25 +96,8 @@ impl Tool for BashTool {
             .await
             .map_err(|e| BashError::ExecutionFailed(e.to_string()))?;
 
-        let mut stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let mut stderr = String::from_utf8_lossy(&output.stderr).to_string();
-
-        // Helper function to truncate string to max lines
-        fn truncate_lines(s: &mut String, max_lines: usize) {
-            let line_count = s.lines().count();
-            if line_count > max_lines {
-                let truncated: Vec<&str> = s.lines().take(max_lines).collect();
-                *s = format!(
-                    "{}\n\n... ({} more lines truncated)",
-                    truncated.join("\n"),
-                    line_count - max_lines
-                );
-            }
-        }
-
-        // Limit the number of lines returned to the LLM and printed to terminal
-        truncate_lines(&mut stdout, 200);
-        truncate_lines(&mut stderr, 200);
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
         Ok(BashOutput { stdout, stderr, exit_code: output.status.code().unwrap_or(-1) })
     }

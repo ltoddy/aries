@@ -1,6 +1,6 @@
 pub mod agent_type;
 pub mod builder;
-pub mod compaction;
+pub mod compact;
 pub mod summary;
 pub mod title;
 
@@ -13,7 +13,7 @@ use tokio::sync::mpsc::UnboundedSender;
 
 pub use self::agent_type::AgentType;
 pub use self::builder::AgentBuilder;
-pub use self::compaction::CompactionAgent;
+pub use self::compact::{CompactAgent, CompactOutcome};
 pub use self::summary::SummaryAgent;
 pub use self::title::TitleAgent;
 use crate::AriesResult;
