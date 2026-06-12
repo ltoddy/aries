@@ -203,19 +203,16 @@ fn locations(t: ToolCall) -> Option<Vec<ToolCallLocation>> {
 
     match name {
         read::NAME => serde_json::from_value::<read::ReadArgs>(arguments)
-            .map(|args| {
-                let line = args.offset.and_then(|o| u32::try_from(o).ok());
-                vec![ToolCallLocation::new(args.file_path).line(line)]
-            })
+            .map(|args| vec![ToolCallLocation::new(args.location())])
             .ok(),
         write::NAME => serde_json::from_value::<write::WriteArgs>(arguments)
-            .map(|args| vec![ToolCallLocation::new(args.file_path)])
+            .map(|args| vec![ToolCallLocation::new(args.location())])
             .ok(),
         edit::NAME => serde_json::from_value::<edit::EditArgs>(arguments)
-            .map(|args| vec![ToolCallLocation::new(args.file_path)])
+            .map(|args| vec![ToolCallLocation::new(args.location())])
             .ok(),
         multiedit::NAME => serde_json::from_value::<multiedit::MultiEditArgs>(arguments)
-            .map(|args| vec![ToolCallLocation::new(args.file_path)])
+            .map(|args| vec![ToolCallLocation::new(args.location())])
             .ok(),
         ls::NAME => serde_json::from_value::<ls::LsArgs>(arguments)
             .ok()

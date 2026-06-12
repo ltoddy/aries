@@ -17,6 +17,12 @@ pub struct EditArgs {
     pub replace_all: bool,
 }
 
+impl EditArgs {
+    pub fn location(&self) -> impl Into<PathBuf> {
+        &self.file_path
+    }
+}
+
 impl ToolArgsRender for EditArgs {
     fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
         let args: Self = serde_json::from_str(raw)?;

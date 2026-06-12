@@ -14,6 +14,12 @@ pub struct WriteArgs {
     pub content: String,
 }
 
+impl WriteArgs {
+    pub fn location(&self) -> impl Into<PathBuf> {
+        &self.file_path
+    }
+}
+
 impl ToolArgsRender for WriteArgs {
     fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
         let args: Self = serde_json::from_str(raw)?;

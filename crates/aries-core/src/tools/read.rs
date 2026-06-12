@@ -15,6 +15,12 @@ pub struct ReadArgs {
     pub offset: Option<usize>,
 }
 
+impl ReadArgs {
+    pub fn location(&self) -> impl Into<PathBuf> {
+        &self.file_path
+    }
+}
+
 impl ToolArgsRender for ReadArgs {
     fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
         let args: Self = serde_json::from_str(raw)?;
