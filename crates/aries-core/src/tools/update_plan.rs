@@ -42,7 +42,32 @@ pub enum PlanEntryStatus {
 impl ToolArgsRender for UpdatePlanArgs {
     fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
         let args: Self = serde_json::from_str(raw)?;
-        Ok((format!("plan ({} entries)", args.items.len()), None))
+
+        let first = format!("{} plan entries", args.items.len());
+        if args.items.is_empty() {
+            return Ok((first, None));
+        }
+
+        let detail = args
+            .items
+            .into_iter()
+            .map(|item| {
+                let priority = match item.priority {
+                    PlanEntryPriority::High => "high",
+                    PlanEntryPriority::Medium => "medium",
+                    PlanEntryPriority::Low => "low",
+                };
+                let status = match item.status {
+                    PlanEntryStatus::Pending => "pending",
+                    PlanEntryStatus::InProgress => "in_progress",
+                    PlanEntryStatus::Completed => "completed",
+                };
+                format!("- [{}|{}] {}", priority, status, item.content)
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        Ok((first, Some(detail)))
     }
 }
 

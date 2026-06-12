@@ -64,7 +64,7 @@ impl Tool for WriteTool {
                 "properties": {
                     "file_path": {
                         "type": "string",
-                        "description": "The absolute path to the file to write"
+                        "description": "The path to the file to write"
                     },
                     "content": {
                         "type": "string",

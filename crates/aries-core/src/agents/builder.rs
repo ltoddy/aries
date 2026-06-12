@@ -100,6 +100,8 @@ where
             Box::new(tools::grep::GrepTool::new(self.cwd.clone())),
             Box::new(tools::ls::LsTool::new(self.cwd.clone())),
             Box::new(tools::codesearch::CodeSearchTool),
+            Box::new(tools::webfetch::WebFetchTool),
+            Box::new(tools::websearch::WebSearchTool),
         ];
 
         if matches!(agent_type, AgentType::Build | AgentType::General) {

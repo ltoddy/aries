@@ -16,18 +16,12 @@ pub fn print_agent_event(
     theme: Theme,
     tool_names: &mut HashMap<String, String>,
 ) {
-    let prefix = if event.main {
-        String::new()
-    } else {
-        format!("{} ", theme.magenta_text(&format!("[{}]", event.name)))
-    };
-
     match event.signal {
         AgentSignal::Stream(item) => match item {
             MultiTurnStreamItem::StreamAssistantItem(content) => match content {
                 StreamedAssistantContent::Text(text) => {
                     if !text.text.is_empty() {
-                        print!("{}{}", prefix, text.text);
+                        print!("{}", text.text);
                         let _ = std::io::stdout().flush();
                     }
                 },
@@ -37,7 +31,7 @@ pub fn print_agent_event(
                     let args = tool_call.function.arguments.to_string();
                     let (call_str, rest) =
                         format_tool_call_args(&tool_call.function.name, &args, &theme);
-                    println!("\n{}{} {}", prefix, theme.cyan_text("•"), call_str);
+                    println!("\n{} {}", theme.cyan_text("•"), call_str);
                     if let Some(rest) = rest {
                         println!("{}", rest);
                     }
@@ -59,14 +53,14 @@ pub fn print_agent_event(
                     .collect::<Vec<_>>()
                     .join("\n");
                 let formatted = format_tool_result_output(&tool_name, &raw, theme);
-                println!("{}{}", prefix, formatted);
+                println!("{formatted}");
             },
             MultiTurnStreamItem::FinalResponse(res) if event.main => {
                 display_token_usage(&res.usage(), &theme);
             },
             _ => {},
         },
-        AgentSignal::PlanUpdate(entries) => print_plan_entries(&prefix, entries, &theme),
+        AgentSignal::PlanUpdate(entries) => print_plan_entries(entries, &theme),
     }
 }
 
@@ -100,6 +94,7 @@ fn is_known_tool(tool_name: &str) -> bool {
             | tools::question::NAME
             | tools::read::NAME
             | tools::skill::NAME
+            | tools::update_plan::NAME
             | tools::webfetch::NAME
             | tools::websearch::NAME
             | tools::write::NAME
@@ -151,12 +146,12 @@ pub fn preview(content: impl Into<String>) -> String {
     }
 }
 
-fn print_plan_entries(prefix: &str, entries: Vec<PlanEntry>, theme: &Theme) {
+fn print_plan_entries(entries: Vec<PlanEntry>, theme: &Theme) {
     if entries.is_empty() {
-        println!("\n{}{} Plan cleared", prefix, theme.cyan_text("📋"));
+        println!("\n{} Plan cleared", theme.cyan_text("📋"));
         return;
     }
-    println!("\n{}{} Plan", prefix, theme.cyan_text("📋"));
+    println!("\n{} Plan", theme.cyan_text("📋"));
     for entry in entries {
         println!("  {}", format_plan_entry(&entry, theme));
     }
