@@ -23,6 +23,12 @@ pub struct AskUserQuestionArgs {
     pub custom: bool,
 }
 
+impl AskUserQuestionArgs {
+    pub fn title(&self) -> String {
+        format!("Ask user: {}", self.question)
+    }
+}
+
 impl ToolArgsRender for AskUserQuestionArgs {
     fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
         let args: Self = serde_json::from_str(raw)?;

@@ -26,6 +26,10 @@ impl MultiEditArgs {
     pub fn location(&self) -> impl Into<PathBuf> {
         &self.file_path
     }
+
+    pub fn title(&self) -> String {
+        format!("Edit file {} with {} changes", self.file_path.display(), self.edits.len())
+    }
 }
 
 impl ToolArgsRender for MultiEditArgs {

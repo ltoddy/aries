@@ -16,6 +16,16 @@ pub struct UpdatePlanArgs {
     pub items: Vec<PlanEntry>,
 }
 
+impl UpdatePlanArgs {
+    pub fn title(&self) -> String {
+        if self.items.is_empty() {
+            "Clear plan".to_string()
+        } else {
+            format!("Update plan with {} items", self.items.len())
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct PlanEntry {
     pub content: String,

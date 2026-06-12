@@ -18,6 +18,10 @@ impl WriteArgs {
     pub fn location(&self) -> impl Into<PathBuf> {
         &self.file_path
     }
+
+    pub fn title(&self) -> String {
+        format!("Write file {}", self.file_path.display())
+    }
 }
 
 impl ToolArgsRender for WriteArgs {

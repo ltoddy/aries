@@ -15,6 +15,13 @@ pub struct LsArgs {
     pub ignore: Option<Vec<String>>,
 }
 
+impl LsArgs {
+    pub fn title(&self) -> String {
+        let path = self.path.as_deref().unwrap_or_else(|| std::path::Path::new("."));
+        format!("List the {} directory's contents", path.display())
+    }
+}
+
 impl ToolArgsRender for LsArgs {
     fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
         let args: Self = serde_json::from_str(raw)?;

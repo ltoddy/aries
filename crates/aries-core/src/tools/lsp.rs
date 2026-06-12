@@ -48,6 +48,16 @@ pub struct LspArgs {
     pub query: Option<String>,
 }
 
+impl LspArgs {
+    pub fn title(&self) -> String {
+        match (&self.file_path, &self.query) {
+            (Some(path), _) => format!("Run {} on {}", self.operation, path.display()),
+            (None, Some(query)) => format!("Run {} for {}", self.operation, query),
+            (None, None) => format!("Run {}", self.operation),
+        }
+    }
+}
+
 impl ToolArgsRender for LspArgs {
     fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
         let args: Self = serde_json::from_str(raw)?;

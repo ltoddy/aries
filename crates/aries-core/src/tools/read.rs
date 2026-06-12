@@ -19,6 +19,10 @@ impl ReadArgs {
     pub fn location(&self) -> impl Into<PathBuf> {
         &self.file_path
     }
+
+    pub fn title(&self) -> String {
+        format!("Read file {}", self.file_path.display())
+    }
 }
 
 impl ToolArgsRender for ReadArgs {

@@ -24,6 +24,12 @@ pub struct AgentArgs {
     pub task_id: Option<String>,
 }
 
+impl AgentArgs {
+    pub fn title(&self) -> String {
+        format!("Launch {} subagent: {}", self.subagent_type, self.description)
+    }
+}
+
 impl ToolArgsRender for AgentArgs {
     fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
         let args: Self = serde_json::from_str(raw)?;

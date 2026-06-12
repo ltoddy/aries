@@ -27,6 +27,12 @@ pub struct BatchArgs {
     pub calls: Vec<BatchCall>,
 }
 
+impl BatchArgs {
+    pub fn title(&self) -> String {
+        format!("Run {} tool calls in parallel", self.calls.len())
+    }
+}
+
 impl ToolArgsRender for BatchArgs {
     fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
         let args: Self = serde_json::from_str(raw)?;

@@ -11,6 +11,12 @@ pub struct CodeSearchArgs {
     pub tokens_num: Option<i32>,
 }
 
+impl CodeSearchArgs {
+    pub fn title(&self) -> String {
+        format!("Search code context for {}", self.query)
+    }
+}
+
 impl ToolArgsRender for CodeSearchArgs {
     fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
         let args: Self = serde_json::from_str(raw)?;
