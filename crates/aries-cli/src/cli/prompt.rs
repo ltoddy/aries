@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use aries_config::AriesConfigLoader;
 use aries_context::GlobalContext;
+use aries_init::SettingLoader;
 use aries_session::SessionRegistry;
 use clap::Parser;
 
@@ -18,10 +18,10 @@ pub struct PromptArgs {
 pub async fn execute(args: PromptArgs, gctx: GlobalContext) -> anyhow::Result<()> {
     let session_id = nanoid::nanoid!();
 
-    let loader = AriesConfigLoader::new(&gctx.config_dir);
-    let config = loader.load_or_setup().await?;
+    let loader = SettingLoader::new(&gctx.root_dir);
+    let setting = loader.load().await?;
 
-    let mut registry = SessionRegistry::new(gctx.clone(), config.clone()).await?;
+    let mut registry = SessionRegistry::new(gctx.clone(), setting).await?;
 
     let current_dir = gctx.current_dir.display().to_string();
 

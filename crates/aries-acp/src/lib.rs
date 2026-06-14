@@ -8,8 +8,8 @@ pub mod session;
 use std::sync::Arc;
 
 use agent_client_protocol::{Agent, ConnectTo, on_receive_notification, on_receive_request};
-use aries_config::AriesConfig;
 use aries_context::GlobalContext;
+use aries_init::Setting;
 use aries_session::SessionRegistry;
 use tokio::sync::Mutex;
 
@@ -27,10 +27,11 @@ type SharedRegistry = Arc<Mutex<SessionRegistry>>;
 
 pub async fn run(
     gctx: GlobalContext,
-    config: AriesConfig,
+    setting: Setting,
     transport: impl ConnectTo<Agent> + 'static,
 ) -> anyhow::Result<()> {
-    let registry: SharedRegistry = Arc::new(Mutex::new(SessionRegistry::new(gctx, config).await?));
+    let registry: SharedRegistry =
+        Arc::new(Mutex::new(SessionRegistry::new(gctx, setting.clone()).await?));
 
     Agent
         .builder()
@@ -40,8 +41,9 @@ pub async fn run(
         .on_receive_request(
             {
                 let register = registry.clone();
+                let setting = setting.clone();
                 async move |req, responder, cx| {
-                    new_session(req, responder, cx, register.clone()).await
+                    new_session(req, responder, cx, register.clone(), setting.clone()).await
                 }
             },
             on_receive_request!(),
@@ -49,8 +51,9 @@ pub async fn run(
         .on_receive_request(
             {
                 let registry = registry.clone();
+                let setting = setting.clone();
                 async move |req, responder, cx| {
-                    load_session(req, responder, cx, registry.clone()).await
+                    load_session(req, responder, cx, registry.clone(), setting.clone()).await
                 }
             },
             on_receive_request!(),
@@ -83,7 +86,17 @@ pub async fn run(
         .on_receive_request(close_session, on_receive_request!())
         .on_receive_request(logout, on_receive_request!())
         .on_receive_request(resume_session, on_receive_request!())
-        .on_receive_request(set_session_config_option, on_receive_request!())
+        .on_receive_request(
+            {
+                let registry = registry.clone();
+                let setting = setting.clone();
+                async move |req, responder, cx| {
+                    set_session_config_option(req, responder, cx, registry.clone(), setting.clone())
+                        .await
+                }
+            },
+            on_receive_request!(),
+        )
         .on_receive_notification(
             async move |args, cx| cancel(args, cx, registry.clone()).await,
             on_receive_notification!(),

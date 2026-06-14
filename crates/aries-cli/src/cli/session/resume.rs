@@ -1,7 +1,7 @@
 use aries_context::GlobalContext;
 use clap::Parser;
 
-use crate::cli::session::run_session;
+use crate::cli::run_session;
 
 #[derive(Clone, Debug, Parser)]
 pub struct ResumeSessionsArgs {

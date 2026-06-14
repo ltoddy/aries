@@ -12,9 +12,9 @@ pub struct ListSessionsArgs {
 }
 
 pub async fn execute(args: ListSessionsArgs, gctx: GlobalContext) -> anyhow::Result<()> {
-    let db = aries_session::connect(&gctx.config_dir)
+    let db = aries_session::connect(&gctx.root_dir)
         .await
-        .with_context(|| format!("Failed to connect local storage: {}", gctx.config_dir.display()))
+        .with_context(|| format!("Failed to connect local storage: {}", gctx.root_dir.display()))
         .expect("Run `aries init -h` for initialization");
     let mut session_repo = aries_session::persistence::SessionRepository::new(db);
 

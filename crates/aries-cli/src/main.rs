@@ -9,7 +9,8 @@ mod welcome;
 use aries_context::GlobalContext;
 use clap::Parser;
 
-use crate::cli::SessionCommand;
+use crate::cli::model::{self, ModelCommand};
+use crate::cli::session::{self, SessionCommand};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -17,15 +18,20 @@ async fn main() -> anyhow::Result<()> {
 
     let gctx = GlobalContext::new()?;
     match args.command {
-        Some(cli::Subcommands::Init { command }) => cli::init::execute(gctx, command).await,
         Some(cli::Subcommands::Setup) => cli::setup::execute(gctx).await,
         Some(cli::Subcommands::Acp) => cli::acp::execute(gctx).await,
         Some(cli::Subcommands::Session { command }) => match command {
-            SessionCommand::List(args) => cli::list_sessions::execute(args, gctx).await,
-            SessionCommand::Prune(args) => cli::prune_sessions::execute(args, gctx).await,
-            SessionCommand::Resume(args) => cli::resume_session::execute(args, gctx).await,
+            SessionCommand::List(args) => session::list::execute(args, gctx).await,
+            SessionCommand::Prune(args) => session::prune::execute(args, gctx).await,
+            SessionCommand::Resume(args) => session::resume::execute(args, gctx).await,
+        },
+        Some(cli::Subcommands::Model { command }) => match command {
+            ModelCommand::Add(args) => model::add::execute(args, gctx).await,
+            ModelCommand::Default(args) => model::default::execute(args, gctx).await,
+            ModelCommand::List(args) => model::list::execute(args, gctx).await,
+            ModelCommand::Rm(args) => model::rm::execute(args, gctx).await,
         },
         Some(cli::Subcommands::Prompt(args)) => cli::prompt::execute(args, gctx).await,
-        _ => cli::session::run_session(gctx, nanoid::nanoid!()).await,
+        _ => cli::run_session(gctx, nanoid::nanoid!()).await,
     }
 }

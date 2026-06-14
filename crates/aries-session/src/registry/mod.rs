@@ -2,16 +2,16 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use anyhow::Context;
-use aries_config::AriesConfig;
 use aries_context::GlobalContext;
 use aries_core::ext::hook::{HooksExecutor, HooksLoader};
+use aries_init::Setting;
 
 use crate::Session;
 use crate::persistence::SessionRepository;
 
 pub struct SessionRegistry {
     gctx: GlobalContext,
-    config: AriesConfig,
+    setting: Setting,
 
     active_sessions: HashMap<String, Session>,
     session_repo: SessionRepository,
@@ -20,11 +20,11 @@ pub struct SessionRegistry {
 }
 
 impl SessionRegistry {
-    pub async fn new(gctx: GlobalContext, config: AriesConfig) -> anyhow::Result<Self> {
+    pub async fn new(gctx: GlobalContext, setting: Setting) -> anyhow::Result<Self> {
         #[rustfmt::skip]
-        let mut db = crate::persistence::connect(&gctx.config_dir)
+        let mut db = crate::persistence::connect(&gctx.root_dir)
             .await
-            .with_context(|| format!("connecting to session database at {}", gctx.config_dir.display()))?;
+            .with_context(|| format!("connecting to session database at {}", gctx.root_dir.display()))?;
         let _ = crate::migrate(&mut db).await;
 
         let session_repo = SessionRepository::new(db.clone());
@@ -33,7 +33,13 @@ impl SessionRegistry {
         let hooks = hooks_loader.load().await.unwrap_or_default();
         let hooks_executor = HooksExecutor::new(hooks);
 
-        Ok(Self { gctx, config, active_sessions: Default::default(), session_repo, hooks_executor })
+        Ok(Self {
+            gctx,
+            setting,
+            active_sessions: Default::default(),
+            session_repo,
+            hooks_executor,
+        })
     }
 
     pub async fn list_projects(&mut self) -> anyhow::Result<Vec<String>> {
@@ -92,9 +98,11 @@ impl SessionRegistry {
         let cwd = cwd.into();
 
         let session_id = nanoid::nanoid!();
-        let root_dir = self.gctx.config_dir.join(format!("{}{session_id}", Session::PREFIX));
+        let root_dir = self.gctx.root_dir.join(format!("{}{session_id}", Session::PREFIX));
 
-        let session = Session::new(session_id, self.config.clone(), &root_dir, &cwd)
+        let model_config = self.setting.active_model()?;
+
+        let session = Session::new(session_id, model_config, &root_dir, &cwd)
             .await
             .with_context(|| format!("Failed to create session at {}", root_dir.display()))?;
 
@@ -115,11 +123,13 @@ impl SessionRegistry {
             .await
             .with_context(|| format!("Failed to load session {session_id} from database"))?;
 
-        let root_dir = self.gctx.config_dir.join(format!("{}{session_id}", Session::PREFIX));
+        let root_dir = self.gctx.root_dir.join(format!("{}{session_id}", Session::PREFIX));
+
+        let model_config = self.setting.active_model()?;
 
         let session = Session::load(
             session.session_id,
-            self.config.clone(),
+            model_config,
             root_dir.clone(),
             PathBuf::from(session.cwd),
         )

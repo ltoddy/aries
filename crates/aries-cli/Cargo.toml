@@ -12,9 +12,9 @@ path = "src/main.rs"
 agent-client-protocol.workspace = true
 anyhow.workspace = true
 aries-acp = { path = "../aries-acp" }
-aries-config = { path = "../aries-config" }
 aries-context = { path = "../aries-context" }
 aries-core = { path = "../aries-core" }
+aries-init = { path = "../aries-init" }
 aries-session = { path = "../aries-session" }
 clap = { workspace = true, features = ["derive"] }
 colored.workspace = true

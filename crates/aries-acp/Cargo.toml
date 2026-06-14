@@ -6,9 +6,9 @@ edition = "2024"
 [dependencies]
 agent-client-protocol.workspace = true
 anyhow.workspace = true
-aries-config = { path = "../aries-config" }
 aries-context = { path = "../aries-context" }
 aries-core = { path = "../aries-core" }
+aries-init = { path = "../aries-init" }
 aries-session = { path = "../aries-session" }
 itertools.workspace = true
 parking_lot.workspace = true

@@ -3,8 +3,17 @@ use terminal_size::{Width, terminal_size};
 
 use crate::theme::Theme;
 
-pub fn welcome(provider: &str, model: &str, session_id: &str, context: &GlobalContext) {
+pub fn welcome(
+    provider: impl Into<String>,
+    model: impl Into<String>,
+    session_id: impl Into<String>,
+    context: &GlobalContext,
+) {
     let theme = Theme::default();
+
+    let provider = provider.into();
+    let model = model.into();
+    let session_id = session_id.into();
 
     let name = env!("CARGO_BIN_NAME");
     let version = env!("CARGO_PKG_VERSION");

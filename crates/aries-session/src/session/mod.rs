@@ -6,12 +6,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::Context;
-use aries_config::AriesConfig;
 use aries_core::agents::{AgentBuilder, AgentType, AriesAgent, CompactAgent, CompactOutcome};
 use aries_core::compact::{AutoCompactBreaker, Decision, TokenEstimator};
 use aries_core::event::AgentEvent;
 use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
 use aries_core::{AriesClient, compact};
+use aries_init::ModelConfig;
 use futures::pin_mut;
 use rig_core::agent::FinalResponse;
 use rig_core::completion::Message;
@@ -26,7 +26,7 @@ use crate::session::history::ChatHistory;
 #[derive(Clone)]
 pub struct Session {
     id: String,
-    config: AriesConfig,
+    config: ModelConfig,
     cwd: PathBuf,
     client: AriesClient,
     agents: ProviderAgents,
@@ -52,7 +52,7 @@ impl Session {
 
     pub async fn new(
         id: impl Into<String>,
-        config: AriesConfig,
+        config: ModelConfig,
         root_dir: impl AsRef<Path>,
         cwd: impl AsRef<Path>,
     ) -> anyhow::Result<Self> {
@@ -100,7 +100,7 @@ impl Session {
 
     pub async fn load(
         id: String,
-        config: AriesConfig,
+        config: ModelConfig,
         root_dir: impl AsRef<Path>,
         cwd: impl AsRef<Path>,
     ) -> anyhow::Result<Self> {
@@ -190,7 +190,7 @@ impl Session {
 
         compact::micro_compact(self.chat_history.history_mut());
 
-        let window = compact::ContextWindow::for_model(self.config.model());
+        let window = compact::ContextWindow::for_model(self.config.model().into());
         let compact_threshold = window.auto_compact_threshold();
         let estimate_tokens =
             self.chat_history.history().estimate_tokens().saturating_add(prompt.estimate_tokens());
@@ -393,11 +393,11 @@ impl Session {
 
     async fn create_agents(
         agent_type: AgentType,
-        config: AriesConfig,
+        config: ModelConfig,
         cwd: impl AsRef<Path>,
         lsp_client: Option<SharedLspClient>,
     ) -> anyhow::Result<(ProviderAgents, UnboundedReceiver<AgentEvent>)> {
-        let model = config.model().to_owned();
+        let model = config.model().into();
         let cwd = cwd.as_ref().to_path_buf();
 
         let client = aries_core::create_client(config.clone())?;

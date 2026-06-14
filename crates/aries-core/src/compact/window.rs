@@ -20,8 +20,8 @@ impl ContextWindow {
 
     const AUTO_COMPACT_BUFFER_TOKENS: u64 = 13_000;
 
-    pub fn for_model(model: &str) -> Self {
-        let m = model.to_ascii_lowercase();
+    pub fn for_model(model: impl Into<String>) -> Self {
+        let m = model.into().to_ascii_lowercase();
         let total = if m.contains("deepseek") || m.contains("gpt-5") {
             Self::LARGE_CONTEXT_WINDOW
         } else {

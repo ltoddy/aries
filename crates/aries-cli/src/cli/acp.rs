@@ -1,10 +1,10 @@
 use agent_client_protocol::Stdio;
-use aries_config::AriesConfigLoader;
 use aries_context::GlobalContext;
+use aries_init::SettingLoader;
 
 pub async fn execute(gctx: GlobalContext) -> anyhow::Result<()> {
-    let loader = AriesConfigLoader::new(&gctx.config_dir);
-    let config = loader.load_or_setup().await?;
+    let loader = SettingLoader::new(&gctx.root_dir);
+    let setting = loader.load().await?;
 
-    aries_acp::run(gctx, config, Stdio::new()).await
+    aries_acp::run(gctx, setting, Stdio::new()).await
 }

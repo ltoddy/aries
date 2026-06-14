@@ -1,34 +1,24 @@
+use anyhow::Context;
 use aries_context::GlobalContext;
-use aries_init::{ModelConfig, Provider, Setting, SettingLoader};
+use aries_init::{ModelConfig, Provider, SettingLoader};
+use clap::Parser;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input, Select};
 
-use crate::theme::Theme;
+#[derive(Clone, Debug, Parser)]
+pub struct AddModelArgs {}
 
-pub async fn execute(gctx: GlobalContext) -> anyhow::Result<()> {
-    let theme = Theme::default();
-
-    let mut db = aries_session::connect(&gctx.root_dir).await?;
-    let _ = aries_session::migrate(&mut db).await;
-
-    let setting = setup()?;
+pub async fn execute(_: AddModelArgs, gctx: GlobalContext) -> anyhow::Result<()> {
     let loader = SettingLoader::new(gctx.root_dir);
-    loader.save(&setting).await?;
+    let mut setting = loader.load().await.with_context(
+        || "failed to load setting; run `aries setup` to initialize the configuration",
+    )?;
 
-    let file_path = loader.file_path();
-    let file_path = file_path.as_ref();
+    println!("Current models:");
+    let table = setting.table();
+    table.printstd();
 
-    println!(
-        "{}",
-        theme.green_text(&format!("Configuration saved successfully to {}", file_path.display()))
-    );
-    Ok(())
-}
-
-fn setup() -> anyhow::Result<Setting> {
-    println!("Welcome to Aries! Let's set up your AI model configuration.");
     let theme = ColorfulTheme::default();
-
     let providers: [Provider; 3] = [Provider::Azure, Provider::DeepSeek, Provider::OpenAI];
     let items = providers.iter().map(|p| p.to_string()).collect::<Vec<_>>();
     let provider = &providers
@@ -115,7 +105,10 @@ fn setup() -> anyhow::Result<Setting> {
         },
     };
 
-    let setting = Setting::new(model);
+    setting.add_model(model);
+    loader.save(&setting).await?;
 
-    Ok(setting)
+    println!("model added.");
+
+    Ok(())
 }

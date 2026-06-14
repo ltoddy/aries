@@ -1,4 +1,3 @@
-use aries_context::GlobalContext;
 use aries_session::Session;
 use clap::{CommandFactory, Parser, Subcommand};
 
@@ -7,7 +6,6 @@ use crate::theme::Theme;
 pub mod compact;
 pub mod completer;
 pub mod exit;
-pub mod setup;
 pub mod shell;
 
 #[derive(Parser)]
@@ -26,8 +24,6 @@ pub enum Command {
         #[arg(trailing_var_arg = true)]
         command: Vec<String>,
     },
-    /// Open configuration setup
-    Setup,
     /// Clear chat history
     ClearHistory,
     /// Force compact conversation context
@@ -49,7 +45,7 @@ impl Command {
     }
 }
 
-pub async fn execute(input: &str, theme: &Theme, gctx: &GlobalContext, session: &mut Session) {
+pub async fn execute(input: &str, theme: &Theme, session: &mut Session) {
     let input = input.strip_prefix('/').unwrap_or(input);
     let mut args = vec![String::from(env!("CARGO_BIN_NAME"))];
 
@@ -78,11 +74,6 @@ pub async fn execute(input: &str, theme: &Theme, gctx: &GlobalContext, session: 
         Command::Shell { command } => {
             let cmd = command.join(" ");
             shell::execute(&cmd, theme).await;
-        },
-        Command::Setup => {
-            if let Err(e) = setup::execute(theme, &gctx.config_dir).await {
-                eprintln!("Error: {}", e);
-            }
         },
         Command::ClearHistory => {
             session.clear_history();
