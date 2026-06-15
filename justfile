@@ -20,7 +20,7 @@ fmt-check:
     @cargo +nightly fmt -- --check
 
 fix:
-    @cargo clippy --fix --allow-dirty
+    @cargo clippy --fix --allow-dirty --all
     @cargo +nightly fmt
 
 lint: fmt-check clippy

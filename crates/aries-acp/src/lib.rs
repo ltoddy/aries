@@ -20,7 +20,7 @@ use crate::logout::logout;
 use crate::prompt::prompt;
 use crate::session::{
     close_session, list_session, load_session, new_session, resume_session,
-    set_session_config_option, set_session_mode,
+    set_session_config_option,
 };
 
 type SharedRegistry = Arc<Mutex<SessionRegistry>>;
@@ -30,8 +30,7 @@ pub async fn run(
     setting: Setting,
     transport: impl ConnectTo<Agent> + 'static,
 ) -> anyhow::Result<()> {
-    let registry: SharedRegistry =
-        Arc::new(Mutex::new(SessionRegistry::new(gctx, setting.clone()).await?));
+    let registry: SharedRegistry = Arc::new(Mutex::new(SessionRegistry::new(gctx, setting).await?));
 
     Agent
         .builder()
@@ -41,9 +40,8 @@ pub async fn run(
         .on_receive_request(
             {
                 let register = registry.clone();
-                let setting = setting.clone();
                 async move |req, responder, cx| {
-                    new_session(req, responder, cx, register.clone(), setting.clone()).await
+                    new_session(req, responder, cx, register.clone()).await
                 }
             },
             on_receive_request!(),
@@ -51,9 +49,8 @@ pub async fn run(
         .on_receive_request(
             {
                 let registry = registry.clone();
-                let setting = setting.clone();
                 async move |req, responder, cx| {
-                    load_session(req, responder, cx, registry.clone(), setting.clone()).await
+                    load_session(req, responder, cx, registry.clone()).await
                 }
             },
             on_receive_request!(),
@@ -63,15 +60,6 @@ pub async fn run(
                 let registry = registry.clone();
                 async move |req, responder, cx| {
                     list_session(req, responder, cx, registry.clone()).await
-                }
-            },
-            on_receive_request!(),
-        )
-        .on_receive_request(
-            {
-                let registry = registry.clone();
-                async move |req, responder, cx| {
-                    set_session_mode(req, responder, cx, registry.clone()).await
                 }
             },
             on_receive_request!(),
@@ -89,10 +77,8 @@ pub async fn run(
         .on_receive_request(
             {
                 let registry = registry.clone();
-                let setting = setting.clone();
                 async move |req, responder, cx| {
-                    set_session_config_option(req, responder, cx, registry.clone(), setting.clone())
-                        .await
+                    set_session_config_option(req, responder, cx, registry.clone()).await
                 }
             },
             on_receive_request!(),

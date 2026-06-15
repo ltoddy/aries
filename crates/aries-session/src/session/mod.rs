@@ -6,44 +6,44 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::Context;
-use aries_core::agents::{AgentBuilder, AgentType, AriesAgent, CompactAgent, CompactOutcome};
+use aries_core::agents::{CompactAgent, CompactOutcome, Mode};
 use aries_core::compact::{AutoCompactBreaker, Decision, TokenEstimator};
 use aries_core::event::AgentEvent;
 use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
-use aries_core::{AriesClient, compact};
-use aries_init::ModelConfig;
+use aries_core::{agents, compact};
+use aries_init::{ModelConfig, Setting, SettingError};
 use futures::pin_mut;
 use rig_core::agent::FinalResponse;
 use rig_core::completion::Message;
-use rig_core::providers::{azure, deepseek, openai};
 use rig_core::wasm_compat::WasmCompatSend;
 use tokio::sync::Mutex as AsyncMutex;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_util::sync::CancellationToken;
 
 use crate::session::history::ChatHistory;
+use crate::{AriesAgent, AriesClient};
 
 #[derive(Clone)]
 pub struct Session {
     id: String,
+
+    setting: Setting,
     config: ModelConfig,
     cwd: PathBuf,
     client: AriesClient,
-    agents: ProviderAgents,
+    agent: AriesAgent,
+    mode: Mode,
+
     lsp_client: Option<SharedLspClient>,
     chat_history: ChatHistory,
+
     root_dir: PathBuf,
     transcript_dir: PathBuf,
-    cancel: CancellationToken,
-    agent_events: Arc<AsyncMutex<UnboundedReceiver<AgentEvent>>>,
-    compact_breaker: AutoCompactBreaker,
-}
 
-#[derive(Clone)]
-enum ProviderAgents {
-    OpenAICompatible { agent: AriesAgent<openai::CompletionModel> },
-    Azure { agent: AriesAgent<azure::CompletionModel> },
-    DeepSeek { agent: AriesAgent<deepseek::CompletionModel> },
+    cancel: CancellationToken,
+    receiver: Arc<AsyncMutex<UnboundedReceiver<AgentEvent>>>,
+
+    compact_breaker: AutoCompactBreaker,
 }
 
 impl Session {
@@ -52,14 +52,15 @@ impl Session {
 
     pub async fn new(
         id: impl Into<String>,
-        config: ModelConfig,
         root_dir: impl AsRef<Path>,
         cwd: impl AsRef<Path>,
+        config: ModelConfig,
+        setting: Setting,
     ) -> anyhow::Result<Self> {
         let id = id.into();
         let cwd = cwd.as_ref();
 
-        let client = aries_core::create_client(config.clone())?;
+        let client = AriesClient::new(&config)?;
         let lsp_client = Self::warm_up_lsp(cwd).await;
 
         let root_dir = root_dir.as_ref();
@@ -74,60 +75,64 @@ impl Session {
             .await
             .with_context(|| format!("failed to create session transcripts directory at: {}", transcript_dir.display()))?;
 
-        let project_dir = root_dir.join(sanitize_dir(cwd));
-
-        let (agents, agent_events) =
-            Self::create_agents(AgentType::Build, config.clone(), cwd, lsp_client.clone()).await?;
+        let mode = Mode::default();
+        let (agent, receiver) = client.agent(mode, config.clone(), cwd, lsp_client.clone()).await?;
 
         let chat_history = ChatHistory::new(root_dir.join(Self::FILENAME)).await;
         let cancel = CancellationToken::new();
 
         Ok(Self {
             id,
+            setting,
             config,
             cwd: cwd.to_path_buf(),
             client,
-            agents,
+            agent,
+            mode,
             lsp_client,
             chat_history,
             root_dir: root_dir.to_path_buf(),
             transcript_dir,
             cancel,
-            agent_events: Arc::new(AsyncMutex::new(agent_events)),
+            receiver: Arc::new(AsyncMutex::new(receiver)),
             compact_breaker: AutoCompactBreaker::new(),
         })
     }
 
     pub async fn load(
         id: String,
-        config: ModelConfig,
         root_dir: impl AsRef<Path>,
         cwd: impl AsRef<Path>,
+        config: ModelConfig,
+        setting: Setting,
     ) -> anyhow::Result<Self> {
         let cwd = cwd.as_ref();
         let root_dir = root_dir.as_ref();
         let transcript_dir = root_dir.join("transcripts");
 
         let lsp_client = Self::warm_up_lsp(cwd).await;
-        let client = aries_core::create_client(config.clone())?;
+        let client = AriesClient::new(&config)?;
 
-        let (agents, agent_events) =
-            Self::create_agents(AgentType::Build, config.clone(), cwd, lsp_client.clone()).await?;
+        let mode = Mode::default();
+        let (agent, agent_events) =
+            client.agent(mode, config.clone(), cwd, lsp_client.clone()).await?;
         let chat_history = ChatHistory::new(root_dir.join(Self::FILENAME)).await;
         let cancel = CancellationToken::new();
 
         Ok(Self {
             id,
+            setting,
             config,
             cwd: cwd.to_path_buf(),
             client,
-            agents,
+            agent,
+            mode,
             lsp_client,
             chat_history,
             root_dir: root_dir.to_path_buf(),
             transcript_dir,
             cancel,
-            agent_events: Arc::new(AsyncMutex::new(agent_events)),
+            receiver: Arc::new(AsyncMutex::new(agent_events)),
             compact_breaker: AutoCompactBreaker::new(),
         })
     }
@@ -137,11 +142,15 @@ impl Session {
     }
 
     pub fn system_prompt(&self) -> &str {
-        match &self.agents {
-            ProviderAgents::OpenAICompatible { agent, .. } => agent.system_prompt(),
-            ProviderAgents::Azure { agent, .. } => agent.system_prompt(),
-            ProviderAgents::DeepSeek { agent, .. } => agent.system_prompt(),
-        }
+        self.agent.system_prompt()
+    }
+
+    pub fn mode(&self) -> Mode {
+        self.mode
+    }
+
+    pub fn setting(&self) -> &Setting {
+        &self.setting
     }
 
     pub fn history(&self) -> &[Message] {
@@ -156,16 +165,34 @@ impl Session {
         self.cancel.cancel();
     }
 
-    pub async fn switch_agent(&mut self, agent_type: AgentType) -> anyhow::Result<()> {
-        let (agents, agent_events) = Self::create_agents(
-            agent_type,
-            self.config.clone(),
-            self.cwd.clone(),
-            self.lsp_client.clone(),
-        )
-        .await?;
-        self.agents = agents;
-        self.agent_events = Arc::new(AsyncMutex::new(agent_events));
+    pub async fn set_model(&mut self, alias: impl Into<String>) -> anyhow::Result<()> {
+        let alias = alias.into();
+
+        let config = match self.setting.models.iter().find(|m| m.alias().into() == alias) {
+            Some(config) => config,
+            None => return Err(SettingError::not_found(alias).into()),
+        };
+        self.client = AriesClient::new(config)?;
+        let (agent, agent_events) = self
+            .client
+            .agent(self.mode, self.config.clone(), self.cwd.clone(), self.lsp_client.clone())
+            .await?;
+        self.agent = agent;
+        self.receiver = Arc::new(AsyncMutex::new(agent_events));
+        self.config = config.to_owned();
+        self.setting.active = alias;
+        Ok(())
+    }
+
+    pub async fn set_mode(&mut self, mode: Mode) -> anyhow::Result<()> {
+        let (agent, agent_events) = self
+            .client
+            .agent(mode, self.config.clone(), self.cwd.clone(), self.lsp_client.clone())
+            .await?;
+
+        self.mode = mode;
+        self.agent = agent;
+        self.receiver = Arc::new(AsyncMutex::new(agent_events));
         Ok(())
     }
 
@@ -186,7 +213,7 @@ impl Session {
         self.cancel = CancellationToken::new();
 
         let cancel_token = self.cancel.clone();
-        let agent_events = self.agent_events.clone();
+        let agent_events = self.receiver.clone();
 
         compact::micro_compact(self.chat_history.history_mut());
 
@@ -203,8 +230,8 @@ impl Session {
             self.compact().await;
         }
 
-        let final_res = match &mut self.agents {
-            ProviderAgents::OpenAICompatible { agent } => {
+        let final_res = match &mut self.agent {
+            AriesAgent::Azure(agent) => {
                 let snapshot = self.chat_history.history().to_vec();
                 Self::run_prompt(
                     agent,
@@ -216,7 +243,7 @@ impl Session {
                 )
                 .await?
             },
-            ProviderAgents::Azure { agent } => {
+            AriesAgent::Deepseek(agent) => {
                 let snapshot = self.chat_history.history().to_vec();
                 Self::run_prompt(
                     agent,
@@ -228,7 +255,7 @@ impl Session {
                 )
                 .await?
             },
-            ProviderAgents::DeepSeek { agent } => {
+            AriesAgent::OpenAI(agent) => {
                 let snapshot = self.chat_history.history().to_vec();
                 Self::run_prompt(
                     agent,
@@ -277,17 +304,17 @@ impl Session {
         }
 
         let outcome = match self.client.clone() {
-            AriesClient::OpenAI(client) => {
-                let mut compact_agent =
-                    CompactAgent::new(client, self.config.model(), &self.transcript_dir);
-                compact_agent.compact(self.chat_history.history()).await
-            },
             AriesClient::Azure(client) => {
                 let mut compact_agent =
                     CompactAgent::new(client, self.config.model(), &self.transcript_dir);
                 compact_agent.compact(self.chat_history.history()).await
             },
-            AriesClient::DeepSeek(client) => {
+            AriesClient::Deepseek(client) => {
+                let mut compact_agent =
+                    CompactAgent::new(client, self.config.model(), &self.transcript_dir);
+                compact_agent.compact(self.chat_history.history()).await
+            },
+            AriesClient::OpenAI(client) => {
                 let mut compact_agent =
                     CompactAgent::new(client, self.config.model(), &self.transcript_dir);
                 compact_agent.compact(self.chat_history.history()).await
@@ -338,7 +365,7 @@ impl Session {
     }
 
     async fn run_prompt<M, F, Fut>(
-        agent: &mut AriesAgent<M>,
+        agent: &mut agents::AriesAgent<M>,
         prompt: impl Into<Message> + WasmCompatSend,
         history: &[Message],
         cb: &mut Option<F>,
@@ -389,48 +416,6 @@ impl Session {
         }
 
         Ok(final_res)
-    }
-
-    async fn create_agents(
-        agent_type: AgentType,
-        config: ModelConfig,
-        cwd: impl AsRef<Path>,
-        lsp_client: Option<SharedLspClient>,
-    ) -> anyhow::Result<(ProviderAgents, UnboundedReceiver<AgentEvent>)> {
-        let model = config.model().into();
-        let cwd = cwd.as_ref().to_path_buf();
-
-        let client = aries_core::create_client(config.clone())?;
-
-        let (agents, receiver) = match client {
-            AriesClient::OpenAI(client) => {
-                let (agent, receiver) = AgentBuilder::<openai::CompletionsClient>::new(
-                    client.clone(),
-                    &model,
-                    agent_type,
-                    cwd,
-                )
-                .with_tools(lsp_client)
-                .await;
-                (ProviderAgents::OpenAICompatible { agent }, receiver)
-            },
-            AriesClient::Azure(client) => {
-                let (agent, receiver) =
-                    AgentBuilder::<azure::Client>::new(client.clone(), &model, agent_type, cwd)
-                        .with_tools(lsp_client)
-                        .await;
-                (ProviderAgents::Azure { agent }, receiver)
-            },
-            AriesClient::DeepSeek(client) => {
-                let (agent, receiver) =
-                    AgentBuilder::<deepseek::Client>::new(client.clone(), &model, agent_type, cwd)
-                        .with_tools(lsp_client)
-                        .await;
-                (ProviderAgents::DeepSeek { agent }, receiver)
-            },
-        };
-
-        Ok((agents, receiver))
     }
 
     async fn warm_up_lsp(dir: impl AsRef<Path>) -> Option<SharedLspClient> {

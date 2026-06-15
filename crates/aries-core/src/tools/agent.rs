@@ -9,8 +9,8 @@ use rig_core::tool::Tool;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::agents::{AgentBuilder, AgentType};
-use crate::error::AgentError;
+use crate::AgentError;
+use crate::agents::{AgentBuilder, Mode};
 use crate::event::AgentEvent;
 use crate::tools::{RenderError, ToolArgsRender, ToolOutputRender};
 
@@ -20,13 +20,13 @@ pub const NAME: &str = "Agent";
 pub struct AgentArgs {
     pub description: String,
     pub prompt: String,
-    pub subagent_type: String,
+    pub mode: String,
     pub task_id: Option<String>,
 }
 
 impl AgentArgs {
     pub fn title(&self) -> String {
-        format!("Launch {} subagent: {}", self.subagent_type, self.description)
+        format!("Launch {} subagent: {}", self.mode, self.description)
     }
 }
 
@@ -35,7 +35,7 @@ impl ToolArgsRender for AgentArgs {
         let args: Self = serde_json::from_str(raw)?;
 
         let mut first = args.description;
-        first.push_str(&format!(", subagent_type = {}", args.subagent_type));
+        first.push_str(&format!(", mode = {}", args.mode));
         if let Some(task_id) = &args.task_id {
             first.push_str(&format!(", task_id = {}", task_id));
         }
@@ -107,7 +107,7 @@ where
                         "type": "string",
                         "description": "The highly detailed task description for the agent to perform autonomously"
                     },
-                    "subagent_type": {
+                    "mode": {
                         "type": "string",
                         "description": "The type of agent to launch (e.g. 'explore', 'plan', 'default')"
                     },
@@ -116,7 +116,7 @@ where
                         "description": "Optional task ID to resume a previous subagent session"
                     }
                 },
-                "required": ["description", "prompt", "subagent_type"]
+                "required": ["description", "prompt", "mode"]
             }),
         }
     }
@@ -124,19 +124,19 @@ where
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         let task_id = args.task_id.unwrap_or_else(|| nanoid::nanoid!());
 
-        let agent_type = match args.subagent_type.as_str() {
-            "default" | "build" => AgentType::Build,
-            "explore" => AgentType::Explore,
-            "plan" => AgentType::Plan,
-            "general" => AgentType::General,
-            _ => AgentType::General,
+        let mode = match args.mode.as_str() {
+            "default" | "build" => Mode::Build,
+            "explore" => Mode::Explore,
+            "plan" => Mode::Plan,
+            "general" => Mode::General,
+            _ => Mode::General,
         };
 
         let client = self.client.clone();
         let model = self.model.clone();
         let cwd = self.cwd.clone();
 
-        let mut agent = AgentBuilder::<C>::new(client, model, agent_type, cwd).build();
+        let mut agent = AgentBuilder::<C>::new(client, model, mode, cwd).build();
 
         let stream = agent.stream_prompt::<Vec<_>, Message>(&args.prompt, vec![]).await;
         tokio::pin!(stream);
@@ -145,7 +145,7 @@ where
         while let Some(chunk) = stream.next().await {
             match chunk {
                 Ok(item) => {
-                    let event = AgentEvent::from_stream(false, agent_type.name(), item.clone());
+                    let event = AgentEvent::from_stream(false, mode.name(), item.clone());
                     let _ = self.sender.send(event);
 
                     if let MultiTurnStreamItem::FinalResponse(res) = item {

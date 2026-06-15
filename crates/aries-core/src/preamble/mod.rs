@@ -5,18 +5,18 @@ mod skill;
 
 use std::path::Path;
 
-use crate::agents::AgentType;
+use crate::agents::Mode;
 use crate::ext::skill::SkillDefinition;
 
 pub async fn render(
     cwd: impl AsRef<Path>,
-    agent_type: AgentType,
+    mode: Mode,
     model: &str,
     available_skills: &[SkillDefinition],
 ) -> String {
-    match agent_type {
-        AgentType::Build | AgentType::General => {
-            let mut preamble = agent_type.bare_preamble().to_string();
+    match mode {
+        Mode::Build | Mode::General => {
+            let mut preamble = mode.bare_preamble().to_string();
 
             preamble.push('\n');
             preamble.push_str(&env::render(&cwd, model));
@@ -45,6 +45,6 @@ pub async fn render(
 
             preamble
         },
-        _ => agent_type.bare_preamble().to_string(),
+        _ => mode.bare_preamble().to_string(),
     }
 }

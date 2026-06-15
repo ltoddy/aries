@@ -1,9 +1,8 @@
 use rig_core::client::CompletionClient;
 use rig_core::completion::{self, Message};
 
-use crate::AriesResult;
 use crate::agents::{AGENT_LOOP_MAX_TURNS, AriesAgent};
-use crate::error::AgentError;
+use crate::{AgentError, AriesResult};
 
 const PREAMBLE: &str = include_str!("prompts/title.txt");
 const NAME: &str = "Namer";

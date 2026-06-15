@@ -15,6 +15,19 @@ pub enum SettingError {
     ActiveModelNotFound(String),
 }
 
+impl SettingError {
+    pub fn duplicate(alias: impl Into<String>) -> Self {
+        let alias = alias.into();
+        Self::DuplicateModelAlias(alias)
+    }
+
+    pub fn not_found(alias: impl Into<String>) -> Self {
+        let alias = alias.into();
+        Self::ActiveModelNotFound(alias)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct SettingLoader {
     file_path: PathBuf,
 }
@@ -105,7 +118,17 @@ impl Setting {
             .iter()
             .find(|m| m.alias().into() == self.active)
             .cloned()
-            .ok_or_else(|| SettingError::ActiveModelNotFound(self.active.clone()))
+            .ok_or_else(|| SettingError::not_found(self.active.clone()))
+    }
+
+    pub fn activate(&mut self, alias: impl Into<String>) -> Result<(), SettingError> {
+        let alias = alias.into();
+        if !self.models.iter().any(|m| m.alias().into() == alias) {
+            return Err(SettingError::not_found(alias));
+        }
+
+        self.active = alias;
+        Ok(())
     }
 
     #[inline]

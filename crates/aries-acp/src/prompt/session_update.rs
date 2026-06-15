@@ -29,6 +29,20 @@ impl SessionUpdates {
                 MultiTurnStreamItem::StreamUserItem(v) => {
                     Self(Self::from_stream_user_content(v, tool_calls))
                 },
+                MultiTurnStreamItem::FinalResponse(res) => {
+                    let usage = res.usage();
+                    let text = format!(
+                        "\n\nUsage: input tokens = {} (cached = {}), output tokens = {}, total tokens = {}, reasoning tokens = {}",
+                        usage.input_tokens,
+                        usage.cached_input_tokens,
+                        usage.output_tokens,
+                        usage.total_tokens,
+                        usage.reasoning_tokens,
+                    );
+                    Self(vec![SessionUpdate::AgentMessageChunk(ContentChunk::new(
+                        ContentBlock::from(text),
+                    ))])
+                },
                 _ => Self(Vec::new()),
             },
             AgentSignal::PlanUpdate(entries) => Self(Self::from_plan_entries(entries)),

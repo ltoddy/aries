@@ -1,10 +1,10 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use aries_core::ext::hook::input::{PostToolUseHookInput, PreToolUseHookInput};
 use aries_core::ext::hook::{HookDecision, HooksExecutor};
 use rig_core::agent::{HookAction, PromptHook, ToolCallHookAction};
-use rig_core::completion::CompletionModel;
+use rig_core::completion::{CompletionModel, CompletionResponse, Message};
 use serde_json::Value;
 
 #[derive(Clone)]
@@ -12,22 +12,17 @@ pub struct SessionPromptHook {
     executor: Arc<HooksExecutor>,
     session_id: String,
     cwd: PathBuf,
-    transcript_path: PathBuf,
 }
 
 impl SessionPromptHook {
     pub fn new(
         executor: Arc<HooksExecutor>,
         session_id: impl Into<String>,
-        cwd: impl Into<PathBuf>,
-        transcript_path: impl Into<PathBuf>,
+        cwd: impl AsRef<Path>,
     ) -> Self {
-        Self {
-            executor,
-            session_id: session_id.into(),
-            cwd: cwd.into(),
-            transcript_path: transcript_path.into(),
-        }
+        let session_id = session_id.into();
+        let cwd = cwd.as_ref().to_path_buf();
+        Self { executor, session_id, cwd }
     }
 }
 
@@ -35,6 +30,18 @@ impl<M> PromptHook<M> for SessionPromptHook
 where
     M: CompletionModel,
 {
+    async fn on_completion_call(&self, _prompt: &Message, _history: &[Message]) -> HookAction {
+        HookAction::cont()
+    }
+
+    async fn on_completion_response(
+        &self,
+        _prompt: &Message,
+        _response: &CompletionResponse<M::Response>,
+    ) -> HookAction {
+        HookAction::cont()
+    }
+
     async fn on_tool_call(
         &self,
         tool_name: &str,
@@ -47,11 +54,9 @@ where
 
         let input = PreToolUseHookInput {
             session_id: self.session_id.clone(),
-            transcript_path: self.transcript_path.clone(),
             cwd: self.cwd.clone(),
             permission_mode: None,
             agent_id: None,
-            agent_type: None,
             hook_event_name: "PreToolUse".to_owned(),
             tool_name: tool_name.to_owned(),
             tool_input,
@@ -79,11 +84,9 @@ where
 
         let input = PostToolUseHookInput {
             session_id: self.session_id.clone(),
-            transcript_path: self.transcript_path.clone(),
             cwd: self.cwd.clone(),
             permission_mode: None,
             agent_id: None,
-            agent_type: None,
             hook_event_name: "PostToolUse".to_owned(),
             tool_name: tool_name.to_owned(),
             tool_input,
@@ -95,5 +98,27 @@ where
             HookDecision::Continue => HookAction::cont(),
             HookDecision::Terminate { reason } => HookAction::terminate(reason),
         }
+    }
+
+    async fn on_text_delta(&self, _text_delta: &str, _aggregated_text: &str) -> HookAction {
+        HookAction::cont()
+    }
+
+    async fn on_tool_call_delta(
+        &self,
+        _tool_call_id: &str,
+        _internal_call_id: &str,
+        _tool_name: Option<&str>,
+        _tool_call_delta: &str,
+    ) -> HookAction {
+        HookAction::cont()
+    }
+
+    async fn on_stream_completion_response_finish(
+        &self,
+        _prompt: &Message,
+        _response: &<M as CompletionModel>::StreamingResponse,
+    ) -> HookAction {
+        HookAction::cont()
     }
 }

@@ -1,13 +1,15 @@
+use std::fmt::{Display, Formatter};
+use std::str::FromStr;
+
 use agent_client_protocol::schema::{
     CloseSessionRequest, CloseSessionResponse, ListSessionsRequest, ListSessionsResponse,
     LoadSessionRequest, LoadSessionResponse, NewSessionRequest, NewSessionResponse,
-    ResumeSessionRequest, ResumeSessionResponse, SessionConfigOption, SessionConfigOptionCategory,
-    SessionConfigSelectOption, SessionConfigSelectOptions, SessionInfo,
-    SetSessionConfigOptionRequest, SetSessionConfigOptionResponse, SetSessionModeRequest,
-    SetSessionModeResponse,
+    ResumeSessionRequest, ResumeSessionResponse, SessionConfigId, SessionConfigOption,
+    SessionConfigOptionCategory, SessionConfigSelectOption, SessionConfigSelectOptions,
+    SessionInfo, SetSessionConfigOptionRequest, SetSessionConfigOptionResponse,
 };
 use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
-use aries_core::agents::AgentType;
+use aries_core::agents::Mode;
 use aries_init::Setting;
 use tracing::info;
 
@@ -18,7 +20,6 @@ pub async fn new_session(
     responder: Responder<NewSessionResponse>,
     _: ConnectionTo<Client>,
     registry: SharedRegistry,
-    setting: Setting,
 ) -> Result<(), Error> {
     info!("Received new session request {req:?}");
 
@@ -31,7 +32,7 @@ pub async fn new_session(
         },
     };
 
-    let config_options = config_options(&setting, AgentType::Build);
+    let config_options = config_options(session.setting(), session.mode());
     let resp = NewSessionResponse::new(session.id()).config_options(config_options);
     responder.respond(resp)
 }
@@ -41,17 +42,18 @@ pub async fn load_session(
     responder: Responder<LoadSessionResponse>,
     _: ConnectionTo<Client>,
     registry: SharedRegistry,
-    setting: Setting,
 ) -> Result<(), Error> {
     info!("Received list sessions request {req:?}");
 
     let session_id = req.session_id.to_string();
     let mut reg = registry.lock().await;
-    if let Err(err) = reg.load_session(&session_id).await {
-        return responder.respond_with_internal_error(err.to_string());
-    }
 
-    let config_options = config_options(&setting, AgentType::Build);
+    let session = match reg.load_session(session_id).await {
+        Ok(session) => session,
+        Err(err) => return responder.respond_with_internal_error(err.to_string()),
+    };
+
+    let config_options = config_options(session.setting(), session.mode());
     let resp = LoadSessionResponse::new().config_options(config_options);
     responder.respond(resp)
 }
@@ -80,35 +82,8 @@ pub async fn list_session(
         })
         .collect();
 
-    responder.respond(ListSessionsResponse::new(sessions))
-}
-
-pub async fn set_session_mode(
-    req: SetSessionModeRequest,
-    responder: Responder<SetSessionModeResponse>,
-    _: ConnectionTo<Client>,
-    registry: SharedRegistry,
-) -> Result<(), Error> {
-    info!("Received set session mode request {req:?}");
-
-    let session_id = req.session_id.to_string();
-    let mut session = {
-        let reg = registry.lock().await;
-        match reg.get_session(&session_id) {
-            Some(session) => session,
-            None => {
-                return responder.respond_with_error(Error::resource_not_found(Some(session_id)));
-            },
-        }
-    };
-
-    let mode_id = req.mode_id.to_string();
-    let agent_type = AgentType::from_id(&mode_id);
-    if let Err(err) = session.switch_agent(agent_type).await {
-        return responder.respond_with_internal_error(err.to_string());
-    }
-
-    responder.respond(SetSessionModeResponse::new())
+    let resp = ListSessionsResponse::new(sessions);
+    responder.respond(resp)
 }
 
 pub async fn close_session(
@@ -119,7 +94,8 @@ pub async fn close_session(
     let session_id = req.session_id.to_string();
     info!("Received close session request for {session_id}");
 
-    responder.respond(CloseSessionResponse::new())
+    let resp = CloseSessionResponse::new();
+    responder.respond(resp)
 }
 
 pub async fn set_session_config_option(
@@ -127,7 +103,6 @@ pub async fn set_session_config_option(
     responder: Responder<SetSessionConfigOptionResponse>,
     _: ConnectionTo<Client>,
     registry: SharedRegistry,
-    setting: Setting,
 ) -> Result<(), Error> {
     info!("Received set session config option request {req:?}");
 
@@ -135,32 +110,45 @@ pub async fn set_session_config_option(
     let config_id = req.config_id.to_string();
     let value = req.value.to_string();
 
-    let (mut session, setting) = {
+    let mut session = {
         let reg = registry.lock().await;
         match reg.get_session(&session_id) {
-            Some(session) => (session, setting),
+            Some(session) => session,
             None => {
                 return responder.respond_with_error(Error::resource_not_found(Some(session_id)));
             },
         }
     };
 
-    let current_mode = match config_id.as_str() {
-        MODE_CONFIG_ID => {
-            let agent_type = AgentType::from_id(&value);
-            if let Err(err) = session.switch_agent(agent_type).await {
-                return responder.respond_with_internal_error(err.to_string());
-            }
-            agent_type
-        },
-        MODEL_CONFIG_ID => {
-            // TODO: switch the active model on the session once supported.
-            AgentType::Build
-        },
-        _ => AgentType::Build,
-    };
+    if let Ok(session_config) = config_id.parse::<SessionConfig>() {
+        return match session_config {
+            SessionConfig::Mode => {
+                let mode = Mode::from_str(&value).unwrap_or_default();
+                if let Err(err) = session.set_mode(mode).await {
+                    return responder.respond_with_internal_error(err.to_string());
+                }
+                let resp = SetSessionConfigOptionResponse::new(config_options(
+                    session.setting(),
+                    session.mode(),
+                ));
+                responder.respond(resp)
+            },
+            SessionConfig::Model => {
+                if let Err(err) = session.set_model(value).await {
+                    return responder.respond_with_internal_error(err.to_string());
+                };
+                let resp = SetSessionConfigOptionResponse::new(config_options(
+                    session.setting(),
+                    session.mode(),
+                ));
+                responder.respond(resp)
+            },
+        };
+    }
 
-    responder.respond(SetSessionConfigOptionResponse::new(config_options(&setting, current_mode)))
+    let resp =
+        SetSessionConfigOptionResponse::new(config_options(session.setting(), session.mode()));
+    responder.respond(resp)
 }
 
 pub async fn resume_session(
@@ -170,18 +158,74 @@ pub async fn resume_session(
 ) -> Result<(), Error> {
     info!("Received resume session request {req:?}");
 
-    responder.respond(ResumeSessionResponse::new())
+    let resp = ResumeSessionResponse::new();
+    responder.respond(resp)
 }
 
-const MODE_CONFIG_ID: &str = "mode";
-const MODEL_CONFIG_ID: &str = "model";
+#[derive(Debug, Copy, Clone)]
+pub enum SessionConfig {
+    Mode,
+    Model,
+}
 
-fn config_options(setting: &Setting, current_mode: AgentType) -> Vec<SessionConfigOption> {
+impl Display for SessionConfig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SessionConfig::Mode => write!(f, "mode"),
+            SessionConfig::Model => write!(f, "model"),
+        }
+    }
+}
+
+impl From<SessionConfig> for SessionConfigId {
+    fn from(val: SessionConfig) -> Self {
+        match val {
+            SessionConfig::Mode => SessionConfigId::new("mode"),
+            SessionConfig::Model => SessionConfigId::new("model"),
+        }
+    }
+}
+
+impl From<SessionConfig> for String {
+    fn from(val: SessionConfig) -> Self {
+        match val {
+            SessionConfig::Mode => String::from("mode"),
+            SessionConfig::Model => String::from("model"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseSessionConfigError;
+
+impl Display for ParseSessionConfigError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        "provieded string was not `mode` or `model`".fmt(f)
+    }
+}
+
+impl std::error::Error for ParseSessionConfigError {}
+
+impl FromStr for SessionConfig {
+    type Err = ParseSessionConfigError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.trim();
+
+        match s {
+            "mode" => Ok(SessionConfig::Mode),
+            "model" => Ok(SessionConfig::Model),
+            _ => Err(ParseSessionConfigError),
+        }
+    }
+}
+
+fn config_options(setting: &Setting, current_mode: Mode) -> Vec<SessionConfigOption> {
     vec![mode_option(current_mode), model_option(setting)]
 }
 
-fn mode_option(current: AgentType) -> SessionConfigOption {
-    let options = [AgentType::Build, AgentType::Plan, AgentType::General, AgentType::Explore]
+fn mode_option(current: Mode) -> SessionConfigOption {
+    let options = [Mode::Build, Mode::Plan, Mode::General, Mode::Explore]
         .into_iter()
         .map(|agent| {
             SessionConfigSelectOption::new(agent.id(), agent.name())
@@ -190,11 +234,12 @@ fn mode_option(current: AgentType) -> SessionConfigOption {
         .collect::<Vec<_>>();
 
     SessionConfigOption::select(
-        MODE_CONFIG_ID,
-        "Mode",
+        SessionConfig::Mode,
+        SessionConfig::Mode,
         current.id(),
         SessionConfigSelectOptions::Ungrouped(options),
     )
+    .description("")
     .category(SessionConfigOptionCategory::Mode)
 }
 
@@ -209,10 +254,11 @@ fn model_option(setting: &Setting) -> SessionConfigOption {
         .collect::<Vec<_>>();
 
     SessionConfigOption::select(
-        MODEL_CONFIG_ID,
-        "Model",
+        SessionConfig::Model,
+        SessionConfig::Model,
         setting.active.clone(),
         SessionConfigSelectOptions::Ungrouped(options),
     )
+    .description("")
     .category(SessionConfigOptionCategory::Model)
 }

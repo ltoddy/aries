@@ -5,7 +5,6 @@ edition = "2024"
 
 [dependencies]
 anyhow.workspace = true
-aries-init = { path = "../aries-init" }
 dialoguer.workspace = true
 futures.workspace = true
 git2.workspace = true

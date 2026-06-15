@@ -1,6 +1,6 @@
-pub mod agent_type;
 pub mod builder;
 pub mod compact;
+pub mod mode;
 pub mod summary;
 pub mod title;
 
@@ -11,14 +11,13 @@ use rig_core::streaming::StreamingPrompt;
 use rig_core::wasm_compat::WasmCompatSend;
 use tokio::sync::mpsc::UnboundedSender;
 
-pub use self::agent_type::AgentType;
 pub use self::builder::AgentBuilder;
 pub use self::compact::{CompactAgent, CompactOutcome};
+pub use self::mode::Mode;
 pub use self::summary::SummaryAgent;
 pub use self::title::TitleAgent;
-use crate::AriesResult;
-use crate::error::AgentError;
 use crate::event::AgentEvent;
+use crate::{AgentError, AriesResult};
 
 pub const AGENT_LOOP_MAX_TURNS: usize = 200;
 

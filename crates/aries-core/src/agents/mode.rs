@@ -1,22 +1,41 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AgentType {
+use std::fmt::{Display, Formatter};
+use std::str::FromStr;
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum Mode {
+    #[default]
     Build,
     Plan,
     General,
     Explore,
 }
 
-impl AgentType {
-    pub fn from_id(id: &str) -> Self {
-        match id {
-            "build" => Self::Build,
-            "plan" => Self::Plan,
-            "general" => Self::General,
-            "explore" => Self::Explore,
-            _ => Self::Build,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseModeError;
+
+impl Display for ParseModeError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        "provieded string was not `build`, `plan`, `general` or `explore`".fmt(f)
+    }
+}
+
+impl std::error::Error for ParseModeError {}
+
+impl FromStr for Mode {
+    type Err = ParseModeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "build" => Ok(Self::Build),
+            "plan" => Ok(Self::Plan),
+            "general" => Ok(Self::General),
+            "explore" => Ok(Self::Explore),
+            _ => Err(ParseModeError),
         }
     }
+}
 
+impl Mode {
     pub const fn bare_preamble(self) -> &'static str {
         match self {
             Self::Build => include_str!("prompts/build.txt"),

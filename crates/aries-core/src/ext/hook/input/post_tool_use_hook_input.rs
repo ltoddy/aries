@@ -10,11 +10,9 @@ where
     ToolResponse: Serialize + Clone + Debug,
 {
     pub session_id: String,
-    pub transcript_path: PathBuf,
     pub cwd: PathBuf,
     pub permission_mode: Option<String>,
     pub agent_id: Option<String>,
-    pub agent_type: Option<String>,
     #[serde(serialize_with = "serialize_hook_event_name")]
     pub hook_event_name: String,
     pub tool_name: String,

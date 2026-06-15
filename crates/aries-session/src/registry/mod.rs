@@ -102,7 +102,7 @@ impl SessionRegistry {
 
         let model_config = self.setting.active_model()?;
 
-        let session = Session::new(session_id, model_config, &root_dir, &cwd)
+        let session = Session::new(session_id, &root_dir, &cwd, model_config, self.setting.clone())
             .await
             .with_context(|| format!("Failed to create session at {}", root_dir.display()))?;
 
@@ -116,10 +116,12 @@ impl SessionRegistry {
         Ok(session)
     }
 
-    pub async fn load_session(&mut self, session_id: &str) -> anyhow::Result<Session> {
+    pub async fn load_session(&mut self, session_id: impl Into<String>) -> anyhow::Result<Session> {
+        let session_id = session_id.into();
+
         let session = self
             .session_repo
-            .find_last_by_session_id(session_id)
+            .find_last_by_session_id(&session_id)
             .await
             .with_context(|| format!("Failed to load session {session_id} from database"))?;
 
@@ -129,9 +131,10 @@ impl SessionRegistry {
 
         let session = Session::load(
             session.session_id,
+            &root_dir,
+            session.cwd,
             model_config,
-            root_dir.clone(),
-            PathBuf::from(session.cwd),
+            self.setting.clone(),
         )
         .await
         .with_context(|| format!("Failed to load session from: {}", root_dir.display()))?;
