@@ -24,7 +24,7 @@ pub enum CompactOutcome {
     PromptTooLong,
     /// 网络/超时/限流等瞬时错误——不该计入熔断器失败计数，留给上层继续重试。
     Transient(String),
-    /// 模型有响应但内容空、或解析后空——按一次正常失败累计。
+    /// 模型有响应但内容空、或解析后空,按一次正常失败累计。
     Empty,
 }
 
@@ -70,7 +70,7 @@ where
 
         let compressed_prompt = compress(messages);
         let final_res =
-            match self.inner.prompt::<[Message; 0], Message>(compressed_prompt, []).await {
+            match self.inner.prompt::<[_; 0], Message, _>(compressed_prompt, [], ()).await {
                 Ok(r) => r,
                 Err(e) => {
                     return if e.is_context_exceeded() {

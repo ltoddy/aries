@@ -1,5 +1,5 @@
 mod history;
-mod hook;
+pub mod hook;
 
 use std::future::Future;
 use std::path::{Path, PathBuf};
@@ -7,10 +7,14 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use aries_core::agents::{CompactAgent, CompactOutcome, Mode};
+use aries_core::compact;
 use aries_core::compact::{AutoCompactBreaker, Decision, TokenEstimator};
 use aries_core::event::AgentEvent;
+use aries_core::ext::hook::HooksExecutor;
+use aries_core::ext::hook::input::{
+    SessionStartHookInput, SessionStartSource, StopFailureHookInput, StopHookInput,
+};
 use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
-use aries_core::{agents, compact};
 use aries_init::{ModelConfig, Setting, SettingError};
 use futures::pin_mut;
 use rig_core::agent::FinalResponse;
@@ -21,6 +25,7 @@ use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_util::sync::CancellationToken;
 
 use crate::session::history::ChatHistory;
+use crate::session::hook::SessionPromptHook;
 use crate::{AriesAgent, AriesClient};
 
 #[derive(Clone)]
@@ -44,6 +49,7 @@ pub struct Session {
     receiver: Arc<AsyncMutex<UnboundedReceiver<AgentEvent>>>,
 
     compact_breaker: AutoCompactBreaker,
+    hooks_executor: Arc<HooksExecutor>,
 }
 
 impl Session {
@@ -56,6 +62,7 @@ impl Session {
         cwd: impl AsRef<Path>,
         config: ModelConfig,
         setting: Setting,
+        hooks_executor: Arc<HooksExecutor>,
     ) -> anyhow::Result<Self> {
         let id = id.into();
         let cwd = cwd.as_ref();
@@ -81,6 +88,10 @@ impl Session {
         let chat_history = ChatHistory::new(root_dir.join(Self::FILENAME)).await;
         let cancel = CancellationToken::new();
 
+        let input =
+            SessionStartHookInput::new(&id, cwd, SessionStartSource::Startup, config.model(), mode);
+        hooks_executor.fire_session_start(input).await;
+
         Ok(Self {
             id,
             setting,
@@ -96,6 +107,7 @@ impl Session {
             cancel,
             receiver: Arc::new(AsyncMutex::new(receiver)),
             compact_breaker: AutoCompactBreaker::new(),
+            hooks_executor,
         })
     }
 
@@ -105,6 +117,7 @@ impl Session {
         cwd: impl AsRef<Path>,
         config: ModelConfig,
         setting: Setting,
+        hooks_executor: Arc<HooksExecutor>,
     ) -> anyhow::Result<Self> {
         let cwd = cwd.as_ref();
         let root_dir = root_dir.as_ref();
@@ -118,6 +131,10 @@ impl Session {
             client.agent(mode, config.clone(), cwd, lsp_client.clone()).await?;
         let chat_history = ChatHistory::new(root_dir.join(Self::FILENAME)).await;
         let cancel = CancellationToken::new();
+
+        let input =
+            SessionStartHookInput::new(&id, cwd, SessionStartSource::Resume, config.model(), mode);
+        hooks_executor.fire_session_start(input).await;
 
         Ok(Self {
             id,
@@ -134,6 +151,7 @@ impl Session {
             cancel,
             receiver: Arc::new(AsyncMutex::new(agent_events)),
             compact_breaker: AutoCompactBreaker::new(),
+            hooks_executor,
         })
     }
 
@@ -168,10 +186,13 @@ impl Session {
     pub async fn set_model(&mut self, alias: impl Into<String>) -> anyhow::Result<()> {
         let alias = alias.into();
 
-        let config = match self.setting.models.iter().find(|m| m.alias().into() == alias) {
-            Some(config) => config,
-            None => return Err(SettingError::not_found(alias).into()),
-        };
+        let config = self
+            .setting
+            .models
+            .iter()
+            .find(|m| m.alias().into() == alias)
+            .ok_or_else(|| SettingError::not_found(&alias))?;
+
         self.client = AriesClient::new(config)?;
         let (agent, agent_events) = self
             .client
@@ -230,49 +251,30 @@ impl Session {
             self.compact().await;
         }
 
-        let final_res = match &mut self.agent {
-            AriesAgent::Azure(agent) => {
-                let snapshot = self.chat_history.history().to_vec();
-                Self::run_prompt(
-                    agent,
-                    prompt,
-                    &snapshot,
-                    &mut cb,
-                    agent_events.clone(),
-                    cancel_token,
-                )
-                .await?
-            },
-            AriesAgent::Deepseek(agent) => {
-                let snapshot = self.chat_history.history().to_vec();
-                Self::run_prompt(
-                    agent,
-                    prompt,
-                    &snapshot,
-                    &mut cb,
-                    agent_events.clone(),
-                    cancel_token,
-                )
-                .await?
-            },
-            AriesAgent::OpenAI(agent) => {
-                let snapshot = self.chat_history.history().to_vec();
-                Self::run_prompt(
-                    agent,
-                    prompt,
-                    &snapshot,
-                    &mut cb,
-                    agent_events.clone(),
-                    cancel_token,
-                )
-                .await?
-            },
+        let final_res = {
+            let snapshot = self.chat_history.history().to_vec();
+            match self
+                .run_prompt(prompt, &snapshot, &mut cb, agent_events.clone(), cancel_token)
+                .await
+            {
+                Ok(res) => res,
+                Err(err) => {
+                    let input = StopFailureHookInput::new(&self.id, &self.cwd, err.to_string())
+                        .error_details(err.to_string());
+                    self.hooks_executor.fire_stop_failure(input).await;
+                    return Err(err);
+                },
+            }
         };
 
         if let Some(his) = final_res.history() {
             self.chat_history.extend(his.iter().cloned());
             self.chat_history.persist();
         }
+
+        let input = StopHookInput::new(&self.id, &self.cwd, false)
+            .last_assistant_message(final_res.response());
+        self.hooks_executor.fire_stop(input).await;
 
         if final_res.usage().total_tokens > compact_threshold {
             println!(
@@ -364,8 +366,8 @@ impl Session {
         }
     }
 
-    async fn run_prompt<M, F, Fut>(
-        agent: &mut agents::AriesAgent<M>,
+    async fn run_prompt<F, Fut>(
+        &mut self,
         prompt: impl Into<Message> + WasmCompatSend,
         history: &[Message],
         cb: &mut Option<F>,
@@ -373,11 +375,17 @@ impl Session {
         cancel_token: CancellationToken,
     ) -> anyhow::Result<FinalResponse>
     where
-        M: rig_core::completion::CompletionModel + 'static,
         F: FnMut(AgentEvent) -> Fut,
         Fut: Future<Output = ()>,
     {
-        let prompt_fut = agent.prompt(prompt, history.to_vec());
+        let hook = SessionPromptHook::new(
+            self.hooks_executor.clone(),
+            self.id.clone(),
+            self.cwd.clone(),
+            self.mode.id(),
+            self.mode.name(),
+        );
+        let prompt_fut = self.agent.prompt(prompt, history.to_vec(), hook);
         pin_mut!(prompt_fut);
 
         let mut events_guard = agent_events.lock().await;

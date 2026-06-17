@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use anyhow::Context;
 use aries_context::GlobalContext;
@@ -16,7 +17,7 @@ pub struct SessionRegistry {
     active_sessions: HashMap<String, Session>,
     session_repo: SessionRepository,
 
-    hooks_executor: HooksExecutor,
+    hooks_executor: Arc<HooksExecutor>,
 }
 
 impl SessionRegistry {
@@ -31,7 +32,7 @@ impl SessionRegistry {
 
         let mut hooks_loader = HooksLoader::new(&gctx.current_dir);
         let hooks = hooks_loader.load().await.unwrap_or_default();
-        let hooks_executor = HooksExecutor::new(hooks);
+        let hooks_executor = Arc::new(HooksExecutor::new(hooks));
 
         Ok(Self {
             gctx,
@@ -102,9 +103,16 @@ impl SessionRegistry {
 
         let model_config = self.setting.active_model()?;
 
-        let session = Session::new(session_id, &root_dir, &cwd, model_config, self.setting.clone())
-            .await
-            .with_context(|| format!("Failed to create session at {}", root_dir.display()))?;
+        let session = Session::new(
+            session_id,
+            &root_dir,
+            &cwd,
+            model_config,
+            self.setting.clone(),
+            self.hooks_executor.clone(),
+        )
+        .await
+        .with_context(|| format!("Failed to create session at {}", root_dir.display()))?;
 
         self.active_sessions.insert(session.id(), session.clone());
 
@@ -135,6 +143,7 @@ impl SessionRegistry {
             session.cwd,
             model_config,
             self.setting.clone(),
+            self.hooks_executor.clone(),
         )
         .await
         .with_context(|| format!("Failed to load session from: {}", root_dir.display()))?;

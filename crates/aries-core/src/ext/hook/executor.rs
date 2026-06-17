@@ -12,7 +12,12 @@ use tokio::time::error::Elapsed;
 use tracing::warn;
 
 use crate::ext::hook::HooksPreset;
-use crate::ext::hook::input::{PostToolUseHookInput, PreToolUseHookInput};
+use crate::ext::hook::input::{
+    HookInput, PostCompactHookInput, PostToolUseFailureHookInput, PostToolUseHookInput,
+    PreCompactHookInput, PreToolUseHookInput, SessionEndHookInput, SessionStartHookInput,
+    StopFailureHookInput, StopHookInput, SubagentStartHookInput, SubagentStopHookInput,
+    UserPromptSubmitHookInput,
+};
 use crate::ext::hook::preset::{BashCommandHook, HookCommand, HookEvent, HookMatcher};
 
 const DEFAULT_HOOK_TIMEOUT_SECS: f64 = 60.0;
@@ -21,12 +26,6 @@ const DEFAULT_HOOK_TIMEOUT_SECS: f64 = 60.0;
 pub enum HookDecision {
     Continue,
     Terminate { reason: String },
-}
-
-impl HookDecision {
-    pub fn is_terminate(&self) -> bool {
-        matches!(self, HookDecision::Terminate { .. })
-    }
 }
 
 pub struct HooksExecutor {
@@ -45,123 +44,144 @@ impl HooksExecutor {
         Self { hooks }
     }
 
-    pub async fn fire_pre_tool_use<ToolInput>(
-        &self,
-        input: &PreToolUseHookInput<ToolInput>,
-    ) -> HookDecision
-    where
-        ToolInput: Serialize + Clone + Debug,
-    {
-        let payload = match serde_json::to_string(input) {
-            Ok(s) => s,
-            Err(err) => {
-                warn!("failed to serialize PreToolUseHookInput: {err}");
-                return HookDecision::Continue;
-            },
-        };
-
-        let tool_name = input.tool_name.as_str();
-        let Some(matchers) = self.hooks.get(&HookEvent::PreToolUse) else {
+    pub async fn fire_post_compact(&self, input: PostCompactHookInput) -> HookDecision {
+        let Some(matchers) = self.hooks.get(&HookEvent::PostCompact) else {
             return HookDecision::Continue;
         };
 
         for matcher in matchers {
+            Self::fire_hooks(&matcher.hooks, input.clone()).await;
+        }
+
+        HookDecision::Continue
+    }
+
+    pub async fn fire_post_tool_use_failure<ToolInput>(
+        &self,
+        _input: PostToolUseFailureHookInput<ToolInput>,
+    ) where
+        ToolInput: Serialize + Clone + Debug,
+    {
+    }
+
+    pub async fn fire_post_tool_use<ToolInput, ToolResponse>(
+        &self,
+        input: PostToolUseHookInput<ToolInput, ToolResponse>,
+    ) where
+        ToolInput: Clone + Debug + Default + Serialize,
+        ToolResponse: Clone + Debug + Default + Serialize,
+    {
+        let Some(matchers) = self.hooks.get(&HookEvent::PostToolUse) else { return };
+
+        for matcher in matchers {
+            let tool_name = input.tool_name.as_str();
             match matcher.matches(tool_name) {
-                Ok(true) => {},
+                Ok(true) => {
+                    let _ = Self::fire_hooks(&matcher.hooks, input.clone()).await;
+                },
                 Ok(false) => continue,
                 Err(err) => {
                     warn!("invalid hook matcher, skipped: {err}");
                     continue;
                 },
             }
+        }
+    }
 
-            for hook in &matcher.hooks {
-                match hook {
-                    HookCommand::Command(bash) => {
-                        match execute_bash_command_hook(bash, &payload).await {
-                            Ok(outcome) if outcome.blocked => {
-                                let reason = if outcome.stderr.trim().is_empty() {
-                                    format!(
-                                        "PreToolUse hook blocked tool {:?} (exit code 2)",
-                                        tool_name
-                                    )
-                                } else {
-                                    outcome.stderr.trim().to_string()
-                                };
-                                return HookDecision::Terminate { reason };
-                            },
-                            Ok(_) => {},
-                            Err(err) => {
-                                warn!("bash hook execution failed for tool {:?}: {err}", tool_name);
-                            },
-                        }
-                    },
-                    HookCommand::Prompt(_) => {},
-                    HookCommand::Agent(_) => {},
-                    HookCommand::Http(_) => {},
-                }
+    pub async fn fire_pre_compact(&self, _input: &PreCompactHookInput) {}
+
+    pub async fn fire_pre_tool_use<ToolInput>(
+        &self,
+        input: PreToolUseHookInput<ToolInput>,
+    ) -> HookDecision
+    where
+        ToolInput: Clone + Debug + Default + Serialize,
+    {
+        let Some(matchers) = self.hooks.get(&HookEvent::PreToolUse) else {
+            return HookDecision::Continue;
+        };
+
+        for matcher in matchers {
+            match matcher.matches(&input.tool_name) {
+                Ok(true) => {
+                    if let HookDecision::Terminate { reason } =
+                        Self::fire_hooks(&matcher.hooks, input.clone()).await
+                    {
+                        return HookDecision::Terminate { reason };
+                    }
+                },
+                Ok(false) => continue,
+                Err(err) => {
+                    warn!("invalid hook matcher, skipped: {err}");
+                    continue;
+                },
             }
         }
 
         HookDecision::Continue
     }
 
-    pub async fn fire_post_tool_use<ToolInput, ToolResponse>(
-        &self,
-        input: &PostToolUseHookInput<ToolInput, ToolResponse>,
-    ) -> HookDecision
-    where
-        ToolInput: Serialize + Clone + Debug,
-        ToolResponse: Serialize + Clone + Debug,
-    {
-        let payload = match serde_json::to_string(input) {
+    pub async fn fire_session_end(&self, _input: SessionEndHookInput) {}
+
+    pub async fn fire_session_start(&self, input: SessionStartHookInput) {
+        let Some(matchers) = self.hooks.get(&HookEvent::PreToolUse) else { return };
+
+        for matcher in matchers {
+            Self::fire_hooks(&matcher.hooks, input.clone()).await;
+        }
+    }
+
+    pub async fn fire_stop_failure(&self, _input: StopFailureHookInput) {}
+
+    pub async fn fire_stop(&self, _input: StopHookInput) -> HookDecision {
+        HookDecision::Continue
+    }
+
+    pub async fn fire_subagent_start(&self, _input: SubagentStartHookInput) {}
+
+    pub async fn fire_subagent_stop(&self, _input: SubagentStopHookInput) -> HookDecision {
+        // claude-code 的文档对于 subagent stop 的注释是: Prevents the subagent from stopping
+        // 难道要重试?
+        HookDecision::Continue
+    }
+
+    pub async fn fire_user_prompt_submit(&self, _input: UserPromptSubmitHookInput) -> HookDecision {
+        HookDecision::Continue
+    }
+
+    async fn fire_hooks(hooks: &[HookCommand], input: impl HookInput) -> HookDecision {
+        let hook_event_name = input.hook_event_name();
+
+        let payload = match serde_json::to_string(&input) {
             Ok(s) => s,
             Err(err) => {
-                warn!("failed to serialize PostToolUseHookInput: {err}");
+                warn!("failed to serialize `{hook_event_name}` hook input: {err}");
                 return HookDecision::Continue;
             },
         };
 
-        let tool_name = input.tool_name.as_str();
-        let Some(matchers) = self.hooks.get(&HookEvent::PostToolUse) else {
-            return HookDecision::Continue;
-        };
-
-        for matcher in matchers {
-            match matcher.matches(tool_name) {
-                Ok(true) => {},
-                Ok(false) => continue,
-                Err(err) => {
-                    warn!("invalid hook matcher, skipped: {err}");
-                    continue;
+        for hook in hooks {
+            match hook {
+                HookCommand::Command(bash) => {
+                    match execute_bash_command_hook(bash, &payload).await {
+                        Ok(outcome) if outcome.blocked => {
+                            let reason = if outcome.stderr.trim().is_empty() {
+                                format!("{hook_event_name} hook blocked (exit code 2)",)
+                            } else {
+                                outcome.stderr.trim().to_string()
+                            };
+                            return HookDecision::Terminate { reason };
+                        },
+                        Err(err) => {
+                            let reason = format!("bash hook execute failed: {err}");
+                            return HookDecision::Terminate { reason };
+                        },
+                        _ => continue,
+                    }
                 },
-            }
-
-            for hook in &matcher.hooks {
-                match hook {
-                    HookCommand::Command(bash) => {
-                        match execute_bash_command_hook(bash, &payload).await {
-                            Ok(outcome) if outcome.blocked => {
-                                let reason = if outcome.stderr.trim().is_empty() {
-                                    format!(
-                                        "PostToolUse hook blocked tool {:?} (exit code 2)",
-                                        tool_name
-                                    )
-                                } else {
-                                    outcome.stderr.trim().to_string()
-                                };
-                                return HookDecision::Terminate { reason };
-                            },
-                            Ok(_) => {},
-                            Err(err) => {
-                                warn!("bash hook execution failed for tool {:?}: {err}", tool_name);
-                            },
-                        }
-                    },
-                    HookCommand::Prompt(_) => {},
-                    HookCommand::Agent(_) => {},
-                    HookCommand::Http(_) => {},
-                }
+                HookCommand::Prompt(_) => {},
+                HookCommand::Agent(_) => {},
+                HookCommand::Http(_) => {},
             }
         }
 
@@ -195,8 +215,9 @@ pub enum BashHookError {
 
 pub async fn execute_bash_command_hook(
     hook: &BashCommandHook,
-    stdin_payload: &str,
+    stdin_payload: impl Into<String>,
 ) -> Result<BashHookOutcome, BashHookError> {
+    let stdin_payload = stdin_payload.into();
     let (program, arg) = hook.shell.unwrap_or_default().invocation();
 
     let mut child = Command::new(program)

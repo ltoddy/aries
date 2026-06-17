@@ -5,7 +5,7 @@ pub mod summary;
 pub mod title;
 
 use futures::StreamExt;
-use rig_core::agent::{Agent, FinalResponse, MultiTurnStreamItem, StreamingResult};
+use rig_core::agent::{Agent, FinalResponse, MultiTurnStreamItem, PromptHook, StreamingResult};
 use rig_core::completion::{CompletionModel, Message};
 use rig_core::streaming::StreamingPrompt;
 use rig_core::wasm_compat::WasmCompatSend;
@@ -36,7 +36,7 @@ where
 
 impl<M> AriesAgent<M>
 where
-    M: CompletionModel,
+    M: CompletionModel + 'static,
 {
     pub fn new(
         inner: Agent<M>,
@@ -49,22 +49,19 @@ where
 
         Self { inner, preamble, name, sender }
     }
-}
 
-impl<M> AriesAgent<M>
-where
-    M: CompletionModel + 'static,
-{
-    pub async fn prompt<I, T>(
+    pub async fn prompt<I, T, P>(
         &mut self,
         prompt: impl Into<Message> + WasmCompatSend,
         history: I,
+        hook: P,
     ) -> AriesResult<FinalResponse>
     where
         I: IntoIterator<Item = T>,
         T: Into<Message>,
+        P: PromptHook<M> + 'static,
     {
-        let stream = self.inner.stream_prompt(prompt).with_history(history).await;
+        let stream = self.inner.stream_prompt(prompt).with_history(history).with_hook(hook).await;
         tokio::pin!(stream);
 
         let mut final_res = FinalResponse::empty();

@@ -136,7 +136,7 @@ where
         let model = self.model.clone();
         let cwd = self.cwd.clone();
 
-        let mut agent = AgentBuilder::<C>::new(client, model, mode, cwd).build();
+        let mut agent = AgentBuilder::new(client, model, mode, cwd).build();
 
         let stream = agent.stream_prompt::<Vec<_>, Message>(&args.prompt, vec![]).await;
         tokio::pin!(stream);

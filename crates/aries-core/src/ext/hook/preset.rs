@@ -308,7 +308,9 @@ pub enum HookMatcherError {
 }
 
 impl HookMatcher {
-    pub fn matches(&self, tool_name: &str) -> Result<bool, HookMatcherError> {
+    pub fn matches(&self, tool_name: impl Into<String>) -> Result<bool, HookMatcherError> {
+        let tool_name = tool_name.into();
+
         let pattern = match self.matcher.as_deref() {
             None => return Ok(true),
             Some(p) => p.trim(),
@@ -325,6 +327,6 @@ impl HookMatcher {
             pattern: pattern.to_string(),
             source: err,
         })?;
-        Ok(re.is_match(tool_name))
+        Ok(re.is_match(&tool_name))
     }
 }

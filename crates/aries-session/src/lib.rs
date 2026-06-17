@@ -9,7 +9,7 @@ use aries_core::event::AgentEvent;
 use aries_core::language_server::SharedLspClient;
 use aries_core::{AriesResult, agents};
 use aries_init::ModelConfig;
-use rig_core::agent::FinalResponse;
+use rig_core::agent::{FinalResponse, PromptHook};
 use rig_core::completion::Message;
 use rig_core::providers::{azure, deepseek, openai};
 use rig_core::wasm_compat::WasmCompatSend;
@@ -90,19 +90,24 @@ pub enum AriesAgent {
 
 impl AriesAgent {
     #[inline]
-    pub async fn prompt<I, T>(
+    pub async fn prompt<I, T, P>(
         &mut self,
         prompt: impl Into<Message> + WasmCompatSend,
         history: I,
+        hook: P,
     ) -> AriesResult<FinalResponse>
     where
         I: IntoIterator<Item = T>,
         T: Into<Message>,
+        P: PromptHook<azure::CompletionModel>
+            + PromptHook<deepseek::CompletionModel>
+            + PromptHook<openai::CompletionModel>
+            + 'static,
     {
         match self {
-            AriesAgent::Azure(a) => a.prompt(prompt, history).await,
-            AriesAgent::Deepseek(a) => a.prompt(prompt, history).await,
-            AriesAgent::OpenAI(a) => a.prompt(prompt, history).await,
+            AriesAgent::Azure(a) => a.prompt(prompt, history, hook).await,
+            AriesAgent::Deepseek(a) => a.prompt(prompt, history, hook).await,
+            AriesAgent::OpenAI(a) => a.prompt(prompt, history, hook).await,
         }
     }
 

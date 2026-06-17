@@ -35,6 +35,28 @@ impl FromStr for Mode {
     }
 }
 
+impl Into<String> for Mode {
+    fn into(self) -> String {
+        match self {
+            Mode::Build => String::from("build"),
+            Mode::Plan => String::from("plan"),
+            Mode::General => String::from("general"),
+            Mode::Explore => String::from("explore"),
+        }
+    }
+}
+
+impl Display for Mode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Mode::Build => write!(f, "build"),
+            Mode::Plan => write!(f, "plan"),
+            Mode::General => write!(f, "general"),
+            Mode::Explore => write!(f, "explore"),
+        }
+    }
+}
+
 impl Mode {
     pub const fn bare_preamble(self) -> &'static str {
         match self {

@@ -10,7 +10,7 @@ const DESCRIPTION: &str = "用于生成对话标题的智能体。";
 
 pub struct TitleAgent<M>
 where
-    M: completion::CompletionModel,
+    M: completion::CompletionModel + 'static,
 {
     inner: AriesAgent<M>,
 }
@@ -39,7 +39,7 @@ where
         input: &str,
         history: &[Message],
     ) -> AriesResult<String, AgentError> {
-        let final_res = self.inner.prompt(input, history).await?;
+        let final_res = self.inner.prompt(input, history, ()).await?;
 
         Ok(final_res.response().to_owned())
     }

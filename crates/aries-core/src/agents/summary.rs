@@ -35,7 +35,7 @@ where
     }
 
     pub async fn summarize(&mut self, history: &[Message]) -> AriesResult<String, AgentError> {
-        let final_res = self.inner.prompt("请总结这次对话。", history).await?;
+        let final_res = self.inner.prompt("请总结这次对话。", history, ()).await?;
 
         Ok(final_res.response().to_owned())
     }

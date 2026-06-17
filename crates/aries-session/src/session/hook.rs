@@ -1,8 +1,11 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use aries_core::ext::hook::input::{PostToolUseHookInput, PreToolUseHookInput};
+use aries_core::ext::hook::input::{
+    PostToolUseHookInput, PreToolUseHookInput, SubagentStartHookInput, SubagentStopHookInput,
+};
 use aries_core::ext::hook::{HookDecision, HooksExecutor};
+use aries_core::tools::agent;
 use rig_core::agent::{HookAction, PromptHook, ToolCallHookAction};
 use rig_core::completion::{CompletionModel, CompletionResponse, Message};
 use serde_json::Value;
@@ -12,6 +15,8 @@ pub struct SessionPromptHook {
     executor: Arc<HooksExecutor>,
     session_id: String,
     cwd: PathBuf,
+    agent_id: String,
+    agent_type: String,
 }
 
 impl SessionPromptHook {
@@ -19,10 +24,15 @@ impl SessionPromptHook {
         executor: Arc<HooksExecutor>,
         session_id: impl Into<String>,
         cwd: impl AsRef<Path>,
+        agent_id: impl Into<String>,
+        agent_type: impl Into<String>,
     ) -> Self {
         let session_id = session_id.into();
         let cwd = cwd.as_ref().to_path_buf();
-        Self { executor, session_id, cwd }
+        let agent_id = agent_id.into();
+        let agent_type = agent_type.into();
+
+        Self { executor, session_id, cwd, agent_id, agent_type }
     }
 }
 
@@ -52,18 +62,20 @@ where
         let tool_input: Value =
             serde_json::from_str(args).unwrap_or_else(|_| Value::String(args.to_owned()));
 
-        let input = PreToolUseHookInput {
-            session_id: self.session_id.clone(),
-            cwd: self.cwd.clone(),
-            permission_mode: None,
-            agent_id: None,
-            hook_event_name: "PreToolUse".to_owned(),
-            tool_name: tool_name.to_owned(),
-            tool_input,
-            tool_use_id: tool_call_id.unwrap_or_default(),
-        };
+        if tool_name == agent::NAME {
+            let input = SubagentStartHookInput::new(&self.session_id, &self.cwd, "", "");
+            self.executor.fire_subagent_start(input).await;
+        }
 
-        match self.executor.fire_pre_tool_use(&input).await {
+        let input = PreToolUseHookInput::new(
+            &self.session_id,
+            &self.cwd,
+            tool_name,
+            tool_input,
+            tool_call_id.unwrap_or_default(),
+        );
+
+        match self.executor.fire_pre_tool_use(input).await {
             HookDecision::Continue => ToolCallHookAction::cont(),
             HookDecision::Terminate { reason } => ToolCallHookAction::skip(reason),
         }
@@ -82,22 +94,28 @@ where
         let tool_response: Value =
             serde_json::from_str(result).unwrap_or_else(|_| Value::String(result.to_owned()));
 
-        let input = PostToolUseHookInput {
-            session_id: self.session_id.clone(),
-            cwd: self.cwd.clone(),
-            permission_mode: None,
-            agent_id: None,
-            hook_event_name: "PostToolUse".to_owned(),
-            tool_name: tool_name.to_owned(),
+        if tool_name == agent::NAME {
+            let input = SubagentStopHookInput::new(
+                &self.session_id,
+                &self.cwd,
+                false,
+                &self.agent_id,
+                &self.agent_type,
+            );
+            self.executor.fire_subagent_stop(input).await;
+        }
+
+        let input = PostToolUseHookInput::new(
+            self.session_id.clone(),
+            self.cwd.clone(),
+            tool_name.to_owned(),
             tool_input,
             tool_response,
-            tool_use_id: tool_call_id.unwrap_or_default(),
-        };
+            tool_call_id.unwrap_or_default(),
+        );
 
-        match self.executor.fire_post_tool_use(&input).await {
-            HookDecision::Continue => HookAction::cont(),
-            HookDecision::Terminate { reason } => HookAction::terminate(reason),
-        }
+        self.executor.fire_post_tool_use(input).await;
+        HookAction::cont()
     }
 
     async fn on_text_delta(&self, _text_delta: &str, _aggregated_text: &str) -> HookAction {
