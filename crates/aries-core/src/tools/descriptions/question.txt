@@ -4,15 +4,11 @@
 3. 在多种实现方案之间征求决定
 4. 让用户从若干方向中做选择
 
-参数：
-- `question` 必需，要呈现给用户的问题。
-- `options` 可选选项数组，每项包含 `label` 与可选 `description`；展示时格式为 `label - description`（无描述时仅展示 label）。
-- `multiple` 默认 `false`；为 `true` 时允许多选。
-- `custom` 默认 `true`；启用时会在选项末尾追加「Type your own answer...」入口，用户选中后可输入自定义文本。
-
 行为：
+- `options` 每项包含 `label` 与可选 `description`；展示时格式为 `label - description`（无描述时仅展示 label）。
 - 提供 `options` 时，单选用 `Select`、多选用 `MultiSelect`，最终返回所选 `label`（自定义入口返回用户输入文本）。
 - 不提供 `options` 时，直接通过文本输入收集自由作答。
+- `custom` 启用时会在选项末尾追加「Type your own answer...」入口，用户选中后可输入自定义文本。
 
 使用建议：
 - 如果你有推荐项，请把它放在选项数组的第一位，并在 `label` 末尾标注「(推荐)」。

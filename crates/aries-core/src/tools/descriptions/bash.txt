@@ -1,5 +1,3 @@
 通过 `bash -c` 执行单条 shell 命令，并返回 `stdout`、`stderr`、`exit_code`。
 
-- `command` 是必需参数。
-- `stdout` 与 `stderr` 各自被截断到最多 200 行，超出部分会附加 `... (N more lines truncated)` 标记。
 - 文件读取、搜索、编辑等操作请优先使用对应的专用工具，而不是通过 shell 间接完成。

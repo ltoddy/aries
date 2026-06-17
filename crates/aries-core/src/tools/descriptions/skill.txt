@@ -1,6 +1,6 @@
 加载并注入一个由系统提示词中 `available_skills` 列出的专用 skill。
 
-- `name` 必需，必须与 `available_skills` 中的某个 skill 名称完全一致；否则会以「未在 available_skills 中」的错误返回。
+- `name` 必须与 `available_skills` 中的某个 skill 名称完全一致；否则会以「未在 available_skills 中」的错误返回。
 - 调用后返回 `<skill_content>` 块，包含：
   - skill 的正文（指令）；
   - skill 所在目录的 base URI；
