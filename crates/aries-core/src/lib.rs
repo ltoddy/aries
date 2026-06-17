@@ -9,21 +9,17 @@ pub mod preamble;
 pub mod repository;
 pub mod tools;
 
-use rig_core::http_client;
+use rig_core::agent::StreamingError;
+use rig_core::completion::CompletionError;
 
 #[derive(Debug, thiserror::Error)]
-pub enum AgentError {
-    #[error("Task execution failed: {0}")]
-    ExecutionError(String),
-
-    #[error("Failed to create llm client: {0}")]
-    Client(#[from] http_client::Error),
+pub enum AriesError {
+    #[error("{0}")]
+    Streaming(#[from] StreamingError),
 }
 
-impl AgentError {
+impl AriesError {
     pub fn is_context_exceeded(&self) -> bool {
-        let content = self.to_string().to_lowercase();
-
         const PATTERNS: [&str; 6] = [
             "prompt_too_long",
             "context_length_exceeded",
@@ -33,8 +29,14 @@ impl AgentError {
             "input is too long",
         ];
 
-        PATTERNS.iter().any(|p| content.contains(p))
+        if let AriesError::Streaming(StreamingError::Completion(CompletionError::ProviderError(
+            err,
+        ))) = self
+        {
+            return PATTERNS.iter().any(|p| err.contains(p));
+        }
+        false
     }
 }
 
-pub type AriesResult<T, E = AgentError> = Result<T, E>;
+pub type AriesResult<T, E = AriesError> = Result<T, E>;

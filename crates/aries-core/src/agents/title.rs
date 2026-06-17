@@ -1,8 +1,8 @@
 use rig_core::client::CompletionClient;
 use rig_core::completion::{self, Message};
 
+use crate::AriesResult;
 use crate::agents::{AGENT_LOOP_MAX_TURNS, AriesAgent};
-use crate::{AgentError, AriesResult};
 
 const PREAMBLE: &str = include_str!("prompts/title.txt");
 const NAME: &str = "Namer";
@@ -34,11 +34,7 @@ where
         Self { inner: AriesAgent::new(agent, NAME, PREAMBLE, None) }
     }
 
-    pub async fn generate(
-        &mut self,
-        input: &str,
-        history: &[Message],
-    ) -> AriesResult<String, AgentError> {
+    pub async fn generate(&mut self, input: &str, history: &[Message]) -> AriesResult<String> {
         let final_res = self.inner.prompt(input, history, ()).await?;
 
         Ok(final_res.response().to_owned())

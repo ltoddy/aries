@@ -26,7 +26,6 @@ impl SessionEndHookInput {
     ) -> Self {
         let session_id = session_id.into();
         let cwd = cwd.as_ref().to_path_buf();
-        let reason = reason.into();
 
         Self { session_id, cwd, reason, ..Default::default() }
     }

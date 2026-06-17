@@ -2,14 +2,13 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use futures::StreamExt;
-use rig_core::agent::MultiTurnStreamItem;
+use rig_core::agent::{MultiTurnStreamItem, StreamingError};
 use rig_core::client::CompletionClient;
 use rig_core::completion::{Message, ToolDefinition};
 use rig_core::tool::Tool;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::AgentError;
 use crate::agents::{AgentBuilder, Mode};
 use crate::event::AgentEvent;
 use crate::tools::{RenderError, ToolArgsRender, ToolOutputRender};
@@ -88,7 +87,7 @@ where
     C: CompletionClient + Clone + Send + Sync + 'static,
 {
     const NAME: &'static str = NAME;
-    type Error = AgentError;
+    type Error = StreamingError;
     type Args = AgentArgs;
     type Output = AgentOutput;
 
@@ -143,18 +142,12 @@ where
         let mut final_res = rig_core::agent::FinalResponse::empty();
 
         while let Some(chunk) = stream.next().await {
-            match chunk {
-                Ok(item) => {
-                    let event = AgentEvent::from_stream(false, mode.name(), item.clone());
-                    let _ = self.sender.send(event);
+            let chunk = chunk?;
+            let event = AgentEvent::from_stream(false, mode.name(), chunk.clone());
+            let _ = self.sender.send(event);
 
-                    if let MultiTurnStreamItem::FinalResponse(res) = item {
-                        final_res = res;
-                    }
-                },
-                Err(e) => {
-                    return Err(AgentError::ExecutionError(format!("Subagent failed: {}", e)));
-                },
+            if let MultiTurnStreamItem::FinalResponse(res) = chunk {
+                final_res = res;
             }
         }
 

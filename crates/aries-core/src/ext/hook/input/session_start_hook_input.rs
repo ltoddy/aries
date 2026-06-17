@@ -33,7 +33,6 @@ impl SessionStartHookInput {
     ) -> Self {
         let session_id = session_id.into();
         let cwd = cwd.as_ref().to_path_buf();
-        let source = source.into();
         let model = model.into();
         let agent_type = agent_type.into();
 

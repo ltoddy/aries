@@ -17,7 +17,7 @@ pub use self::mode::Mode;
 pub use self::summary::SummaryAgent;
 pub use self::title::TitleAgent;
 use crate::event::AgentEvent;
-use crate::{AgentError, AriesResult};
+use crate::{AriesError, AriesResult};
 
 pub const AGENT_LOOP_MAX_TURNS: usize = 200;
 
@@ -77,9 +77,7 @@ where
                         final_res = res;
                     }
                 },
-                Err(e) => {
-                    return Err(AgentError::ExecutionError(format!("Main agent failed: {}", e)));
-                },
+                Err(err) => return Err(AriesError::Streaming(err)),
             }
         }
 
