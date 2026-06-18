@@ -66,9 +66,8 @@ pub fn earse<R>(item: MultiTurnStreamItem<R>) -> MultiTurnStreamItem<()> {
         },
         MultiTurnStreamItem::StreamUserItem(item) => MultiTurnStreamItem::StreamUserItem(item),
         MultiTurnStreamItem::FinalResponse(f) => MultiTurnStreamItem::FinalResponse(f),
-        _ => MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Text(Text {
-            // unreachable
-            text: String::new(),
-        })),
+        _ => MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Text(Text::new(
+            String::new(),
+        ))), // unreachable
     }
 }

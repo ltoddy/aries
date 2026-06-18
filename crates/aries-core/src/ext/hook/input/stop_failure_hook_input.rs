@@ -2,6 +2,10 @@ use std::path::{Path, PathBuf};
 
 use serde::{Serialize, Serializer};
 
+use crate::ext::hook::input::HookInput;
+
+const HOOK_EVENT_NAME: &str = "StopFailure";
+
 #[derive(Debug, Default, Clone, Serialize)]
 pub struct StopFailureHookInput {
     pub session_id: String,
@@ -49,6 +53,12 @@ impl StopFailureHookInput {
     }
 }
 
+impl HookInput for StopFailureHookInput {
+    fn hook_event_name(&self) -> &'static str {
+        HOOK_EVENT_NAME
+    }
+}
+
 fn serialize_hook_event_name<S: Serializer>(_: &String, s: S) -> Result<S::Ok, S::Error> {
-    s.serialize_str("StopFailure")
+    s.serialize_str(HOOK_EVENT_NAME)
 }

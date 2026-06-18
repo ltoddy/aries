@@ -11,7 +11,7 @@ use aries_core::tools::{
 };
 use itertools::Itertools;
 use parking_lot::Mutex;
-use rig_core::agent::{MultiTurnStreamItem, Text};
+use rig_core::agent::MultiTurnStreamItem;
 use rig_core::message::{ReasoningContent, ToolCall, ToolFunction, ToolResultContent};
 use rig_core::streaming::{StreamedAssistantContent, StreamedUserContent};
 
@@ -59,8 +59,10 @@ impl SessionUpdates {
         tool_calls: &Mutex<HashMap<String, ToolCall>>,
     ) -> Vec<SessionUpdate> {
         match content {
-            StreamedAssistantContent::Text(Text { text }) => {
-                vec![SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::from(text)))]
+            StreamedAssistantContent::Text(t) => {
+                vec![SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::from(
+                    t.text(),
+                )))]
             },
             StreamedAssistantContent::Reasoning(reasoning) => reasoning
                 .content
@@ -116,7 +118,7 @@ impl SessionUpdates {
                     })
                     .join("\n");
 
-                let tool_call = tool_calls.lock().get(&internal_call_id).cloned();
+                let tool_call = tool_calls.lock().remove(&internal_call_id);
                 let (name, raw_input, content) = match tool_call {
                     Some(t) => {
                         let ToolFunction { name, arguments, .. } = t.function.clone();

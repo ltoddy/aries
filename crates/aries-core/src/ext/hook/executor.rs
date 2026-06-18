@@ -9,7 +9,7 @@ use thiserror::Error;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tokio::time::error::Elapsed;
-use tracing::warn;
+use tracing::{info, warn};
 
 use crate::ext::hook::HooksPreset;
 use crate::ext::hook::input::{
@@ -45,12 +45,15 @@ impl HooksExecutor {
     }
 
     pub async fn fire_post_compact(&self, input: PostCompactHookInput) -> HookDecision {
+        let hook_event_name = input.hook_event_name();
+        let input = serde_json::to_string(&input).unwrap();
+        info!(event = hook_event_name, input = %input, "received hook event");
         let Some(matchers) = self.hooks.get(&HookEvent::PostCompact) else {
             return HookDecision::Continue;
         };
 
         for matcher in matchers {
-            Self::fire_hooks(&matcher.hooks, input.clone()).await;
+            Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await;
         }
 
         HookDecision::Continue
@@ -58,10 +61,13 @@ impl HooksExecutor {
 
     pub async fn fire_post_tool_use_failure<ToolInput>(
         &self,
-        _input: PostToolUseFailureHookInput<ToolInput>,
+        input: PostToolUseFailureHookInput<ToolInput>,
     ) where
         ToolInput: Serialize + Clone + Debug,
     {
+        let hook_event_name = input.hook_event_name();
+        let input = serde_json::to_string(&input).unwrap();
+        info!(event = hook_event_name, input = %input, "received hook event");
     }
 
     pub async fn fire_post_tool_use<ToolInput, ToolResponse>(
@@ -71,15 +77,18 @@ impl HooksExecutor {
         ToolInput: Clone + Debug + Default + Serialize,
         ToolResponse: Clone + Debug + Default + Serialize,
     {
+        let hook_event_name = input.hook_event_name();
+        let tool_name = input.tool_name.clone();
+        let input = serde_json::to_string(&input).unwrap();
+        info!(event = hook_event_name, input = %input, "received hook event");
         let Some(matchers) = self.hooks.get(&HookEvent::PostToolUse) else { return };
 
         for matcher in matchers {
-            let tool_name = input.tool_name.as_str();
-            match matcher.matches(tool_name) {
+            match matcher.matches(&tool_name) {
                 Ok(true) => {
-                    let _ = Self::fire_hooks(&matcher.hooks, input.clone()).await;
+                    let _ = Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await;
                 },
-                Ok(false) => continue,
+                Ok(_) => continue,
                 Err(err) => {
                     warn!("invalid hook matcher, skipped: {err}");
                     continue;
@@ -88,7 +97,11 @@ impl HooksExecutor {
         }
     }
 
-    pub async fn fire_pre_compact(&self, _input: &PreCompactHookInput) {}
+    pub async fn fire_pre_compact(&self, input: &PreCompactHookInput) {
+        let hook_event_name = input.hook_event_name();
+        let input = serde_json::to_string(input).unwrap();
+        info!(event = hook_event_name, input = %input, "received hook event");
+    }
 
     pub async fn fire_pre_tool_use<ToolInput>(
         &self,
@@ -97,15 +110,19 @@ impl HooksExecutor {
     where
         ToolInput: Clone + Debug + Default + Serialize,
     {
+        let hook_event_name = input.hook_event_name();
+        let tool_name = input.tool_name.clone();
+        let input = serde_json::to_string(&input).unwrap();
+        info!(event = hook_event_name, input = %input, "received hook event");
         let Some(matchers) = self.hooks.get(&HookEvent::PreToolUse) else {
             return HookDecision::Continue;
         };
 
         for matcher in matchers {
-            match matcher.matches(&input.tool_name) {
+            match matcher.matches(&tool_name) {
                 Ok(true) => {
                     if let HookDecision::Terminate { reason } =
-                        Self::fire_hooks(&matcher.hooks, input.clone()).await
+                        Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await
                     {
                         return HookDecision::Terminate { reason };
                     }
@@ -121,44 +138,64 @@ impl HooksExecutor {
         HookDecision::Continue
     }
 
-    pub async fn fire_session_end(&self, _input: SessionEndHookInput) {}
+    pub async fn fire_session_end(&self, input: SessionEndHookInput) {
+        let hook_event_name = input.hook_event_name();
+        let input = serde_json::to_string(&input).unwrap();
+        info!(event = hook_event_name, input = %input, "received hook event");
+    }
 
     pub async fn fire_session_start(&self, input: SessionStartHookInput) {
+        let hook_event_name = input.hook_event_name();
+        let input = serde_json::to_string(&input).unwrap();
+        info!(event = hook_event_name, input = %input, "received hook event");
         let Some(matchers) = self.hooks.get(&HookEvent::PreToolUse) else { return };
 
         for matcher in matchers {
-            Self::fire_hooks(&matcher.hooks, input.clone()).await;
+            Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await;
         }
     }
 
-    pub async fn fire_stop_failure(&self, _input: StopFailureHookInput) {}
+    pub async fn fire_stop_failure(&self, input: StopFailureHookInput) {
+        let hook_event_name = input.hook_event_name();
+        let input = serde_json::to_string(&input).unwrap();
+        info!(event = hook_event_name, input = %input, "received hook event");
+    }
 
-    pub async fn fire_stop(&self, _input: StopHookInput) -> HookDecision {
+    pub async fn fire_stop(&self, input: StopHookInput) -> HookDecision {
+        let hook_event_name = input.hook_event_name();
+        let input = serde_json::to_string(&input).unwrap();
+        info!(event = hook_event_name, input = %input, "received hook event");
         HookDecision::Continue
     }
 
-    pub async fn fire_subagent_start(&self, _input: SubagentStartHookInput) {}
+    pub async fn fire_subagent_start(&self, input: SubagentStartHookInput) {
+        let hook_event_name = input.hook_event_name();
+        let input = serde_json::to_string(&input).unwrap();
+        info!(event = hook_event_name, input = %input, "received hook event");
+    }
 
-    pub async fn fire_subagent_stop(&self, _input: SubagentStopHookInput) -> HookDecision {
+    pub async fn fire_subagent_stop(&self, input: SubagentStopHookInput) -> HookDecision {
+        let hook_event_name = input.hook_event_name();
+        let input = serde_json::to_string(&input).unwrap();
+        info!(event = hook_event_name, input = %input, "received hook event");
         // claude-code 的文档对于 subagent stop 的注释是: Prevents the subagent from stopping
         // 难道要重试?
         HookDecision::Continue
     }
 
-    pub async fn fire_user_prompt_submit(&self, _input: UserPromptSubmitHookInput) -> HookDecision {
+    pub async fn fire_user_prompt_submit(&self, input: UserPromptSubmitHookInput) -> HookDecision {
+        let hook_event_name = input.hook_event_name();
+        let input = serde_json::to_string(&input).unwrap();
+        info!(event = hook_event_name, input = %input, "received hook event");
         HookDecision::Continue
     }
 
-    async fn fire_hooks(hooks: &[HookCommand], input: impl HookInput) -> HookDecision {
-        let hook_event_name = input.hook_event_name();
-
-        let payload = match serde_json::to_string(&input) {
-            Ok(s) => s,
-            Err(err) => {
-                warn!("failed to serialize `{hook_event_name}` hook input: {err}");
-                return HookDecision::Continue;
-            },
-        };
+    async fn fire_hooks(
+        hooks: &[HookCommand],
+        input: impl Into<String>,
+        hook_event_name: &str,
+    ) -> HookDecision {
+        let payload = input.into();
 
         for hook in hooks {
             match hook {

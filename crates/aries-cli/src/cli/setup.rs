@@ -35,6 +35,36 @@ fn setup() -> anyhow::Result<Setting> {
         [Select::with_theme(&theme).with_prompt("provider").items(&items).default(0).interact()?];
 
     let model = match provider {
+        Provider::Anthropic => {
+            let base_url = Input::<String>::with_theme(&theme)
+                .with_prompt("base url")
+                .allow_empty(false)
+                .default(String::from("https://api.openai.com/v1"))
+                .interact_text()?;
+
+            let api_key = Input::<String>::with_theme(&theme)
+                .with_prompt("api key")
+                .allow_empty(false)
+                .interact_text()?;
+
+            let model = Input::<String>::with_theme(&theme)
+                .with_prompt("model name")
+                .allow_empty(false)
+                .interact_text()?;
+
+            let max_tokens = Input::<u64>::with_theme(&theme)
+                .with_prompt("max tokens")
+                .default(2000)
+                .allow_empty(false)
+                .interact_text()?;
+
+            let alias = Input::<String>::with_theme(&theme)
+                .with_prompt("alias")
+                .allow_empty(false)
+                .interact_text()?;
+
+            ModelConfig::anthropic(alias, model, api_key, base_url, max_tokens)
+        },
         Provider::Azure => {
             let azure_endpoint = Input::<String>::with_theme(&theme)
                 .with_prompt("azure endpoint")

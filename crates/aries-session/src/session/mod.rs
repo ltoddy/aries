@@ -23,7 +23,10 @@ use rig_core::wasm_compat::WasmCompatSend;
 use tokio::sync::Mutex as AsyncMutex;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_util::sync::CancellationToken;
+use tracing::info;
+use tracing::instrument::WithSubscriber;
 
+use crate::logger::Logger;
 use crate::session::history::ChatHistory;
 use crate::session::hook::SessionPromptHook;
 use crate::{AriesAgent, AriesClient};
@@ -45,11 +48,13 @@ pub struct Session {
     root_dir: PathBuf,
     transcript_dir: PathBuf,
 
-    cancel: CancellationToken,
+    cancel_token: CancellationToken,
     receiver: Arc<AsyncMutex<UnboundedReceiver<AgentEvent>>>,
 
     compact_breaker: AutoCompactBreaker,
     hooks_executor: Arc<HooksExecutor>,
+
+    logger: Logger,
 }
 
 impl Session {
@@ -82,11 +87,13 @@ impl Session {
             .await
             .with_context(|| format!("failed to create session transcripts directory at: {}", transcript_dir.display()))?;
 
+        let logger = Logger::new(root_dir).await?;
+
         let mode = Mode::default();
         let (agent, receiver) = client.agent(mode, config.clone(), cwd, lsp_client.clone()).await?;
 
         let chat_history = ChatHistory::new(root_dir.join(Self::FILENAME)).await;
-        let cancel = CancellationToken::new();
+        let cancel_token = CancellationToken::new();
 
         let input =
             SessionStartHookInput::new(&id, cwd, SessionStartSource::Startup, config.model(), mode);
@@ -104,10 +111,11 @@ impl Session {
             chat_history,
             root_dir: root_dir.to_path_buf(),
             transcript_dir,
-            cancel,
+            cancel_token,
             receiver: Arc::new(AsyncMutex::new(receiver)),
             compact_breaker: AutoCompactBreaker::new(),
             hooks_executor,
+            logger,
         })
     }
 
@@ -123,6 +131,8 @@ impl Session {
         let root_dir = root_dir.as_ref();
         let transcript_dir = root_dir.join("transcripts");
 
+        let logger = Logger::new(root_dir).await?;
+
         let lsp_client = Self::warm_up_lsp(cwd).await;
         let client = AriesClient::new(&config)?;
 
@@ -134,7 +144,7 @@ impl Session {
 
         let input =
             SessionStartHookInput::new(&id, cwd, SessionStartSource::Resume, config.model(), mode);
-        hooks_executor.fire_session_start(input).await;
+        hooks_executor.fire_session_start(input).with_subscriber(logger.dispatch()).await;
 
         Ok(Self {
             id,
@@ -148,39 +158,12 @@ impl Session {
             chat_history,
             root_dir: root_dir.to_path_buf(),
             transcript_dir,
-            cancel,
+            cancel_token: cancel,
             receiver: Arc::new(AsyncMutex::new(agent_events)),
             compact_breaker: AutoCompactBreaker::new(),
             hooks_executor,
+            logger,
         })
-    }
-
-    pub fn id(&self) -> String {
-        self.id.clone()
-    }
-
-    pub fn system_prompt(&self) -> &str {
-        self.agent.system_prompt()
-    }
-
-    pub fn mode(&self) -> Mode {
-        self.mode
-    }
-
-    pub fn setting(&self) -> &Setting {
-        &self.setting
-    }
-
-    pub fn history(&self) -> &[Message] {
-        self.chat_history.history()
-    }
-
-    pub fn clear_history(&mut self) {
-        self.chat_history.clear();
-    }
-
-    pub fn cancel(&self) {
-        self.cancel.cancel();
     }
 
     pub async fn set_model(&mut self, alias: impl Into<String>) -> anyhow::Result<()> {
@@ -217,10 +200,6 @@ impl Session {
         Ok(())
     }
 
-    pub fn dir(&self) -> PathBuf {
-        self.root_dir.clone()
-    }
-
     pub async fn prompt<F, Fut>(
         &mut self,
         prompt: impl Into<Message> + WasmCompatSend,
@@ -231,10 +210,7 @@ impl Session {
         Fut: Future<Output = ()>,
     {
         let prompt: Message = prompt.into();
-        self.cancel = CancellationToken::new();
-
-        let cancel_token = self.cancel.clone();
-        let agent_events = self.receiver.clone();
+        self.cancel_token = CancellationToken::new();
 
         compact::micro_compact(self.chat_history.history_mut());
 
@@ -244,24 +220,23 @@ impl Session {
             self.chat_history.history().estimate_tokens().saturating_add(prompt.estimate_tokens());
 
         if estimate_tokens >= compact_threshold {
-            println!(
-                "\n🔄 预估 tokens {} 已达阈值 {}（上下文窗口 {}），提前触发压缩...",
-                estimate_tokens, compact_threshold, window.total
+            info!(
+                "\n🔄 预估 tokens {estimate_tokens} 已达阈值 {compact_threshold}（上下文窗口 {}），提前触发压缩...",
+                window.total
             );
             self.compact().await;
         }
 
         let final_res = {
             let snapshot = self.chat_history.history().to_vec();
-            match self
-                .run_prompt(prompt, &snapshot, &mut cb, agent_events.clone(), cancel_token)
-                .await
-            {
+            let dispatch = self.logger.dispatch();
+            match self.run_prompt(prompt, &snapshot, &mut cb).with_subscriber(dispatch).await {
                 Ok(res) => res,
                 Err(err) => {
+                    let dispatch = self.logger.dispatch();
                     let input = StopFailureHookInput::new(&self.id, &self.cwd, err.to_string())
                         .error_details(err.to_string());
-                    self.hooks_executor.fire_stop_failure(input).await;
+                    self.hooks_executor.fire_stop_failure(input).with_subscriber(dispatch).await;
                     return Err(err);
                 },
             }
@@ -274,13 +249,12 @@ impl Session {
 
         let input = StopHookInput::new(&self.id, &self.cwd, false)
             .last_assistant_message(final_res.response());
-        self.hooks_executor.fire_stop(input).await;
+        self.hooks_executor.fire_stop(input).with_subscriber(self.logger.dispatch()).await;
 
         if final_res.usage().total_tokens > compact_threshold {
-            println!(
-                "\n🔄 实际 tokens {} 已达阈值 {}，触发压缩...",
+            info!(
+                "\n🔄 实际 tokens {} 已达阈值 {compact_threshold}，触发压缩...",
                 final_res.usage().total_tokens,
-                compact_threshold
             );
             self.compact().await;
         }
@@ -291,21 +265,24 @@ impl Session {
     pub async fn compact(&mut self) -> bool {
         match self.compact_breaker.decide() {
             Decision::Skip { wait, consecutive_failures } => {
-                println!(
-                    "\n⏳ 压缩处于冷却期（已连续失败 {} 次），约 {} 秒后重试，本次跳过。",
-                    consecutive_failures,
-                    wait.as_secs(),
+                info!(
+                    "\n⏳ 压缩处于冷却期（已连续失败 {consecutive_failures} 次），约 {wait:?} 后重试，本次跳过。",
                 );
                 return false;
             },
             Decision::Allow { half_open } => {
                 if half_open {
-                    println!("\n🔁 冷却结束，尝试恢复压缩...");
+                    info!("\n🔁 冷却结束，尝试恢复压缩...");
                 }
             },
         }
 
         let outcome = match self.client.clone() {
+            AriesClient::Anthropic(client) => {
+                let mut compact_agent =
+                    CompactAgent::new(client, self.config.model(), &self.transcript_dir);
+                compact_agent.compact(self.chat_history.history()).await
+            },
             AriesClient::Azure(client) => {
                 let mut compact_agent =
                     CompactAgent::new(client, self.config.model(), &self.transcript_dir);
@@ -331,9 +308,8 @@ impl Session {
                 let post_tokens = self.chat_history.history().estimate_tokens();
                 let threshold = window.auto_compact_threshold();
                 if post_tokens >= threshold {
-                    println!(
-                        "\n⚠️  压缩后 tokens {} 仍高于阈值 {}，本次压缩无效。",
-                        post_tokens, threshold,
+                    info!(
+                        "\n⚠️  压缩后 tokens {post_tokens} 仍高于阈值 {threshold}，本次压缩无效。",
                     );
                     self.compact_breaker.on_failure();
                     return false;
@@ -343,11 +319,11 @@ impl Session {
                 true
             },
             CompactOutcome::Transient(err) => {
-                println!("\n🌐 压缩遇到临时错误（不计入失败）：{}", err);
+                info!("\n🌐 压缩遇到临时错误（不计入失败）：{}", err);
                 false
             },
             CompactOutcome::PromptTooLong => {
-                println!("\n🛑 上下文过长，压缩请求被拒，进入冷却以避免反复重试。");
+                info!("\n🛑 上下文过长，压缩请求被拒，进入冷却以避免反复重试。");
                 self.compact_breaker.trip();
                 false
             },
@@ -355,9 +331,8 @@ impl Session {
                 self.compact_breaker.on_failure();
                 let failures = self.compact_breaker.consecutive_failures();
                 if failures >= AutoCompactBreaker::MAX_CONSECUTIVE_AUTOCOMPACT_FAILURES {
-                    println!(
-                        "\n⛔ 连续 {} 次压缩失败，进入 {} 分钟冷却。",
-                        failures,
+                    info!(
+                        "\n⛔ 连续 {failures} 次压缩失败，进入 {} 分钟冷却。",
                         AutoCompactBreaker::AUTOCOMPACT_FAILURE_COOLDOWN.as_secs() / 60,
                     );
                 }
@@ -371,8 +346,6 @@ impl Session {
         prompt: impl Into<Message> + WasmCompatSend,
         history: &[Message],
         cb: &mut Option<F>,
-        agent_events: Arc<AsyncMutex<UnboundedReceiver<AgentEvent>>>,
-        cancel_token: CancellationToken,
     ) -> anyhow::Result<FinalResponse>
     where
         F: FnMut(AgentEvent) -> Fut,
@@ -388,13 +361,13 @@ impl Session {
         let prompt_fut = self.agent.prompt(prompt, history.to_vec(), hook);
         pin_mut!(prompt_fut);
 
-        let mut events_guard = agent_events.lock().await;
+        let mut events_guard = self.receiver.lock().await;
         let mut final_res = FinalResponse::empty();
 
         loop {
             tokio::select! {
                 biased;
-                _ = cancel_token.cancelled() => {
+                _ = self.cancel_token.cancelled() => {
                     break;
                 }
                 event = events_guard.recv() => {
@@ -438,14 +411,36 @@ impl Session {
 
         None
     }
-}
 
-#[inline]
-fn sanitize_dir(dir: impl AsRef<Path>) -> String {
-    dir.as_ref()
-        .display()
-        .to_string()
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
-        .collect()
+    pub fn id(&self) -> String {
+        self.id.clone()
+    }
+
+    pub fn system_prompt(&self) -> &str {
+        self.agent.system_prompt()
+    }
+
+    pub fn mode(&self) -> Mode {
+        self.mode
+    }
+
+    pub fn setting(&self) -> &Setting {
+        &self.setting
+    }
+
+    pub fn history(&self) -> &[Message] {
+        self.chat_history.history()
+    }
+
+    pub fn clear_history(&mut self) {
+        self.chat_history.clear();
+    }
+
+    pub fn cancel(&self) {
+        self.cancel_token.cancel();
+    }
+
+    pub fn dir(&self) -> PathBuf {
+        self.root_dir.clone()
+    }
 }

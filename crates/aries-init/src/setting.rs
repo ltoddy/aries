@@ -160,12 +160,28 @@ impl Setting {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ModelConfig {
+    Anthropic(Anthropic),
     Azure(Azure),
     Deepseek(Deepseek),
     OpenAI(OpenAI),
 }
 
 impl ModelConfig {
+    pub fn anthropic(
+        alias: impl Into<String>,
+        model: impl Into<String>,
+        api_key: impl Into<String>,
+        base_url: impl Into<String>,
+        max_tokens: u64,
+    ) -> Self {
+        let alias = alias.into();
+        let model = model.into();
+        let api_key = api_key.into();
+        let base_url = base_url.into();
+
+        Self::Anthropic(Anthropic { alias, model, api_key, base_url, max_tokens })
+    }
+
     pub fn azure(
         alias: impl Into<String>,
         model: impl Into<String>,
@@ -212,22 +228,25 @@ impl ModelConfig {
 
     pub const fn alias(&self) -> impl Into<String> {
         match self {
-            ModelConfig::OpenAI(o) => &o.alias,
+            ModelConfig::Anthropic(a) => &a.alias,
             ModelConfig::Azure(a) => &a.alias,
             ModelConfig::Deepseek(d) => &d.alias,
+            ModelConfig::OpenAI(o) => &o.alias,
         }
     }
 
     pub const fn model(&self) -> impl Into<String> {
         match self {
-            ModelConfig::OpenAI(o) => &o.model,
+            ModelConfig::Anthropic(a) => &a.model,
             ModelConfig::Azure(a) => &a.model,
             ModelConfig::Deepseek(d) => &d.model,
+            ModelConfig::OpenAI(o) => &o.model,
         }
     }
 
     pub const fn provider(&self) -> Provider {
         match self {
+            ModelConfig::Anthropic(_) => Provider::Anthropic,
             ModelConfig::Azure(_) => Provider::Azure,
             ModelConfig::Deepseek(_) => Provider::DeepSeek,
             ModelConfig::OpenAI(_) => Provider::OpenAI,
@@ -237,6 +256,7 @@ impl ModelConfig {
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 pub enum Provider {
+    Anthropic,
     Azure,
     DeepSeek,
     OpenAI,
@@ -245,6 +265,7 @@ pub enum Provider {
 impl Provider {
     pub const fn as_str(&self) -> &str {
         match self {
+            Provider::Anthropic => "Anthropic",
             Provider::Azure => "Azure",
             Provider::DeepSeek => "Deepseek",
             Provider::OpenAI => "OpenAI",
@@ -255,6 +276,7 @@ impl Provider {
 impl Display for Provider {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
+            Provider::Anthropic => write!(f, "Anthropic"),
             Provider::Azure => write!(f, "Azure"),
             Provider::DeepSeek => write!(f, "Deepseek"),
             Provider::OpenAI => write!(f, "OpenAI"),
@@ -264,11 +286,12 @@ impl Display for Provider {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub struct OpenAI {
+pub struct Anthropic {
     pub alias: String,
     pub model: String,
     pub api_key: String,
     pub base_url: String,
+    pub max_tokens: u64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -284,6 +307,15 @@ pub struct Azure {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Deepseek {
+    pub alias: String,
+    pub model: String,
+    pub api_key: String,
+    pub base_url: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct OpenAI {
     pub alias: String,
     pub model: String,
     pub api_key: String,

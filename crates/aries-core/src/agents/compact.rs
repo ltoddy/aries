@@ -141,22 +141,22 @@ fn compress(messages: &[Message]) -> String {
         match message {
             Message::User { content } => {
                 for c in content.iter() {
-                    if let UserContent::Text(message::Text { text }) = c {
+                    if let UserContent::Text(t) = c {
                         if prompt.len() > start_len {
                             prompt.push('\n');
                         }
-                        prompt.push_str(text);
+                        prompt.push_str(t.text());
                     }
                 }
             },
             Message::Assistant { content, .. } => {
                 for c in content.iter() {
                     match c {
-                        AssistantContent::Text(message::Text { text }) => {
+                        AssistantContent::Text(t) => {
                             if prompt.len() > start_len {
                                 prompt.push('\n');
                             }
-                            prompt.push_str(text);
+                            prompt.push_str(t.text());
                         },
                         AssistantContent::Reasoning(message::Reasoning { content, .. }) => {
                             for rc in content {
