@@ -11,7 +11,7 @@ use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
 use aries_core::event::AgentEvent;
 use parking_lot::Mutex;
 use rig_core::message::ToolCall;
-use tracing::info;
+use tracing::{info, info_span};
 
 use crate::SharedRegistry;
 use crate::prompt::message::UserMessage;
@@ -44,6 +44,9 @@ pub async fn prompt(
             let _ = cx.send_notification(SessionNotification::new(session_id.clone(), u));
         });
     };
+
+    let span = info_span!("prompt", session_id = %session_id);
+    let _enter = span.enter();
 
     match session.prompt(prompt, Some(callback)).await {
         Ok(_) => {

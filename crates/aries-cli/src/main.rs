@@ -2,7 +2,6 @@ mod cli;
 mod commands;
 mod display;
 mod input;
-mod logger;
 mod theme;
 mod welcome;
 

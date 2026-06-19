@@ -6,6 +6,8 @@ use anyhow::Context;
 use aries_context::GlobalContext;
 use aries_extension::hook::{HooksExecutor, HooksLoader};
 use aries_init::Setting;
+use aries_logger;
+use tracing::{Instrument, info_span};
 
 use crate::Session;
 use crate::persistence::SessionRepository;
@@ -94,14 +96,17 @@ impl SessionRegistry {
 
         let model_config = self.setting.active_model()?;
 
+        aries_logger::register(&session_id, &root_dir);
+
         let session = Session::new(
-            session_id,
+            &session_id,
             &root_dir,
             &cwd,
             model_config,
             self.setting.clone(),
             self.hooks_executor.clone(),
         )
+        .instrument(info_span!("session_init", session_id = %session_id))
         .await
         .with_context(|| format!("Failed to create session at {}", root_dir.display()))?;
 
@@ -129,15 +134,18 @@ impl SessionRegistry {
         let model_config = self.setting.active_model()?;
 
         let session = Session::load(
-            session.session_id,
+            &session.session_id,
             &root_dir,
             session.cwd,
             model_config,
             self.setting.clone(),
             self.hooks_executor.clone(),
         )
+        .instrument(info_span!("session_init", session_id = %session_id))
         .await
         .with_context(|| format!("Failed to load session from: {}", root_dir.display()))?;
+
+        aries_logger::register(&session_id, &root_dir);
 
         self.active_sessions.insert(session.id(), session.clone());
 

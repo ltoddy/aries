@@ -1,4 +1,3 @@
-mod logger;
 pub mod persistence;
 pub mod registry;
 pub mod session;

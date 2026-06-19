@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use aries_filesystem::jsonl;
 use rig_core::completion::Message;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
-use tracing::error;
+use tracing::{Instrument, Span, error};
 
 #[derive(Debug, Clone)]
 pub struct ChatHistory {
@@ -22,7 +22,9 @@ impl ChatHistory {
         let history = Self::load(&file_path).await.unwrap_or_default();
 
         let (sender, receiver) = unbounded_channel();
-        tokio::spawn(refresh_history(receiver, file_path.to_path_buf()));
+        tokio::spawn(
+            refresh_history(receiver, file_path.to_path_buf()).instrument(Span::current()),
+        );
 
         Self { history, sender }
     }

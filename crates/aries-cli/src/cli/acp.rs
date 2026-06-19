@@ -6,5 +6,7 @@ pub async fn execute(gctx: GlobalContext) -> anyhow::Result<()> {
     let loader = SettingLoader::new(&gctx.root_dir);
     let setting = loader.load().await?;
 
+    aries_logger::init(gctx.root_dir.join("logs"));
+
     aries_acp::run(gctx, setting, Stdio::new()).await
 }

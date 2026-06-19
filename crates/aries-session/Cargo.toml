@@ -10,6 +10,7 @@ aries-core = { path = "../aries-core" }
 aries-extension = { version = "0.1.0", path = "../aries-extension" }
 aries-filesystem = { version = "0.1.0", path = "../aries-filesystem" }
 aries-init = { path = "../aries-init" }
+aries-logger = { path = "../aries-logger" }
 futures.workspace = true
 itertools.workspace = true
 jiff.workspace = true
@@ -19,6 +20,4 @@ serde_json.workspace = true
 toasty = { workspace = true, features = ["jiff", "sqlite"] }
 tokio = { workspace = true, features = ["sync", "macros"] }
 tokio-util.workspace = true
-tracing-appender.workspace = true
-tracing-subscriber = { workspace = true, features = ["env-filter", "json"] }
 tracing.workspace = true

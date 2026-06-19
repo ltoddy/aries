@@ -239,7 +239,7 @@ fn mode_option(current: Mode) -> SessionConfigOption {
         current.id(),
         SessionConfigSelectOptions::Ungrouped(options),
     )
-    .description("")
+    .description("Agent mode determines how Aries processes your requests — Build (coding), Plan (no edits), General (multi-step), Explore (codebase search).")
     .category(SessionConfigOptionCategory::Mode)
 }
 
@@ -259,6 +259,6 @@ fn model_option(setting: &Setting) -> SessionConfigOption {
         setting.active.clone(),
         SessionConfigSelectOptions::Ungrouped(options),
     )
-    .description("")
+    .description("The language model that powers this session. Switch models to change providers, capabilities, or context window size.")
     .category(SessionConfigOptionCategory::Model)
 }

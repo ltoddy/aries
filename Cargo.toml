@@ -8,6 +8,7 @@ members = [
     "crates/aries-filesystem",
     "crates/aries-harness",
     "crates/aries-init",
+    "crates/aries-logger",
     "crates/aries-session",
 ]
 default-members = ["crates/aries-cli"]

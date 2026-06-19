@@ -25,9 +25,7 @@ use tokio::sync::Mutex as AsyncMutex;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
-use tracing::instrument::WithSubscriber;
 
-use crate::logger::Logger;
 use crate::session::chat_context::ChatContext;
 use crate::session::chat_history::ChatHistory;
 use crate::session::hook::SessionPromptHook;
@@ -56,8 +54,6 @@ pub struct Session {
 
     compact_breaker: AutoCompactBreaker,
     hooks_executor: Arc<HooksExecutor>,
-
-    logger: Logger,
 }
 
 impl Session {
@@ -89,8 +85,6 @@ impl Session {
             .await
             .with_context(|| format!("failed to create session transcripts directory at: {}", transcript_dir.display()))?;
 
-        let logger = Logger::new(root_dir).await?;
-
         let mode = Mode::default();
         let (agent, receiver) = client.agent(mode, config.clone(), cwd, lsp_client.clone()).await?;
 
@@ -101,7 +95,7 @@ impl Session {
 
         let input =
             SessionStartHookInput::new(&id, cwd, SessionStartSource::Startup, config.model(), mode);
-        hooks_executor.fire_session_start(input).with_subscriber(logger.dispatch()).await;
+        hooks_executor.fire_session_start(input).await;
 
         Ok(Self {
             id,
@@ -120,23 +114,22 @@ impl Session {
             receiver: Arc::new(AsyncMutex::new(receiver)),
             compact_breaker: AutoCompactBreaker::new(),
             hooks_executor,
-            logger,
         })
     }
 
     pub async fn load(
-        id: String,
+        id: impl Into<String>,
         root_dir: impl AsRef<Path>,
         cwd: impl AsRef<Path>,
         config: ModelConfig,
         setting: Setting,
         hooks_executor: Arc<HooksExecutor>,
     ) -> anyhow::Result<Self> {
+        let id = id.into();
         let cwd = cwd.as_ref();
         let root_dir = root_dir.as_ref();
-        let transcript_dir = root_dir.join("transcripts");
 
-        let logger = Logger::new(root_dir).await?;
+        let transcript_dir = root_dir.join("transcripts");
 
         let lsp_client = Self::warm_up_lsp(cwd).await;
         let client = AriesClient::new(&config)?;
@@ -151,7 +144,7 @@ impl Session {
 
         let input =
             SessionStartHookInput::new(&id, cwd, SessionStartSource::Resume, config.model(), mode);
-        hooks_executor.fire_session_start(input).with_subscriber(logger.dispatch()).await;
+        hooks_executor.fire_session_start(input).await;
 
         Ok(Self {
             id,
@@ -170,7 +163,6 @@ impl Session {
             receiver: Arc::new(AsyncMutex::new(agent_events)),
             compact_breaker: AutoCompactBreaker::new(),
             hooks_executor,
-            logger,
         })
     }
 
@@ -237,14 +229,12 @@ impl Session {
 
         let final_res = {
             let snapshot = self.chat_context.history().to_vec();
-            let dispatch = self.logger.dispatch();
-            match self.run_prompt(prompt, &snapshot, &mut cb).with_subscriber(dispatch).await {
+            match self.run_prompt(prompt, &snapshot, &mut cb).await {
                 Ok(res) => res,
                 Err(err) => {
-                    let dispatch = self.logger.dispatch();
                     let input = StopFailureHookInput::new(&self.id, &self.cwd, err.to_string())
                         .error_details(err.to_string());
-                    self.hooks_executor.fire_stop_failure(input).with_subscriber(dispatch).await;
+                    self.hooks_executor.fire_stop_failure(input).await;
                     return Err(err);
                 },
             }
@@ -257,7 +247,7 @@ impl Session {
 
         let input = StopHookInput::new(&self.id, &self.cwd, false)
             .last_assistant_message(final_res.response());
-        self.hooks_executor.fire_stop(input).with_subscriber(self.logger.dispatch()).await;
+        self.hooks_executor.fire_stop(input).await;
 
         if final_res.usage().total_tokens > compact_threshold {
             info!(

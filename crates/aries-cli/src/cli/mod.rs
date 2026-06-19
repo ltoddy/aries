@@ -15,12 +15,13 @@ use clap::{Parser, Subcommand};
 use prompt::PromptArgs;
 use rustyline::error::ReadlineError;
 use terminal_size::{Width, terminal_size};
+use tracing::info_span;
 
 use crate::cli::model::ModelCommand;
 use crate::cli::session::SessionCommand;
 use crate::display::print_agent_event;
 use crate::theme::Theme;
-use crate::{commands, input, logger, welcome};
+use crate::{commands, input, welcome};
 
 #[derive(Parser, Debug, Clone)]
 pub struct Args {
@@ -51,11 +52,12 @@ pub async fn run_session(gctx: GlobalContext, session_id: impl Into<String>) -> 
 
     let mut registry = SessionRegistry::new(gctx.clone(), setting.clone()).await?;
 
+    aries_logger::init(gctx.root_dir.join("logs"));
+
     let current_dir = gctx.current_dir.display().to_string();
     let session_id = session_id.into();
 
     let mut session = registry.try_session(&current_dir, &session_id).await?;
-    let _guard = logger::init(session.root_dir()).await;
 
     let mut reader = input::InputReader::new(session.root_dir())?;
     welcome::welcome(
@@ -84,22 +86,25 @@ pub async fn run_session(gctx: GlobalContext, session_id: impl Into<String>) -> 
                 let start = Instant::now();
                 let tool_names: Arc<Mutex<HashMap<String, String>>> =
                     Arc::new(Mutex::new(HashMap::new()));
-                if let Err(err) = session
-                    .prompt(
-                        input,
-                        Some(|event| {
-                            let tool_names = tool_names.clone();
-                            async move {
-                                if let Ok(mut map) = tool_names.lock() {
-                                    print_agent_event(event, theme, &mut map);
-                                }
-                            }
-                        }),
-                    )
-                    .await
                 {
-                    eprintln!("\n{}: {}", theme.red_text("Error streaming_chunk"), err);
-                    continue;
+                    let _enter = info_span!("prompt", session_id = %session_id).entered();
+                    if let Err(err) = session
+                        .prompt(
+                            input,
+                            Some(|event| {
+                                let tool_names = tool_names.clone();
+                                async move {
+                                    if let Ok(mut map) = tool_names.lock() {
+                                        print_agent_event(event, theme, &mut map);
+                                    }
+                                }
+                            }),
+                        )
+                        .await
+                    {
+                        eprintln!("\n{}: {}", theme.red_text("Error"), err);
+                        continue;
+                    }
                 }
 
                 display_elapsed(start, &theme);
