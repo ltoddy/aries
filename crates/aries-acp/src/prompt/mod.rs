@@ -27,8 +27,8 @@ pub async fn prompt(
 
     let session_id = req.session_id.to_string();
     let mut session = {
-        let reg = registry.lock().await;
-        match reg.get_session(&session_id) {
+        let registry = registry.lock().await;
+        match registry.get_session(&session_id) {
             Some(session) => session,
             None => {
                 return responder.respond_with_error(Error::resource_not_found(Some(session_id)));
@@ -50,8 +50,8 @@ pub async fn prompt(
 
     match session.prompt(prompt, Some(callback)).await {
         Ok(_) => {
-            let mut reg = registry.lock().await;
-            reg.putback_session(session);
+            let mut registry = registry.lock().await;
+            registry.putback_session(session);
             responder.respond(PromptResponse::new(StopReason::EndTurn))
         },
         Err(err) => responder.respond_with_internal_error(err.to_string()),

@@ -23,9 +23,9 @@ pub async fn new_session(
 ) -> Result<(), Error> {
     info!("Received new session request {req:?}");
 
-    let mut reg = registry.lock().await;
+    let mut registry = registry.lock().await;
     let cwd = req.cwd.display().to_string();
-    let session = match reg.new_session(cwd).await {
+    let session = match registry.new_session(cwd).await {
         Ok(session) => session,
         Err(err) => {
             return responder.respond_with_internal_error(err.to_string());
@@ -46,9 +46,9 @@ pub async fn load_session(
     info!("Received list sessions request {req:?}");
 
     let session_id = req.session_id.to_string();
-    let mut reg = registry.lock().await;
+    let mut registry = registry.lock().await;
 
-    let session = match reg.load_session(session_id).await {
+    let session = match registry.load_session(session_id).await {
         Ok(session) => session,
         Err(err) => return responder.respond_with_internal_error(err.to_string()),
     };
@@ -66,8 +66,8 @@ pub async fn list_session(
 ) -> Result<(), Error> {
     info!("Received list sessions request {req:?}");
 
-    let mut reg = registry.lock().await;
-    let sessions = match reg.list_sessions(req.cwd).await {
+    let mut registry = registry.lock().await;
+    let sessions = match registry.list_sessions(req.cwd).await {
         Ok(sessions) => sessions,
         Err(err) => {
             return responder.respond_with_internal_error(err.to_string());
@@ -90,9 +90,13 @@ pub async fn close_session(
     req: CloseSessionRequest,
     responder: Responder<CloseSessionResponse>,
     _: ConnectionTo<Client>,
+    registry: SharedRegistry,
 ) -> Result<(), Error> {
     let session_id = req.session_id.to_string();
     info!("Received close session request for {session_id}");
+
+    let mut registry = registry.lock().await;
+    registry.close_session(session_id);
 
     let resp = CloseSessionResponse::new();
     responder.respond(resp)
@@ -111,8 +115,8 @@ pub async fn set_session_config_option(
     let value = req.value.to_string();
 
     let mut session = {
-        let reg = registry.lock().await;
-        match reg.get_session(&session_id) {
+        let registry = registry.lock().await;
+        match registry.get_session(&session_id) {
             Some(session) => session,
             None => {
                 return responder.respond_with_error(Error::resource_not_found(Some(session_id)));

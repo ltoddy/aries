@@ -63,6 +63,12 @@ impl SessionRegistry {
         Ok(sessions)
     }
 
+    pub fn close_session(&mut self, session_id: impl Into<String>) {
+        let session_id = session_id.into();
+
+        self.active_sessions.remove(&session_id);
+    }
+
     pub async fn try_session(
         &mut self,
         project_dir: &str,
