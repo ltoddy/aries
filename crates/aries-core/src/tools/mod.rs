@@ -16,23 +16,23 @@ pub mod webfetch;
 pub mod websearch;
 pub mod write;
 
-pub use self::agent::{AgentArgs, AgentOutput, AgentTool};
-pub use self::bash::{BashArgs, BashOutput, BashTool};
-pub use self::batch::{BatchArgs, BatchOutput, BatchTool};
-pub use self::codesearch::{CodeSearchArgs, CodeSearchOutput, CodeSearchTool};
-pub use self::edit::{EditArgs, EditOutput, EditTool};
-pub use self::glob::{GlobArgs, GlobOutput, GlobTool};
-pub use self::grep::{GrepArgs, GrepOutput, GrepTool};
-pub use self::ls::{LsArgs, LsOutput, LsTool};
-pub use self::lsp::{LspArgs, LspOutput, LspTool};
-pub use self::multiedit::{MultiEditArgs, MultiEditOutput, MultiEditTool};
-pub use self::question::{AskUserQuestionArgs, AskUserQuestionOutput, AskUserQuestionTool};
-pub use self::read::{ReadArgs, ReadOutput, ReadTool};
-pub use self::skill::{SkillArgs, SkillOutput, SkillTool};
-pub use self::update_plan::{UpdatePlanArgs, UpdatePlanOutput, UpdatePlanTool};
-pub use self::webfetch::{WebFetchArgs, WebFetchOutput, WebFetchTool};
-pub use self::websearch::{WebSearchArgs, WebSearchOutput, WebSearchTool};
-pub use self::write::{WriteArgs, WriteOutput, WriteTool};
+pub use crate::tools::agent::{AgentArgs, AgentOutput, AgentTool};
+pub use crate::tools::bash::{BashArgs, BashOutput, BashTool};
+pub use crate::tools::batch::{BatchArgs, BatchOutput, BatchTool};
+pub use crate::tools::codesearch::{CodeSearchArgs, CodeSearchOutput, CodeSearchTool};
+pub use crate::tools::edit::{EditArgs, EditOutput, EditTool};
+pub use crate::tools::glob::{GlobArgs, GlobOutput, GlobTool};
+pub use crate::tools::grep::{GrepArgs, GrepOutput, GrepTool};
+pub use crate::tools::ls::{LsArgs, LsOutput, LsTool};
+pub use crate::tools::lsp::{LspArgs, LspOutput, LspTool};
+pub use crate::tools::multiedit::{MultiEditArgs, MultiEditOutput, MultiEditTool};
+pub use crate::tools::question::{AskUserQuestionArgs, AskUserQuestionOutput, AskUserQuestionTool};
+pub use crate::tools::read::{ReadArgs, ReadOutput, ReadTool};
+pub use crate::tools::skill::{SkillArgs, SkillOutput, SkillTool};
+pub use crate::tools::update_plan::{UpdatePlanArgs, UpdatePlanOutput, UpdatePlanTool};
+pub use crate::tools::webfetch::{WebFetchArgs, WebFetchOutput, WebFetchTool};
+pub use crate::tools::websearch::{WebSearchArgs, WebSearchOutput, WebSearchTool};
+pub use crate::tools::write::{WriteArgs, WriteOutput, WriteTool};
 
 pub fn format_tool_args(tool_name: &str, raw_json: &str) -> (String, Option<String>) {
     let result = match tool_name {

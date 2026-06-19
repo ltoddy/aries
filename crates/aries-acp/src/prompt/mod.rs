@@ -13,9 +13,9 @@ use parking_lot::Mutex;
 use rig_core::message::ToolCall;
 use tracing::info;
 
-use self::message::UserMessage;
-use self::session_update::SessionUpdates;
 use crate::SharedRegistry;
+use crate::prompt::message::UserMessage;
+use crate::prompt::session_update::SessionUpdates;
 
 pub async fn prompt(
     req: PromptRequest,

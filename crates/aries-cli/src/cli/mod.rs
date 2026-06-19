@@ -16,8 +16,8 @@ use prompt::PromptArgs;
 use rustyline::error::ReadlineError;
 use terminal_size::{Width, terminal_size};
 
-use self::model::ModelCommand;
-use self::session::SessionCommand;
+use crate::cli::model::ModelCommand;
+use crate::cli::session::SessionCommand;
 use crate::display::print_agent_event;
 use crate::theme::Theme;
 use crate::{commands, input, logger, welcome};
@@ -55,9 +55,9 @@ pub async fn run_session(gctx: GlobalContext, session_id: impl Into<String>) -> 
     let session_id = session_id.into();
 
     let mut session = registry.try_session(&current_dir, &session_id).await?;
-    let _guard = logger::init(session.dir()).await;
+    let _guard = logger::init(session.root_dir()).await;
 
-    let mut reader = input::InputReader::new(session.dir())?;
+    let mut reader = input::InputReader::new(session.root_dir())?;
     welcome::welcome(
         model_config.provider().to_string(),
         model_config.model(),

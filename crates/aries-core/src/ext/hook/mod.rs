@@ -4,6 +4,6 @@ pub mod input;
 pub mod loader;
 pub mod preset;
 
-pub use self::executor::{HookDecision, HooksExecutor};
-pub use self::loader::HooksLoader;
-pub use self::preset::HooksPreset;
+pub use crate::ext::hook::executor::{HookDecision, HooksExecutor};
+pub use crate::ext::hook::loader::HooksLoader;
+pub use crate::ext::hook::preset::HooksPreset;

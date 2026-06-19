@@ -2,7 +2,7 @@ pub mod session;
 
 use std::path::Path;
 
-pub use self::session::{Session, SessionRepository};
+pub use crate::persistence::session::{Session, SessionRepository};
 
 pub async fn connect(dir: impl AsRef<Path>) -> toasty::Result<toasty::Db> {
     let file_path = dir.as_ref().join("aries.db");

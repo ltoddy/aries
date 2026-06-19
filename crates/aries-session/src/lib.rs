@@ -16,9 +16,9 @@ use rig_core::providers::{anthropic, azure, deepseek, openai};
 use rig_core::wasm_compat::WasmCompatSend;
 use tokio::sync::mpsc::UnboundedReceiver;
 
-pub use self::persistence::{connect, migrate};
-pub use self::registry::SessionRegistry;
-pub use self::session::Session;
+pub use crate::persistence::{connect, migrate};
+pub use crate::registry::SessionRegistry;
+pub use crate::session::Session;
 
 #[derive(Clone)]
 pub enum AriesClient {

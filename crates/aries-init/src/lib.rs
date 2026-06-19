@@ -1,5 +1,5 @@
 pub mod global;
 pub mod setting;
 
-pub use self::global::GlobalContext;
-pub use self::setting::{ModelConfig, Provider, Setting, SettingError, SettingLoader};
+pub use crate::global::GlobalContext;
+pub use crate::setting::{ModelConfig, Provider, Setting, SettingError, SettingLoader};

@@ -11,11 +11,11 @@ use rig_core::streaming::StreamingPrompt;
 use rig_core::wasm_compat::WasmCompatSend;
 use tokio::sync::mpsc::UnboundedSender;
 
-pub use self::builder::AgentBuilder;
-pub use self::compact::{CompactAgent, CompactOutcome};
-pub use self::mode::Mode;
-pub use self::summary::SummaryAgent;
-pub use self::title::TitleAgent;
+pub use crate::agents::builder::AgentBuilder;
+pub use crate::agents::compact::{CompactAgent, CompactOutcome};
+pub use crate::agents::mode::Mode;
+pub use crate::agents::summary::SummaryAgent;
+pub use crate::agents::title::TitleAgent;
 use crate::event::AgentEvent;
 use crate::{AriesError, AriesResult};
 

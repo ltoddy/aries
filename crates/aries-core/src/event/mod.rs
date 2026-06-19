@@ -28,6 +28,7 @@ impl AgentEvent {
 }
 
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum AgentSignal {
     Stream(MultiTurnStreamItem<()>),
     PlanUpdate(Vec<PlanEntry>),

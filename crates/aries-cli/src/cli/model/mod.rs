@@ -5,10 +5,10 @@ pub mod rm;
 
 use clap::Subcommand;
 
-use self::add::AddModelArgs;
-use self::default::DefaultModelArgs;
-use self::list::ListModelArgs;
-use self::rm::RmModelArgs;
+use crate::cli::model::add::AddModelArgs;
+use crate::cli::model::default::DefaultModelArgs;
+use crate::cli::model::list::ListModelArgs;
+use crate::cli::model::rm::RmModelArgs;
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum ModelCommand {

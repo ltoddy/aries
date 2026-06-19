@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use url::Url;
 
-pub use self::walk::{walk_dir, walk_dirs};
+pub use crate::fs::walk::{walk_dir, walk_dirs};
 
 pub fn path_to_uri(path: impl AsRef<Path>) -> String {
     let path = path.as_ref();

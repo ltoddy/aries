@@ -26,7 +26,7 @@ pub async fn execute(args: PromptArgs, gctx: GlobalContext) -> anyhow::Result<()
     let current_dir = gctx.current_dir.display().to_string();
 
     let mut session = registry.try_session(&current_dir, &session_id).await?;
-    let _guard = logger::init(session.dir()).await;
+    let _guard = logger::init(session.root_dir()).await;
 
     let theme = Theme::default();
 

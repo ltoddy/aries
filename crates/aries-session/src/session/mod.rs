@@ -1,5 +1,6 @@
-mod history;
-pub mod hook;
+mod chat_context;
+mod chat_history;
+mod hook;
 
 use std::future::Future;
 use std::path::{Path, PathBuf};
@@ -27,7 +28,8 @@ use tracing::info;
 use tracing::instrument::WithSubscriber;
 
 use crate::logger::Logger;
-use crate::session::history::ChatHistory;
+use crate::session::chat_context::ChatContext;
+use crate::session::chat_history::ChatHistory;
 use crate::session::hook::SessionPromptHook;
 use crate::{AriesAgent, AriesClient};
 
@@ -44,6 +46,7 @@ pub struct Session {
 
     lsp_client: Option<SharedLspClient>,
     chat_history: ChatHistory,
+    chat_context: ChatContext,
 
     root_dir: PathBuf,
     transcript_dir: PathBuf,
@@ -58,7 +61,6 @@ pub struct Session {
 }
 
 impl Session {
-    const FILENAME: &str = "chat-history.jsonl";
     pub const PREFIX: &str = "session-";
 
     pub async fn new(
@@ -92,7 +94,9 @@ impl Session {
         let mode = Mode::default();
         let (agent, receiver) = client.agent(mode, config.clone(), cwd, lsp_client.clone()).await?;
 
-        let chat_history = ChatHistory::new(root_dir.join(Self::FILENAME)).await;
+        let chat_history = ChatHistory::new(root_dir).await;
+        let chat_context = ChatContext::new(root_dir).await;
+
         let cancel_token = CancellationToken::new();
 
         let input =
@@ -109,6 +113,7 @@ impl Session {
             mode,
             lsp_client,
             chat_history,
+            chat_context,
             root_dir: root_dir.to_path_buf(),
             transcript_dir,
             cancel_token,
@@ -139,7 +144,9 @@ impl Session {
         let mode = Mode::default();
         let (agent, agent_events) =
             client.agent(mode, config.clone(), cwd, lsp_client.clone()).await?;
-        let chat_history = ChatHistory::new(root_dir.join(Self::FILENAME)).await;
+        let chat_history = ChatHistory::new(root_dir).await;
+        let chat_context = ChatContext::new(root_dir).await;
+
         let cancel = CancellationToken::new();
 
         let input =
@@ -156,6 +163,7 @@ impl Session {
             mode,
             lsp_client,
             chat_history,
+            chat_context,
             root_dir: root_dir.to_path_buf(),
             transcript_dir,
             cancel_token: cancel,
@@ -212,12 +220,12 @@ impl Session {
         let prompt: Message = prompt.into();
         self.cancel_token = CancellationToken::new();
 
-        compact::micro_compact(self.chat_history.history_mut());
+        compact::micro_compact(self.chat_context.history_mut());
 
         let window = compact::ContextWindow::for_model(self.config.model().into());
         let compact_threshold = window.auto_compact_threshold();
         let estimate_tokens =
-            self.chat_history.history().estimate_tokens().saturating_add(prompt.estimate_tokens());
+            self.chat_context.history().estimate_tokens().saturating_add(prompt.estimate_tokens());
 
         if estimate_tokens >= compact_threshold {
             info!(
@@ -228,7 +236,7 @@ impl Session {
         }
 
         let final_res = {
-            let snapshot = self.chat_history.history().to_vec();
+            let snapshot = self.chat_context.history().to_vec();
             let dispatch = self.logger.dispatch();
             match self.run_prompt(prompt, &snapshot, &mut cb).with_subscriber(dispatch).await {
                 Ok(res) => res,
@@ -244,7 +252,7 @@ impl Session {
 
         if let Some(his) = final_res.history() {
             self.chat_history.extend(his.iter().cloned());
-            self.chat_history.persist();
+            self.chat_context.extend(his.iter().cloned()).await;
         }
 
         let input = StopHookInput::new(&self.id, &self.cwd, false)
@@ -281,31 +289,31 @@ impl Session {
             AriesClient::Anthropic(client) => {
                 let mut compact_agent =
                     CompactAgent::new(client, self.config.model(), &self.transcript_dir);
-                compact_agent.compact(self.chat_history.history()).await
+                compact_agent.compact(self.chat_context.history()).await
             },
             AriesClient::Azure(client) => {
                 let mut compact_agent =
                     CompactAgent::new(client, self.config.model(), &self.transcript_dir);
-                compact_agent.compact(self.chat_history.history()).await
+                compact_agent.compact(self.chat_context.history()).await
             },
             AriesClient::Deepseek(client) => {
                 let mut compact_agent =
                     CompactAgent::new(client, self.config.model(), &self.transcript_dir);
-                compact_agent.compact(self.chat_history.history()).await
+                compact_agent.compact(self.chat_context.history()).await
             },
             AriesClient::OpenAI(client) => {
                 let mut compact_agent =
                     CompactAgent::new(client, self.config.model(), &self.transcript_dir);
-                compact_agent.compact(self.chat_history.history()).await
+                compact_agent.compact(self.chat_context.history()).await
             },
         };
 
         match outcome {
             CompactOutcome::Success(compressed) => {
-                self.chat_history.reset(&compressed);
+                self.chat_context.overwrite(compressed).await;
 
                 let window = compact::ContextWindow::for_model(self.config.model());
-                let post_tokens = self.chat_history.history().estimate_tokens();
+                let post_tokens = self.chat_context.history().estimate_tokens();
                 let threshold = window.auto_compact_threshold();
                 if post_tokens >= threshold {
                     info!(
@@ -428,19 +436,15 @@ impl Session {
         &self.setting
     }
 
-    pub fn history(&self) -> &[Message] {
-        self.chat_history.history()
-    }
-
-    pub fn clear_history(&mut self) {
-        self.chat_history.clear();
+    pub async fn clear_context(&mut self) {
+        self.chat_context.overwrite([]).await;
     }
 
     pub fn cancel(&self) {
         self.cancel_token.cancel();
     }
 
-    pub fn dir(&self) -> PathBuf {
-        self.root_dir.clone()
+    pub fn root_dir(&self) -> impl AsRef<Path> {
+        &self.root_dir
     }
 }

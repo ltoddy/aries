@@ -24,8 +24,8 @@ pub enum Command {
         #[arg(trailing_var_arg = true)]
         command: Vec<String>,
     },
-    /// Clear chat history
-    ClearHistory,
+    /// Clear chat context
+    ClearContext,
     /// Force compact conversation context
     Compact,
     SystemPrompt,
@@ -75,9 +75,9 @@ pub async fn execute(input: &str, theme: &Theme, session: &mut Session) {
             let cmd = command.join(" ");
             shell::execute(&cmd, theme).await;
         },
-        Command::ClearHistory => {
-            session.clear_history();
-            println!("{}", theme.green_text("Chat history cleared."));
+        Command::ClearContext => {
+            session.clear_context().await;
+            println!("{}", theme.green_text("Chat context cleared."));
         },
         Command::Compact => {
             compact::execute(session, theme).await;

@@ -3,6 +3,6 @@ pub mod definition;
 pub mod error;
 pub mod loader;
 
-pub use self::definition::{Frontmatter, SkillDefinition};
-pub use self::error::ParseSkillError;
-pub use self::loader::SkillsLoader;
+pub use crate::ext::skill::definition::{Frontmatter, SkillDefinition};
+pub use crate::ext::skill::error::ParseSkillError;
+pub use crate::ext::skill::loader::SkillsLoader;
