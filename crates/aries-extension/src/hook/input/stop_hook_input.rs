@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-use crate::ext::hook::input::HookInput;
-use crate::ext::hook::input::common::Effort;
+use crate::hook::input::HookInput;
+use crate::hook::input::common::Effort;
 
 const HOOK_EVENT_NAME: &str = "Stop";
 

@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use aries_context::GlobalContext;
-use aries_core::ext::hook::{HooksExecutor, HooksLoader};
+use aries_extension::hook::{HooksExecutor, HooksLoader};
 use aries_init::Setting;
 
 use crate::Session;
@@ -41,15 +41,6 @@ impl SessionRegistry {
             session_repo,
             hooks_executor,
         })
-    }
-
-    pub async fn list_projects(&mut self) -> anyhow::Result<Vec<String>> {
-        let projects = self
-            .session_repo
-            .find_projects()
-            .await
-            .with_context(|| "Failed to list all project directories")?;
-        Ok(projects)
     }
 
     pub async fn list_sessions(

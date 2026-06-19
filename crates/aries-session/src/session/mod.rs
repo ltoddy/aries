@@ -11,11 +11,11 @@ use aries_core::agents::{CompactAgent, CompactOutcome, Mode};
 use aries_core::compact;
 use aries_core::compact::{AutoCompactBreaker, Decision, TokenEstimator};
 use aries_core::event::AgentEvent;
-use aries_core::ext::hook::HooksExecutor;
-use aries_core::ext::hook::input::{
+use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
+use aries_extension::hook::HooksExecutor;
+use aries_extension::hook::input::{
     SessionStartHookInput, SessionStartSource, StopFailureHookInput, StopHookInput,
 };
-use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
 use aries_init::{ModelConfig, Setting, SettingError};
 use futures::pin_mut;
 use rig_core::agent::FinalResponse;
@@ -101,7 +101,7 @@ impl Session {
 
         let input =
             SessionStartHookInput::new(&id, cwd, SessionStartSource::Startup, config.model(), mode);
-        hooks_executor.fire_session_start(input).await;
+        hooks_executor.fire_session_start(input).with_subscriber(logger.dispatch()).await;
 
         Ok(Self {
             id,

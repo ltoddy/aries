@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Serialize, Serializer};
 
-use crate::ext::hook::input::{HookInput, PostCompactTrigger};
+use crate::hook::input::{HookInput, PostCompactTrigger};
 
 const HOOK_EVENT_NAME: &str = "PreCompact";
 

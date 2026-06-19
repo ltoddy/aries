@@ -1,10 +1,10 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
+use aries_filesystem::walk::walk_dirs;
 use futures::stream::{self, StreamExt};
 
-use crate::ext::skill::SkillDefinition;
-use crate::fs::walk_dirs;
+use crate::skill::SkillDefinition;
 
 pub struct SkillsLoader {
     roots: Vec<PathBuf>,

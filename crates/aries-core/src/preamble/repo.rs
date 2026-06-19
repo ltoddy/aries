@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::path::Path;
 
-use crate::repository::count_files;
+use aries_filesystem::count_files;
 
 pub async fn render(cwd: impl AsRef<Path>) -> Option<String> {
     let files = count_files(cwd).ok()?;

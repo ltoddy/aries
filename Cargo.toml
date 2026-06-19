@@ -4,6 +4,8 @@ members = [
     "crates/aries-cli",
     "crates/aries-context",
     "crates/aries-core",
+    "crates/aries-extension",
+    "crates/aries-filesystem",
     "crates/aries-harness",
     "crates/aries-init",
     "crates/aries-session",

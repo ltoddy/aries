@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Serialize, Serializer};
 
-use crate::ext::hook::input::HookInput;
+use crate::hook::input::HookInput;
 
 const HOOK_EVENT_NAME: &str = "SessionStart";
 

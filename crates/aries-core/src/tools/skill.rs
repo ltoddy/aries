@@ -2,13 +2,14 @@ use std::io;
 use std::path::PathBuf;
 
 use anyhow::Result;
+use aries_extension::skill::definition::SkillDefinition;
+use aries_filesystem::path_to_uri;
+use aries_filesystem::walk::walk_dir;
 use itertools::Itertools;
 use rig_core::completion::ToolDefinition;
 use rig_core::tool::Tool;
 use serde::{Deserialize, Serialize};
 
-use crate::ext::skill::SkillDefinition;
-use crate::fs::{path_to_uri, walk_dir};
 use crate::tools::{RenderError, ToolArgsRender, ToolOutputRender};
 
 #[derive(Debug, Deserialize, Serialize)]

@@ -29,7 +29,8 @@ fn setup() -> anyhow::Result<Setting> {
     println!("Welcome to Aries! Let's set up your AI model configuration.");
     let theme = ColorfulTheme::default();
 
-    let providers: [Provider; 3] = [Provider::Azure, Provider::DeepSeek, Provider::OpenAI];
+    let providers: [Provider; 4] =
+        [Provider::Anthropic, Provider::Azure, Provider::DeepSeek, Provider::OpenAI];
     let items = providers.iter().map(|p| p.to_string()).collect::<Vec<_>>();
     let provider = &providers
         [Select::with_theme(&theme).with_prompt("provider").items(&items).default(0).interact()?];

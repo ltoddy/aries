@@ -11,14 +11,13 @@ use tokio::process::Command;
 use tokio::time::error::Elapsed;
 use tracing::{info, warn};
 
-use crate::ext::hook::HooksPreset;
-use crate::ext::hook::input::{
+use crate::hook::input::{
     HookInput, PostCompactHookInput, PostToolUseFailureHookInput, PostToolUseHookInput,
     PreCompactHookInput, PreToolUseHookInput, SessionEndHookInput, SessionStartHookInput,
     StopFailureHookInput, StopHookInput, SubagentStartHookInput, SubagentStopHookInput,
     UserPromptSubmitHookInput,
 };
-use crate::ext::hook::preset::{BashCommandHook, HookCommand, HookEvent, HookMatcher};
+use crate::hook::preset::{BashCommandHook, HookCommand, HookEvent, HookMatcher, HooksPreset};
 
 const DEFAULT_HOOK_TIMEOUT_SECS: f64 = 60.0;
 
@@ -48,6 +47,7 @@ impl HooksExecutor {
         let hook_event_name = input.hook_event_name();
         let input = serde_json::to_string(&input).unwrap();
         info!(event = hook_event_name, input = %input, "received hook event");
+
         let Some(matchers) = self.hooks.get(&HookEvent::PostCompact) else {
             return HookDecision::Continue;
         };
@@ -148,6 +148,7 @@ impl HooksExecutor {
         let hook_event_name = input.hook_event_name();
         let input = serde_json::to_string(&input).unwrap();
         info!(event = hook_event_name, input = %input, "received hook event");
+
         let Some(matchers) = self.hooks.get(&HookEvent::PreToolUse) else { return };
 
         for matcher in matchers {

@@ -1,10 +1,10 @@
 use std::io;
 use std::path::{Path, PathBuf};
 
+use aries_filesystem::walk::walk_dirs;
 use futures::stream::{self, StreamExt};
 
-use crate::ext::hook::HooksPreset;
-use crate::fs::walk_dirs;
+use crate::hook::preset::HooksPreset;
 
 pub struct HooksLoader {
     roots: Vec<PathBuf>,

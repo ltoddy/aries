@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::ext::skill::ParseSkillError;
+use super::ParseSkillError;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SkillDefinition {

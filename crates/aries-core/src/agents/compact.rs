@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Context;
+use aries_filesystem::jsonl;
 use regex_lite::Regex;
 use rig_core::client::CompletionClient;
 use rig_core::completion::Message;
@@ -10,7 +11,6 @@ use rig_core::{completion, message};
 use tracing::info;
 
 use crate::agents::AriesAgent;
-use crate::fs::jsonl;
 
 const PREAMBLE: &str = include_str!("prompts/compact.txt");
 const NAME: &str = "Archivist";

@@ -5,9 +5,9 @@ mod schema;
 use std::path::Path;
 use std::sync::Arc;
 
+use aries_filesystem::path_to_uri;
 use tracing::error;
 
-use crate::fs::path_to_uri;
 pub use crate::language_server::client::{DocumentSymbolItem, LspClient, LspResult};
 pub use crate::language_server::detection::LspServerInfo;
 pub use crate::language_server::schema::{

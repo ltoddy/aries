@@ -1,17 +1,14 @@
-use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 
 use serde::{Serialize, Serializer};
 
-use crate::ext::hook::input::{Effort, HookInput};
+use crate::hook::input::HookInput;
+use crate::hook::input::common::Effort;
 
-const HOOK_EVENT_NAME: &str = "PreToolUse";
+const HOOK_EVENT_NAME: &str = "SubagentStop";
 
 #[derive(Debug, Default, Clone, Serialize)]
-pub struct PreToolUseHookInput<ToolInput>
-where
-    ToolInput: Clone + Debug + Default + Serialize,
-{
+pub struct SubagentStopHookInput {
     pub session_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transcript_path: Option<PathBuf>,
@@ -20,34 +17,32 @@ where
     pub permission_mode: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub effort: Option<Effort>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub agent_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub agent_type: Option<String>,
     #[serde(serialize_with = "serialize_hook_event_name")]
     hook_event_name: String,
-    pub tool_name: String,
-    pub tool_input: ToolInput,
-    pub tool_use_id: String,
+    /// `true` when already continuing as a result of a stop hook.
+    pub stop_hook_active: bool,
+    pub agent_id: String,
+    pub agent_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_transcript_path: Option<PathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_assistant_message: Option<String>,
 }
 
-impl<ToolInput> PreToolUseHookInput<ToolInput>
-where
-    ToolInput: Clone + Debug + Default + Serialize,
-{
+impl SubagentStopHookInput {
     pub fn new(
         session_id: impl Into<String>,
         cwd: impl AsRef<Path>,
-        tool_name: impl Into<String>,
-        tool_input: ToolInput,
-        tool_use_id: impl Into<String>,
+        stop_hook_active: bool,
+        agent_id: impl Into<String>,
+        agent_type: impl Into<String>,
     ) -> Self {
         let session_id = session_id.into();
         let cwd = cwd.as_ref().to_path_buf();
-        let tool_name = tool_name.into();
-        let tool_use_id = tool_use_id.into();
+        let agent_id = agent_id.into();
+        let agent_type = agent_type.into();
 
-        Self { session_id, cwd, tool_name, tool_input, tool_use_id, ..Default::default() }
+        Self { session_id, cwd, stop_hook_active, agent_id, agent_type, ..Default::default() }
     }
 
     pub fn transcript_path(mut self, transcript_path: impl AsRef<Path>) -> Self {
@@ -65,21 +60,18 @@ where
         self
     }
 
-    pub fn agent_id(mut self, agent_id: impl Into<String>) -> Self {
-        self.agent_id = Some(agent_id.into());
+    pub fn agent_transcript_path(mut self, agent_transcript_path: impl AsRef<Path>) -> Self {
+        self.agent_transcript_path = Some(agent_transcript_path.as_ref().to_path_buf());
         self
     }
 
-    pub fn agent_type(mut self, agent_type: impl Into<String>) -> Self {
-        self.agent_type = Some(agent_type.into());
+    pub fn last_assistant_message(mut self, last_assistant_message: impl Into<String>) -> Self {
+        self.last_assistant_message = Some(last_assistant_message.into());
         self
     }
 }
 
-impl<ToolInput> HookInput for PreToolUseHookInput<ToolInput>
-where
-    ToolInput: Clone + Debug + Default + Serialize,
-{
+impl HookInput for SubagentStopHookInput {
     fn hook_event_name(&self) -> &'static str {
         HOOK_EVENT_NAME
     }

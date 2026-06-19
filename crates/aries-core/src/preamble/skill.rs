@@ -1,6 +1,5 @@
+use aries_extension::skill::definition::SkillDefinition;
 use itertools::Itertools;
-
-use crate::ext::skill::SkillDefinition;
 
 pub fn render(skills: &[SkillDefinition]) -> String {
     if skills.is_empty() {

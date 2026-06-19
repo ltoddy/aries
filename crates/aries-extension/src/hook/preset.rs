@@ -35,19 +35,6 @@ impl HooksPreset {
 #[serde(transparent)]
 pub struct HooksSettings(pub HashMap<HookEvent, Vec<HookMatcher>>);
 
-/// Hook events fire at specific points in the Claude Code lifecycle.
-///
-/// Hooks provide deterministic control over behavior, ensuring certain actions
-/// always happen rather than relying on the model to choose them. These events
-/// can be used to enforce project rules, automate repetitive tasks, send
-/// notifications, inject context, and integrate with external tooling.
-///
-/// Naming convention:
-/// - `Pre*`: before an action executes
-/// - `Post*`: after an action completes
-/// - `*Failure`: after an action fails
-/// - `*Start` / `*Stop` / `*Completed`: lifecycle boundaries for longer-running
-///   work
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialOrd, PartialEq, Deserialize, Serialize)]
 pub enum HookEvent {
     /// Fires when a session starts.

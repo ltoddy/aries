@@ -1,11 +1,11 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use aries_core::ext::hook::input::{
+use aries_core::tools::agent;
+use aries_extension::hook::input::{
     PostToolUseHookInput, PreToolUseHookInput, SubagentStartHookInput, SubagentStopHookInput,
 };
-use aries_core::ext::hook::{HookDecision, HooksExecutor};
-use aries_core::tools::agent;
+use aries_extension::hook::{HookDecision, HooksExecutor};
 use rig_core::agent::{HookAction, PromptHook, ToolCallHookAction};
 use rig_core::completion::{CompletionModel, CompletionResponse, Message};
 use serde_json::Value;

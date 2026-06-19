@@ -1,12 +1,9 @@
 pub mod agents;
 pub mod compact;
 pub mod event;
-pub mod ext;
-pub mod fs;
 pub mod jsonrpc;
 pub mod language_server;
 pub mod preamble;
-pub mod repository;
 pub mod tools;
 
 use rig_core::agent::StreamingError;

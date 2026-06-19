@@ -5,6 +5,8 @@ edition = "2024"
 
 [dependencies]
 anyhow.workspace = true
+aries-extension = { path = "../aries-extension" }
+aries-filesystem = { path = "../aries-filesystem" }
 dialoguer.workspace = true
 futures.workspace = true
 git2.workspace = true
@@ -20,8 +22,6 @@ rig-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_repr.workspace = true
-serde_yaml.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["fs", "process", "sync", "time", "io-util"] }
 tracing.workspace = true
-url.workspace = true
