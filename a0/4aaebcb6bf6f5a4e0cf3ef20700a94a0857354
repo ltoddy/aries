@@ -1,0 +1,22 @@
+crates/aries-session/src/session/mod.rs
+  s_65918137bb3379::t_c5f43f3e005d8d 104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "a04aaebcb6bf6f5a4e0cf3ef20700a94a0857354",
+  "prompts": {},
+  "sessions": {
+    "s_65918137bb3379": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a32c64233733722f6f0568c",
+        "model": "openrouter-3o__dev",
+        "display_model_name": "openrouter-3o"
+      },
+      "human_author": "liutao.rs <liutao.rs@bytedance.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
