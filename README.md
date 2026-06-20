@@ -41,9 +41,11 @@
 ```json
 {
   "agent_servers": {
-    "Aries Agent": {
+    "aries": {
       "command": "aries",
-      "args": ["acp"]
+      "args": [
+        "acp"
+      ]
     }
   }
 }
@@ -58,10 +60,12 @@
 ```json
 {
   "agent_servers": {
-    "Aries Agent": {
+    "aries": {
       "type": "custom",
       "command": "aries",
-      "args": ["acp"]
+      "args": [
+        "acp"
+      ]
     }
   }
 }

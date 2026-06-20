@@ -43,20 +43,20 @@ impl HooksExecutor {
         Self { hooks }
     }
 
-    pub async fn fire_post_compact(&self, input: PostCompactHookInput) -> HookDecision {
+    pub async fn fire_post_compact(&self, input: PostCompactHookInput) {
         let hook_event_name = input.hook_event_name();
         let input = serde_json::to_string(&input).unwrap();
         info!(event = hook_event_name, input = %input, "received hook event");
 
-        let Some(matchers) = self.hooks.get(&HookEvent::PostCompact) else {
-            return HookDecision::Continue;
-        };
+        let Some(matchers) = self.hooks.get(&HookEvent::PostCompact) else { return };
 
         for matcher in matchers {
-            Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await;
+            if let HookDecision::Terminate { reason } =
+                Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await
+            {
+                warn!(event = hook_event_name, %reason, "hook exited with code 2");
+            }
         }
-
-        HookDecision::Continue
     }
 
     pub async fn fire_post_tool_use_failure<ToolInput>(
@@ -66,8 +66,25 @@ impl HooksExecutor {
         ToolInput: Serialize + Clone + Debug,
     {
         let hook_event_name = input.hook_event_name();
+        let tool_name = input.tool_name.as_str();
         let input = serde_json::to_string(&input).unwrap();
         info!(event = hook_event_name, input = %input, "received hook event");
+
+        let Some(matchers) = self.hooks.get(&HookEvent::PostToolUseFailure) else { return };
+
+        for matcher in matchers {
+            match matcher.matches(tool_name) {
+                Ok(true) => {
+                    if let HookDecision::Terminate { reason } =
+                        Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await
+                    {
+                        warn!(event = hook_event_name, %reason, "hook exited with code 2");
+                    }
+                },
+                Err(err) => warn!("invalid hook matcher, skipped: {err}"),
+                _ => {},
+            }
+        }
     }
 
     pub async fn fire_post_tool_use<ToolInput, ToolResponse>(
@@ -78,29 +95,46 @@ impl HooksExecutor {
         ToolResponse: Clone + Debug + Default + Serialize,
     {
         let hook_event_name = input.hook_event_name();
-        let tool_name = input.tool_name.clone();
+        let tool_name = input.tool_name.as_str();
         let input = serde_json::to_string(&input).unwrap();
         info!(event = hook_event_name, input = %input, "received hook event");
+
         let Some(matchers) = self.hooks.get(&HookEvent::PostToolUse) else { return };
 
         for matcher in matchers {
-            match matcher.matches(&tool_name) {
+            match matcher.matches(tool_name) {
                 Ok(true) => {
-                    let _ = Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await;
+                    if let HookDecision::Terminate { reason } =
+                        Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await
+                    {
+                        warn!(event = hook_event_name, %reason, "hook exited with code 2");
+                    }
                 },
-                Ok(_) => continue,
-                Err(err) => {
-                    warn!("invalid hook matcher, skipped: {err}");
-                    continue;
-                },
+                Err(err) => warn!("invalid hook matcher, skipped: {err}"),
+                _ => {},
             }
         }
     }
 
-    pub async fn fire_pre_compact(&self, input: &PreCompactHookInput) {
+    pub async fn fire_pre_compact(&self, input: &PreCompactHookInput) -> HookDecision {
         let hook_event_name = input.hook_event_name();
         let input = serde_json::to_string(input).unwrap();
         info!(event = hook_event_name, input = %input, "received hook event");
+
+        let Some(matchers) = self.hooks.get(&HookEvent::PreCompact) else {
+            return HookDecision::Continue;
+        };
+
+        for matcher in matchers {
+            if let HookDecision::Terminate { reason } =
+                Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await
+            {
+                warn!(event = hook_event_name, %reason, "hook blocked with exit code 2");
+                return HookDecision::Terminate { reason };
+            }
+        }
+
+        HookDecision::Continue
     }
 
     pub async fn fire_pre_tool_use<ToolInput>(
@@ -124,14 +158,12 @@ impl HooksExecutor {
                     if let HookDecision::Terminate { reason } =
                         Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await
                     {
+                        warn!(event = hook_event_name, %reason, "hook blocked with exit code 2");
                         return HookDecision::Terminate { reason };
                     }
                 },
-                Ok(false) => continue,
-                Err(err) => {
-                    warn!("invalid hook matcher, skipped: {err}");
-                    continue;
-                },
+                Err(err) => warn!("invalid hook matcher, skipped: {err}"),
+                _ => {},
             }
         }
 
@@ -142,6 +174,16 @@ impl HooksExecutor {
         let hook_event_name = input.hook_event_name();
         let input = serde_json::to_string(&input).unwrap();
         info!(event = hook_event_name, input = %input, "received hook event");
+
+        let Some(matchers) = self.hooks.get(&HookEvent::SessionEnd) else { return };
+
+        for matcher in matchers {
+            if let HookDecision::Terminate { reason } =
+                Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await
+            {
+                warn!(event = hook_event_name, %reason, "hook exited with code 2");
+            }
+        }
     }
 
     pub async fn fire_session_start(&self, input: SessionStartHookInput) {
@@ -149,10 +191,14 @@ impl HooksExecutor {
         let input = serde_json::to_string(&input).unwrap();
         info!(event = hook_event_name, input = %input, "received hook event");
 
-        let Some(matchers) = self.hooks.get(&HookEvent::PreToolUse) else { return };
+        let Some(matchers) = self.hooks.get(&HookEvent::SessionStart) else { return };
 
         for matcher in matchers {
-            Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await;
+            if let HookDecision::Terminate { reason } =
+                Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await
+            {
+                warn!(event = hook_event_name, %reason, "hook exited with code 2");
+            }
         }
     }
 
@@ -160,12 +206,37 @@ impl HooksExecutor {
         let hook_event_name = input.hook_event_name();
         let input = serde_json::to_string(&input).unwrap();
         info!(event = hook_event_name, input = %input, "received hook event");
+
+        let Some(matchers) = self.hooks.get(&HookEvent::StopFailure) else { return };
+
+        for matcher in matchers {
+            if let HookDecision::Terminate { reason } =
+                Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await
+            {
+                warn!(event = hook_event_name, %reason, "hook exited with code 2");
+            }
+        }
     }
 
+    /// 在文档中对于 stop hook 是可以被阻止的: `Prevents Claude from stopping, continues the conversation`. 没太理解, 先记录个 todo
     pub async fn fire_stop(&self, input: StopHookInput) -> HookDecision {
         let hook_event_name = input.hook_event_name();
         let input = serde_json::to_string(&input).unwrap();
         info!(event = hook_event_name, input = %input, "received hook event");
+
+        let Some(matchers) = self.hooks.get(&HookEvent::Stop) else {
+            return HookDecision::Continue;
+        };
+
+        for matcher in matchers {
+            if let HookDecision::Terminate { reason } =
+                Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await
+            {
+                warn!(event = hook_event_name, %reason, "hook exited with code 2");
+                return HookDecision::Terminate { reason };
+            }
+        }
+
         HookDecision::Continue
     }
 
@@ -173,14 +244,37 @@ impl HooksExecutor {
         let hook_event_name = input.hook_event_name();
         let input = serde_json::to_string(&input).unwrap();
         info!(event = hook_event_name, input = %input, "received hook event");
+
+        let Some(matchers) = self.hooks.get(&HookEvent::SubagentStart) else { return };
+
+        for matcher in matchers {
+            if let HookDecision::Terminate { reason } =
+                Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await
+            {
+                warn!(event = hook_event_name, %reason, "hook exited with code 2");
+            }
+        }
     }
 
+    /// 在文档中对于 subagent stop hook 是可以被阻止的: `Prevents the subagent from stopping` 没太理解, 先记录一个 todo
     pub async fn fire_subagent_stop(&self, input: SubagentStopHookInput) -> HookDecision {
         let hook_event_name = input.hook_event_name();
         let input = serde_json::to_string(&input).unwrap();
         info!(event = hook_event_name, input = %input, "received hook event");
-        // claude-code 的文档对于 subagent stop 的注释是: Prevents the subagent from stopping
-        // 难道要重试?
+
+        let Some(matchers) = self.hooks.get(&HookEvent::SubagentStop) else {
+            return HookDecision::Continue;
+        };
+
+        for matcher in matchers {
+            if let HookDecision::Terminate { reason } =
+                Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await
+            {
+                warn!(event = hook_event_name, %reason, "hook exited with code 2");
+                return HookDecision::Terminate { reason };
+            }
+        }
+
         HookDecision::Continue
     }
 
@@ -188,6 +282,20 @@ impl HooksExecutor {
         let hook_event_name = input.hook_event_name();
         let input = serde_json::to_string(&input).unwrap();
         info!(event = hook_event_name, input = %input, "received hook event");
+
+        let Some(matchers) = self.hooks.get(&HookEvent::UserPromptSubmit) else {
+            return HookDecision::Continue;
+        };
+
+        for matcher in matchers {
+            if let HookDecision::Terminate { reason } =
+                Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await
+            {
+                warn!(event = hook_event_name, %reason, "hook exited with code 2");
+                return HookDecision::Terminate { reason };
+            }
+        }
+
         HookDecision::Continue
     }
 
@@ -204,9 +312,12 @@ impl HooksExecutor {
                     match execute_bash_command_hook(bash, &payload).await {
                         Ok(outcome) if outcome.blocked => {
                             let reason = if outcome.stderr.trim().is_empty() {
-                                format!("{hook_event_name} hook blocked (exit code 2)",)
+                                format!("{hook_event_name} hook returned exit code 2")
                             } else {
-                                outcome.stderr.trim().to_string()
+                                format!(
+                                    "{hook_event_name} hook returned exit code 2: {}",
+                                    outcome.stderr.trim()
+                                )
                             };
                             return HookDecision::Terminate { reason };
                         },
