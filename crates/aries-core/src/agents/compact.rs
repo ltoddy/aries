@@ -18,7 +18,7 @@ const DESCRIPTION: &str = "Summarises a conversation transcript into a structure
 
 #[derive(Debug)]
 pub enum CompactOutcome {
-    Success(Vec<Message>),
+    Success((Vec<Message>, String)),
     /// 上下文超长（prompt_too_long / context_length_exceeded）——同样输入再调一次也是同错，
     /// 应立刻 trip 熔断器，不要短时间内反复浪费 token。
     PromptTooLong,
@@ -86,9 +86,9 @@ where
             return CompactOutcome::Empty;
         }
 
-        let formatted = extract_summary(summary);
+        let compact_summary = compact_summary(summary);
 
-        CompactOutcome::Success(resume_prompt(&formatted, &file_path))
+        CompactOutcome::Success((resume_prompt(&compact_summary, &file_path), compact_summary))
     }
 
     async fn save_transcript(&mut self, messages: &[Message]) -> anyhow::Result<PathBuf> {
@@ -124,7 +124,7 @@ fn resume_prompt(formatted_summary: &str, transcript_path: impl AsRef<Path>) -> 
 }
 
 /// 从模型输出中提取 `<summary>` 块内容，格式化为 "Summary:\n..."。
-pub fn extract_summary(raw: &str) -> String {
+pub fn compact_summary(raw: &str) -> String {
     let re = Regex::new(r"(?s)<summary>(.*?)</summary>").unwrap();
 
     re.captures(raw)

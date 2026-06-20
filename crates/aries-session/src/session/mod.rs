@@ -12,10 +12,11 @@ use aries_core::compact;
 use aries_core::compact::{AutoCompactBreaker, Decision, TokenEstimator};
 use aries_core::event::AgentEvent;
 use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
-use aries_extension::hook::HooksExecutor;
 use aries_extension::hook::input::{
+    PostCompactHookInput, PostCompactTrigger, PreCompactCustomInstructions, PreCompactHookInput,
     SessionStartHookInput, SessionStartSource, StopFailureHookInput, StopHookInput,
 };
+use aries_extension::hook::{HookDecision, HooksExecutor};
 use aries_init::{ModelConfig, Setting, SettingError};
 use futures::pin_mut;
 use rig_core::agent::FinalResponse;
@@ -275,6 +276,19 @@ impl Session {
             },
         }
 
+        let input = PreCompactHookInput::new(
+            &self.id,
+            &self.cwd,
+            PostCompactTrigger::Auto,
+            PreCompactCustomInstructions::Auto,
+        )
+        .transcript_path(&self.transcript_dir);
+        if let HookDecision::Terminate { reason } =
+            self.hooks_executor.fire_pre_compact(input).await
+        {
+            return false;
+        }
+
         let outcome = match self.client.clone() {
             AriesClient::Anthropic(client) => {
                 let mut compact_agent =
@@ -299,7 +313,7 @@ impl Session {
         };
 
         match outcome {
-            CompactOutcome::Success(compressed) => {
+            CompactOutcome::Success((compressed, compact_summary)) => {
                 self.chat_context.overwrite(compressed).await;
 
                 let window = compact::ContextWindow::for_model(self.config.model());
@@ -314,6 +328,15 @@ impl Session {
                 }
 
                 self.compact_breaker.on_success();
+
+                let input = PostCompactHookInput::new(
+                    &self.id,
+                    &self.cwd,
+                    PostCompactTrigger::Auto,
+                    compact_summary,
+                )
+                .transcript_path(&self.transcript_dir);
+                self.hooks_executor.fire_post_compact(input).await;
                 true
             },
             CompactOutcome::Transient(err) => {

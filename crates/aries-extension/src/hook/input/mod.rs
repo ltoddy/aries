@@ -16,7 +16,9 @@ pub use crate::hook::input::common::{Effort, PostCompactTrigger};
 pub use crate::hook::input::post_compact_hook_input::PostCompactHookInput;
 pub use crate::hook::input::post_tool_use_failure_hook_input::PostToolUseFailureHookInput;
 pub use crate::hook::input::post_tool_use_hook_input::PostToolUseHookInput;
-pub use crate::hook::input::pre_compact_hook_input::PreCompactHookInput;
+pub use crate::hook::input::pre_compact_hook_input::{
+    PreCompactCustomInstructions, PreCompactHookInput,
+};
 pub use crate::hook::input::pre_tool_use_hook_input::PreToolUseHookInput;
 pub use crate::hook::input::session_end_hook_input::{SessionEndHookInput, SessionEndReason};
 pub use crate::hook::input::session_start_hook_input::{SessionStartHookInput, SessionStartSource};

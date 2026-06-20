@@ -116,9 +116,9 @@ impl HooksExecutor {
         }
     }
 
-    pub async fn fire_pre_compact(&self, input: &PreCompactHookInput) -> HookDecision {
+    pub async fn fire_pre_compact(&self, input: PreCompactHookInput) -> HookDecision {
         let hook_event_name = input.hook_event_name();
-        let input = serde_json::to_string(input).unwrap();
+        let input = serde_json::to_string(&input).unwrap();
         info!(event = hook_event_name, input = %input, "received hook event");
 
         let Some(matchers) = self.hooks.get(&HookEvent::PreCompact) else {
