@@ -9,7 +9,8 @@ use crate::tools::{
     bash, batch, codesearch, edit, glob, grep, ls, lsp, multiedit, read, webfetch, websearch, write,
 };
 
-const PLACEHOLDER: &str = "[Old tool result content cleared]";
+const TOOL_RESULT_PLACEHOLDER: &str = "[Old tool result content cleared]";
+const TOOL_CALL_PLACEHOLDER: &str = "[Old tool call content cleared — file can be re-read]";
 const KEEP_RECENT: usize = 5;
 
 pub fn micro_compact(messages: &mut [Message]) {
@@ -34,8 +35,45 @@ pub fn micro_compact(messages: &mut [Message]) {
                 {
                     *item = UserContent::tool_result(
                         tr.id.clone(),
-                        OneOrMany::one(ToolResultContent::text(PLACEHOLDER.to_owned())),
+                        OneOrMany::one(ToolResultContent::text(TOOL_RESULT_PLACEHOLDER.to_owned())),
                     );
+                }
+            }
+        }
+    }
+
+    let compactable = messages
+        .iter()
+        .filter_map(|m| {
+            if let Message::Assistant { content, .. } = m { Some(content.iter()) } else { None }
+        })
+        .flatten()
+        .filter_map(|c| if let AssistantContent::ToolCall(tc) = c { Some(tc) } else { None })
+        .filter(|tc| COMPACTABLE_TOOL_CALL_TOOL_NAMES.contains(&tc.function.name.as_str()))
+        .map(|tc| tc.id.clone())
+        .collect::<Vec<_>>();
+
+    let clears: HashSet<_> = compactable.into_iter().rev().skip(KEEP_RECENT).collect();
+
+    for message in messages.iter_mut() {
+        if let Message::Assistant { content, .. } = message {
+            for item in content.iter_mut() {
+                if let AssistantContent::ToolCall(ToolCall { id, call_id, function, .. }) = item
+                    && clears.contains(id)
+                {
+                    *item = match call_id {
+                        Some(call_id) => AssistantContent::tool_call_with_call_id(
+                            id.to_owned(),
+                            call_id.to_owned(),
+                            &function.name,
+                            serde_json::Value::String(String::from(TOOL_CALL_PLACEHOLDER)),
+                        ),
+                        None => AssistantContent::tool_call(
+                            id.to_owned(),
+                            &function.name,
+                            serde_json::Value::String(String::from(TOOL_CALL_PLACEHOLDER)),
+                        ),
+                    };
                 }
             }
         }
@@ -60,9 +98,11 @@ fn build_tools(messages: &[Message]) -> HashMap<String, String> {
         .collect()
 }
 
+const COMPACTABLE_TOOL_CALL_TOOL_NAMES: &[&str; 3] = &[edit::NAME, multiedit::NAME, write::NAME];
+
 /// - 只清空"信息密集、可重新获取"的工具结果（Read/Bash/Grep/Glob/Edit/Write/Web*…）。
 /// - 保留对会话状态有控制语义的工具（Agent/UpdatePlan/Question/Skill）。
-const COMPACTABLE_TOOL_NAMES: &[&str; 13] = &[
+const COMPACTABLE_TOOL_RESULT_TOOL_NAMES: &[&str; 13] = &[
     bash::NAME,
     batch::NAME,
     codesearch::NAME,
@@ -80,5 +120,7 @@ const COMPACTABLE_TOOL_NAMES: &[&str; 13] = &[
 
 #[inline]
 fn is_compactable_tool_result(tr: &ToolResult, tools: &HashMap<String, String>) -> bool {
-    tools.get(&tr.id).is_some_and(|name| COMPACTABLE_TOOL_NAMES.contains(&name.as_str()))
+    tools
+        .get(&tr.id)
+        .is_some_and(|name| COMPACTABLE_TOOL_RESULT_TOOL_NAMES.contains(&name.as_str()))
 }
