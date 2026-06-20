@@ -1,11 +1,13 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time;
 
 use aries_core::tools::agent;
 use aries_extension::hook::input::{
     PostToolUseHookInput, PreToolUseHookInput, SubagentStartHookInput, SubagentStopHookInput,
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
+use parking_lot::Mutex;
 use rig_core::agent::{HookAction, PromptHook, ToolCallHookAction};
 use rig_core::completion::{CompletionModel, CompletionResponse, Message};
 use serde_json::Value;
@@ -15,8 +17,10 @@ pub struct SessionPromptHook {
     executor: Arc<HooksExecutor>,
     session_id: String,
     cwd: PathBuf,
+    transcript_path: PathBuf,
     agent_id: String,
     agent_type: String,
+    last_tool_call_at: Arc<Mutex<Option<time::Instant>>>,
 }
 
 impl SessionPromptHook {
@@ -24,15 +28,25 @@ impl SessionPromptHook {
         executor: Arc<HooksExecutor>,
         session_id: impl Into<String>,
         cwd: impl AsRef<Path>,
+        transcript_path: impl AsRef<Path>,
         agent_id: impl Into<String>,
         agent_type: impl Into<String>,
     ) -> Self {
         let session_id = session_id.into();
         let cwd = cwd.as_ref().to_path_buf();
+        let transcript_path = transcript_path.as_ref().to_path_buf();
         let agent_id = agent_id.into();
         let agent_type = agent_type.into();
 
-        Self { executor, session_id, cwd, agent_id, agent_type }
+        Self {
+            executor,
+            session_id,
+            cwd,
+            transcript_path,
+            agent_id,
+            agent_type,
+            last_tool_call_at: Default::default(),
+        }
     }
 }
 
@@ -59,11 +73,14 @@ where
         _internal_call_id: &str,
         args: &str,
     ) -> ToolCallHookAction {
+        let call_at = time::Instant::now();
+
         let tool_input: Value =
             serde_json::from_str(args).unwrap_or_else(|_| Value::String(args.to_owned()));
 
         if tool_name == agent::NAME {
-            let input = SubagentStartHookInput::new(&self.session_id, &self.cwd, "", "");
+            let input = SubagentStartHookInput::new(&self.session_id, &self.cwd, "", "")
+                .transcript_path(&self.transcript_path);
             self.executor.fire_subagent_start(input).await;
         }
 
@@ -73,11 +90,22 @@ where
             tool_name,
             tool_input,
             tool_call_id.unwrap_or_default(),
-        );
+        )
+        .transcript_path(&self.transcript_path)
+        .agent_id(&self.agent_id)
+        .agent_type(&self.agent_type);
 
         match self.executor.fire_pre_tool_use(input).await {
-            HookDecision::Continue => ToolCallHookAction::cont(),
-            HookDecision::Terminate { reason } => ToolCallHookAction::skip(reason),
+            HookDecision::Continue => {
+                let mut last_tool_call_at = self.last_tool_call_at.lock();
+                *last_tool_call_at = Some(call_at);
+                ToolCallHookAction::cont()
+            },
+            HookDecision::Terminate { reason } => {
+                let mut last_tool_call_at = self.last_tool_call_at.lock();
+                *last_tool_call_at = None;
+                ToolCallHookAction::skip(reason)
+            },
         }
     }
 
@@ -89,6 +117,9 @@ where
         args: &str,
         result: &str,
     ) -> HookAction {
+        let duration_ms =
+            self.last_tool_call_at.lock().map(|started_at| started_at.elapsed().as_millis() as u64);
+
         let tool_input: Value =
             serde_json::from_str(args).unwrap_or_else(|_| Value::String(args.to_owned()));
         let tool_response: Value =
@@ -101,7 +132,8 @@ where
                 false,
                 &self.agent_id,
                 &self.agent_type,
-            );
+            )
+            .transcript_path(&self.transcript_path);
             self.executor.fire_subagent_stop(input).await;
         }
 
@@ -112,9 +144,17 @@ where
             tool_input,
             tool_response,
             tool_call_id.unwrap_or_default(),
-        );
+        )
+        .transcript_path(&self.transcript_path)
+        .agent_id(&self.agent_id)
+        .agent_type(&self.agent_type);
+        let input = match duration_ms {
+            Some(duration_ms) => input.duration_ms(duration_ms),
+            None => input,
+        };
 
         self.executor.fire_post_tool_use(input).await;
+
         HookAction::cont()
     }
 

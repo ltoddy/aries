@@ -283,9 +283,7 @@ impl Session {
             PreCompactCustomInstructions::Auto,
         )
         .transcript_path(&self.transcript_dir);
-        if let HookDecision::Terminate { reason } =
-            self.hooks_executor.fire_pre_compact(input).await
-        {
+        if let HookDecision::Terminate { .. } = self.hooks_executor.fire_pre_compact(input).await {
             return false;
         }
 
@@ -374,8 +372,9 @@ impl Session {
     {
         let hook = SessionPromptHook::new(
             self.hooks_executor.clone(),
-            self.id.clone(),
-            self.cwd.clone(),
+            &self.id,
+            &self.cwd,
+            &self.transcript_dir,
             self.mode.id(),
             self.mode.name(),
         );
