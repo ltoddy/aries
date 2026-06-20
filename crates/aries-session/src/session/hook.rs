@@ -4,7 +4,8 @@ use std::time;
 
 use aries_core::tools::agent;
 use aries_extension::hook::input::{
-    PostToolUseHookInput, PreToolUseHookInput, SubagentStartHookInput, SubagentStopHookInput,
+    PostToolUseFailureHookInput, PostToolUseHookInput, PreToolUseHookInput, SubagentStartHookInput,
+    SubagentStopHookInput,
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
 use parking_lot::Mutex;
@@ -69,8 +70,8 @@ where
     async fn on_tool_call(
         &self,
         tool_name: &str,
-        tool_call_id: Option<String>,
-        _internal_call_id: &str,
+        _tool_call_id: Option<String>,
+        internal_call_id: &str,
         args: &str,
     ) -> ToolCallHookAction {
         let call_at = time::Instant::now();
@@ -89,7 +90,7 @@ where
             &self.cwd,
             tool_name,
             tool_input,
-            tool_call_id.unwrap_or_default(),
+            internal_call_id,
         )
         .transcript_path(&self.transcript_path)
         .agent_id(&self.agent_id)
@@ -104,7 +105,7 @@ where
             HookDecision::Terminate { reason } => {
                 let mut last_tool_call_at = self.last_tool_call_at.lock();
                 *last_tool_call_at = None;
-                ToolCallHookAction::skip(reason)
+                ToolCallHookAction::terminate(reason)
             },
         }
     }
@@ -112,8 +113,8 @@ where
     async fn on_tool_result(
         &self,
         tool_name: &str,
-        tool_call_id: Option<String>,
-        _internal_call_id: &str,
+        _tool_call_id: Option<String>,
+        internal_call_id: &str,
         args: &str,
         result: &str,
     ) -> HookAction {
@@ -124,6 +125,26 @@ where
             serde_json::from_str(args).unwrap_or_else(|_| Value::String(args.to_owned()));
         let tool_response: Value =
             serde_json::from_str(result).unwrap_or_else(|_| Value::String(result.to_owned()));
+
+        if result.contains("ToolCallError") {
+            let input = PostToolUseFailureHookInput::new(
+                &self.session_id,
+                &self.cwd,
+                tool_name,
+                tool_input,
+                internal_call_id,
+                args,
+            )
+            .transcript_path(&self.transcript_path)
+            .is_interrupt(false);
+            let input = match duration_ms {
+                Some(duration_ms) => input.duration_ms(duration_ms),
+                None => input,
+            };
+
+            self.executor.fire_post_tool_use_failure(input).await;
+            return HookAction::cont();
+        }
 
         if tool_name == agent::NAME {
             let input = SubagentStopHookInput::new(
@@ -143,7 +164,7 @@ where
             tool_name.to_owned(),
             tool_input,
             tool_response,
-            tool_call_id.unwrap_or_default(),
+            internal_call_id,
         )
         .transcript_path(&self.transcript_path)
         .agent_id(&self.agent_id)
