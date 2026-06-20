@@ -96,7 +96,7 @@ pub async fn close_session(
     info!("Received close session request for {session_id}");
 
     let mut registry = registry.lock().await;
-    registry.close_session(session_id);
+    registry.close_session(session_id).await;
 
     let resp = CloseSessionResponse::new();
     responder.respond(resp)

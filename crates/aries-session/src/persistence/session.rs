@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use jiff::Timestamp;
 use toasty::Db;
 use toasty::codegen_support::List;
@@ -18,8 +17,8 @@ pub struct Session {
 
     #[index]
     pub cwd: String,
-
     pub root_dir: String,
+    pub transcript_path: String,
 
     #[index]
     #[auto]
@@ -42,28 +41,16 @@ impl SessionRepository {
         session_id: impl IntoExpr<String>,
         cwd: impl IntoExpr<String>,
         root_dir: impl IntoExpr<String>,
+        transcript_path: impl IntoExpr<String>,
     ) -> toasty::Result<Session> {
         Session::create()
             .session_id(session_id)
             .cwd(cwd)
             .root_dir(root_dir)
+            .transcript_path(transcript_path)
             .updated_at(Timestamp::now())
             .exec(&mut self.db)
             .await
-    }
-
-    pub async fn find_projects(&mut self) -> toasty::Result<Vec<String>> {
-        // TODO: use sql distinct statemate
-
-        let values = Session::all()
-            .order_by(Session::fields().created_at().desc())
-            .exec(&mut self.db)
-            .await?
-            .into_iter()
-            .map(|v| v.cwd)
-            .unique()
-            .collect::<Vec<_>>();
-        Ok(values)
     }
 
     pub async fn find_by_cwd(

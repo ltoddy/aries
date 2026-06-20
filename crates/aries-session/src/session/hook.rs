@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time;
 
-use aries_core::tools::agent;
+use aries_core::tools::{AgentOutput, agent};
 use aries_extension::hook::input::{
     PostToolUseFailureHookInput, PostToolUseHookInput, PreToolUseHookInput, SubagentStartHookInput,
     SubagentStopHookInput,
@@ -131,7 +131,7 @@ where
                 &self.session_id,
                 &self.cwd,
                 tool_name,
-                tool_input,
+                &tool_input,
                 internal_call_id,
                 args,
             )
@@ -143,7 +143,6 @@ where
             };
 
             self.executor.fire_post_tool_use_failure(input).await;
-            return HookAction::cont();
         }
 
         if tool_name == agent::NAME {
@@ -155,15 +154,20 @@ where
                 &self.agent_type,
             )
             .transcript_path(&self.transcript_path);
+
+            let input = match serde_json::from_value::<AgentOutput>(tool_response.clone()) {
+                Ok(output) => input.last_assistant_message(output.result),
+                Err(_) => input,
+            };
             self.executor.fire_subagent_stop(input).await;
         }
 
         let input = PostToolUseHookInput::new(
-            self.session_id.clone(),
-            self.cwd.clone(),
-            tool_name.to_owned(),
-            tool_input,
-            tool_response,
+            &self.session_id,
+            &self.cwd,
+            tool_name,
+            &tool_input,
+            &tool_response,
             internal_call_id,
         )
         .transcript_path(&self.transcript_path)

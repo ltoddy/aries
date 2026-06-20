@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use aries_context::GlobalContext;
+use aries_extension::hook::input::{SessionEndHookInput, SessionEndReason};
 use aries_extension::hook::{HooksExecutor, HooksLoader};
 use aries_init::Setting;
 use aries_logger;
@@ -63,10 +64,20 @@ impl SessionRegistry {
         Ok(sessions)
     }
 
-    pub fn close_session(&mut self, session_id: impl Into<String>) {
+    pub async fn close_session(&mut self, session_id: impl Into<String>) {
         let session_id = session_id.into();
 
         self.active_sessions.remove(&session_id);
+
+        if let Ok(session) = self.session_repo.find_last_by_session_id(&session_id).await {
+            let _ = self.session_repo.delete_by_session_id(&session_id).await;
+            let _ = tokio::fs::remove_dir_all(&session.root_dir).await;
+
+            let input =
+                SessionEndHookInput::new(&session_id, session.cwd, SessionEndReason::Logout)
+                    .transcript_path(session.transcript_path);
+            self.hooks_executor.fire_session_end(input).await;
+        }
     }
 
     pub async fn try_session(
@@ -119,7 +130,12 @@ impl SessionRegistry {
         self.active_sessions.insert(session.id(), session.clone());
 
         self.session_repo
-            .create(&session.id(), &cwd, root_dir.display().to_string())
+            .create(
+                &session.id(),
+                &cwd,
+                root_dir.display().to_string(),
+                root_dir.join("transcripts").display().to_string(),
+            )
             .await
             .with_context(|| "Failed to create session info in local storage")?;
 

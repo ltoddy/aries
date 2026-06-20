@@ -15,6 +15,7 @@ use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
 use aries_extension::hook::input::{
     PostCompactHookInput, PostCompactTrigger, PreCompactCustomInstructions, PreCompactHookInput,
     SessionStartHookInput, SessionStartSource, StopFailureHookInput, StopHookInput,
+    UserPromptSubmitHookInput,
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
 use aries_init::{ModelConfig, Setting, SettingError};
@@ -48,13 +49,15 @@ pub struct Session {
     chat_context: ChatContext,
 
     root_dir: PathBuf,
-    transcript_dir: PathBuf,
+    transcript_path: PathBuf,
 
     cancel_token: CancellationToken,
     receiver: Arc<AsyncMutex<UnboundedReceiver<AgentEvent>>>,
 
     compact_breaker: AutoCompactBreaker,
     hooks_executor: Arc<HooksExecutor>,
+
+    last_assistant_message: Option<String>,
 }
 
 impl Session {
@@ -80,11 +83,11 @@ impl Session {
             .await
             .with_context(|| format!("failed to create session directory at: {}", root_dir.display()))?;
 
-        let transcript_dir = root_dir.join("transcripts");
+        let transcript_path = root_dir.join("transcripts");
         #[rustfmt::skip]
-        tokio::fs::create_dir_all(&transcript_dir)
+        tokio::fs::create_dir_all(&transcript_path)
             .await
-            .with_context(|| format!("failed to create session transcripts directory at: {}", transcript_dir.display()))?;
+            .with_context(|| format!("failed to create session transcripts directory at: {}", transcript_path.display()))?;
 
         let mode = Mode::default();
         let (agent, receiver) = client.agent(mode, config.clone(), cwd, lsp_client.clone()).await?;
@@ -110,11 +113,12 @@ impl Session {
             chat_history,
             chat_context,
             root_dir: root_dir.to_path_buf(),
-            transcript_dir,
+            transcript_path,
             cancel_token,
             receiver: Arc::new(AsyncMutex::new(receiver)),
             compact_breaker: AutoCompactBreaker::new(),
             hooks_executor,
+            last_assistant_message: None,
         })
     }
 
@@ -130,7 +134,7 @@ impl Session {
         let cwd = cwd.as_ref();
         let root_dir = root_dir.as_ref();
 
-        let transcript_dir = root_dir.join("transcripts");
+        let transcript_path = root_dir.join("transcripts");
 
         let lsp_client = Self::warm_up_lsp(cwd).await;
         let client = AriesClient::new(&config)?;
@@ -159,11 +163,12 @@ impl Session {
             chat_history,
             chat_context,
             root_dir: root_dir.to_path_buf(),
-            transcript_dir,
+            transcript_path,
             cancel_token: cancel,
             receiver: Arc::new(AsyncMutex::new(agent_events)),
             compact_breaker: AutoCompactBreaker::new(),
             hooks_executor,
+            last_assistant_message: None,
         })
     }
 
@@ -213,6 +218,15 @@ impl Session {
         let prompt: Message = prompt.into();
         self.cancel_token = CancellationToken::new();
 
+        // TODO 字符串形式的 prompt 还比较难搞, 不太好映射
+        let input = UserPromptSubmitHookInput::new(&self.id, &self.cwd, "")
+            .transcript_path(&self.transcript_path);
+        if let HookDecision::Terminate { reason } =
+            self.hooks_executor.fire_user_prompt_submit(input).await
+        {
+            return Err(anyhow::anyhow!(reason));
+        }
+
         compact::micro_compact(self.chat_context.history_mut());
 
         let window = compact::ContextWindow::for_model(self.config.model().into());
@@ -234,13 +248,21 @@ impl Session {
                 Ok(res) => res,
                 Err(err) => {
                     let input = StopFailureHookInput::new(&self.id, &self.cwd, err.to_string())
+                        .transcript_path(&self.transcript_path)
                         .error_details(err.to_string());
+
+                    let input = match &self.last_assistant_message {
+                        Some(message) => input.last_assistant_message(message),
+                        None => input,
+                    };
+
                     self.hooks_executor.fire_stop_failure(input).await;
                     return Err(err);
                 },
             }
         };
 
+        self.last_assistant_message = Some(final_res.response().to_owned());
         if let Some(his) = final_res.history() {
             self.chat_history.extend(his.iter().cloned());
             self.chat_context.extend(his.iter().cloned()).await;
@@ -282,7 +304,7 @@ impl Session {
             PostCompactTrigger::Auto,
             PreCompactCustomInstructions::Auto,
         )
-        .transcript_path(&self.transcript_dir);
+        .transcript_path(&self.transcript_path);
         if let HookDecision::Terminate { .. } = self.hooks_executor.fire_pre_compact(input).await {
             return false;
         }
@@ -290,22 +312,22 @@ impl Session {
         let outcome = match self.client.clone() {
             AriesClient::Anthropic(client) => {
                 let mut compact_agent =
-                    CompactAgent::new(client, self.config.model(), &self.transcript_dir);
+                    CompactAgent::new(client, self.config.model(), &self.transcript_path);
                 compact_agent.compact(self.chat_context.history()).await
             },
             AriesClient::Azure(client) => {
                 let mut compact_agent =
-                    CompactAgent::new(client, self.config.model(), &self.transcript_dir);
+                    CompactAgent::new(client, self.config.model(), &self.transcript_path);
                 compact_agent.compact(self.chat_context.history()).await
             },
             AriesClient::Deepseek(client) => {
                 let mut compact_agent =
-                    CompactAgent::new(client, self.config.model(), &self.transcript_dir);
+                    CompactAgent::new(client, self.config.model(), &self.transcript_path);
                 compact_agent.compact(self.chat_context.history()).await
             },
             AriesClient::OpenAI(client) => {
                 let mut compact_agent =
-                    CompactAgent::new(client, self.config.model(), &self.transcript_dir);
+                    CompactAgent::new(client, self.config.model(), &self.transcript_path);
                 compact_agent.compact(self.chat_context.history()).await
             },
         };
@@ -333,7 +355,7 @@ impl Session {
                     PostCompactTrigger::Auto,
                     compact_summary,
                 )
-                .transcript_path(&self.transcript_dir);
+                .transcript_path(&self.transcript_path);
                 self.hooks_executor.fire_post_compact(input).await;
                 true
             },
@@ -374,7 +396,7 @@ impl Session {
             self.hooks_executor.clone(),
             &self.id,
             &self.cwd,
-            &self.transcript_dir,
+            &self.transcript_path,
             self.mode.id(),
             self.mode.name(),
         );

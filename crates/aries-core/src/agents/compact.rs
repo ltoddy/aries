@@ -34,7 +34,7 @@ where
     M: completion::CompletionModel,
 {
     inner: AriesAgent<M>,
-    transcript_dir: PathBuf,
+    transcript_path: PathBuf,
 }
 
 impl<M> CompactAgent<M>
@@ -43,11 +43,11 @@ where
 {
     const COMPACTION_MAX_TURNS: usize = 1; // 强制单论,避免陷入循环
 
-    pub fn new<C>(c: C, model: impl Into<String>, transcript_dir: impl AsRef<Path>) -> Self
+    pub fn new<C>(c: C, model: impl Into<String>, transcript_path: impl AsRef<Path>) -> Self
     where
         C: CompletionClient<CompletionModel = M> + 'static,
     {
-        let transcript_dir = transcript_dir.as_ref().to_path_buf();
+        let transcript_path = transcript_path.as_ref().to_path_buf();
 
         let agent = c
             .agent(model)
@@ -57,7 +57,7 @@ where
             .default_max_turns(Self::COMPACTION_MAX_TURNS)
             .build();
 
-        Self { inner: AriesAgent::new(agent, NAME, PREAMBLE, None), transcript_dir }
+        Self { inner: AriesAgent::new(agent, NAME, PREAMBLE, None), transcript_path }
     }
 
     pub async fn compact(&mut self, messages: &[Message]) -> CompactOutcome {
@@ -93,13 +93,13 @@ where
 
     async fn save_transcript(&mut self, messages: &[Message]) -> anyhow::Result<PathBuf> {
         #[rustfmt::skip]
-        tokio::fs::create_dir_all(&self.transcript_dir)
+        tokio::fs::create_dir_all(&self.transcript_path)
             .await
-            .with_context(|| format!("Failed to create transcript directory `{}`", self.transcript_dir.display()))?;
+            .with_context(|| format!("Failed to create transcript directory `{}`", self.transcript_path.display()))?;
 
         let now = SystemTime::now();
         let ts = now.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
-        let file_path = self.transcript_dir.join(format!("transcript_{ts}.json"));
+        let file_path = self.transcript_path.join(format!("transcript_{ts}.json"));
 
         jsonl::write(&file_path, messages)
             .await
