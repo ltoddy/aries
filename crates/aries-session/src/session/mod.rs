@@ -228,9 +228,10 @@ impl Session {
         F: FnMut(AgentEvent) -> Fut,
         Fut: Future<Output = ()>,
     {
-        let prompt: Message = prompt.into();
         self.cancel_token = CancellationToken::new();
+        self.last_assistant_message = None;
 
+        let prompt: Message = prompt.into();
         let title = message_to_simple_text(&prompt);
         if let Err(err) = self.session_repo.update_title_by_session_id(&self.id, &title).await {
             warn!("failed to update title({title}): {err}");

@@ -58,6 +58,8 @@ pub async fn run_session(gctx: GlobalContext, session_id: impl Into<String>) -> 
     let session_id = session_id.into();
 
     let mut session = registry.try_session(&current_dir, &session_id).await?;
+    let session_id = session.id();
+    let _session_span = info_span!("session", session_id = %session_id).entered();
 
     let mut reader = input::InputReader::new(session.root_dir())?;
     welcome::welcome(
@@ -86,25 +88,22 @@ pub async fn run_session(gctx: GlobalContext, session_id: impl Into<String>) -> 
                 let start = Instant::now();
                 let tool_names: Arc<Mutex<HashMap<String, String>>> =
                     Arc::new(Mutex::new(HashMap::new()));
-                {
-                    let _enter = info_span!("prompt", session_id = %session_id).entered();
-                    if let Err(err) = session
-                        .prompt(
-                            input,
-                            Some(|event| {
-                                let tool_names = tool_names.clone();
-                                async move {
-                                    if let Ok(mut map) = tool_names.lock() {
-                                        print_agent_event(event, theme, &mut map);
-                                    }
+                if let Err(err) = session
+                    .prompt(
+                        input,
+                        Some(|event| {
+                            let tool_names = tool_names.clone();
+                            async move {
+                                if let Ok(mut map) = tool_names.lock() {
+                                    print_agent_event(event, theme, &mut map);
                                 }
-                            }),
-                        )
-                        .await
-                    {
-                        eprintln!("\n{}: {}", theme.red_text("Error"), err);
-                        continue;
-                    }
+                            }
+                        }),
+                    )
+                    .await
+                {
+                    eprintln!("\n{}: {}", theme.red_text("Error"), err);
+                    continue;
                 }
 
                 display_elapsed(start, &theme);

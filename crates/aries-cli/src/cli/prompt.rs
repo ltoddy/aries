@@ -30,27 +30,26 @@ pub async fn execute(args: PromptArgs, gctx: GlobalContext) -> anyhow::Result<()
     let current_dir = gctx.current_dir.display().to_string();
 
     let mut session = registry.try_session(&current_dir, &session_id).await?;
+    let session_id = session.id();
+    let _session_span = info_span!("session", session_id = %session_id).entered();
 
     let theme = Theme::default();
 
     print!("\n{}: ", theme.magenta_text("Aries"));
 
     let tool_names: Arc<Mutex<HashMap<String, String>>> = Arc::new(Mutex::new(HashMap::new()));
-    {
-        let _enter = info_span!("prompt", session_id = %session_id).entered();
-        session
-            .prompt(
-                &args.prompt,
-                Some(|event| {
-                    let tool_names = tool_names.clone();
-                    async move {
-                        if let Ok(mut map) = tool_names.lock() {
-                            print_agent_event(event, theme, &mut map);
-                        }
+    session
+        .prompt(
+            &args.prompt,
+            Some(|event| {
+                let tool_names = tool_names.clone();
+                async move {
+                    if let Ok(mut map) = tool_names.lock() {
+                        print_agent_event(event, theme, &mut map);
                     }
-                }),
-            )
-            .await?;
-    }
+                }
+            }),
+        )
+        .await?;
     Ok(())
 }
