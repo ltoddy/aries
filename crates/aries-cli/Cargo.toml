@@ -21,6 +21,7 @@ clap = { workspace = true, features = ["derive"] }
 colored.workspace = true
 dark-light.workspace = true
 dialoguer.workspace = true
+ferris-says.workspace = true
 futures.workspace = true
 itertools.workspace = true
 nanoid.workspace = true
