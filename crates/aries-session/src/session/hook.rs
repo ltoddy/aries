@@ -133,7 +133,7 @@ where
                 tool_name,
                 &tool_input,
                 internal_call_id,
-                args,
+                result,
             )
             .transcript_path(&self.transcript_path)
             .is_interrupt(false);
@@ -143,6 +143,7 @@ where
             };
 
             self.executor.fire_post_tool_use_failure(input).await;
+            return HookAction::cont();
         }
 
         if tool_name == agent::NAME {
