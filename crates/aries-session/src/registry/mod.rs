@@ -8,6 +8,7 @@ use aries_extension::hook::input::{SessionEndHookInput, SessionEndReason};
 use aries_extension::hook::{HooksExecutor, HooksLoader};
 use aries_init::Setting;
 use aries_logger;
+use toasty::Db;
 use tracing::{Instrument, info_span};
 
 use crate::Session;
@@ -17,6 +18,7 @@ pub struct SessionRegistry {
     gctx: GlobalContext,
     setting: Setting,
 
+    db: Db,
     active_sessions: HashMap<String, Session>,
     session_repo: SessionRepository,
 
@@ -40,6 +42,7 @@ impl SessionRegistry {
         Ok(Self {
             gctx,
             setting,
+            db,
             active_sessions: Default::default(),
             session_repo,
             hooks_executor,
@@ -121,6 +124,7 @@ impl SessionRegistry {
             &cwd,
             model_config,
             self.setting.clone(),
+            self.db.clone(),
             self.hooks_executor.clone(),
         )
         .instrument(info_span!("session_init", session_id = %session_id))
@@ -161,6 +165,7 @@ impl SessionRegistry {
             session.cwd,
             model_config,
             self.setting.clone(),
+            self.db.clone(),
             self.hooks_executor.clone(),
         )
         .instrument(info_span!("session_init", session_id = %session_id))

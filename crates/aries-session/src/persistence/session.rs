@@ -1,7 +1,7 @@
 use jiff::Timestamp;
 use toasty::Db;
-use toasty::codegen_support::List;
-use toasty::stmt::IntoExpr;
+use toasty::codegen_support::{FieldExprTarget, List};
+use toasty::stmt::{Assign, IntoExpr};
 
 #[derive(Debug, Clone, toasty::Model)]
 #[table = "sessions"]
@@ -27,6 +27,7 @@ pub struct Session {
     pub updated_at: Timestamp,
 }
 
+#[derive(Clone)]
 pub struct SessionRepository {
     db: Db,
 }
@@ -86,12 +87,16 @@ impl SessionRepository {
             .await
     }
 
-    pub async fn update_title_by_id(
+    pub async fn update_title_by_session_id(
         &mut self,
-        id: impl IntoExpr<u64>,
-        title: String,
+        session_id: impl IntoExpr<String>,
+        title: impl Assign<FieldExprTarget<Option<String>>>,
     ) -> toasty::Result<()> {
-        Session::update_by_id(id).title(title).updated_at(Timestamp::now()).exec(&mut self.db).await
+        Session::update_by_session_id(session_id)
+            .title(title)
+            .updated_at(Timestamp::now())
+            .exec(&mut self.db)
+            .await
     }
 
     pub async fn delete_by_session_id(

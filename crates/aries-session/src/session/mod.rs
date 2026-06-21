@@ -24,11 +24,13 @@ use rig_core::agent::FinalResponse;
 use rig_core::completion::Message;
 use rig_core::message::UserContent;
 use rig_core::wasm_compat::WasmCompatSend;
+use toasty::Db;
 use tokio::sync::Mutex as AsyncMutex;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_util::sync::CancellationToken;
-use tracing::info;
+use tracing::{info, warn};
 
+use crate::persistence::SessionRepository;
 use crate::session::chat_context::ChatContext;
 use crate::session::chat_history::ChatHistory;
 use crate::session::hook::SessionPromptHook;
@@ -48,6 +50,8 @@ pub struct Session {
     lsp_client: Option<SharedLspClient>,
     chat_history: ChatHistory,
     chat_context: ChatContext,
+
+    session_repo: SessionRepository,
 
     root_dir: PathBuf,
     transcript_path: PathBuf,
@@ -70,6 +74,7 @@ impl Session {
         cwd: impl AsRef<Path>,
         config: ModelConfig,
         setting: Setting,
+        db: Db,
         hooks_executor: Arc<HooksExecutor>,
     ) -> anyhow::Result<Self> {
         let id = id.into();
@@ -96,6 +101,8 @@ impl Session {
         let chat_history = ChatHistory::new(root_dir).await;
         let chat_context = ChatContext::new(root_dir).await;
 
+        let session_repo = SessionRepository::new(db.clone());
+
         let cancel_token = CancellationToken::new();
 
         let input =
@@ -113,6 +120,7 @@ impl Session {
             lsp_client,
             chat_history,
             chat_context,
+            session_repo,
             root_dir: root_dir.to_path_buf(),
             transcript_path,
             cancel_token,
@@ -129,6 +137,7 @@ impl Session {
         cwd: impl AsRef<Path>,
         config: ModelConfig,
         setting: Setting,
+        db: Db,
         hooks_executor: Arc<HooksExecutor>,
     ) -> anyhow::Result<Self> {
         let id = id.into();
@@ -145,6 +154,8 @@ impl Session {
             client.agent(mode, config.clone(), cwd, lsp_client.clone()).await?;
         let chat_history = ChatHistory::new(root_dir).await;
         let chat_context = ChatContext::new(root_dir).await;
+
+        let session_repo = SessionRepository::new(db.clone());
 
         let cancel = CancellationToken::new();
 
@@ -163,6 +174,7 @@ impl Session {
             lsp_client,
             chat_history,
             chat_context,
+            session_repo,
             root_dir: root_dir.to_path_buf(),
             transcript_path,
             cancel_token: cancel,
@@ -219,9 +231,13 @@ impl Session {
         let prompt: Message = prompt.into();
         self.cancel_token = CancellationToken::new();
 
-        let input =
-            UserPromptSubmitHookInput::new(&self.id, &self.cwd, message_to_simple_text(&prompt))
-                .transcript_path(&self.transcript_path);
+        let title = message_to_simple_text(&prompt);
+        if let Err(err) = self.session_repo.update_title_by_session_id(&self.id, &title).await {
+            warn!("failed to update title({title}): {err}");
+        }
+
+        let input = UserPromptSubmitHookInput::new(&self.id, &self.cwd, title)
+            .transcript_path(&self.transcript_path);
         if let HookDecision::Terminate { reason } =
             self.hooks_executor.fire_user_prompt_submit(input).await
         {
