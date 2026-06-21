@@ -1,4 +1,4 @@
-use agent_client_protocol::schema::CancelNotification;
+use agent_client_protocol::schema::v1::CancelNotification;
 use agent_client_protocol::{Client, ConnectionTo, Error};
 use tracing::info;
 

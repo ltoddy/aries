@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
-use agent_client_protocol::schema::{
+use agent_client_protocol::schema::v1::{
     CloseSessionRequest, CloseSessionResponse, ListSessionsRequest, ListSessionsResponse,
     LoadSessionRequest, LoadSessionResponse, NewSessionRequest, NewSessionResponse,
     ResumeSessionRequest, ResumeSessionResponse, SessionConfigId, SessionConfigOption,

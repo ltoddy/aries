@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
-use agent_client_protocol::schema::{
-    self, Content, ContentBlock, ContentChunk, Diff, Plan, SessionUpdate, ToolCallContent,
-    ToolCallId, ToolCallLocation, ToolCallStatus, ToolCallUpdate, ToolCallUpdateFields, ToolKind,
+use agent_client_protocol::schema::v1::{
+    Content, ContentBlock, ContentChunk, Diff, Plan, SessionUpdate, ToolCall as AcpToolCall,
+    ToolCallContent, ToolCallId, ToolCallLocation, ToolCallStatus, ToolCallUpdate,
+    ToolCallUpdateFields, ToolKind,
 };
 use aries_core::event::{AgentEvent, AgentSignal};
 use aries_core::tools::{
@@ -91,7 +92,7 @@ impl SessionUpdates {
 
                 let ToolFunction { name, arguments } = tool_call.function;
 
-                let acp_tool_call = schema::ToolCall::new(ToolCallId::new(tool_call.id), title)
+                let acp_tool_call = AcpToolCall::new(ToolCallId::new(tool_call.id), title)
                     .kind(tool_kind(&Some(name.clone())))
                     .status(ToolCallStatus::InProgress)
                     .content(content)

@@ -1,4 +1,4 @@
-use agent_client_protocol::schema::{ContentBlock, EmbeddedResourceResource};
+use agent_client_protocol::schema::v1::{ContentBlock, EmbeddedResourceResource};
 use rig_core::OneOrMany;
 use rig_core::completion::Message;
 use rig_core::message::{DocumentMediaType, UserContent};

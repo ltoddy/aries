@@ -4,7 +4,7 @@ pub mod session_update;
 
 use std::collections::HashMap;
 
-use agent_client_protocol::schema::{
+use agent_client_protocol::schema::v1::{
     PromptRequest, PromptResponse, SessionNotification, StopReason,
 };
 use agent_client_protocol::{Client, ConnectionTo, Error, Responder};

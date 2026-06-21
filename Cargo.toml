@@ -15,7 +15,7 @@ default-members = ["crates/aries-cli"]
 resolver = "3"
 
 [workspace.dependencies]
-agent-client-protocol = "0.14"
+agent-client-protocol = "0.15"
 anyhow = "1"
 clap = "4"
 colored = "3"
@@ -35,7 +35,7 @@ parking_lot = "0.12"
 prettytable-rs = "0.10"
 regex-lite = "0.1"
 reqwest = "0.13"
-rig-core = "0.38"
+rig-core = "0.39"
 rustyline = "18.0"
 rustyline-derive = "0.12"
 serde = "1"

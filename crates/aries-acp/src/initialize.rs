@@ -1,16 +1,17 @@
-use agent_client_protocol::schema::{
+use agent_client_protocol::schema::ProtocolVersion;
+use agent_client_protocol::schema::v1::{
     AgentCapabilities, Implementation, InitializeRequest, InitializeResponse, McpCapabilities,
-    PromptCapabilities, ProtocolVersion, SessionAdditionalDirectoriesCapabilities,
-    SessionCapabilities, SessionListCapabilities,
+    PromptCapabilities, SessionAdditionalDirectoriesCapabilities, SessionCapabilities,
+    SessionListCapabilities,
 };
-use agent_client_protocol::{Client, ConnectionTo, Responder};
+use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
 use tracing::info;
 
 pub async fn initialize(
     req: InitializeRequest,
     responder: Responder<InitializeResponse>,
     _: ConnectionTo<Client>,
-) -> Result<(), agent_client_protocol::schema::Error> {
+) -> Result<(), Error> {
     info!("Received initialize request {req:?}");
 
     let info = Implementation::new("Aries", "0.0.1").title("Aries Agent");
