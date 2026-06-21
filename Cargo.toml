@@ -9,7 +9,13 @@ members = [
     "crates/aries-harness",
     "crates/aries-init",
     "crates/aries-logger",
+    "crates/aries-memory",
+    "crates/aries-sandbox",
+    "crates/aries-selfimprove",
     "crates/aries-session",
+    "crates/aries-telemetry",
+    "crates/aries-tokenopt",
+    "crates/aries-workflow",
 ]
 default-members = ["crates/aries-cli"]
 resolver = "3"
