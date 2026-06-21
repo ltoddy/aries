@@ -22,6 +22,7 @@ use aries_init::{ModelConfig, Setting, SettingError};
 use futures::pin_mut;
 use rig_core::agent::FinalResponse;
 use rig_core::completion::Message;
+use rig_core::message::UserContent;
 use rig_core::wasm_compat::WasmCompatSend;
 use tokio::sync::Mutex as AsyncMutex;
 use tokio::sync::mpsc::UnboundedReceiver;
@@ -218,9 +219,9 @@ impl Session {
         let prompt: Message = prompt.into();
         self.cancel_token = CancellationToken::new();
 
-        // TODO 字符串形式的 prompt 还比较难搞, 不太好映射
-        let input = UserPromptSubmitHookInput::new(&self.id, &self.cwd, "")
-            .transcript_path(&self.transcript_path);
+        let input =
+            UserPromptSubmitHookInput::new(&self.id, &self.cwd, message_to_simple_text(&prompt))
+                .transcript_path(&self.transcript_path);
         if let HookDecision::Terminate { reason } =
             self.hooks_executor.fire_user_prompt_submit(input).await
         {
@@ -480,5 +481,15 @@ impl Session {
 
     pub fn root_dir(&self) -> impl AsRef<Path> {
         &self.root_dir
+    }
+}
+
+fn message_to_simple_text(message: &Message) -> String {
+    match message {
+        Message::User { content } => match content.first() {
+            UserContent::Text(text) => text.text.clone(),
+            _ => String::new(),
+        },
+        _ => String::new(),
     }
 }
