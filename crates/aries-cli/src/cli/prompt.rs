@@ -13,10 +13,12 @@ use crate::theme::Theme;
 #[derive(Parser, Debug, Clone)]
 pub struct PromptArgs {
     pub prompt: String,
+    #[arg(long)]
+    pub session_id: Option<String>,
 }
 
 pub async fn execute(args: PromptArgs, gctx: GlobalContext) -> anyhow::Result<()> {
-    let session_id = nanoid::nanoid!();
+    let session_id = args.session_id.unwrap_or_else(|| nanoid::nanoid!());
 
     let loader = SettingLoader::new(&gctx.root_dir);
     let setting = loader.load().await?;
