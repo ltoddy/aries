@@ -48,7 +48,7 @@ struct NotchView: View {
     private var expansionWidth: CGFloat {
         if activityCoordinator.expandingActivity.show {
             switch activityCoordinator.expandingActivity.type {
-            case .claude:
+            case .processing:
                 return 2 * max(0, closedNotchSize.height - 12) + 20
             case .none:
                 break
@@ -166,7 +166,7 @@ struct NotchView: View {
     }
 
     private var isProcessing: Bool {
-        activityCoordinator.expandingActivity.show && activityCoordinator.expandingActivity.type == .claude
+        activityCoordinator.expandingActivity.show && activityCoordinator.expandingActivity.type == .processing
     }
 
     private var showClosedActivity: Bool {
@@ -290,7 +290,7 @@ struct NotchView: View {
 
     private func handleProcessingChange() {
         if isAnyProcessing {
-            activityCoordinator.showActivity(type: .claude)
+            activityCoordinator.showActivity(type: .processing)
             isVisible = true
         } else if hasWaitingForInput {
             activityCoordinator.hideActivity()

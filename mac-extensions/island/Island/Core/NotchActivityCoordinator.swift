@@ -2,7 +2,7 @@ import Combine
 import SwiftUI
 
 enum NotchActivityType: Equatable {
-    case claude
+    case processing
     case none
 }
 

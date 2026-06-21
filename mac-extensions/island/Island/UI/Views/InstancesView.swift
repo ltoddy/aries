@@ -19,7 +19,7 @@ struct InstancesView: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(.white.opacity(0.4))
 
-            Text("Run claude in terminal")
+            Text("Run a session in terminal")
                 .font(.system(size: 11))
                 .foregroundColor(.white.opacity(0.25))
         }
@@ -82,7 +82,7 @@ struct InstanceRow: View {
     @State private var isHovered = false
     @State private var spinnerPhase = 0
 
-    private let claudeOrange = Color(red: 0.85, green: 0.47, blue: 0.34)
+    private let processingAccent = Color(red: 0.85, green: 0.47, blue: 0.34)
     private let spinnerSymbols = ["·", "✢", "✳", "∗", "✻", "✽"]
     private let spinnerTimer = Timer.publish(every: 0.15, on: .main, in: .common).autoconnect()
 
@@ -204,7 +204,7 @@ struct InstanceRow: View {
         case .processing, .compacting:
             Text(spinnerSymbols[spinnerPhase % spinnerSymbols.count])
                 .font(.system(size: 12, weight: .bold))
-                .foregroundColor(claudeOrange)
+                .foregroundColor(processingAccent)
                 .onReceive(spinnerTimer) { _ in
                     spinnerPhase = (spinnerPhase + 1) % spinnerSymbols.count
                 }

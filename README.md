@@ -4,7 +4,7 @@
 
 本项目命名为 **Aries**（白羊座），因为项目创建时正值白羊座时期（3月21日 - 4月19日）。象征着全新的开始与充满活力的探索。
 
-![terminal](assets/terminal.png)
+![terminal](docs/assets/terminal.png)
 
 ## 安装
 
@@ -30,43 +30,10 @@
 
 查看当前所有模型: `aries model list`.
 
-## 在支持 agent-client-protocol 协议的 IDE 中使用：
+## 在支持 Agent Client Protocol 的 IDE 中使用
 
-### jetbrains IDE
+> 详见 [docs/acp.md](docs/acp.md)
 
-![jetbrains acp](assets/jetbrains-acp.png)
+## Aries Island（macOS 菜单栏助手）
 
-添加配置文件 `~/.jetbrains/acp.json`:
-
-```json
-{
-  "agent_servers": {
-    "aries": {
-      "command": "aries",
-      "args": [
-        "acp"
-      ]
-    }
-  }
-}
-```
-
-### Zed
-
-![zed acp](assets/zed-acp.png)
-
-在 `~/.config/zed/settings.json` 添加配置:
-
-```json
-{
-  "agent_servers": {
-    "aries": {
-      "type": "custom",
-      "command": "aries",
-      "args": [
-        "acp"
-      ]
-    }
-  }
-}
-```
+> 详见 [docs/mac-island.md](docs/mac-island.md)
