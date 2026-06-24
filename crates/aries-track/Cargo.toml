@@ -1,0 +1,8 @@
+[package]
+name = "aries-track"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+jiff.workspace = true
+toasty = { workspace = true, features = ["jiff", "sqlite"] }

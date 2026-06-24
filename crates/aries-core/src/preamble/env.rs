@@ -20,7 +20,7 @@ pub fn render(cwd: impl AsRef<Path>, model: &str) -> String {
         ),
         String::from("</env>"),
     ]
-        .join(",")
+    .join(",")
 }
 
 fn today() -> String {

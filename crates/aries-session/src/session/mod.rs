@@ -51,6 +51,7 @@ pub struct Session {
     chat_history: ChatHistory,
     chat_context: ChatContext,
 
+    db: Db,
     session_repo: SessionRepository,
 
     root_dir: PathBuf,
@@ -120,6 +121,7 @@ impl Session {
             lsp_client,
             chat_history,
             chat_context,
+            db,
             session_repo,
             root_dir: root_dir.to_path_buf(),
             transcript_path,
@@ -174,6 +176,7 @@ impl Session {
             lsp_client,
             chat_history,
             chat_context,
+            db,
             session_repo,
             root_dir: root_dir.to_path_buf(),
             transcript_path,
@@ -417,6 +420,7 @@ impl Session {
             &self.transcript_path,
             self.mode.id(),
             self.mode.name(),
+            self.db.clone(),
         );
         let prompt_fut = self.agent.prompt(prompt, history.to_vec(), hook);
         pin_mut!(prompt_fut);

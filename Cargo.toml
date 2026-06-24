@@ -15,6 +15,7 @@ members = [
     "crates/aries-session",
     "crates/aries-telemetry",
     "crates/aries-tokenopt",
+    "crates/aries-track",
     "crates/aries-workflow",
 ]
 default-members = ["crates/aries-cli"]

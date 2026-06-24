@@ -27,10 +27,9 @@ pub struct SessionRegistry {
 
 impl SessionRegistry {
     pub async fn new(gctx: GlobalContext, setting: Setting) -> anyhow::Result<Self> {
-        #[rustfmt::skip]
         let mut db = crate::persistence::connect(&gctx.root_dir)
             .await
-            .with_context(|| format!("connecting to session database at {}", gctx.root_dir.display()))?;
+            .with_context(|| format!("connecting to database at {}", gctx.root_dir.display()))?;
         let _ = crate::migrate(&mut db).await;
 
         let session_repo = SessionRepository::new(db.clone());

@@ -8,10 +8,12 @@ use aries_extension::hook::input::{
     SubagentStopHookInput,
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
+use aries_track::ToolCallRepository;
 use parking_lot::Mutex;
 use rig_core::agent::{HookAction, PromptHook, ToolCallHookAction};
 use rig_core::completion::{CompletionModel, CompletionResponse, Message};
 use serde_json::Value;
+use toasty::Db;
 
 #[derive(Clone)]
 pub struct SessionPromptHook {
@@ -22,6 +24,8 @@ pub struct SessionPromptHook {
     agent_id: String,
     agent_type: String,
     last_tool_call_at: Arc<Mutex<Option<time::Instant>>>,
+
+    tool_call_repo: ToolCallRepository,
 }
 
 impl SessionPromptHook {
@@ -32,12 +36,15 @@ impl SessionPromptHook {
         transcript_path: impl AsRef<Path>,
         agent_id: impl Into<String>,
         agent_type: impl Into<String>,
+        db: Db,
     ) -> Self {
         let session_id = session_id.into();
         let cwd = cwd.as_ref().to_path_buf();
         let transcript_path = transcript_path.as_ref().to_path_buf();
         let agent_id = agent_id.into();
         let agent_type = agent_type.into();
+
+        let tool_call_repo = ToolCallRepository::new(db);
 
         Self {
             executor,
@@ -47,6 +54,7 @@ impl SessionPromptHook {
             agent_id,
             agent_type,
             last_tool_call_at: Default::default(),
+            tool_call_repo,
         }
     }
 }
@@ -118,15 +126,39 @@ where
         args: &str,
         result: &str,
     ) -> HookAction {
-        let duration_ms =
-            self.last_tool_call_at.lock().map(|started_at| started_at.elapsed().as_millis() as u64);
+        let duration_ms = self
+            .last_tool_call_at
+            .lock()
+            .take()
+            .map(|started_at| started_at.elapsed().as_millis() as u64);
 
         let tool_input: Value =
             serde_json::from_str(args).unwrap_or_else(|_| Value::String(args.to_owned()));
         let tool_response: Value =
             serde_json::from_str(result).unwrap_or_else(|_| Value::String(result.to_owned()));
 
-        if result.contains("ToolCallError") {
+        let was_successful = !result.contains("ToolCallError");
+        {
+            let mut repo = self.tool_call_repo.clone();
+            let session_id = self.session_id.clone();
+            let internal_call_id = internal_call_id.to_owned();
+            let tool_name = tool_name.to_owned();
+            let args = args.to_owned();
+            tokio::spawn(async move {
+                let _ = repo
+                    .create(
+                        session_id,
+                        internal_call_id,
+                        tool_name,
+                        args,
+                        duration_ms,
+                        was_successful,
+                    )
+                    .await;
+            });
+        }
+
+        if !was_successful {
             let input = PostToolUseFailureHookInput::new(
                 &self.session_id,
                 &self.cwd,
