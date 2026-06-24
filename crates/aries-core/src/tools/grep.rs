@@ -55,8 +55,6 @@ impl ToolOutputRender for GrepOutput {
 pub enum GrepError {
     #[error("Regex error: {0}")]
     Regex(#[from] regex_lite::Error),
-    #[error("Glob error: {0}")]
-    Glob(#[from] glob::PatternError),
     #[error("Globset error: {0}")]
     Globset(#[from] globset::Error),
 }

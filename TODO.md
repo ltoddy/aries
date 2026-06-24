@@ -11,6 +11,7 @@
 9. [ ] 支持 Workflow
 10. [ ] 支持长期记忆
 11. [ ] 支持自我进化
-12. [ ] 遥测与 tracing
+12. [ ] 遥测与 tracing (记录每个工具调用预估耗费的 token, 用于统计，针对工具做优化)
 13. [ ] 优化 island，展示 token 消耗与类似 Github 的活跃图
-14. for harness engineering and autonomous agent
+14. [ ] for harness engineering and autonomous agent
+15. [ ] 支持 design.md

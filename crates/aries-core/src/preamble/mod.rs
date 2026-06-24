@@ -38,8 +38,7 @@ pub async fn render(
             let loader = instruction::AgentsmdFileLoader::new(&cwd);
             if let Some(content) = loader.read().await {
                 preamble.push('\n');
-                preamble.push_str(&format!("Instructions from: {}", loader.file_path().display()));
-                preamble.push('\n');
+                preamble.push_str(&format!("Instructions from: {}\n", loader.file_path().display()));
                 preamble.push_str(&content);
                 preamble.push('\n');
             }

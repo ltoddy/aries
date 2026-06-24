@@ -4,17 +4,23 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn render(cwd: impl AsRef<Path>, model: &str) -> String {
     let today = today();
-    let cwd = cwd.as_ref().display();
+    let cwd = cwd.as_ref();
+    let is_git_repository = git2::Repository::discover(cwd).is_ok();
+    let cwd = cwd.display();
 
     [
-        "<env>",
-        format!("  Model: {}", model).as_str(),
-        format!("  Working directory: {cwd}").as_str(),
-        format!("  Platform: {OS}").as_str(),
-        format!("  Today's date: {today}").as_str(),
-        "</env>",
+        String::from("<env>"),
+        format!("  Model: {}", model),
+        format!("  Working directory: {cwd}"),
+        format!("  Platform: {OS}"),
+        format!("  Today's date: {today}"),
+        format!(
+            "  Is directory a git repo: Yes/No: {}",
+            if is_git_repository { "yes" } else { "no" }
+        ),
+        String::from("</env>"),
     ]
-    .join("\n")
+        .join(",")
 }
 
 fn today() -> String {

@@ -10,7 +10,6 @@ aries-filesystem = { path = "../aries-filesystem" }
 dialoguer.workspace = true
 futures.workspace = true
 git2.workspace = true
-glob.workspace = true
 globset.workspace = true
 ignore.workspace = true
 itertools.workspace = true

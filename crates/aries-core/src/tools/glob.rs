@@ -52,8 +52,6 @@ impl ToolOutputRender for GlobOutput {
 
 #[derive(thiserror::Error, Debug)]
 pub enum GlobError {
-    #[error("Glob pattern error: {0}")]
-    PatternError(#[from] glob::PatternError),
     #[error("Globset error: {0}")]
     GlobsetError(#[from] globset::Error),
     #[error("Walk error: {0}")]
