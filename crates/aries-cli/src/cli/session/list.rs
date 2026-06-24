@@ -36,7 +36,7 @@ pub async fn execute(args: ListSessionsArgs, gctx: GlobalContext) -> anyhow::Res
             Row::new(vec![
                 Cell::new(s.session_id.as_str()),
                 Cell::new(s.cwd.as_str()),
-                Cell::new(s.title.unwrap_or_default().as_str()),
+                Cell::new(clamp(s.title.unwrap_or_default(), 10).as_str()),
                 Cell::new(s.created_at.to_string().as_str()),
             ])
         })
@@ -47,4 +47,14 @@ pub async fn execute(args: ListSessionsArgs, gctx: GlobalContext) -> anyhow::Res
     table.printstd();
 
     Ok(())
+}
+
+fn clamp(s: impl Into<String>, max_chars: usize) -> String {
+    let s = s.into();
+    if s.chars().count() <= max_chars {
+        s
+    } else {
+        let truncated = s.chars().take(max_chars).collect::<String>();
+        format!("{}...", truncated)
+    }
 }
