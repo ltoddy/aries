@@ -11,7 +11,6 @@ aries-extension = { version = "0.1.0", path = "../aries-extension" }
 aries-filesystem = { version = "0.1.0", path = "../aries-filesystem" }
 aries-init = { path = "../aries-init" }
 aries-logger = { path = "../aries-logger" }
-aries-track = { path = "../aries-track" }
 futures.workspace = true
 jiff.workspace = true
 nanoid.workspace = true

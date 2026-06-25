@@ -1,10 +1,12 @@
-pub mod session;
+mod session;
+mod token_audit;
+mod tool_call;
 
 use std::path::Path;
 
-use aries_track::{TokenAudit, ToolCall};
-
-pub use crate::persistence::session::{Session, SessionRepository};
+pub use self::session::{Session, SessionRepository};
+pub use self::token_audit::{TokenAudit, TokenAuditRepository};
+pub use self::tool_call::{ToolCall, ToolCallRepository};
 
 pub async fn connect(dir: impl AsRef<Path>) -> toasty::Result<toasty::Db> {
     let file_path = dir.as_ref().join("aries.db");

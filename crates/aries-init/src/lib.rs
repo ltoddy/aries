@@ -3,3 +3,5 @@ pub mod setting;
 
 pub use crate::global::GlobalContext;
 pub use crate::setting::{ModelConfig, Provider, Setting, SettingError, SettingLoader};
+
+pub async fn init() {}

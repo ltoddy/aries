@@ -272,7 +272,7 @@ impl Session {
                         .transcript_path(&self.transcript_path)
                         .error_details(err.to_string());
 
-                    let input = match &self.last_assistant_message {
+                    let input = match &self.last_assistant_message.take() {
                         Some(message) => input.last_assistant_message(message),
                         None => input,
                     };
