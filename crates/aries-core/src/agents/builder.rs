@@ -21,6 +21,7 @@ where
     model: String,
     mode: Mode,
     cwd: PathBuf,
+    memory: Option<String>,
 
     sender: UnboundedSender<AgentEvent>,
     receiver: UnboundedReceiver<AgentEvent>,
@@ -35,7 +36,12 @@ where
         let model = model.into();
         let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
 
-        Self { client, model, mode, cwd, sender, receiver }
+        Self { client, model, mode, cwd, memory: None, sender, receiver }
+    }
+
+    pub fn with_memory(mut self, memory: Option<String>) -> Self {
+        self.memory = memory;
+        self
     }
 
     pub fn build(self) -> AriesAgent<C::CompletionModel> {
@@ -66,8 +72,14 @@ where
         let available_skills = skillloader.load().await.unwrap_or_default();
 
         let name = mode.name();
-        let preamble =
-            crate::preamble::render(&self.cwd, mode, &self.model, &available_skills).await;
+        let preamble = crate::preamble::render(
+            &self.cwd,
+            mode,
+            &self.model,
+            &available_skills,
+            self.memory.as_deref(),
+        )
+        .await;
 
         let tools = self.build_tools(lsp_client, available_skills);
 

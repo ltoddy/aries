@@ -1,5 +1,6 @@
 mod env;
 mod instruction;
+pub mod memory;
 mod repo;
 mod skill;
 
@@ -12,9 +13,12 @@ use crate::agents::Mode;
 pub async fn render(
     cwd: impl AsRef<Path>,
     mode: Mode,
-    model: &str,
+    model: impl Into<String>,
     available_skills: &[SkillDefinition],
+    memory: Option<&str>,
 ) -> String {
+    let model = model.into();
+
     match mode {
         Mode::Build | Mode::General => {
             let mut preamble = mode.bare_preamble().to_string();
@@ -32,6 +36,12 @@ pub async fn render(
             if !available_skills.is_empty() {
                 preamble.push('\n');
                 preamble.push_str(&skill::render(available_skills));
+                preamble.push('\n');
+            }
+
+            if let Some(mem) = memory {
+                preamble.push('\n');
+                preamble.push_str(mem);
                 preamble.push('\n');
             }
 

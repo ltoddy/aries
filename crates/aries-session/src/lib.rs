@@ -6,14 +6,17 @@ use std::path::Path;
 
 use aries_core::agents::{AgentBuilder, Mode};
 use aries_core::event::AgentEvent;
+use aries_core::extractor::{ExtractedMemory, MemoryExtractor};
 use aries_core::language_server::SharedLspClient;
 use aries_core::{AriesResult, agents};
 use aries_init::ModelConfig;
+use aries_memory::{ManifestEntry, MemoryFrontmatter, MemoryStore};
 use rig_core::agent::{FinalResponse, PromptHook};
 use rig_core::completion::Message;
 use rig_core::providers::{anthropic, azure, deepseek, openai};
 use rig_core::wasm_compat::WasmCompatSend;
 use tokio::sync::mpsc::UnboundedReceiver;
+use tracing::{info, warn};
 
 pub use crate::persistence::{connect, migrate};
 pub use crate::registry::SessionRegistry;
@@ -65,31 +68,83 @@ impl AriesClient {
         config: ModelConfig,
         cwd: impl AsRef<Path>,
         lsp_client: Option<SharedLspClient>,
+        memory: Option<String>,
     ) -> anyhow::Result<(AriesAgent, UnboundedReceiver<AgentEvent>)> {
         let model = config.model().into();
         let cwd = cwd.as_ref().to_path_buf();
 
         match self {
             AriesClient::Anthropic(c) => {
-                let (agent, receiver) =
-                    AgentBuilder::new(c.clone(), &model, mode, cwd).with_tools(lsp_client).await;
+                let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd)
+                    .with_memory(memory)
+                    .with_tools(lsp_client)
+                    .await;
                 Ok((AriesAgent::Anthropic(agent), receiver))
             },
             AriesClient::Azure(c) => {
-                let (agent, receiver) =
-                    AgentBuilder::new(c.clone(), &model, mode, cwd).with_tools(lsp_client).await;
+                let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd)
+                    .with_memory(memory)
+                    .with_tools(lsp_client)
+                    .await;
                 Ok((AriesAgent::Azure(agent), receiver))
             },
             AriesClient::Deepseek(c) => {
-                let (agent, receiver) =
-                    AgentBuilder::new(c.clone(), &model, mode, cwd).with_tools(lsp_client).await;
+                let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd)
+                    .with_memory(memory)
+                    .with_tools(lsp_client)
+                    .await;
                 Ok((AriesAgent::Deepseek(agent), receiver))
             },
             AriesClient::OpenAI(c) => {
-                let (agent, receiver) =
-                    AgentBuilder::new(c.clone(), &model, mode, cwd).with_tools(lsp_client).await;
+                let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd)
+                    .with_memory(memory)
+                    .with_tools(lsp_client)
+                    .await;
                 Ok((AriesAgent::OpenAI(agent), receiver))
             },
+        }
+    }
+
+    pub async fn extract_memories(
+        &self,
+        model: impl Into<String>,
+        user: impl Into<String>,
+        assistant: impl Into<String>,
+        store: &MemoryStore,
+    ) {
+        let model = model.into();
+
+        let memories = match self {
+            AriesClient::Anthropic(c) => {
+                let extractor = MemoryExtractor::new(c.clone(), model);
+                extractor.extract(user, assistant).await
+            },
+            AriesClient::Azure(c) => {
+                let extractor = MemoryExtractor::new(c.clone(), model);
+                extractor.extract(user, assistant).await
+            },
+            AriesClient::Deepseek(c) => {
+                let extractor = MemoryExtractor::new(c.clone(), model);
+                extractor.extract(user, assistant).await
+            },
+            AriesClient::OpenAI(c) => {
+                let extractor = MemoryExtractor::new(c.clone(), model);
+                extractor.extract(user, assistant).await
+            },
+        };
+
+        for mem in memories {
+            let ExtractedMemory { name, description, memory_type, body } = mem;
+
+            let frontmatter = MemoryFrontmatter::new(&name, &description, memory_type);
+            match store.write_memory(frontmatter, body).await {
+                Ok(_) => {
+                    let entry = ManifestEntry::new(format!("{name}.md"), description.clone());
+                    let _ = store.append_to_manifest(entry).await;
+                    info!("memory saved: {name} (type: {memory_type:?})");
+                },
+                Err(e) => warn!("failed to write memory {name}: {e}"),
+            }
         }
     }
 }

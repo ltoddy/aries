@@ -4,3 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+aries-filesystem = { path = "../aries-filesystem" }
+itertools.workspace = true
+schemars.workspace = true
+serde = { workspace = true, features = ["derive"] }
+tokio = { workspace = true, features = ["io-util"] }
+tracing = { workspace = true }

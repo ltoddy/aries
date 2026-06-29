@@ -1,6 +1,7 @@
 pub mod agents;
 pub mod compact;
 pub mod event;
+pub mod extractor;
 pub mod jsonrpc;
 pub mod language_server;
 pub mod preamble;

@@ -1,4 +1,5 @@
 pub mod jsonl;
+pub mod markdown;
 pub mod walk;
 
 use std::io;

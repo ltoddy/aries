@@ -7,6 +7,7 @@ edition = "2024"
 anyhow.workspace = true
 aries-extension = { path = "../aries-extension" }
 aries-filesystem = { path = "../aries-filesystem" }
+aries-memory = { path = "../aries-memory" }
 dialoguer.workspace = true
 futures.workspace = true
 git2.workspace = true
@@ -18,9 +19,10 @@ parking_lot.workspace = true
 regex-lite.workspace = true
 reqwest.workspace = true
 rig-core.workspace = true
+schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_repr.workspace = true
 thiserror.workspace = true
-tokio = { workspace = true, features = ["fs", "process", "sync", "time", "io-util"] }
+tokio = { workspace = true, features = ["process", "sync", "time", "io-util"] }
 tracing.workspace = true

@@ -30,7 +30,7 @@ pub async fn execute(_: AddModelArgs, gctx: GlobalContext) -> anyhow::Result<()>
             let base_url = Input::<String>::with_theme(&theme)
                 .with_prompt("base url")
                 .allow_empty(false)
-                .default(String::from("https://api.openai.com/v1"))
+                .default(String::from("https://api.anthropic.com"))
                 .interact_text()?;
 
             let api_key = Input::<String>::with_theme(&theme)

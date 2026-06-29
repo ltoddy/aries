@@ -8,10 +8,10 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use aries_core::agents::{CompactAgent, CompactOutcome, Mode};
-use aries_core::compact;
 use aries_core::compact::{AutoCompactBreaker, Decision, TokenEstimator};
 use aries_core::event::AgentEvent;
 use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
+use aries_core::{compact, preamble};
 use aries_extension::hook::input::{
     PostCompactHookInput, PostCompactTrigger, PreCompactCustomInstructions, PreCompactHookInput,
     SessionStartHookInput, SessionStartSource, StopFailureHookInput, StopHookInput,
@@ -19,6 +19,7 @@ use aries_extension::hook::input::{
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
 use aries_init::{ModelConfig, Setting, SettingError};
+use aries_memory::MemoryStore;
 use futures::pin_mut;
 use rig_core::agent::FinalResponse;
 use rig_core::completion::Message;
@@ -54,7 +55,7 @@ pub struct Session {
     db: Db,
     session_repo: SessionRepository,
 
-    root_dir: PathBuf,
+    session_dir: PathBuf,
     transcript_path: PathBuf,
 
     cancel_token: CancellationToken,
@@ -62,13 +63,14 @@ pub struct Session {
 
     compact_breaker: AutoCompactBreaker,
     hooks_executor: Arc<HooksExecutor>,
+    memory_store: MemoryStore,
 
     last_assistant_message: Option<String>,
 }
 
-impl Session {
-    pub const PREFIX: &str = "session-";
+const PREFIX: &str = "session-";
 
+impl Session {
     pub async fn new(
         id: impl Into<String>,
         root_dir: impl AsRef<Path>,
@@ -84,23 +86,31 @@ impl Session {
         let client = AriesClient::new(&config)?;
         let lsp_client = Self::warm_up_lsp(cwd).await;
 
-        let root_dir = root_dir.as_ref();
-        #[rustfmt::skip]
-        tokio::fs::create_dir_all(&root_dir)
-            .await
-            .with_context(|| format!("failed to create session directory at: {}", root_dir.display()))?;
+        let root_dir = root_dir.as_ref().to_path_buf();
+        let session_dir = root_dir.join(format!("{PREFIX}{id}"));
 
-        let transcript_path = root_dir.join("transcripts");
+        #[rustfmt::skip]
+        tokio::fs::create_dir_all(&session_dir)
+            .await
+            .with_context(|| format!("failed to create session directory at: {}", session_dir.display()))?;
+
+        let transcript_path = session_dir.join("transcripts");
         #[rustfmt::skip]
         tokio::fs::create_dir_all(&transcript_path)
             .await
             .with_context(|| format!("failed to create session transcripts directory at: {}", transcript_path.display()))?;
 
-        let mode = Mode::default();
-        let (agent, receiver) = client.agent(mode, config.clone(), cwd, lsp_client.clone()).await?;
+        aries_logger::register(&id, &session_dir);
 
-        let chat_history = ChatHistory::new(root_dir).await;
-        let chat_context = ChatContext::new(root_dir).await;
+        let memory_store = MemoryStore::new(&root_dir, cwd).await;
+        let memory = Self::load_memory(&memory_store).await;
+
+        let mode = Mode::default();
+        let (agent, receiver) =
+            client.agent(mode, config.clone(), cwd, lsp_client.clone(), memory).await?;
+
+        let chat_history = ChatHistory::new(&session_dir).await;
+        let chat_context = ChatContext::new(&session_dir).await;
 
         let session_repo = SessionRepository::new(db.clone());
 
@@ -123,12 +133,13 @@ impl Session {
             chat_context,
             db,
             session_repo,
-            root_dir: root_dir.to_path_buf(),
+            session_dir,
             transcript_path,
             cancel_token,
             receiver: Arc::new(AsyncMutex::new(receiver)),
             compact_breaker: AutoCompactBreaker::new(),
             hooks_executor,
+            memory_store,
             last_assistant_message: None,
         })
     }
@@ -144,18 +155,24 @@ impl Session {
     ) -> anyhow::Result<Self> {
         let id = id.into();
         let cwd = cwd.as_ref();
-        let root_dir = root_dir.as_ref();
+        let root_dir = root_dir.as_ref().to_path_buf();
+        let session_dir = root_dir.join(format!("{PREFIX}{id}"));
 
-        let transcript_path = root_dir.join("transcripts");
+        let transcript_path = session_dir.join("transcripts");
+
+        aries_logger::register(&id, &session_dir);
 
         let lsp_client = Self::warm_up_lsp(cwd).await;
         let client = AriesClient::new(&config)?;
 
+        let memory_store = MemoryStore::new(&root_dir, cwd).await;
+        let memory = Self::load_memory(&memory_store).await;
+
         let mode = Mode::default();
         let (agent, agent_events) =
-            client.agent(mode, config.clone(), cwd, lsp_client.clone()).await?;
-        let chat_history = ChatHistory::new(root_dir).await;
-        let chat_context = ChatContext::new(root_dir).await;
+            client.agent(mode, config.clone(), cwd, lsp_client.clone(), memory).await?;
+        let chat_history = ChatHistory::new(&session_dir).await;
+        let chat_context = ChatContext::new(&session_dir).await;
 
         let session_repo = SessionRepository::new(db.clone());
 
@@ -178,12 +195,13 @@ impl Session {
             chat_context,
             db,
             session_repo,
-            root_dir: root_dir.to_path_buf(),
+            session_dir,
             transcript_path,
             cancel_token: cancel,
             receiver: Arc::new(AsyncMutex::new(agent_events)),
             compact_breaker: AutoCompactBreaker::new(),
             hooks_executor,
+            memory_store,
             last_assistant_message: None,
         })
     }
@@ -199,9 +217,16 @@ impl Session {
             .ok_or_else(|| SettingError::not_found(&alias))?;
 
         self.client = AriesClient::new(config)?;
+        let memory = Self::load_memory(&self.memory_store).await;
         let (agent, agent_events) = self
             .client
-            .agent(self.mode, self.config.clone(), self.cwd.clone(), self.lsp_client.clone())
+            .agent(
+                self.mode,
+                self.config.clone(),
+                self.cwd.clone(),
+                self.lsp_client.clone(),
+                memory,
+            )
             .await?;
         self.agent = agent;
         self.receiver = Arc::new(AsyncMutex::new(agent_events));
@@ -211,9 +236,10 @@ impl Session {
     }
 
     pub async fn set_mode(&mut self, mode: Mode) -> anyhow::Result<()> {
+        let memory = Self::load_memory(&self.memory_store).await;
         let (agent, agent_events) = self
             .client
-            .agent(mode, self.config.clone(), self.cwd.clone(), self.lsp_client.clone())
+            .agent(mode, self.config.clone(), self.cwd.clone(), self.lsp_client.clone(), memory)
             .await?;
 
         self.mode = mode;
@@ -236,6 +262,7 @@ impl Session {
 
         let prompt: Message = prompt.into();
         let title = message_to_simple_text(&prompt);
+        let user_msg_for_memory = title.clone();
         if let Err(err) = self.session_repo.update_title_by_session_id(&self.id, &title).await {
             warn!("failed to update title({title}): {err}");
         }
@@ -292,6 +319,18 @@ impl Session {
         let input = StopHookInput::new(&self.id, &self.cwd, false)
             .last_assistant_message(final_res.response());
         self.hooks_executor.fire_stop(input).await;
+
+        // Spawn background memory extraction task
+        {
+            let client = self.client.clone();
+            let model: String = self.config.model().into();
+            let memory_store = self.memory_store.clone();
+            let user_msg = user_msg_for_memory.clone();
+            let assistant_resp = final_res.response().to_owned();
+            tokio::spawn(async move {
+                client.extract_memories(&model, &user_msg, &assistant_resp, &memory_store).await;
+            });
+        }
 
         if final_res.usage().total_tokens > compact_threshold {
             info!(
@@ -500,8 +539,19 @@ impl Session {
         self.cancel_token.cancel();
     }
 
-    pub fn root_dir(&self) -> impl AsRef<Path> {
-        &self.root_dir
+    pub fn session_dir(&self) -> &Path {
+        &self.session_dir
+    }
+
+    pub fn transcript_path(&self) -> &Path {
+        &self.transcript_path
+    }
+
+    // TODO
+    async fn load_memory(store: &MemoryStore) -> Option<String> {
+        let manifest = store.read_manifest().await.unwrap_or(None);
+        let prompt = preamble::memory::render(store.dir(), manifest.as_deref());
+        Some(prompt)
     }
 }
 

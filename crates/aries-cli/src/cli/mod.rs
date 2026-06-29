@@ -61,7 +61,7 @@ pub async fn run_session(gctx: GlobalContext, session_id: impl Into<String>) -> 
     let session_id = session.id();
     let _session_span = info_span!("session", session_id = %session_id).entered();
 
-    let mut reader = input::InputReader::new(session.root_dir())?;
+    let mut reader = input::InputReader::new(session.session_dir())?;
     welcome::welcome(
         model_config.provider().to_string(),
         model_config.model(),

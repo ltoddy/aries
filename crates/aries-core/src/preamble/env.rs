@@ -2,7 +2,7 @@ use std::env::consts::OS;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub fn render(cwd: impl AsRef<Path>, model: &str) -> String {
+pub fn render(cwd: impl AsRef<Path>, model: impl Into<String>) -> String {
     let today = today();
     let cwd = cwd.as_ref();
     let is_git_repository = git2::Repository::discover(cwd).is_ok();
@@ -10,7 +10,7 @@ pub fn render(cwd: impl AsRef<Path>, model: &str) -> String {
 
     [
         String::from("<env>"),
-        format!("  Model: {}", model),
+        format!("  Model: {}", model.into()),
         format!("  Working directory: {cwd}"),
         format!("  Platform: {OS}"),
         format!("  Today's date: {today}"),

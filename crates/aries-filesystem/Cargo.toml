@@ -9,5 +9,7 @@ ignore.workspace = true
 itertools.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+serde_yaml.workspace = true
+thiserror.workspace = true
 tokio = { workspace = true, features = ["fs"] }
 url.workspace = true

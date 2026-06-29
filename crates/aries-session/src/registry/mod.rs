@@ -7,7 +7,6 @@ use aries_context::GlobalContext;
 use aries_extension::hook::input::{SessionEndHookInput, SessionEndReason};
 use aries_extension::hook::{HooksExecutor, HooksLoader};
 use aries_init::Setting;
-use aries_logger;
 use toasty::Db;
 use tracing::{Instrument, info_span};
 
@@ -109,17 +108,12 @@ impl SessionRegistry {
 
     pub async fn new_session(&mut self, cwd: impl Into<String>) -> anyhow::Result<Session> {
         let cwd = cwd.into();
-
         let session_id = nanoid::nanoid!();
-        let root_dir = self.gctx.root_dir.join(format!("{}{session_id}", Session::PREFIX));
-
         let model_config = self.setting.active_model()?;
-
-        aries_logger::register(&session_id, &root_dir);
 
         let session = Session::new(
             &session_id,
-            &root_dir,
+            &self.gctx.root_dir,
             &cwd,
             model_config,
             self.setting.clone(),
@@ -128,16 +122,15 @@ impl SessionRegistry {
         )
         .instrument(info_span!("session_init", session_id = %session_id))
         .await
-        .with_context(|| format!("Failed to create session at {}", root_dir.display()))?;
+        .with_context(|| format!("Failed to create session {}", session_id))?;
 
         self.active_sessions.insert(session.id(), session.clone());
-
         self.session_repo
             .create(
                 &session.id(),
                 &cwd,
-                root_dir.display().to_string(),
-                root_dir.join("transcripts").display().to_string(),
+                session.session_dir().display().to_string(),
+                session.transcript_path().display().to_string(),
             )
             .await
             .with_context(|| "Failed to create session info in local storage")?;
@@ -154,13 +147,11 @@ impl SessionRegistry {
             .await
             .with_context(|| format!("Failed to load session {session_id} from database"))?;
 
-        let root_dir = self.gctx.root_dir.join(format!("{}{session_id}", Session::PREFIX));
-
         let model_config = self.setting.active_model()?;
 
         let session = Session::load(
             &session.session_id,
-            &root_dir,
+            &self.gctx.root_dir,
             session.cwd,
             model_config,
             self.setting.clone(),
@@ -169,9 +160,7 @@ impl SessionRegistry {
         )
         .instrument(info_span!("session_init", session_id = %session_id))
         .await
-        .with_context(|| format!("Failed to load session from: {}", root_dir.display()))?;
-
-        aries_logger::register(&session_id, &root_dir);
+        .with_context(|| format!("Failed to load session: {}", session_id))?;
 
         self.active_sessions.insert(session.id(), session.clone());
 
