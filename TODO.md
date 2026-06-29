@@ -11,7 +11,7 @@
 - [ ] token 使用优化
 - [ ] 支持 Browser Use
 - [ ] 支持 Workflow
-- [ ] 支持长期记忆
+- [x] 支持长期记忆
 - [ ] 支持自我进化
 - [ ] 遥测与 tracing (记录每个工具调用预估耗费的 token, 用于统计，针对工具做优化)
 - [ ] 优化 island，展示 token 消耗与类似 Github 的活跃图

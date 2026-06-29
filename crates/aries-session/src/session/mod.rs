@@ -10,7 +10,6 @@ use anyhow::Context;
 use aries_core::agents::{CompactAgent, CompactOutcome, Mode};
 use aries_core::compact::{AutoCompactBreaker, Decision, TokenEstimator};
 use aries_core::event::AgentEvent;
-use aries_core::language_server::{LspServerInfo, SharedLspClient, warm_up};
 use aries_core::{compact, preamble};
 use aries_extension::hook::input::{
     PostCompactHookInput, PostCompactTrigger, PreCompactCustomInstructions, PreCompactHookInput,
@@ -19,6 +18,7 @@ use aries_extension::hook::input::{
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
 use aries_init::{ModelConfig, Setting, SettingError};
+use aries_lspclient::{LspServerInfo, SharedLspClient, warm_up};
 use aries_memory::MemoryStore;
 use futures::pin_mut;
 use rig_core::agent::FinalResponse;

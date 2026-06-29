@@ -1,5 +1,6 @@
 mod client;
 mod detection;
+mod jsonrpc;
 mod schema;
 
 use std::path::Path;
@@ -8,12 +9,8 @@ use std::sync::Arc;
 use aries_filesystem::path_to_uri;
 use tracing::error;
 
-pub use crate::language_server::client::{DocumentSymbolItem, LspClient, LspResult};
-pub use crate::language_server::detection::LspServerInfo;
-pub use crate::language_server::schema::{
-    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, DocumentSymbol, Hover,
-    Location, Position, Range, SymbolInformation, SymbolKind,
-};
+pub use self::client::{DocumentSymbolItem, LspClient, LspResult};
+pub use self::detection::LspServerInfo;
 
 pub type SharedLspClient = Arc<LspClient>;
 

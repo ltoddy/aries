@@ -13,10 +13,11 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::oneshot;
 
+use crate::detection::LspServerInfo;
 use crate::jsonrpc::{JsonRpcMessage, Notification, Request, RequestId, Response};
-use crate::language_server::{
+use crate::schema::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, DocumentSymbol, Hover,
-    Location, LspServerInfo, SymbolInformation,
+    Location, SymbolInformation,
 };
 
 #[derive(Debug, Deserialize, Serialize)]

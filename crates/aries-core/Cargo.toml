@@ -7,6 +7,7 @@ edition = "2024"
 anyhow.workspace = true
 aries-extension = { path = "../aries-extension" }
 aries-filesystem = { path = "../aries-filesystem" }
+aries-lspclient = { path = "../aries-lspclient" }
 aries-memory = { path = "../aries-memory" }
 dialoguer.workspace = true
 futures.workspace = true
@@ -15,14 +16,12 @@ globset.workspace = true
 ignore.workspace = true
 itertools.workspace = true
 nanoid.workspace = true
-parking_lot.workspace = true
 regex-lite.workspace = true
 reqwest.workspace = true
 rig-core.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-serde_repr.workspace = true
 thiserror.workspace = true
-tokio = { workspace = true, features = ["process", "sync", "time", "io-util"] }
+tokio = { workspace = true, features = ["process", "sync", "io-util"] }
 tracing.workspace = true

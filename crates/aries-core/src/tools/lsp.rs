@@ -2,11 +2,11 @@ use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
+use aries_lspclient::{DocumentSymbolItem, LspResult, SharedLspClient};
 use rig_core::completion::ToolDefinition;
 use rig_core::tool::Tool;
 use serde::{Deserialize, Serialize};
 
-use crate::language_server::{DocumentSymbolItem, LspResult, SharedLspClient};
 use crate::tools::{RenderError, ToolArgsRender, ToolOutputRender};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]

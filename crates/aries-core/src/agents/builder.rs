@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use aries_extension::skill::definition::SkillDefinition;
 use aries_extension::skill::loader::SkillsLoader;
+use aries_lspclient::SharedLspClient;
 use rig_core::client::CompletionClient;
 use rig_core::completion;
 use rig_core::tool::ToolDyn;
@@ -9,7 +10,6 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::agents::{AGENT_LOOP_MAX_TURNS, AriesAgent, Mode};
 use crate::event::AgentEvent;
-use crate::language_server::SharedLspClient;
 use crate::tools;
 
 pub struct AgentBuilder<C>
