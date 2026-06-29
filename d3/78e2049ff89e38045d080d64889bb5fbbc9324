@@ -1,0 +1,66 @@
+crates/aries-session/src/lib.rs
+  s_326ba226d51135::t_f3e4c618a6b45e 71,78-81,85-88,92-95,99-102
+  s_326ba226d51135::t_823d2e1010645a 107-118,121-122,125-126,129-130,133-149
+  s_326ba226d51135::t_1f7c17a8177e7c 19
+  s_326ba226d51135::t_0790a4de8affd1 9
+  s_326ba226d51135::t_ec6fa5ce0faeb9 13
+  s_326ba226d51135::t_bfbaecc923bb91 119-120,123-124,127-128,131-132
+crates/aries-core/src/preamble/memory.rs
+  s_326ba226d51135::t_5bed9ef608bd39 1-2,5-7,9,11,13,15,17,22,24,29,31,33-35,38-40,42-43,45-47,49-55,57-62
+  s_326ba226d51135::t_b717a0ff5a1c6f 3,8,10,12,14,16,18-21,23,25-28,30,32,36-37,41,44,48,56
+crates/aries-memory/Cargo.toml
+  s_326ba226d51135::t_6fff8428e56742 9
+crates/aries-core/src/agents/builder.rs
+  s_326ba226d51135::t_fd3952e177ca81 24,39-44,75-82
+crates/aries-core/Cargo.toml
+  s_326ba226d51135::t_ebb79056837374 22
+  s_326ba226d51135::t_6d4df487512d81 10
+crates/aries-core/src/preamble/mod.rs
+  s_326ba226d51135::t_c229d7f80db32b 3,16,18,20-21,42-44
+crates/aries-session/src/session/mod.rs
+  s_326ba226d51135::t_8241ce13fd0ffa 105-107,109-110,112-113,136,142
+  s_326ba226d51135::t_eecf3011f6210e 220,223-229,239,242
+  s_326ba226d51135::t_d964c6b078a412 265
+  s_326ba226d51135::t_bf380809100ec3 548-554
+  s_326ba226d51135::t_4f0c29986437e6 22
+  s_326ba226d51135::t_ded1c1df9b829e 326
+  s_cf78dfd40ef888::t_fabf1321a0eb5b 163
+  s_326ba226d51135::t_c53816cb7ae086 168-170,173-175,198,204
+  s_326ba226d51135::t_01c2134db681ce 66
+  s_cf78dfd40ef888::t_76f4d1cc1879c0 103-104
+  s_326ba226d51135::t_23027024501c99 14
+  s_326ba226d51135::t_c935cdde054afd 323-325,327,329-334
+  s_326ba226d51135::t_8cb9471d2b4b1b 328
+crates/aries-session/Cargo.toml
+  s_326ba226d51135::t_2186c6ea1d0dce 14
+crates/aries-memory/src/lib.rs
+  s_326ba226d51135::t_4916b5f3a9ce0b 7
+  s_326ba226d51135::t_f2a9c458d2e182 1,47-135
+  s_326ba226d51135::t_c4485c885c6d78 137
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "d378e2049ff89e38045d080d64889bb5fbbc9324",
+  "prompts": {},
+  "sessions": {
+    "s_326ba226d51135": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a3e77fb4ba8003db6311c32",
+        "model": "c_o_new_thinking__max"
+      },
+      "human_author": "liutao.rs <liutao.rs@bytedance.com>"
+    },
+    "s_cf78dfd40ef888": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a3fef3b9ee490d90f6595e9",
+        "model": "c_o_new_thinking__max"
+      },
+      "human_author": "liutao.rs <liutao.rs@bytedance.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
