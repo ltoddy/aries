@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 anyhow.workspace = true
 dirs.workspace = true
-prettytable-rs.workspace = true
+prettytable.workspace = true
 serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
 tokio = { workspace = true, features = ["fs"] }
