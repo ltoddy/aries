@@ -8,5 +8,5 @@ pub async fn execute(gctx: GlobalContext) -> anyhow::Result<()> {
 
     aries_logger::init(gctx.root_dir.join("logs"));
 
-    aries_acp::run(gctx, setting, Stdio::new()).await
+    aries_acp::v1::run(gctx, setting, Stdio::new()).await
 }

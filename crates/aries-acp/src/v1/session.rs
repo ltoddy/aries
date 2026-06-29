@@ -13,7 +13,7 @@ use aries_core::agents::Mode;
 use aries_init::Setting;
 use tracing::info;
 
-use crate::SharedRegistry;
+use super::SharedRegistry;
 
 pub async fn new_session(
     req: NewSessionRequest,

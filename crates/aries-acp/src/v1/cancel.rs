@@ -2,7 +2,7 @@ use agent_client_protocol::schema::v1::CancelNotification;
 use agent_client_protocol::{Client, ConnectionTo, Error};
 use tracing::info;
 
-use crate::SharedRegistry;
+use super::SharedRegistry;
 
 pub async fn cancel(
     args: CancelNotification,

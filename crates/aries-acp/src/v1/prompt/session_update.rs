@@ -16,7 +16,7 @@ use rig_core::agent::MultiTurnStreamItem;
 use rig_core::message::{ReasoningContent, ToolCall, ToolFunction, ToolResultContent};
 use rig_core::streaming::{StreamedAssistantContent, StreamedUserContent};
 
-use crate::prompt::plan::PlanEntry;
+use super::plan::PlanEntry;
 
 pub struct SessionUpdates(Vec<SessionUpdate>);
 
