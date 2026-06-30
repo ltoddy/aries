@@ -34,6 +34,74 @@ pub use crate::tools::webfetch::{WebFetchArgs, WebFetchOutput, WebFetchTool};
 pub use crate::tools::websearch::{WebSearchArgs, WebSearchOutput, WebSearchTool};
 pub use crate::tools::write::{WriteArgs, WriteOutput, WriteTool};
 
+pub const ALL_TOOL_NAMES: &[&str] = &[
+    agent::NAME,
+    bash::NAME,
+    batch::NAME,
+    codesearch::NAME,
+    edit::NAME,
+    glob::NAME,
+    grep::NAME,
+    ls::NAME,
+    lsp::NAME,
+    multiedit::NAME,
+    question::NAME,
+    read::NAME,
+    skill::NAME,
+    update_plan::NAME,
+    webfetch::NAME,
+    websearch::NAME,
+    write::NAME,
+];
+
+pub fn create_tools(
+    tool_names: &[&str],
+    cwd: &std::path::Path,
+    sender: &tokio::sync::mpsc::UnboundedSender<crate::event::AgentEvent>,
+    lsp_client: Option<&aries_lspclient::SharedLspClient>,
+    available_skills: &[aries_extension::skill::definition::SkillDefinition],
+) -> Vec<Box<dyn rig_core::tool::ToolDyn>> {
+    let cwd = cwd.to_path_buf();
+    let mut tools: Vec<Box<dyn rig_core::tool::ToolDyn>> = Vec::with_capacity(tool_names.len());
+
+    for &name in tool_names {
+        let tool: Box<dyn rig_core::tool::ToolDyn> = match name {
+            agent::NAME => continue, // generic over client, skip
+            bash::NAME => Box::new(BashTool),
+            batch::NAME => Box::new(BatchTool::new(cwd.clone())),
+            codesearch::NAME => Box::new(CodeSearchTool),
+            edit::NAME => Box::new(EditTool),
+            glob::NAME => Box::new(GlobTool::new(cwd.clone())),
+            grep::NAME => Box::new(GrepTool::new(cwd.clone())),
+            ls::NAME => Box::new(LsTool::new(cwd.clone())),
+            lsp::NAME => {
+                if let Some(client) = lsp_client {
+                    Box::new(LspTool::new(client.clone(), cwd.clone()))
+                } else {
+                    continue;
+                }
+            },
+            multiedit::NAME => Box::new(MultiEditTool),
+            question::NAME => Box::new(AskUserQuestionTool),
+            read::NAME => Box::new(ReadTool),
+            skill::NAME => {
+                if available_skills.is_empty() {
+                    continue;
+                }
+                Box::new(SkillTool::new(available_skills.to_vec()))
+            },
+            update_plan::NAME => Box::new(UpdatePlanTool::new(sender.clone())),
+            webfetch::NAME => Box::new(WebFetchTool),
+            websearch::NAME => Box::new(WebSearchTool),
+            write::NAME => Box::new(WriteTool),
+            _ => continue,
+        };
+        tools.push(tool);
+    }
+
+    tools
+}
+
 pub fn format_tool_args(tool_name: &str, raw_json: &str) -> (String, Option<String>) {
     let result = match tool_name {
         agent::NAME => AgentArgs::render_args(raw_json),

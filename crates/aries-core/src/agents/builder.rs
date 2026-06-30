@@ -103,48 +103,54 @@ where
     }
 
     fn build_tools(&self, available_skills: Vec<SkillDefinition>) -> Vec<Box<dyn ToolDyn>> {
-        let mode = self.mode;
-        let client = self.client.clone();
-        let cwd = self.cwd.clone();
-        let model = self.model.clone();
-
-        let mut tools: Vec<Box<dyn ToolDyn>> = vec![
-            Box::new(tools::bash::BashTool),
-            Box::new(tools::read::ReadTool),
-            Box::new(tools::glob::GlobTool::new(self.cwd.clone())),
-            Box::new(tools::grep::GrepTool::new(self.cwd.clone())),
-            Box::new(tools::ls::LsTool::new(self.cwd.clone())),
-            Box::new(tools::codesearch::CodeSearchTool),
-            Box::new(tools::webfetch::WebFetchTool),
-            Box::new(tools::websearch::WebSearchTool),
+        let mut names: Vec<&str> = vec![
+            tools::bash::NAME,
+            tools::read::NAME,
+            tools::glob::NAME,
+            tools::grep::NAME,
+            tools::ls::NAME,
+            tools::codesearch::NAME,
+            tools::webfetch::NAME,
+            tools::websearch::NAME,
         ];
 
-        if matches!(mode, Mode::Build | Mode::General) {
-            tools.push(Box::new(tools::write::WriteTool));
-            tools.push(Box::new(tools::multiedit::MultiEditTool));
-            tools.push(Box::new(tools::edit::EditTool));
-            tools.push(Box::new(tools::batch::BatchTool::new(self.cwd.clone())));
-            tools.push(Box::new(tools::update_plan::UpdatePlanTool::new(self.sender.clone())));
-            tools.push(Box::new(tools::agent::AgentTool::<C>::new(
-                client,
-                model,
-                cwd,
-                self.sender.clone(),
-            )));
+        match self.mode {
+            Mode::Build | Mode::General => {
+                names.extend_from_slice(&[
+                    tools::write::NAME,
+                    tools::multiedit::NAME,
+                    tools::edit::NAME,
+                    tools::batch::NAME,
+                    tools::update_plan::NAME,
+                ]);
+                names.push(tools::question::NAME);
+                names.push(tools::skill::NAME);
+                names.push(tools::lsp::NAME);
+            },
+            Mode::Plan => {
+                names.push(tools::question::NAME);
+            },
+            Mode::Explore => {},
         }
 
-        if matches!(mode, Mode::Build | Mode::General | Mode::Plan) {
-            tools.push(Box::new(tools::question::AskUserQuestionTool));
-        }
+        let mut tools = tools::create_tools(
+            &names,
+            &self.cwd,
+            &self.sender,
+            self.lsp_client.as_ref(),
+            &available_skills,
+        );
 
-        if matches!(mode, Mode::Build | Mode::General) {
-            if !available_skills.is_empty() {
-                tools.push(Box::new(tools::skill::SkillTool::new(available_skills)));
-            }
-            if let Some(ref lsp_client) = self.lsp_client {
-                tools
-                    .push(Box::new(tools::lsp::LspTool::new(lsp_client.clone(), self.cwd.clone())));
-            }
+        match self.mode {
+            Mode::Build | Mode::General => {
+                tools.push(Box::new(tools::agent::AgentTool::<C>::new(
+                    self.client.clone(),
+                    self.model.clone(),
+                    self.cwd.clone(),
+                    self.sender.clone(),
+                )));
+            },
+            _ => {},
         }
 
         tools
