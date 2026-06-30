@@ -18,3 +18,4 @@
 - [ ] 优化 island，展示 token 消耗与类似 Github 的活跃图
 - [ ] for harness engineering and autonomous agent
 - [ ] 支持 design.md
+- [ ] 支持 cron

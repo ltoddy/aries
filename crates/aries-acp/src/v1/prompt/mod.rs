@@ -13,9 +13,9 @@ use parking_lot::Mutex;
 use rig_core::message::ToolCall;
 use tracing::{info, info_span};
 
-use super::SharedRegistry;
 use self::message::UserMessage;
 use self::session_update::SessionUpdates;
+use super::SharedRegistry;
 
 pub async fn prompt(
     req: PromptRequest,

@@ -22,6 +22,8 @@ where
     mode: Mode,
     cwd: PathBuf,
     memory: Option<String>,
+    lsp_client: Option<SharedLspClient>,
+    use_tools: bool,
 
     sender: UnboundedSender<AgentEvent>,
     receiver: UnboundedReceiver<AgentEvent>,
@@ -36,7 +38,17 @@ where
         let model = model.into();
         let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
 
-        Self { client, model, mode, cwd, memory: None, sender, receiver }
+        Self {
+            client,
+            model,
+            mode,
+            cwd,
+            memory: None,
+            lsp_client: None,
+            use_tools: true,
+            sender,
+            receiver,
+        }
     }
 
     pub fn with_memory(mut self, memory: Option<String>) -> Self {
@@ -44,44 +56,38 @@ where
         self
     }
 
-    pub fn build(self) -> AriesAgent<C::CompletionModel> {
-        let mode = self.mode;
-
-        let name = mode.name();
-        let preamble = mode.bare_preamble().to_owned();
-
-        let inner = self
-            .client
-            .agent(self.model)
-            .name(name)
-            .description(mode.description())
-            .preamble(&preamble)
-            .default_max_turns(AGENT_LOOP_MAX_TURNS)
-            .build();
-
-        AriesAgent::new(inner, name, preamble, Some(self.sender))
+    pub fn with_lsp_client(mut self, lsp_client: Option<SharedLspClient>) -> Self {
+        self.lsp_client = lsp_client;
+        self
     }
 
-    pub async fn with_tools(
-        self,
-        lsp_client: Option<SharedLspClient>,
-    ) -> (AriesAgent<C::CompletionModel>, UnboundedReceiver<AgentEvent>) {
+    pub fn with_use_tools(mut self, use_tools: bool) -> Self {
+        self.use_tools = use_tools;
+        self
+    }
+
+    pub async fn build(self) -> (AriesAgent<C::CompletionModel>, UnboundedReceiver<AgentEvent>) {
         let mode = self.mode;
-
-        let skillloader = SkillsLoader::new(&self.cwd);
-        let available_skills = skillloader.load().await.unwrap_or_default();
-
         let name = mode.name();
-        let preamble = crate::preamble::render(
-            &self.cwd,
-            mode,
-            &self.model,
-            &available_skills,
-            self.memory.as_deref(),
-        )
-        .await;
 
-        let tools = self.build_tools(lsp_client, available_skills);
+        let (preamble, tools) = if self.use_tools {
+            let skillloader = SkillsLoader::new(&self.cwd);
+            let available_skills = skillloader.load().await.unwrap_or_default();
+
+            let preamble = crate::preamble::render(
+                &self.cwd,
+                mode,
+                &self.model,
+                &available_skills,
+                self.memory.as_deref(),
+            )
+            .await;
+
+            let tools = self.build_tools(available_skills);
+            (preamble, tools)
+        } else {
+            (mode.bare_preamble().to_owned(), vec![])
+        };
 
         let inner = self
             .client
@@ -96,11 +102,7 @@ where
         (AriesAgent::new(inner, name, preamble, Some(self.sender)), self.receiver)
     }
 
-    fn build_tools(
-        &self,
-        lsp_client: Option<SharedLspClient>,
-        available_skills: Vec<SkillDefinition>,
-    ) -> Vec<Box<dyn ToolDyn>> {
+    fn build_tools(&self, available_skills: Vec<SkillDefinition>) -> Vec<Box<dyn ToolDyn>> {
         let mode = self.mode;
         let client = self.client.clone();
         let cwd = self.cwd.clone();
@@ -139,8 +141,9 @@ where
             if !available_skills.is_empty() {
                 tools.push(Box::new(tools::skill::SkillTool::new(available_skills)));
             }
-            if let Some(lsp_client) = lsp_client {
-                tools.push(Box::new(tools::lsp::LspTool::new(lsp_client, self.cwd.clone())));
+            if let Some(ref lsp_client) = self.lsp_client {
+                tools
+                    .push(Box::new(tools::lsp::LspTool::new(lsp_client.clone(), self.cwd.clone())));
             }
         }
 

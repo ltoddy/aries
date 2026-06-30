@@ -77,28 +77,32 @@ impl AriesClient {
             AriesClient::Anthropic(c) => {
                 let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd)
                     .with_memory(memory)
-                    .with_tools(lsp_client)
+                    .with_lsp_client(lsp_client)
+                    .build()
                     .await;
                 Ok((AriesAgent::Anthropic(agent), receiver))
             },
             AriesClient::Azure(c) => {
                 let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd)
                     .with_memory(memory)
-                    .with_tools(lsp_client)
+                    .with_lsp_client(lsp_client)
+                    .build()
                     .await;
                 Ok((AriesAgent::Azure(agent), receiver))
             },
             AriesClient::Deepseek(c) => {
                 let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd)
                     .with_memory(memory)
-                    .with_tools(lsp_client)
+                    .with_lsp_client(lsp_client)
+                    .build()
                     .await;
                 Ok((AriesAgent::Deepseek(agent), receiver))
             },
             AriesClient::OpenAI(c) => {
                 let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd)
                     .with_memory(memory)
-                    .with_tools(lsp_client)
+                    .with_lsp_client(lsp_client)
+                    .build()
                     .await;
                 Ok((AriesAgent::OpenAI(agent), receiver))
             },
