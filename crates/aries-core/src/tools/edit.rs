@@ -76,8 +76,8 @@ impl Tool for EditTool {
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
-            name: Self::NAME.to_string(),
-            description: include_str!("descriptions/edit.txt").to_string(),
+            name: Self::NAME.to_owned(),
+            description: include_str!("edit.md").to_owned(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -106,7 +106,7 @@ impl Tool for EditTool {
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         if !args.file_path.exists() {
             return Err(EditError::EditError(
-                "File does not exist. Use write_file to create new files.".to_string(),
+                "File does not exist. Use write_file to create new files.".to_owned(),
             ));
         }
 
@@ -116,17 +116,17 @@ impl Tool for EditTool {
 
         if args.old_text == args.new_text {
             return Err(EditError::EditError(
-                "oldString and newString cannot be identical".to_string(),
+                "oldString and newString cannot be identical".to_owned(),
             ));
         }
 
         if !content.contains(&args.old_text) {
-            return Err(EditError::EditError("oldString not found in content".to_string()));
+            return Err(EditError::EditError("oldString not found in content".to_owned()));
         }
 
         let occurrences = content.matches(&args.old_text).count();
         if occurrences > 1 && !args.replace_all {
-            return Err(EditError::EditError("Found multiple matches for oldString. Provide more surrounding lines in oldString to identify the correct match or use replaceAll.".to_string()));
+            return Err(EditError::EditError("Found multiple matches for oldString. Provide more surrounding lines in oldString to identify the correct match or use replaceAll.".to_owned()));
         }
 
         let new_content = if args.replace_all {
@@ -139,6 +139,6 @@ impl Tool for EditTool {
             .await
             .map_err(|e| EditError::EditError(format!("Failed to write file: {}", e)))?;
 
-        Ok(EditOutput { success: true, message: "Edit applied successfully".to_string() })
+        Ok(EditOutput { success: true, message: "Edit applied successfully".to_owned() })
     }
 }

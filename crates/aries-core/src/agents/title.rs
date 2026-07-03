@@ -4,7 +4,7 @@ use rig_core::completion::{self, Message};
 use crate::AriesResult;
 use crate::agents::{AGENT_LOOP_MAX_TURNS, AriesAgent};
 
-const PREAMBLE: &str = include_str!("prompts/title.txt");
+const PREAMBLE: &str = include_str!("prompts/title.md");
 const NAME: &str = "Namer";
 const DESCRIPTION: &str = "用于生成对话标题的智能体。";
 

@@ -84,7 +84,7 @@ impl SkillTool {
 
     fn available_skills_display(&self) -> String {
         if self.skills.is_empty() {
-            "none".to_string()
+            "none".to_owned()
         } else {
             self.skills.iter().map(|s| &s.frontmatter.name).join(", ")
         }
@@ -99,8 +99,8 @@ impl Tool for SkillTool {
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
-            name: Self::NAME.to_string(),
-            description: include_str!("descriptions/skill.txt").to_string(),
+            name: Self::NAME.to_owned(),
+            description: include_str!("skill.md").to_owned(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {

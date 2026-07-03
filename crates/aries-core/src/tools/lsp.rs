@@ -179,7 +179,7 @@ fn extract_hover_text(contents: &serde_json::Value) -> String {
     match contents {
         serde_json::Value::String(s) => s.clone(),
         serde_json::Value::Object(obj) => {
-            obj.get("value").and_then(|v| v.as_str()).unwrap_or_default().to_string()
+            obj.get("value").and_then(|v| v.as_str()).unwrap_or_default().to_owned()
         },
         serde_json::Value::Array(arr) => arr
             .iter()
@@ -247,8 +247,8 @@ impl Tool for LspTool {
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
-            name: Self::NAME.to_string(),
-            description: include_str!("descriptions/lsp.txt").to_string(),
+            name: Self::NAME.to_owned(),
+            description: include_str!("lsp.md").to_owned(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -311,7 +311,7 @@ impl Tool for LspTool {
             },
             LspOperation::DocumentSymbol => {
                 let file_path = args.file_path.ok_or_else(|| {
-                    LspError::InvalidInput("file_path is required for documentSymbol".to_string())
+                    LspError::InvalidInput("file_path is required for documentSymbol".to_owned())
                 })?;
                 let abs_path = if file_path.is_absolute() {
                     file_path.clone()

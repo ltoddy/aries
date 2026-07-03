@@ -4,7 +4,7 @@ use rig_core::completion::{self, Message};
 use crate::AriesResult;
 use crate::agents::{AGENT_LOOP_MAX_TURNS, AriesAgent};
 
-const PREAMBLE: &str = include_str!("prompts/summary.txt");
+const PREAMBLE: &str = include_str!("prompts/summary.md");
 const NAME: &str = "Summarizer";
 const DESCRIPTION: &str = "用于生成对话摘要（类似于 PR 描述）的智能体。";
 

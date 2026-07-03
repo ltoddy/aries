@@ -42,9 +42,9 @@ impl ToolOutputRender for WriteOutput {
     fn render_output(raw: &str) -> Result<String, RenderError> {
         let output: Self = serde_json::from_str(raw)?;
         Ok(if output.success {
-            "File written successfully".to_string()
+            "File written successfully".to_owned()
         } else {
-            "Failed to write file".to_string()
+            "Failed to write file".to_owned()
         })
     }
 }
@@ -67,8 +67,8 @@ impl Tool for WriteTool {
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
-            name: Self::NAME.to_string(),
-            description: include_str!("descriptions/write.txt").to_string(),
+            name: Self::NAME.to_owned(),
+            description: include_str!("write.md").to_owned(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {

@@ -12,7 +12,7 @@ use tracing::info;
 
 use crate::agents::AriesAgent;
 
-const PREAMBLE: &str = include_str!("prompts/compact.txt");
+const PREAMBLE: &str = include_str!("prompts/compact.md");
 const NAME: &str = "Archivist";
 const DESCRIPTION: &str = "Summarises a conversation transcript into a structured digest.";
 

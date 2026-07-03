@@ -71,8 +71,8 @@ impl Tool for AskUserQuestionTool {
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
-            name: Self::NAME.to_string(),
-            description: include_str!("descriptions/question.txt").to_string(),
+            name: Self::NAME.to_owned(),
+            description: include_str!("question.md").to_owned(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -123,7 +123,7 @@ impl Tool for AskUserQuestionTool {
 
             let custom_opt = "Type your own answer...";
             if args.custom {
-                labels.push(custom_opt.to_string());
+                labels.push(custom_opt.to_owned());
             }
 
             if args.multiple {

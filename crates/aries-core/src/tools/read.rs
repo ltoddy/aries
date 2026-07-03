@@ -68,8 +68,8 @@ impl Tool for ReadTool {
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
-            name: Self::NAME.to_string(),
-            description: include_str!("descriptions/read.txt").to_string(),
+            name: Self::NAME.to_owned(),
+            description: include_str!("read.md").to_owned(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {

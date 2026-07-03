@@ -84,8 +84,8 @@ impl Tool for MultiEditTool {
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
-            name: Self::NAME.to_string(),
-            description: include_str!("descriptions/multiedit.txt").to_string(),
+            name: Self::NAME.to_owned(),
+            description: include_str!("multiedit.md").to_owned(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -132,7 +132,7 @@ impl Tool for MultiEditTool {
         for edit in args.edits {
             if edit.old_text == edit.new_text {
                 return Err(MultiEditError::EditError(
-                    "old_text and new_text cannot be identical".to_string(),
+                    "old_text and new_text cannot be identical".to_owned(),
                 ));
             }
 
@@ -164,6 +164,6 @@ impl Tool for MultiEditTool {
             .await
             .map_err(|e| MultiEditError::EditError(format!("Failed to write file: {}", e)))?;
 
-        Ok(MultiEditOutput { success: true, message: "Edits applied successfully".to_string() })
+        Ok(MultiEditOutput { success: true, message: "Edits applied successfully".to_owned() })
     }
 }

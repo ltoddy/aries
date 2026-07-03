@@ -19,6 +19,7 @@ async fn main() -> anyhow::Result<()> {
     match args.command {
         Some(cli::Subcommands::Setup) => cli::setup::execute(gctx).await,
         Some(cli::Subcommands::Acp) => cli::acp::execute(gctx).await,
+        Some(cli::Subcommands::Exec(args)) => cli::exec::execute(args).await,
         Some(cli::Subcommands::Session { command }) => match command {
             SessionCommand::List(args) => session::list::execute(args, gctx).await,
             SessionCommand::Prune(args) => session::prune::execute(args, gctx).await,

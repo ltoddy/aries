@@ -99,8 +99,8 @@ impl Tool for CodeSearchTool {
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
-            name: Self::NAME.to_string(),
-            description: include_str!("descriptions/codesearch.txt").to_string(),
+            name: Self::NAME.to_owned(),
+            description: include_str!("codesearch.md").to_owned(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -120,11 +120,11 @@ impl Tool for CodeSearchTool {
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         let req = McpCodeRequest {
-            jsonrpc: "2.0".to_string(),
+            jsonrpc: "2.0".to_owned(),
             id: 1,
-            method: "tools/call".to_string(),
+            method: "tools/call".to_owned(),
             params: McpCodeRequestParams {
-                name: "get_code_context_exa".to_string(),
+                name: "get_code_context_exa".to_owned(),
                 arguments: McpCodeRequestArgs {
                     query: args.query.clone(),
                     tokens_num: args.tokens_num.unwrap_or(5000),
@@ -166,7 +166,7 @@ impl Tool for CodeSearchTool {
         }
 
         Ok(CodeSearchOutput {
-            results: "No code snippets or documentation found. Please try a different query, be more specific about the library or programming concept, or check the spelling of framework names.".to_string(),
+            results: "No code snippets or documentation found. Please try a different query, be more specific about the library or programming concept, or check the spelling of framework names.".to_owned(),
         })
     }
 }

@@ -17,6 +17,7 @@ aries-core = { path = "../aries-core" }
 aries-init = { path = "../aries-init" }
 aries-logger = { path = "../aries-logger" }
 aries-session = { path = "../aries-session" }
+aries-tokenopt = { path = "../aries-tokenopt" }
 clap = { workspace = true, features = ["derive"] }
 colored.workspace = true
 dark-light.workspace = true

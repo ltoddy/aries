@@ -105,12 +105,7 @@ fn sanitize_project_path(path: impl AsRef<Path>) -> String {
     let path = path.as_ref();
     let path = path.to_string_lossy();
 
-    path.chars()
-        .map(|c| match c {
-            '/' | '\\' => '_',
-            c => c,
-        })
-        .collect::<String>()
+    path.replace(std::path::MAIN_SEPARATOR, "_")
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

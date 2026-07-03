@@ -60,10 +60,10 @@ impl Display for Mode {
 impl Mode {
     pub const fn bare_preamble(self) -> &'static str {
         match self {
-            Self::Build => include_str!("prompts/build.txt"),
-            Self::Plan => include_str!("prompts/plan.txt"),
-            Self::General => include_str!("prompts/generate.txt"),
-            Self::Explore => include_str!("prompts/explore.txt"),
+            Self::Build => include_str!("prompts/build.md"),
+            Self::Plan => include_str!("prompts/plan.md"),
+            Self::General => include_str!("prompts/generate.md"),
+            Self::Explore => include_str!("prompts/explore.md"),
         }
     }
 

@@ -19,7 +19,7 @@ pub struct UpdatePlanArgs {
 impl UpdatePlanArgs {
     pub fn title(&self) -> String {
         if self.items.is_empty() {
-            "Clear plan".to_string()
+            "Clear plan".to_owned()
         } else {
             format!("Update plan with {} items", self.items.len())
         }
@@ -89,7 +89,7 @@ pub struct UpdatePlanOutput {
 impl ToolOutputRender for UpdatePlanOutput {
     fn render_output(raw: &str) -> Result<String, RenderError> {
         let _: Self = serde_json::from_str(raw)?;
-        Ok("Plan updated.".to_string())
+        Ok("Plan updated.".to_owned())
     }
 }
 
@@ -117,8 +117,8 @@ impl Tool for UpdatePlanTool {
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
-            name: Self::NAME.to_string(),
-            description: include_str!("descriptions/update_plan.txt").to_string(),
+            name: Self::NAME.to_owned(),
+            description: include_str!("update_plan.md").to_owned(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {

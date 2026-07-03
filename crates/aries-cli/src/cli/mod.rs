@@ -1,4 +1,5 @@
 pub mod acp;
+pub mod exec;
 pub mod model;
 pub mod prompt;
 pub mod session;
@@ -17,6 +18,7 @@ use rustyline::error::ReadlineError;
 use terminal_size::{Width, terminal_size};
 use tracing::info_span;
 
+use crate::cli::exec::ExecArgs;
 use crate::cli::model::ModelCommand;
 use crate::cli::session::SessionCommand;
 use crate::display::print_agent_event;
@@ -32,6 +34,7 @@ pub struct Args {
 #[derive(Subcommand, Debug, Clone)]
 pub enum Subcommands {
     Acp,
+    Exec(ExecArgs),
     Prompt(PromptArgs),
     Session {
         #[command(subcommand)]
