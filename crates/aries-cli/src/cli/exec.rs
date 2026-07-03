@@ -24,6 +24,7 @@ pub async fn execute(args: ExecArgs) -> anyhow::Result<()> {
     let status = Command::new(shell)
         .arg("-c")
         .arg(args.command.join(" "))
+        .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .status()
