@@ -15,6 +15,8 @@ use crate::cli::session::{self, SessionCommand};
 async fn main() -> anyhow::Result<()> {
     let args = cli::Args::parse();
 
+    aries_init::init().await;
+
     let gctx = GlobalContext::new()?;
     match args.command {
         Some(cli::Subcommands::Setup) => cli::setup::execute(gctx).await,

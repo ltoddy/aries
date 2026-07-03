@@ -1,4 +1,3 @@
-pub mod persistence;
 pub mod registry;
 pub mod session;
 
@@ -11,6 +10,7 @@ use aries_core::{AriesResult, agents};
 use aries_init::ModelConfig;
 use aries_lspclient::SharedLspClient;
 use aries_memory::{ManifestEntry, MemoryFrontmatter, MemoryStore};
+pub use aries_persistence::{connect, migrate};
 use rig_core::agent::{FinalResponse, PromptHook};
 use rig_core::completion::Message;
 use rig_core::providers::{anthropic, azure, deepseek, openai};
@@ -18,7 +18,6 @@ use rig_core::wasm_compat::WasmCompatSend;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tracing::{info, warn};
 
-pub use crate::persistence::{connect, migrate};
 pub use crate::registry::SessionRegistry;
 pub use crate::session::Session;
 

@@ -16,6 +16,7 @@ aries-context = { path = "../aries-context" }
 aries-core = { path = "../aries-core" }
 aries-init = { path = "../aries-init" }
 aries-logger = { path = "../aries-logger" }
+aries-persistence = { path = "../aries-persistence" }
 aries-session = { path = "../aries-session" }
 aries-tokenopt = { path = "../aries-tokenopt" }
 clap = { workspace = true, features = ["derive"] }

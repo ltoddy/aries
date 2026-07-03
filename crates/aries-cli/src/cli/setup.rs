@@ -8,8 +8,8 @@ use crate::theme::Theme;
 pub async fn execute(gctx: GlobalContext) -> anyhow::Result<()> {
     let theme = Theme::default();
 
-    let mut db = aries_session::connect(&gctx.root_dir).await?;
-    let _ = aries_session::migrate(&mut db).await;
+    let mut db = aries_persistence::connect(&gctx.root_dir).await?;
+    let _ = aries_persistence::migrate(&mut db).await;
 
     let setting = setup()?;
     let loader = SettingLoader::new(gctx.root_dir);

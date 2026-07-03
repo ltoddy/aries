@@ -11,6 +11,7 @@ pub struct ToolCall {
 
     pub session_id: String,
     pub tool_call_id: String,
+    #[index]
     pub tool_name: String,
     pub args: String,
     pub duration_ms: Option<u64>,

@@ -7,11 +7,11 @@ use aries_context::GlobalContext;
 use aries_extension::hook::input::{SessionEndHookInput, SessionEndReason};
 use aries_extension::hook::{HooksExecutor, HooksLoader};
 use aries_init::Setting;
+use aries_persistence::SessionRepository;
 use toasty::Db;
 use tracing::{Instrument, info_span};
 
 use crate::Session;
-use crate::persistence::SessionRepository;
 
 pub struct SessionRegistry {
     gctx: GlobalContext,
@@ -26,10 +26,10 @@ pub struct SessionRegistry {
 
 impl SessionRegistry {
     pub async fn new(gctx: GlobalContext, setting: Setting) -> anyhow::Result<Self> {
-        let mut db = crate::persistence::connect(&gctx.root_dir)
+        let mut db = aries_persistence::connect(&gctx.root_dir)
             .await
             .with_context(|| format!("connecting to database at {}", gctx.root_dir.display()))?;
-        let _ = crate::migrate(&mut db).await;
+        let _ = aries_persistence::migrate(&mut db).await;
 
         let session_repo = SessionRepository::new(db.clone());
 
@@ -50,7 +50,7 @@ impl SessionRegistry {
     pub async fn list_sessions(
         &mut self,
         cwd: Option<PathBuf>,
-    ) -> anyhow::Result<Vec<crate::persistence::Session>> {
+    ) -> anyhow::Result<Vec<aries_persistence::Session>> {
         let sessions = match cwd {
             Some(cwd) => self.session_repo.find_by_cwd(cwd.display().to_string()).await,
             None => self.session_repo.find().await,

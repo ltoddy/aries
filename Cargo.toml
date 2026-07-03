@@ -11,6 +11,7 @@ members = [
     "crates/aries-logger",
     "crates/aries-lspclient",
     "crates/aries-memory",
+    "crates/aries-persistence",
     "crates/aries-sandbox",
     "crates/aries-selfimprove",
     "crates/aries-session",

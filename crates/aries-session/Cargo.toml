@@ -13,8 +13,8 @@ aries-init = { path = "../aries-init" }
 aries-logger = { path = "../aries-logger" }
 aries-lspclient = { path = "../aries-lspclient" }
 aries-memory = { path = "../aries-memory" }
+aries-persistence = { path = "../aries-persistence" }
 futures.workspace = true
-jiff.workspace = true
 nanoid.workspace = true
 parking_lot.workspace = true
 rig-core.workspace = true

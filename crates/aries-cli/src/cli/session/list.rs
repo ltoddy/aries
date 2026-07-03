@@ -16,7 +16,7 @@ pub async fn execute(args: ListSessionsArgs, gctx: GlobalContext) -> anyhow::Res
         .await
         .with_context(|| format!("Failed to connect local storage: {}", gctx.root_dir.display()))
         .expect("Run `aries init -h` for initialization");
-    let mut session_repo = aries_session::persistence::SessionRepository::new(db);
+    let mut session_repo = aries_persistence::SessionRepository::new(db);
 
     let sessions = match args.cwd {
         Some(cwd) => session_repo.find_by_cwd(cwd.display().to_string()).await.unwrap_or_default(),

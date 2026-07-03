@@ -20,6 +20,7 @@ use aries_extension::hook::{HookDecision, HooksExecutor};
 use aries_init::{ModelConfig, Setting, SettingError};
 use aries_lspclient::{LspServerInfo, SharedLspClient, warm_up};
 use aries_memory::MemoryStore;
+use aries_persistence::SessionRepository;
 use futures::pin_mut;
 use rig_core::agent::FinalResponse;
 use rig_core::completion::Message;
@@ -31,7 +32,6 @@ use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
-use crate::persistence::SessionRepository;
 use crate::session::chat_context::ChatContext;
 use crate::session::chat_history::ChatHistory;
 use crate::session::hook::SessionPromptHook;

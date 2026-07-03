@@ -8,13 +8,12 @@ use aries_extension::hook::input::{
     SubagentStopHookInput,
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
+use aries_persistence::ToolCallRepository;
 use parking_lot::Mutex;
 use rig_core::agent::{HookAction, PromptHook, ToolCallHookAction};
 use rig_core::completion::{CompletionModel, CompletionResponse, Message};
 use serde_json::Value;
 use toasty::Db;
-
-use crate::persistence::ToolCallRepository;
 
 #[derive(Clone)]
 pub struct SessionPromptHook {

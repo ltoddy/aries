@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+colored.workspace = true
 jiff.workspace = true
 parking_lot.workspace = true
 tracing-appender.workspace = true
-colored.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true
