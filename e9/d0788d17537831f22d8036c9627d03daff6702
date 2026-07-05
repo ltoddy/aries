@@ -1,0 +1,70 @@
+scripts/swe_bench.py
+  s_fb1d84eb22e329::t_2959561681b994 73-88
+  s_fb1d84eb22e329::t_3ef002a2db568a 97-101
+  s_fb1d84eb22e329::t_d67af0d42a809b 157
+  s_fb1d84eb22e329::t_9ae8c593de2185 198-200
+  s_fb1d84eb22e329::t_051ac4f1369938 110,116
+  s_fb1d84eb22e329::t_a8e5c2c793ed1c 172-185
+  s_fb1d84eb22e329::t_16d70816a3cf28 106-108
+  s_fb1d84eb22e329::t_53327603022ae3 70-72
+  s_7c8566be1f1d30::t_2b40ceb464f23e 5-8
+  s_fb1d84eb22e329::t_f06e916da4947d 119-156
+  s_fb1d84eb22e329::t_c11d0a09a1af26 67-68,89,103-104,109,111-115,117-118
+  s_fb1d84eb22e329::t_955862a80ea0f2 91-96
+  s_fb1d84eb22e329::t_1e39b10496843d 52-66,69,90,102,105,197
+  s_fb1d84eb22e329::t_4ed5e6fdc69a6a 158-161
+  s_fb1d84eb22e329::t_05f2575280a169 162-171
+  s_7c8566be1f1d30::t_5140bf8edca5f6 2-4
+  s_fb1d84eb22e329::t_72c16bad43f4e4 186-196
+  s_7c8566be1f1d30::t_7f8a6525145ab2 1
+  s_fb1d84eb22e329::t_2245a3492f832a 201-203
+scripts/.gitignore
+  s_fb1d84eb22e329::t_eff61487b9bbad 162-164
+  s_fb1d84eb22e329::t_52156fec9238f3 165-168
+  s_fb1d84eb22e329::t_7e688e7fedd5c8 159-161
+scripts/pyproject.toml
+  s_fb1d84eb22e329::t_9c3c53d9938b7f 7-9
+  s_fb1d84eb22e329::t_8c13ed6f958524 10
+  s_fb1d84eb22e329::t_2716937358310e 21
+  s_fb1d84eb22e329::t_bbd51090b54b1f 11-20
+  s_fb1d84eb22e329::t_55b463dfd90659 22-24
+  s_fb1d84eb22e329::t_eb348fb1522bbb 4-6
+  s_fb1d84eb22e329::t_30f5b24f33ed87 25
+scripts/.python-version
+  s_fb1d84eb22e329::t_21776217c1ea87 1
+scripts/justfile
+  s_fb1d84eb22e329::t_d395c7c0aa8b8c 1-6
+  s_fb1d84eb22e329::t_b2ca6ed7b8f9d9 9
+  s_fb1d84eb22e329::t_5a049ad900b96a 7-8,10-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "e9d0788d17537831f22d8036c9627d03daff6702",
+  "prompts": {},
+  "humans": {
+    "h_7e7294fa92d26d": {
+      "author": "liutao.rs <liutao.rs@bytedance.com>"
+    }
+  },
+  "sessions": {
+    "s_7c8566be1f1d30": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a47be233af56a4362c72f7f",
+        "model": "c_o_new_thinking__dev"
+      },
+      "human_author": "liutao.rs <liutao.rs@bytedance.com>"
+    },
+    "s_fb1d84eb22e329": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a49ce35b9566bb16911305b",
+        "model": "c_o_new_thinking__dev"
+      },
+      "human_author": "liutao.rs <liutao.rs@bytedance.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
