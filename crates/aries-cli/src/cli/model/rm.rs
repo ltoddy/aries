@@ -38,13 +38,12 @@ pub async fn execute(_: RmModelArgs, gctx: GlobalContext) -> anyhow::Result<()> 
         return Ok(());
     }
 
-    if !setting.models.iter().any(|m| m.alias().into() == alias) {
+    if !setting.models.iter().any(|m| m.alias() == alias) {
         println!("no model found with alias `{alias}`.");
         return Ok(());
     }
 
-    setting.models =
-        setting.models.into_iter().filter(|m| m.alias().into() != alias).collect::<Vec<_>>();
+    setting.models = setting.models.into_iter().filter(|m| m.alias() != alias).collect::<Vec<_>>();
 
     loader.save(&setting).await?;
 

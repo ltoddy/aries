@@ -1,0 +1,13 @@
+lint:
+    @uv run ruff check
+    @uv run ty check
+
+fmt:
+    @uv run ruff format
+
+evaluate:
+    uv run python -m multi_swe_bench.harness.run_evaluation \
+        --predictions_path predictions.jsonl \
+        --run_id aries-swe-bench-eval \
+        --log_dir ./eval_logs \
+        --max_workers 4

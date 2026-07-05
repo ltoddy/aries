@@ -69,7 +69,7 @@ impl AriesClient {
         lsp_client: Option<SharedLspClient>,
         memory: Option<String>,
     ) -> anyhow::Result<(AriesAgent, UnboundedReceiver<AgentEvent>)> {
-        let model = config.model().into();
+        let model = config.model();
         let cwd = cwd.as_ref().to_path_buf();
 
         match self {

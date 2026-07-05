@@ -213,7 +213,7 @@ impl Session {
             .setting
             .models
             .iter()
-            .find(|m| m.alias().into() == alias)
+            .find(|m| m.alias() == alias)
             .ok_or_else(|| SettingError::not_found(&alias))?;
 
         self.client = AriesClient::new(config)?;
@@ -277,7 +277,7 @@ impl Session {
 
         compact::micro_compact(self.chat_context.history_mut());
 
-        let window = compact::ContextWindow::for_model(self.config.model().into());
+        let window = compact::ContextWindow::for_model(self.config.model());
         let compact_threshold = window.auto_compact_threshold();
         let estimate_tokens =
             self.chat_context.history().estimate_tokens().saturating_add(prompt.estimate_tokens());
@@ -323,7 +323,7 @@ impl Session {
         // Spawn background memory extraction task
         {
             let client = self.client.clone();
-            let model: String = self.config.model().into();
+            let model: String = self.config.model();
             let memory_store = self.memory_store.clone();
             let user_msg = user_msg_for_memory.clone();
             let assistant_resp = final_res.response().to_owned();

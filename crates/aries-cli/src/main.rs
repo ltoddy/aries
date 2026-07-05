@@ -29,6 +29,7 @@ async fn main() -> anyhow::Result<()> {
         },
         Some(cli::Subcommands::Model { command }) => match command {
             ModelCommand::Add(args) => model::add::execute(args, gctx).await,
+            ModelCommand::Current(args) => model::current::execute(args, gctx).await,
             ModelCommand::Default(args) => model::default::execute(args, gctx).await,
             ModelCommand::List(args) => model::list::execute(args, gctx).await,
             ModelCommand::Rm(args) => model::rm::execute(args, gctx).await,

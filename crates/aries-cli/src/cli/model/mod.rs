@@ -1,18 +1,21 @@
 pub mod add;
+pub mod current;
 pub mod default;
 pub mod list;
 pub mod rm;
 
 use clap::Subcommand;
 
-use crate::cli::model::add::AddModelArgs;
-use crate::cli::model::default::DefaultModelArgs;
-use crate::cli::model::list::ListModelArgs;
-use crate::cli::model::rm::RmModelArgs;
+use self::add::AddModelArgs;
+use self::current::CurrentModelArgs;
+use self::default::DefaultModelArgs;
+use self::list::ListModelArgs;
+use self::rm::RmModelArgs;
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum ModelCommand {
     Add(AddModelArgs),
+    Current(CurrentModelArgs),
     Default(DefaultModelArgs),
     List(ListModelArgs),
     Rm(RmModelArgs),

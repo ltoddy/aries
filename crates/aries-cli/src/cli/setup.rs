@@ -16,7 +16,6 @@ pub async fn execute(gctx: GlobalContext) -> anyhow::Result<()> {
     loader.save(&setting).await?;
 
     let file_path = loader.file_path();
-    let file_path = file_path.as_ref();
 
     println!(
         "{}",

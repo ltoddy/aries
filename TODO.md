@@ -19,3 +19,5 @@
 - [ ] for harness engineering and autonomous agent
 - [ ] 支持 design.md
 - [ ] 支持 cron
+- [ ] 长任务
+- [ ] 支持使用 SWE-bench 进行评测

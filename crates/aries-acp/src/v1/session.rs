@@ -252,7 +252,7 @@ fn model_option(setting: &Setting) -> SessionConfigOption {
         .models
         .iter()
         .map(|m| {
-            let alias: String = m.alias().into();
+            let alias = m.alias();
             SessionConfigSelectOption::new(alias.clone(), alias)
         })
         .collect::<Vec<_>>();
