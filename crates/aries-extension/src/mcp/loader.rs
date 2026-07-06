@@ -1,10 +1,10 @@
-use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 use aries_filesystem::walk::walk_dirs;
+use futures::stream::{self, StreamExt};
 
-use crate::mcp::{McpConfig, McpLoadResult, McpServerConfig};
+use crate::mcp::{McpConfig, McpLoadResult};
 
 pub struct McpConfigLoader {
     roots: Vec<PathBuf>,
@@ -31,15 +31,13 @@ impl McpConfigLoader {
             .filter(|entry| entry.file_name().eq(&Some(OsStr::new(Self::FILENAME))))
             .collect::<Vec<_>>();
 
-        let mut mcp_servers = HashMap::<String, McpServerConfig>::new();
-        for file_path in file_paths {
-            let content = tokio::fs::read_to_string(&file_path).await?;
-            let Ok(config) = serde_json::from_str::<McpConfig>(&content) else { continue };
-            for (name, server) in config.mcp_servers {
-                mcp_servers.entry(name).or_insert(server);
-            }
-        }
+        let configs = stream::iter(file_paths)
+            .filter_map(|file_path| async move { McpConfig::parse(file_path).await.ok() })
+            .collect::<Vec<_>>()
+            .await;
 
-        Ok(McpConfig { mcp_servers })
+        let merged = configs.into_iter().flat_map(|c| c.mcp_servers).collect();
+
+        Ok(McpConfig::new(merged))
     }
 }

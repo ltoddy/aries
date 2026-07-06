@@ -15,7 +15,8 @@ use crate::mcp::{
 };
 
 pub struct McpManager {
-    _services: Vec<RunningService<RoleClient, ClientInfo>>,
+    #[allow(dead_code)]
+    services: Vec<RunningService<RoleClient, ClientInfo>>,
 }
 
 impl McpManager {
@@ -35,7 +36,7 @@ impl McpManager {
             }
         }
 
-        (Self { _services: services }, tools)
+        (Self { services }, tools)
     }
 
     async fn connect_one(

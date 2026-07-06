@@ -1,8 +1,6 @@
 pub mod builder;
 pub mod compact;
 pub mod mode;
-pub mod summary;
-pub mod title;
 
 use futures::StreamExt;
 use rig_core::agent::{Agent, FinalResponse, MultiTurnStreamItem, PromptHook, StreamingResult};
@@ -14,8 +12,6 @@ use tokio::sync::mpsc::UnboundedSender;
 pub use crate::agents::builder::AgentBuilder;
 pub use crate::agents::compact::{CompactAgent, CompactOutcome};
 pub use crate::agents::mode::Mode;
-pub use crate::agents::summary::SummaryAgent;
-pub use crate::agents::title::TitleAgent;
 use crate::event::AgentEvent;
 use crate::{AriesError, AriesResult};
 

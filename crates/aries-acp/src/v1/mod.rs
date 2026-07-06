@@ -2,6 +2,7 @@ pub mod authenticate;
 pub mod cancel;
 pub mod initialize;
 pub mod logout;
+pub mod mcp;
 pub mod prompt;
 pub mod session;
 

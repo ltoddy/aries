@@ -1,9 +1,19 @@
 #[derive(Debug, thiserror::Error)]
-pub enum McpLoadError {
+pub enum McpParseError {
     #[error("failed to read mcp.json: {0}")]
     Io(#[from] std::io::Error),
     #[error("failed to parse mcp.json: {0}")]
     Json(#[from] serde_json::Error),
+}
+
+impl McpParseError {
+    pub fn io(err: std::io::Error) -> Self {
+        McpParseError::Io(err)
+    }
+
+    pub fn json(err: serde_json::Error) -> Self {
+        McpParseError::Json(err)
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

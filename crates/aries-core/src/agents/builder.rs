@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use aries_extension::mcp::{McpConfig, McpManager};
 use aries_extension::skill::definition::SkillDefinition;
 use aries_extension::skill::loader::SkillsLoader;
 use aries_lspclient::SharedLspClient;
@@ -24,6 +25,7 @@ where
     memory: Option<String>,
     lsp_client: Option<SharedLspClient>,
     use_tools: bool,
+    mcp_config: McpConfig,
 
     sender: UnboundedSender<AgentEvent>,
     receiver: UnboundedReceiver<AgentEvent>,
@@ -46,6 +48,7 @@ where
             memory: None,
             lsp_client: None,
             use_tools: true,
+            mcp_config: McpConfig::default(),
             sender,
             receiver,
         }
@@ -66,6 +69,11 @@ where
         self
     }
 
+    pub fn with_mcp_config(mut self, mcp_config: McpConfig) -> Self {
+        self.mcp_config = mcp_config;
+        self
+    }
+
     pub async fn build(self) -> (AriesAgent<C::CompletionModel>, UnboundedReceiver<AgentEvent>) {
         let mode = self.mode;
         let name = mode.name();
@@ -83,7 +91,11 @@ where
             )
             .await;
 
-            let tools = self.build_tools(available_skills);
+            let mut tools = self.build_tools(available_skills);
+
+            let (_, mcp_tools) = McpManager::connect(self.mcp_config).await;
+            tools.extend(mcp_tools);
+
             (preamble, tools)
         } else {
             (mode.bare_preamble().to_owned(), vec![])

@@ -7,6 +7,7 @@ use aries_core::agents::{AgentBuilder, Mode};
 use aries_core::event::AgentEvent;
 use aries_core::extractor::{ExtractedMemory, MemoryExtractor};
 use aries_core::{AriesResult, agents};
+use aries_extension::mcp::McpConfig;
 use aries_init::ModelConfig;
 use aries_lspclient::SharedLspClient;
 use aries_memory::{ManifestEntry, MemoryFrontmatter, MemoryStore};
@@ -68,6 +69,7 @@ impl AriesClient {
         cwd: impl AsRef<Path>,
         lsp_client: Option<SharedLspClient>,
         memory: Option<String>,
+        mcp_config: McpConfig,
     ) -> anyhow::Result<(AriesAgent, UnboundedReceiver<AgentEvent>)> {
         let model = config.model();
         let cwd = cwd.as_ref().to_path_buf();
@@ -77,6 +79,7 @@ impl AriesClient {
                 let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd)
                     .with_memory(memory)
                     .with_lsp_client(lsp_client)
+                    .with_mcp_config(mcp_config)
                     .build()
                     .await;
                 Ok((AriesAgent::Anthropic(agent), receiver))
@@ -85,6 +88,7 @@ impl AriesClient {
                 let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd)
                     .with_memory(memory)
                     .with_lsp_client(lsp_client)
+                    .with_mcp_config(mcp_config)
                     .build()
                     .await;
                 Ok((AriesAgent::Azure(agent), receiver))
@@ -93,6 +97,7 @@ impl AriesClient {
                 let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd)
                     .with_memory(memory)
                     .with_lsp_client(lsp_client)
+                    .with_mcp_config(mcp_config)
                     .build()
                     .await;
                 Ok((AriesAgent::Deepseek(agent), receiver))
@@ -101,6 +106,7 @@ impl AriesClient {
                 let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd)
                     .with_memory(memory)
                     .with_lsp_client(lsp_client)
+                    .with_mcp_config(mcp_config)
                     .build()
                     .await;
                 Ok((AriesAgent::OpenAI(agent), receiver))

@@ -17,6 +17,7 @@ use aries_extension::hook::input::{
     UserPromptSubmitHookInput,
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
+use aries_extension::mcp::McpConfig;
 use aries_init::{ModelConfig, Setting, SettingError};
 use aries_lspclient::{LspServerInfo, SharedLspClient, warm_up};
 use aries_memory::MemoryStore;
@@ -64,6 +65,7 @@ pub struct Session {
     compact_breaker: AutoCompactBreaker,
     hooks_executor: Arc<HooksExecutor>,
     memory_store: MemoryStore,
+    mcp_config: McpConfig,
 
     last_assistant_message: Option<String>,
 }
@@ -71,6 +73,7 @@ pub struct Session {
 const PREFIX: &str = "session-";
 
 impl Session {
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         id: impl Into<String>,
         root_dir: impl AsRef<Path>,
@@ -79,6 +82,7 @@ impl Session {
         setting: Setting,
         db: Db,
         hooks_executor: Arc<HooksExecutor>,
+        mcp_config: McpConfig,
     ) -> anyhow::Result<Self> {
         let id = id.into();
         let cwd = cwd.as_ref();
@@ -106,8 +110,9 @@ impl Session {
         let memory = Self::load_memory(&memory_store).await;
 
         let mode = Mode::default();
-        let (agent, receiver) =
-            client.agent(mode, config.clone(), cwd, lsp_client.clone(), memory).await?;
+        let (agent, receiver) = client
+            .agent(mode, config.clone(), cwd, lsp_client.clone(), memory, mcp_config.clone())
+            .await?;
 
         let chat_history = ChatHistory::new(&session_dir).await;
         let chat_context = ChatContext::new(&session_dir).await;
@@ -140,10 +145,12 @@ impl Session {
             compact_breaker: AutoCompactBreaker::new(),
             hooks_executor,
             memory_store,
+            mcp_config,
             last_assistant_message: None,
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn load(
         id: impl Into<String>,
         root_dir: impl AsRef<Path>,
@@ -152,6 +159,7 @@ impl Session {
         setting: Setting,
         db: Db,
         hooks_executor: Arc<HooksExecutor>,
+        mcp_config: McpConfig,
     ) -> anyhow::Result<Self> {
         let id = id.into();
         let cwd = cwd.as_ref();
@@ -169,8 +177,9 @@ impl Session {
         let memory = Self::load_memory(&memory_store).await;
 
         let mode = Mode::default();
-        let (agent, agent_events) =
-            client.agent(mode, config.clone(), cwd, lsp_client.clone(), memory).await?;
+        let (agent, agent_events) = client
+            .agent(mode, config.clone(), cwd, lsp_client.clone(), memory, mcp_config.clone())
+            .await?;
         let chat_history = ChatHistory::new(&session_dir).await;
         let chat_context = ChatContext::new(&session_dir).await;
 
@@ -202,6 +211,7 @@ impl Session {
             compact_breaker: AutoCompactBreaker::new(),
             hooks_executor,
             memory_store,
+            mcp_config,
             last_assistant_message: None,
         })
     }
@@ -226,6 +236,7 @@ impl Session {
                 self.cwd.clone(),
                 self.lsp_client.clone(),
                 memory,
+                self.mcp_config.clone(),
             )
             .await?;
         self.agent = agent;
@@ -239,7 +250,14 @@ impl Session {
         let memory = Self::load_memory(&self.memory_store).await;
         let (agent, agent_events) = self
             .client
-            .agent(mode, self.config.clone(), self.cwd.clone(), self.lsp_client.clone(), memory)
+            .agent(
+                mode,
+                self.config.clone(),
+                self.cwd.clone(),
+                self.lsp_client.clone(),
+                memory,
+                self.mcp_config.clone(),
+            )
             .await?;
 
         self.mode = mode;

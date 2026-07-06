@@ -6,6 +6,7 @@ use anyhow::Context;
 use aries_context::GlobalContext;
 use aries_extension::hook::input::{SessionEndHookInput, SessionEndReason};
 use aries_extension::hook::{HooksExecutor, HooksLoader};
+use aries_extension::mcp::{McpConfig, McpConfigLoader};
 use aries_init::Setting;
 use aries_persistence::SessionRepository;
 use toasty::Db;
@@ -83,16 +84,21 @@ impl SessionRegistry {
 
     pub async fn try_session(
         &mut self,
-        project_dir: &str,
-        session_id: &str,
+        project_dir: impl Into<String>,
+        session_id: impl Into<String>,
     ) -> anyhow::Result<Session> {
-        if let Some(session) = self.active_sessions.get(session_id) {
+        let project_dir = project_dir.into();
+        let session_id = session_id.into();
+        if let Some(session) = self.active_sessions.get(&session_id) {
             return Ok(session.to_owned());
         }
 
-        match self.session_repo.find_last_by_session_id(session_id).await {
-            Ok(_) => self.load_session(session_id).await,
-            Err(_) => self.new_session(project_dir).await,
+        let mcp_loader = McpConfigLoader::new(&project_dir);
+        let mcp_config = mcp_loader.load().await.unwrap_or_default();
+
+        match self.session_repo.find_last_by_session_id(&session_id).await {
+            Ok(_) => self.load_session(session_id, mcp_config).await,
+            Err(_) => self.new_session(project_dir, mcp_config).await,
         }
     }
 
@@ -106,7 +112,11 @@ impl SessionRegistry {
         self.active_sessions.insert(session.id(), session);
     }
 
-    pub async fn new_session(&mut self, cwd: impl Into<String>) -> anyhow::Result<Session> {
+    pub async fn new_session(
+        &mut self,
+        cwd: impl Into<String>,
+        mcp_config: McpConfig,
+    ) -> anyhow::Result<Session> {
         let cwd = cwd.into();
         let session_id = nanoid::nanoid!();
         let model_config = self.setting.active_model()?;
@@ -119,6 +129,7 @@ impl SessionRegistry {
             self.setting.clone(),
             self.db.clone(),
             self.hooks_executor.clone(),
+            mcp_config,
         )
         .instrument(info_span!("session_init", session_id = %session_id))
         .await
@@ -138,7 +149,11 @@ impl SessionRegistry {
         Ok(session)
     }
 
-    pub async fn load_session(&mut self, session_id: impl Into<String>) -> anyhow::Result<Session> {
+    pub async fn load_session(
+        &mut self,
+        session_id: impl Into<String>,
+        mcp_config: McpConfig,
+    ) -> anyhow::Result<Session> {
         let session_id = session_id.into();
 
         let session = self
@@ -157,6 +172,7 @@ impl SessionRegistry {
             self.setting.clone(),
             self.db.clone(),
             self.hooks_executor.clone(),
+            mcp_config,
         )
         .instrument(info_span!("session_init", session_id = %session_id))
         .await
