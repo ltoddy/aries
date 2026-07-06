@@ -7,7 +7,10 @@ edition = "2024"
 anyhow.workspace = true
 aries-filesystem = { path = "../aries-filesystem" }
 futures.workspace = true
+http.workspace = true
 regex-lite.workspace = true
+rig-core = { workspace = true, features = ["rmcp"] }
+rmcp = { workspace = true, features = ["client", "transport-child-process", "transport-streamable-http-client", "transport-streamable-http-client-reqwest"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 serde_yaml.workspace = true

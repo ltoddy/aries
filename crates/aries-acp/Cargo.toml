@@ -8,6 +8,7 @@ agent-client-protocol.workspace = true
 anyhow.workspace = true
 aries-context = { path = "../aries-context" }
 aries-core = { path = "../aries-core" }
+aries-extension = { path = "../aries-extension" }
 aries-init = { path = "../aries-init" }
 aries-session = { path = "../aries-session" }
 itertools.workspace = true
