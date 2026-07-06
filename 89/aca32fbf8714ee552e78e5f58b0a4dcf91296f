@@ -1,0 +1,45 @@
+crates/aries-core/src/agents/builder.rs
+  s_5d64ce987cd1ef::t_2756b27f90dddd 72-73
+  s_5d64ce987cd1ef::t_a3eb9115ce20dd 74-76
+crates/aries-session/src/registry/mod.rs
+  s_5d64ce987cd1ef::t_87f9df29ef436e 101
+  s_5d64ce987cd1ef::t_5ce39ba88d5610 9
+  s_5d64ce987cd1ef::t_4de0958a2d15d8 115-119,132,156
+  s_5d64ce987cd1ef::t_86cf2f0d04e100 98-100
+  s_5d64ce987cd1ef::t_d164912de16c94 153-155
+crates/aries-acp/src/v1/mcp.rs
+  s_5d64ce987cd1ef::t_58fa6d998fcbc9 1-43
+crates/aries-session/src/lib.rs
+  s_5d64ce987cd1ef::t_51759849cc04c0 72,82,91,100,109
+  s_5d64ce987cd1ef::t_1a7f929ff05221 10
+crates/aries-acp/src/v1/mod.rs
+  s_5d64ce987cd1ef::t_21c22f60ecd47f 5
+crates/aries-acp/src/v1/session.rs
+  s_5d64ce987cd1ef::t_865938f00c2e34 17,27
+crates/aries-session/src/session/mod.rs
+  s_5d64ce987cd1ef::t_890c5ca724e8ab 114
+  s_5d64ce987cd1ef::t_b72e55de851dff 20
+  s_5d64ce987cd1ef::t_ce717063f921f3 68
+  s_5d64ce987cd1ef::t_63f527ffd93073 85
+  s_5d64ce987cd1ef::t_bbaeddbd45f550 76
+  s_5d64ce987cd1ef::t_65d1ebe87b3ed6 113
+  s_5d64ce987cd1ef::t_9b322bd4f67da5 115
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "89aca32fbf8714ee552e78e5f58b0a4dcf91296f",
+  "prompts": {},
+  "sessions": {
+    "s_5d64ce987cd1ef": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a4a66178e3df0dcd7da553c",
+        "model": "c_o_new_thinking__dev"
+      },
+      "human_author": "liutao.rs <liutao.rs@bytedance.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
