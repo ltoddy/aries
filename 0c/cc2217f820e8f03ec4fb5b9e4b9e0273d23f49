@@ -1,0 +1,27 @@
+crates/aries-acp/src/v1/session.rs
+  s_5d64ce987cd1ef::t_865938f00c2e34 28
+  s_5d64ce987cd1ef::t_3d168eb42dd3da 27
+crates/aries-core/src/agents/compact.rs
+  s_5d64ce987cd1ef::t_7624907c3724f5 60
+crates/aries-core/src/agents/mod.rs
+  s_5d64ce987cd1ef::t_6e4b86e7eb047d 36
+  s_5d64ce987cd1ef::t_0aefcd7f559056 37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "0ccc2217f820e8f03ec4fb5b9e4b9e0273d23f49",
+  "prompts": {},
+  "sessions": {
+    "s_5d64ce987cd1ef": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a4a66178e3df0dcd7da553c",
+        "model": "c_o_new_thinking__dev"
+      },
+      "human_author": "liutao.rs <liutao.rs@bytedance.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
