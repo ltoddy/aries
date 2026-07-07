@@ -79,7 +79,7 @@ impl AriesClient {
                 let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd)
                     .with_memory(memory)
                     .with_lsp_client(lsp_client)
-                    .with_mcp_config(mcp_config)
+                    .with_mcp(mcp_config)
                     .build()
                     .await;
                 Ok((AriesAgent::Anthropic(agent), receiver))
@@ -88,7 +88,7 @@ impl AriesClient {
                 let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd)
                     .with_memory(memory)
                     .with_lsp_client(lsp_client)
-                    .with_mcp_config(mcp_config)
+                    .with_mcp(mcp_config)
                     .build()
                     .await;
                 Ok((AriesAgent::Azure(agent), receiver))
@@ -97,7 +97,7 @@ impl AriesClient {
                 let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd)
                     .with_memory(memory)
                     .with_lsp_client(lsp_client)
-                    .with_mcp_config(mcp_config)
+                    .with_mcp(mcp_config)
                     .build()
                     .await;
                 Ok((AriesAgent::Deepseek(agent), receiver))
@@ -106,7 +106,7 @@ impl AriesClient {
                 let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd)
                     .with_memory(memory)
                     .with_lsp_client(lsp_client)
-                    .with_mcp_config(mcp_config)
+                    .with_mcp(mcp_config)
                     .build()
                     .await;
                 Ok((AriesAgent::OpenAI(agent), receiver))

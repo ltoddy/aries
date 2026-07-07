@@ -2,11 +2,16 @@ pub mod builder;
 pub mod compact;
 pub mod mode;
 
+use std::sync::Arc;
+
 use futures::StreamExt;
 use rig_core::agent::{Agent, FinalResponse, MultiTurnStreamItem, PromptHook, StreamingResult};
 use rig_core::completion::{CompletionModel, Message};
 use rig_core::streaming::StreamingPrompt;
 use rig_core::wasm_compat::WasmCompatSend;
+use rmcp::RoleClient;
+use rmcp::model::ClientInfo;
+use rmcp::service::RunningService;
 use tokio::sync::mpsc::UnboundedSender;
 
 pub use crate::agents::builder::AgentBuilder;
@@ -28,6 +33,8 @@ where
     name: String,
 
     sender: Option<UnboundedSender<AgentEvent>>,
+    #[allow(dead_code)]
+    mcp_clients: Arc<Option<Vec<RunningService<RoleClient, ClientInfo>>>>,
 }
 
 impl<M> AriesAgent<M>
@@ -39,11 +46,13 @@ where
         name: impl Into<String>,
         preamble: impl Into<String>,
         sender: Option<UnboundedSender<AgentEvent>>,
+        mcp_clients: Option<Vec<RunningService<RoleClient, ClientInfo>>>,
     ) -> Self {
         let name = name.into();
         let preamble = preamble.into();
+        let mcp_clients = Arc::new(mcp_clients);
 
-        Self { inner, preamble, name, sender }
+        Self { inner, preamble, name, sender, mcp_clients }
     }
 
     pub async fn prompt<I, T, P>(

@@ -6,7 +6,7 @@ use anyhow::Context;
 use aries_context::GlobalContext;
 use aries_extension::hook::input::{SessionEndHookInput, SessionEndReason};
 use aries_extension::hook::{HooksExecutor, HooksLoader};
-use aries_extension::mcp::{McpConfig, McpConfigLoader};
+use aries_extension::mcp::McpConfig;
 use aries_init::Setting;
 use aries_persistence::SessionRepository;
 use toasty::Db;
@@ -93,9 +93,7 @@ impl SessionRegistry {
             return Ok(session.to_owned());
         }
 
-        let mcp_loader = McpConfigLoader::new(&project_dir);
-        let mcp_config = mcp_loader.load().await.unwrap_or_default();
-
+        let mcp_config = McpConfig::empty();
         match self.session_repo.find_last_by_session_id(&session_id).await {
             Ok(_) => self.load_session(session_id, mcp_config).await,
             Err(_) => self.new_session(project_dir, mcp_config).await,
@@ -115,7 +113,7 @@ impl SessionRegistry {
     pub async fn new_session(
         &mut self,
         cwd: impl Into<String>,
-        mcp_config: McpConfig,
+        external_mcp_config: McpConfig,
     ) -> anyhow::Result<Session> {
         let cwd = cwd.into();
         let session_id = nanoid::nanoid!();
@@ -129,7 +127,7 @@ impl SessionRegistry {
             self.setting.clone(),
             self.db.clone(),
             self.hooks_executor.clone(),
-            mcp_config,
+            external_mcp_config,
         )
         .instrument(info_span!("session_init", session_id = %session_id))
         .await
@@ -152,7 +150,7 @@ impl SessionRegistry {
     pub async fn load_session(
         &mut self,
         session_id: impl Into<String>,
-        mcp_config: McpConfig,
+        external_mcp_config: McpConfig,
     ) -> anyhow::Result<Session> {
         let session_id = session_id.into();
 
@@ -172,7 +170,7 @@ impl SessionRegistry {
             self.setting.clone(),
             self.db.clone(),
             self.hooks_executor.clone(),
-            mcp_config,
+            external_mcp_config,
         )
         .instrument(info_span!("session_init", session_id = %session_id))
         .await

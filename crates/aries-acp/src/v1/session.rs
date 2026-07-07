@@ -14,7 +14,7 @@ use aries_init::Setting;
 use tracing::info;
 
 use super::SharedRegistry;
-use super::mcp::convert_acp_mcp_servers;
+use crate::v1::mcp::McpServers;
 
 pub async fn new_session(
     req: NewSessionRequest,
@@ -24,7 +24,8 @@ pub async fn new_session(
 ) -> Result<(), Error> {
     info!("Received new session request {req:?}");
 
-    let mcp_config = convert_acp_mcp_servers(req.mcp_servers);
+    let mcp_servers = McpServers(req.mcp_servers);
+    let mcp_config = mcp_servers.into();
     let mut registry = registry.lock().await;
     let cwd = req.cwd.display().to_string();
     let session = match registry.new_session(cwd, mcp_config).await {
@@ -50,7 +51,8 @@ pub async fn load_session(
     let session_id = req.session_id.to_string();
     let mut registry = registry.lock().await;
 
-    let mcp_config = convert_acp_mcp_servers(req.mcp_servers);
+    let mcp_servers = McpServers(req.mcp_servers);
+    let mcp_config = mcp_servers.into();
     let session = match registry.load_session(session_id, mcp_config).await {
         Ok(session) => session,
         Err(err) => return responder.respond_with_internal_error(err.to_string()),

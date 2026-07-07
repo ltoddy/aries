@@ -3,7 +3,7 @@
 - [x] 完善 hooks
 - [x] 日志. chat-history 与 context 分离
 - [x] island
-- [ ] 支持 mcp
+- [x] 支持 mcp
 - [ ] acp 协议 v2 支持
 - [ ] agent (参考 https://github.com/vercel/eve 对 agent 的目录结构设计来支持)
 - [ ] 支持 plugin

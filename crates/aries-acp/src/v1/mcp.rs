@@ -1,43 +1,35 @@
 use std::collections::HashMap;
 
-use agent_client_protocol::schema::v1::McpServer;
-use aries_extension::mcp::{HttpConfig, McpConfig, McpServerConfig, SseConfig, StdioConfig};
+use agent_client_protocol::schema::v1::{McpServer, McpServerHttp, McpServerSse, McpServerStdio};
+use aries_extension::mcp::{McpConfig, McpServerConfig};
 
-pub fn convert_acp_mcp_servers(servers: Vec<McpServer>) -> McpConfig {
-    let mut mcp_servers = HashMap::new();
+pub struct McpServers(pub Vec<McpServer>);
 
-    for server in servers {
-        let (name, config) = match server {
-            McpServer::Stdio(s) => {
-                let env = s.env.into_iter().map(|e| (e.name, e.value)).collect::<HashMap<_, _>>();
-                (
-                    s.name,
-                    McpServerConfig::Stdio(StdioConfig {
-                        command: s.command.display().to_string(),
-                        args: s.args,
-                        env,
-                    }),
-                )
-            },
-            McpServer::Http(h) => (
-                h.name,
-                McpServerConfig::Http(HttpConfig {
-                    url: h.url,
-                    headers: h.headers.into_iter().map(|hdr| (hdr.name, hdr.value)).collect(),
-                }),
-            ),
-            McpServer::Sse(s) => (
-                s.name,
-                McpServerConfig::Sse(SseConfig {
-                    url: s.url,
-                    headers: s.headers.into_iter().map(|hdr| (hdr.name, hdr.value)).collect(),
-                }),
-            ),
-            _ => continue,
-        };
+impl From<McpServers> for McpConfig {
+    fn from(val: McpServers) -> Self {
+        let mut mcp_servers = HashMap::new();
 
-        mcp_servers.entry(name).or_insert(config);
+        for server in val.0 {
+            let (name, config) = match server {
+                McpServer::Http(McpServerHttp { name, url, headers, .. }) => {
+                    let headers = headers.into_iter().map(|v| (v.name, v.value)).collect();
+                    (name, McpServerConfig::http(url, headers))
+                },
+                McpServer::Sse(McpServerSse { name, url, headers, .. }) => {
+                    let headers = headers.into_iter().map(|v| (v.name, v.value)).collect();
+                    (name, McpServerConfig::sse(url, headers))
+                },
+                McpServer::Stdio(McpServerStdio { name, command, args, env, .. }) => {
+                    let command = command.display().to_string();
+                    let env = env.into_iter().map(|v| (v.name, v.value)).collect();
+                    (name, McpServerConfig::stdio(command, args, env))
+                },
+                _ => continue,
+            };
+
+            mcp_servers.entry(name).or_insert(config);
+        }
+
+        McpConfig::new(mcp_servers)
     }
-
-    McpConfig { mcp_servers }
 }

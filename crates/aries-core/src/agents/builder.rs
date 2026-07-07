@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use aries_extension::mcp::{McpConfig, McpManager};
+use aries_extension::mcp::{self, McpConfig};
 use aries_extension::skill::definition::SkillDefinition;
 use aries_extension::skill::loader::SkillsLoader;
 use aries_lspclient::SharedLspClient;
@@ -25,6 +25,7 @@ where
     memory: Option<String>,
     lsp_client: Option<SharedLspClient>,
     use_tools: bool,
+
     mcp_config: McpConfig,
 
     sender: UnboundedSender<AgentEvent>,
@@ -48,7 +49,7 @@ where
             memory: None,
             lsp_client: None,
             use_tools: true,
-            mcp_config: McpConfig::default(),
+            mcp_config: McpConfig::empty(),
             sender,
             receiver,
         }
@@ -69,7 +70,7 @@ where
         self
     }
 
-    pub fn with_mcp_config(mut self, mcp_config: McpConfig) -> Self {
+    pub fn with_mcp(mut self, mcp_config: McpConfig) -> Self {
         self.mcp_config = mcp_config;
         self
     }
@@ -78,7 +79,7 @@ where
         let mode = self.mode;
         let name = mode.name();
 
-        let (preamble, tools) = if self.use_tools {
+        let (preamble, mcp_clients, tools) = if self.use_tools {
             let skillloader = SkillsLoader::new(&self.cwd);
             let available_skills = skillloader.load().await.unwrap_or_default();
 
@@ -93,12 +94,12 @@ where
 
             let mut tools = self.build_tools(available_skills);
 
-            let (_, mcp_tools) = McpManager::connect(self.mcp_config).await;
+            let (mcp_clients, mcp_tools) = mcp::connect(self.mcp_config).await;
             tools.extend(mcp_tools);
 
-            (preamble, tools)
+            (preamble, Some(mcp_clients), tools)
         } else {
-            (mode.bare_preamble().to_owned(), vec![])
+            (mode.bare_preamble().to_owned(), None, vec![])
         };
 
         let inner = self
@@ -111,7 +112,7 @@ where
             .default_max_turns(AGENT_LOOP_MAX_TURNS)
             .build();
 
-        (AriesAgent::new(inner, name, preamble, Some(self.sender)), self.receiver)
+        (AriesAgent::new(inner, name, preamble, Some(self.sender), mcp_clients), self.receiver)
     }
 
     fn build_tools(&self, available_skills: Vec<SkillDefinition>) -> Vec<Box<dyn ToolDyn>> {

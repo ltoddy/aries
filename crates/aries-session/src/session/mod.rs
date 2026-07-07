@@ -17,7 +17,7 @@ use aries_extension::hook::input::{
     UserPromptSubmitHookInput,
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
-use aries_extension::mcp::McpConfig;
+use aries_extension::mcp::{McpConfig, McpConfigLoader};
 use aries_init::{ModelConfig, Setting, SettingError};
 use aries_lspclient::{LspServerInfo, SharedLspClient, warm_up};
 use aries_memory::MemoryStore;
@@ -57,7 +57,7 @@ pub struct Session {
     session_repo: SessionRepository,
 
     session_dir: PathBuf,
-    transcript_path: PathBuf,
+    transcripts_dir: PathBuf,
 
     cancel_token: CancellationToken,
     receiver: Arc<AsyncMutex<UnboundedReceiver<AgentEvent>>>,
@@ -65,12 +65,11 @@ pub struct Session {
     compact_breaker: AutoCompactBreaker,
     hooks_executor: Arc<HooksExecutor>,
     memory_store: MemoryStore,
+
     mcp_config: McpConfig,
 
     last_assistant_message: Option<String>,
 }
-
-const PREFIX: &str = "session-";
 
 impl Session {
     #[allow(clippy::too_many_arguments)]
@@ -82,72 +81,20 @@ impl Session {
         setting: Setting,
         db: Db,
         hooks_executor: Arc<HooksExecutor>,
-        mcp_config: McpConfig,
+        external_mcp_config: McpConfig,
     ) -> anyhow::Result<Self> {
-        let id = id.into();
-        let cwd = cwd.as_ref();
-
-        let client = AriesClient::new(&config)?;
-        let lsp_client = Self::warm_up_lsp(cwd).await;
-
-        let root_dir = root_dir.as_ref().to_path_buf();
-        let session_dir = root_dir.join(format!("{PREFIX}{id}"));
-
-        #[rustfmt::skip]
-        tokio::fs::create_dir_all(&session_dir)
-            .await
-            .with_context(|| format!("failed to create session directory at: {}", session_dir.display()))?;
-
-        let transcript_path = session_dir.join("transcripts");
-        #[rustfmt::skip]
-        tokio::fs::create_dir_all(&transcript_path)
-            .await
-            .with_context(|| format!("failed to create session transcripts directory at: {}", transcript_path.display()))?;
-
-        aries_logger::register(&id, &session_dir);
-
-        let memory_store = MemoryStore::new(&root_dir, cwd).await;
-        let memory = Self::load_memory(&memory_store).await;
-
-        let mode = Mode::default();
-        let (agent, receiver) = client
-            .agent(mode, config.clone(), cwd, lsp_client.clone(), memory, mcp_config.clone())
-            .await?;
-
-        let chat_history = ChatHistory::new(&session_dir).await;
-        let chat_context = ChatContext::new(&session_dir).await;
-
-        let session_repo = SessionRepository::new(db.clone());
-
-        let cancel_token = CancellationToken::new();
-
-        let input =
-            SessionStartHookInput::new(&id, cwd, SessionStartSource::Startup, config.model(), mode);
-        hooks_executor.fire_session_start(input).await;
-
-        Ok(Self {
+        Self::build(
             id,
-            setting,
+            cwd,
+            root_dir,
             config,
-            cwd: cwd.to_path_buf(),
-            client,
-            agent,
-            mode,
-            lsp_client,
-            chat_history,
-            chat_context,
+            setting,
             db,
-            session_repo,
-            session_dir,
-            transcript_path,
-            cancel_token,
-            receiver: Arc::new(AsyncMutex::new(receiver)),
-            compact_breaker: AutoCompactBreaker::new(),
             hooks_executor,
-            memory_store,
-            mcp_config,
-            last_assistant_message: None,
-        })
+            external_mcp_config,
+            SessionStartSource::Startup,
+        )
+        .await
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -159,36 +106,73 @@ impl Session {
         setting: Setting,
         db: Db,
         hooks_executor: Arc<HooksExecutor>,
-        mcp_config: McpConfig,
+        external_mcp_config: McpConfig,
+    ) -> anyhow::Result<Self> {
+        Self::build(
+            id,
+            cwd,
+            root_dir,
+            config,
+            setting,
+            db,
+            hooks_executor,
+            external_mcp_config,
+            SessionStartSource::Resume,
+        )
+        .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn build(
+        id: impl Into<String>,
+        cwd: impl AsRef<Path>,
+        root_dir: impl AsRef<Path>,
+        config: ModelConfig,
+        setting: Setting,
+        db: Db,
+        hooks_executor: Arc<HooksExecutor>,
+        external_mcp_config: McpConfig,
+        source: SessionStartSource,
     ) -> anyhow::Result<Self> {
         let id = id.into();
         let cwd = cwd.as_ref();
-        let root_dir = root_dir.as_ref().to_path_buf();
-        let session_dir = root_dir.join(format!("{PREFIX}{id}"));
+        let root_dir = root_dir.as_ref();
+        let session_dir = root_dir.join(format!("session-{id}"));
+        let transcripts_dir = session_dir.join("transcripts");
 
-        let transcript_path = session_dir.join("transcripts");
+        #[rustfmt::skip]
+        tokio::fs::create_dir_all(&session_dir)
+            .await
+            .with_context(|| format!("failed to create session directory at: {}", session_dir.display()))?;
+
+        #[rustfmt::skip]
+        tokio::fs::create_dir_all(&transcripts_dir)
+            .await
+            .with_context(|| format!("failed to create session transcripts directory at: {}", transcripts_dir.display()))?;
 
         aries_logger::register(&id, &session_dir);
 
         let lsp_client = Self::warm_up_lsp(cwd).await;
-        let client = AriesClient::new(&config)?;
 
-        let memory_store = MemoryStore::new(&root_dir, cwd).await;
-        let memory = Self::load_memory(&memory_store).await;
+        let mcp_loader = McpConfigLoader::new(cwd);
+        let mut mcp_config = mcp_loader.load().await.unwrap_or_default();
+        mcp_config.update(external_mcp_config);
 
-        let mode = Mode::default();
-        let (agent, agent_events) = client
-            .agent(mode, config.clone(), cwd, lsp_client.clone(), memory, mcp_config.clone())
-            .await?;
+        let mem_store = MemoryStore::new(&root_dir, cwd).await;
+        let memory = Self::load_memory(&mem_store).await;
+
         let chat_history = ChatHistory::new(&session_dir).await;
         let chat_context = ChatContext::new(&session_dir).await;
 
         let session_repo = SessionRepository::new(db.clone());
 
-        let cancel = CancellationToken::new();
+        let mode = Mode::default();
+        let client = AriesClient::new(&config)?;
+        let (agent, receiver) = client
+            .agent(mode, config.clone(), cwd, lsp_client.clone(), memory, mcp_config.clone())
+            .await?;
 
-        let input =
-            SessionStartHookInput::new(&id, cwd, SessionStartSource::Resume, config.model(), mode);
+        let input = SessionStartHookInput::new(&id, cwd, source, config.model(), mode);
         hooks_executor.fire_session_start(input).await;
 
         Ok(Self {
@@ -205,14 +189,14 @@ impl Session {
             db,
             session_repo,
             session_dir,
-            transcript_path,
-            cancel_token: cancel,
-            receiver: Arc::new(AsyncMutex::new(agent_events)),
+            transcripts_dir,
+            cancel_token: CancellationToken::new(),
+            receiver: Arc::new(AsyncMutex::new(receiver)),
             compact_breaker: AutoCompactBreaker::new(),
             hooks_executor,
-            memory_store,
-            mcp_config,
+            memory_store: mem_store,
             last_assistant_message: None,
+            mcp_config,
         })
     }
 
@@ -286,7 +270,7 @@ impl Session {
         }
 
         let input = UserPromptSubmitHookInput::new(&self.id, &self.cwd, title)
-            .transcript_path(&self.transcript_path);
+            .transcript_path(&self.transcripts_dir);
         if let HookDecision::Terminate { reason } =
             self.hooks_executor.fire_user_prompt_submit(input).await
         {
@@ -314,7 +298,7 @@ impl Session {
                 Ok(res) => res,
                 Err(err) => {
                     let input = StopFailureHookInput::new(&self.id, &self.cwd, err.to_string())
-                        .transcript_path(&self.transcript_path)
+                        .transcript_path(&self.transcripts_dir)
                         .error_details(err.to_string());
 
                     let input = match &self.last_assistant_message.take() {
@@ -382,7 +366,7 @@ impl Session {
             PostCompactTrigger::Auto,
             PreCompactCustomInstructions::Auto,
         )
-        .transcript_path(&self.transcript_path);
+        .transcript_path(&self.transcripts_dir);
         if let HookDecision::Terminate { .. } = self.hooks_executor.fire_pre_compact(input).await {
             return false;
         }
@@ -390,22 +374,22 @@ impl Session {
         let outcome = match self.client.clone() {
             AriesClient::Anthropic(client) => {
                 let mut compact_agent =
-                    CompactAgent::new(client, self.config.model(), &self.transcript_path);
+                    CompactAgent::new(client, self.config.model(), &self.transcripts_dir);
                 compact_agent.compact(self.chat_context.history()).await
             },
             AriesClient::Azure(client) => {
                 let mut compact_agent =
-                    CompactAgent::new(client, self.config.model(), &self.transcript_path);
+                    CompactAgent::new(client, self.config.model(), &self.transcripts_dir);
                 compact_agent.compact(self.chat_context.history()).await
             },
             AriesClient::Deepseek(client) => {
                 let mut compact_agent =
-                    CompactAgent::new(client, self.config.model(), &self.transcript_path);
+                    CompactAgent::new(client, self.config.model(), &self.transcripts_dir);
                 compact_agent.compact(self.chat_context.history()).await
             },
             AriesClient::OpenAI(client) => {
                 let mut compact_agent =
-                    CompactAgent::new(client, self.config.model(), &self.transcript_path);
+                    CompactAgent::new(client, self.config.model(), &self.transcripts_dir);
                 compact_agent.compact(self.chat_context.history()).await
             },
         };
@@ -433,7 +417,7 @@ impl Session {
                     PostCompactTrigger::Auto,
                     compact_summary,
                 )
-                .transcript_path(&self.transcript_path);
+                .transcript_path(&self.transcripts_dir);
                 self.hooks_executor.fire_post_compact(input).await;
                 true
             },
@@ -474,7 +458,7 @@ impl Session {
             self.hooks_executor.clone(),
             &self.id,
             &self.cwd,
-            &self.transcript_path,
+            &self.transcripts_dir,
             self.mode.id(),
             self.mode.name(),
             self.db.clone(),
@@ -562,7 +546,7 @@ impl Session {
     }
 
     pub fn transcript_path(&self) -> &Path {
-        &self.transcript_path
+        &self.transcripts_dir
     }
 
     // TODO
