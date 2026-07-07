@@ -1,0 +1,48 @@
+crates/aries-session/src/session/mod.rs
+  s_ed92e79420cf9b::t_19dfa2b7af4ae9 84,175
+  s_65918137bb3379::t_910fb693323ebb 151
+  s_65918137bb3379::t_0795b89f9818db 132-134,157-158
+  s_65918137bb3379::t_c5f43f3e005d8d 114-129,135,139-141,143-150,160,169-173
+  s_65918137bb3379::t_40a81e722ec78c 111-113
+  s_65918137bb3379::t_076d45a5d19b74 130-131
+  s_65918137bb3379::t_aeb046117710f8 159
+  s_65918137bb3379::t_aa7aff72cc418c 161-162
+crates/aries-core/src/agents/builder.rs
+  s_5d64ce987cd1ef::t_a3eb9115ce20dd 73
+crates/aries-core/src/agents/mod.rs
+  s_5d64ce987cd1ef::t_4f35142e8914da 36
+  s_65918137bb3379::t_c5f43f3e005d8d 55
+  s_5d64ce987cd1ef::t_2af3f1f745d499 37
+crates/aries-core/src/agents/compact.rs
+  s_5d64ce987cd1ef::t_7624907c3724f5 60
+crates/aries-acp/src/v1/session.rs
+  s_5d64ce987cd1ef::t_3d168eb42dd3da 27
+  s_5d64ce987cd1ef::t_776f4924c15c1a 28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "f355e2e69193bbed06567ac9d431c7bfdf4ebb9e",
+  "prompts": {},
+  "sessions": {
+    "s_5d64ce987cd1ef": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a4a66178e3df0dcd7da553c",
+        "model": "c_o_new_thinking__dev"
+      },
+      "human_author": "liutao.rs <liutao.rs@bytedance.com>"
+    },
+    "s_65918137bb3379": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a32c64233733722f6f0568c",
+        "model": "openrouter-3o__dev",
+        "display_model_name": "openrouter-3o"
+      },
+      "human_author": "liutao.rs <liutao.rs@bytedance.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
