@@ -1,12 +1,28 @@
 use agent_client_protocol::Stdio;
 use aries_context::GlobalContext;
 use aries_init::SettingLoader;
+use clap::Parser;
 
-pub async fn execute(gctx: GlobalContext) -> anyhow::Result<()> {
+#[derive(clap::ValueEnum, Debug, Clone)]
+pub enum AcpVersion {
+    V1,
+    V2,
+}
+
+#[derive(Parser, Debug, Clone)]
+pub struct AcpArgs {
+    #[arg(value_enum, default_value = "v1")]
+    pub version: AcpVersion,
+}
+
+pub async fn execute(args: AcpArgs, gctx: GlobalContext) -> anyhow::Result<()> {
     let loader = SettingLoader::new(&gctx.root_dir);
     let setting = loader.load().await?;
 
     aries_logger::init(gctx.root_dir.join("logs"));
 
-    aries_acp::v1::run(gctx, setting, Stdio::new()).await
+    match args.version {
+        AcpVersion::V1 => aries_acp::v1::run(gctx, setting, Stdio::new()).await,
+        AcpVersion::V2 => aries_acp::v2::run(gctx, setting, Stdio::new()).await,
+    }
 }

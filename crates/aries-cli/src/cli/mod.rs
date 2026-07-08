@@ -18,6 +18,7 @@ use rustyline::error::ReadlineError;
 use terminal_size::{Width, terminal_size};
 use tracing::info_span;
 
+use crate::cli::acp::AcpArgs;
 use crate::cli::exec::ExecArgs;
 use crate::cli::model::ModelCommand;
 use crate::cli::session::SessionCommand;
@@ -33,7 +34,7 @@ pub struct Args {
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum Subcommands {
-    Acp,
+    Acp(AcpArgs),
     Exec(ExecArgs),
     Prompt(PromptArgs),
     Session {
