@@ -117,7 +117,7 @@ pub async fn set_session_config_option(
 
     let session_id = req.session_id.to_string();
     let config_id = req.config_id.to_string();
-    let value = req.value.to_string();
+    let value = req.value.as_value_id().map(|v| v.to_string()).unwrap_or_default();
 
     let mut session = {
         let registry = registry.lock().await;

@@ -1,8 +1,8 @@
 use agent_client_protocol::schema::v2::{
     CloseSessionRequest, CloseSessionResponse, DeleteSessionRequest, DeleteSessionResponse,
-    ListSessionsRequest, ListSessionsResponse, LoadSessionRequest, LoadSessionResponse,
-    NewSessionRequest, NewSessionResponse, ResumeSessionRequest, ResumeSessionResponse,
-    SetSessionConfigOptionRequest, SetSessionConfigOptionResponse,
+    ListSessionsRequest, ListSessionsResponse, NewSessionRequest, NewSessionResponse,
+    ResumeSessionRequest, ResumeSessionResponse, SetSessionConfigOptionRequest,
+    SetSessionConfigOptionResponse,
 };
 use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
 use tracing::info;
@@ -13,15 +13,6 @@ pub async fn new_session(
     _cx: ConnectionTo<Client>,
 ) -> Result<(), Error> {
     info!("Received new session request (v2): {req:?}");
-    todo!()
-}
-
-pub async fn load_session(
-    req: LoadSessionRequest,
-    _responder: Responder<LoadSessionResponse>,
-    _cx: ConnectionTo<Client>,
-) -> Result<(), Error> {
-    info!("Received load session request (v2): {req:?}");
     todo!()
 }
 

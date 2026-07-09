@@ -24,7 +24,6 @@ pub async fn run(
         .on_receive_request(authenticate::authenticate, on_receive_request!())
         .on_receive_request(logout::logout, on_receive_request!())
         .on_receive_request(session::new_session, on_receive_request!())
-        .on_receive_request(session::load_session, on_receive_request!())
         .on_receive_request(session::list_sessions, on_receive_request!())
         .on_receive_request(session::delete_session, on_receive_request!())
         .on_receive_request(prompt::prompt, on_receive_request!())

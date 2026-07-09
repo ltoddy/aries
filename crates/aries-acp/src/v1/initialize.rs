@@ -27,7 +27,7 @@ pub async fn initialize(
                 .additional_directories(SessionAdditionalDirectoriesCapabilities::new()),
         );
 
-    let resp = InitializeResponse::new(ProtocolVersion::LATEST)
+    let resp = InitializeResponse::new(ProtocolVersion::V1)
         .agent_info(info)
         .agent_capabilities(capabilities);
 
