@@ -1,11 +1,11 @@
-use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
-use aries_filesystem::markdown::MarkdownFile;
+use aries_filesystem::document::FrontmatterDocument;
 use aries_filesystem::walk;
 use futures::{StreamExt, stream};
+use itertools::Itertools;
 
-use crate::agents::{CustomAgentDefinition, Frontmatter};
+use crate::agents::CustomAgentDefinition;
 
 pub struct CustomAgentsLoader {
     roots: Vec<PathBuf>,
@@ -27,18 +27,18 @@ impl CustomAgentsLoader {
 
         let file_paths = file_paths
             .into_iter()
-            .filter(|file_path| file_path.extension().eq(&Some(OsStr::new("md"))))
+            .filter(|file_path| file_path.extension().eq(&Some("md".as_ref())))
             .collect::<Vec<_>>();
 
         let agents = stream::iter(file_paths)
-            .filter_map(|file_path| async move {
-                let file = MarkdownFile::new(file_path);
-                file.read::<Frontmatter>().await.ok()
-            })
-            .map(|file| CustomAgentDefinition::new(file.frontmatter, file.body))
+            .filter_map(|file_path| async move { FrontmatterDocument::read(file_path).await.ok() })
+            .map(|doc| CustomAgentDefinition::new(doc.location, doc.frontmatter, doc.body))
             .collect::<Vec<_>>()
             .await;
 
         agents
+            .into_iter()
+            .unique_by(|a| a.frontmatter.name.clone())
+            .collect::<Vec<CustomAgentDefinition>>()
     }
 }

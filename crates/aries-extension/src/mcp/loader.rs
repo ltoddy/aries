@@ -6,11 +6,11 @@ use futures::stream::{self, StreamExt};
 
 use crate::mcp::{McpConfig, McpLoadResult};
 
-pub struct McpConfigLoader {
+pub struct McpsLoader {
     roots: Vec<PathBuf>,
 }
 
-impl McpConfigLoader {
+impl McpsLoader {
     pub const FILENAME: &str = "mcp.json";
 
     pub fn new(cwd: impl AsRef<Path>) -> Self {

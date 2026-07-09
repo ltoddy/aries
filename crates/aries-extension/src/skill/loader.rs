@@ -1,6 +1,7 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
+use aries_filesystem::document::FrontmatterDocument;
 use aries_filesystem::walk::walk_dirs;
 use futures::stream::{self, StreamExt};
 
@@ -32,7 +33,8 @@ impl SkillsLoader {
             .collect::<Vec<_>>();
 
         let skills = stream::iter(file_paths)
-            .filter_map(|file_path| async move { SkillDefinition::parse(file_path).await.ok() })
+            .filter_map(|file_path| async move { FrontmatterDocument::read(file_path).await.ok() })
+            .map(|doc| SkillDefinition::new(doc.location, doc.frontmatter, doc.body))
             .collect()
             .await;
 

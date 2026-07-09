@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 use std::io;
 use std::path::{Path, PathBuf};
 
-use aries_filesystem::markdown::{Markdown, MarkdownFile};
+use aries_filesystem::document::FrontmatterDocument;
 use itertools::Itertools;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -33,15 +33,13 @@ impl MemoryStore {
         &self,
         frontmatter: MemoryFrontmatter,
         body: impl Into<String>,
-    ) -> Result<(), aries_filesystem::markdown::Error> {
+    ) -> Result<(), aries_filesystem::document::DocumentError> {
         let filename = to_filename(&frontmatter.name);
         let file_path = self.dir.join(&filename);
 
-        let file = MarkdownFile::new(&file_path);
-        let markdown = Markdown::new(&file_path, frontmatter, body);
-
+        let document = FrontmatterDocument::new(&file_path, frontmatter, body);
         info!(file_path = %file_path.display(), "writing memory");
-        file.write(markdown).await
+        document.write().await
     }
 
     pub async fn read_manifest(&self) -> io::Result<Option<String>> {

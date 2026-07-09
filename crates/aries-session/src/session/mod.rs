@@ -11,13 +11,14 @@ use aries_core::agents::{CompactAgent, CompactOutcome, Mode};
 use aries_core::compact::{AutoCompactBreaker, Decision, TokenEstimator};
 use aries_core::event::AgentEvent;
 use aries_core::{compact, preamble};
+use aries_extension::agents::CustomAgentsLoader;
 use aries_extension::hook::input::{
     PostCompactHookInput, PostCompactTrigger, PreCompactCustomInstructions, PreCompactHookInput,
     SessionStartHookInput, SessionStartSource, StopFailureHookInput, StopHookInput,
     UserPromptSubmitHookInput,
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
-use aries_extension::mcp::{McpConfig, McpConfigLoader};
+use aries_extension::mcp::{McpConfig, McpsLoader};
 use aries_init::{ModelConfig, Setting, SettingError};
 use aries_lspclient::{LspServerInfo, SharedLspClient, warm_up};
 use aries_memory::MemoryStore;
@@ -154,9 +155,12 @@ impl Session {
 
         let lsp_client = Self::warm_up_lsp(cwd).await;
 
-        let mcp_loader = McpConfigLoader::new(cwd);
+        let mcp_loader = McpsLoader::new(cwd);
         let mut mcp_config = mcp_loader.load().await.unwrap_or_default();
         mcp_config.update(external_mcp_config);
+
+        let agent_loader = CustomAgentsLoader::new(cwd);
+        let _custom_agents = agent_loader.load().await; // TODO
 
         let mem_store = MemoryStore::new(&root_dir, cwd).await;
         let memory = Self::load_memory(&mem_store).await;

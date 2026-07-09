@@ -3,8 +3,6 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use super::ParseSkillError;
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SkillDefinition {
     pub location: PathBuf,
@@ -13,21 +11,15 @@ pub struct SkillDefinition {
 }
 
 impl SkillDefinition {
-    pub async fn parse(file_path: impl AsRef<Path>) -> Result<Self, ParseSkillError> {
-        let location = file_path.as_ref().to_path_buf();
+    pub fn new(
+        location: impl AsRef<Path>,
+        frontmatter: Frontmatter,
+        body: impl Into<String>,
+    ) -> Self {
+        let location = location.as_ref().to_path_buf();
+        let body = body.into();
 
-        let content = tokio::fs::read_to_string(&location).await?;
-        let mut parts = content.splitn(3, Frontmatter::DELIMITER);
-        parts.next();
-
-        match (parts.next(), parts.next()) {
-            (Some(frontmatter), Some(body)) => {
-                let frontmatter = serde_yaml::from_str::<Frontmatter>(frontmatter)?;
-                let body = body.to_owned();
-                Ok(Self { location, frontmatter, body })
-            },
-            _ => Err(ParseSkillError::WrongFormat),
-        }
+        Self { location, frontmatter, body }
     }
 }
 
@@ -43,8 +35,6 @@ pub struct Frontmatter {
 }
 
 impl Frontmatter {
-    const DELIMITER: &str = "---";
-
     pub fn render(&self, file_path: impl AsRef<Path>) -> String {
         let name = &self.name;
         let description = &self.description;

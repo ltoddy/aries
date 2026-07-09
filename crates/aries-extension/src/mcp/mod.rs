@@ -17,7 +17,7 @@ use tracing::info;
 
 pub use self::config::{HttpConfig, McpConfig, McpServerConfig, SseConfig, StdioConfig};
 pub use self::error::{McpConnectError, McpParseError};
-pub use self::loader::McpConfigLoader;
+pub use self::loader::McpsLoader;
 pub use self::tool::NamespacedMcpTool;
 
 pub type McpLoadResult<T> = Result<T, McpParseError>;
