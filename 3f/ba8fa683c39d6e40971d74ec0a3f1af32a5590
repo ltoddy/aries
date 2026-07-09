@@ -1,0 +1,22 @@
+crates/aries-session/src/session/mod.rs
+  s_326ba226d51135::t_c53816cb7ae086 162-163
+  s_326ba226d51135::t_ee48ab3162c7aa 164
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "3fba8fa683c39d6e40971d74ec0a3f1af32a5590",
+  "prompts": {},
+  "sessions": {
+    "s_326ba226d51135": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a3e77fb4ba8003db6311c32",
+        "model": "c_o_new_thinking__max"
+      },
+      "human_author": "liutao.rs <liutao.rs@bytedance.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
