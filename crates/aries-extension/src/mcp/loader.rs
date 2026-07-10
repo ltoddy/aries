@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use aries_filesystem::walk::walk_dirs;
 use futures::stream::{self, StreamExt};
 
-use crate::mcp::{McpConfig, McpLoadResult};
+use crate::mcp::definition::McpDefinition;
 
 pub struct McpsLoader {
     roots: Vec<PathBuf>,
@@ -17,27 +17,22 @@ impl McpsLoader {
         let cwd = cwd.as_ref();
         let home_dir = std::env::home_dir().unwrap_or_else(|| PathBuf::from("~"));
 
-        let roots = vec![cwd.join(".agents").join("mcps"), home_dir.join(".agents").join("mcps")];
+        let roots = vec![cwd.join(".agent").join("mcps"), home_dir.join(".agent").join("mcps")];
 
         Self { roots }
     }
 
-    pub async fn load(&self) -> McpLoadResult<McpConfig> {
-        let entries = walk_dirs(&self.roots, true, true)?;
+    pub async fn load(&self) -> Vec<McpDefinition> {
+        let Ok(entries) = walk_dirs(&self.roots, true, true) else { return vec![] };
 
         let file_paths = entries
             .into_iter()
-            .filter(|entry| entry.is_file())
             .filter(|entry| entry.file_name().eq(&Some(OsStr::new(Self::FILENAME))))
             .collect::<Vec<_>>();
 
-        let configs = stream::iter(file_paths)
-            .filter_map(|file_path| async move { McpConfig::parse(file_path).await.ok() })
+        stream::iter(file_paths)
+            .filter_map(|file_path| async move { McpDefinition::parse(file_path).await.ok() })
             .collect::<Vec<_>>()
-            .await;
-
-        let merged = configs.into_iter().flat_map(|c| c.mcp_servers).collect();
-
-        Ok(McpConfig::new(merged))
+            .await
     }
 }

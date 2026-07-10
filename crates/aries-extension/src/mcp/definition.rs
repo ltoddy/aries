@@ -6,12 +6,12 @@ use serde::{Deserialize, Serialize};
 use crate::mcp::{McpLoadResult, McpParseError};
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-pub struct McpConfig {
+pub struct McpDefinition {
     #[serde(rename = "mcpServers", default)]
     pub mcp_servers: HashMap<String, McpServerConfig>,
 }
 
-impl McpConfig {
+impl McpDefinition {
     pub fn new(mcp_servers: HashMap<String, McpServerConfig>) -> Self {
         Self { mcp_servers }
     }
@@ -36,9 +36,9 @@ impl McpConfig {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum McpServerConfig {
-    Stdio(StdioConfig),
-    Sse(SseConfig),
-    Http(HttpConfig),
+    Stdio(Stdio),
+    Sse(Sse),
+    Http(Http),
 }
 
 impl McpServerConfig {
@@ -47,20 +47,20 @@ impl McpServerConfig {
         args: Vec<String>,
         env: HashMap<String, String>,
     ) -> Self {
-        Self::Stdio(StdioConfig::new(command, args, env))
+        Self::Stdio(Stdio::new(command, args, env))
     }
 
     pub fn sse(url: impl Into<String>, headers: HashMap<String, String>) -> Self {
-        Self::Sse(SseConfig::new(url, headers))
+        Self::Sse(Sse::new(url, headers))
     }
 
     pub fn http(url: impl Into<String>, headers: HashMap<String, String>) -> Self {
-        Self::Http(HttpConfig::new(url, headers))
+        Self::Http(Http::new(url, headers))
     }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct StdioConfig {
+pub struct Stdio {
     pub command: String,
     #[serde(default)]
     pub args: Vec<String>,
@@ -68,7 +68,7 @@ pub struct StdioConfig {
     pub env: HashMap<String, String>,
 }
 
-impl StdioConfig {
+impl Stdio {
     pub fn new(
         command: impl Into<String>,
         args: Vec<String>,
@@ -80,13 +80,13 @@ impl StdioConfig {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct SseConfig {
+pub struct Sse {
     pub url: String,
     #[serde(default)]
     pub headers: HashMap<String, String>,
 }
 
-impl SseConfig {
+impl Sse {
     pub fn new(url: impl Into<String>, headers: HashMap<String, String>) -> Self {
         let url = url.into();
         Self { url, headers }
@@ -94,13 +94,13 @@ impl SseConfig {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct HttpConfig {
+pub struct Http {
     pub url: String,
     #[serde(default)]
     pub headers: HashMap<String, String>,
 }
 
-impl HttpConfig {
+impl Http {
     pub fn new(url: impl Into<String>, headers: HashMap<String, String>) -> Self {
         let url = url.into();
         Self { url, headers }

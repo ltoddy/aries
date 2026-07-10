@@ -13,7 +13,7 @@ pub struct PruneSessionsArgs {
 }
 
 pub async fn execute(args: PruneSessionsArgs, gctx: GlobalContext) -> anyhow::Result<()> {
-    let db = aries_session::connect(&gctx.root_dir)
+    let db = aries_persistence::connect(&gctx.root_dir)
         .await
         .with_context(|| format!("Failed to connect local storage: {}", gctx.root_dir.display()))
         .expect("Run `aries init -h` for initialization");

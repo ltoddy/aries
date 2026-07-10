@@ -5,7 +5,7 @@ use aries_filesystem::walk;
 use futures::{StreamExt, stream};
 use itertools::Itertools;
 
-use crate::agents::CustomAgentDefinition;
+use crate::agent::CustomAgentDefinition;
 
 pub struct CustomAgentsLoader {
     roots: Vec<PathBuf>,
@@ -16,8 +16,7 @@ impl CustomAgentsLoader {
         let cwd = cwd.as_ref();
         let home_dir = std::env::home_dir().unwrap_or_else(|| PathBuf::from("~"));
 
-        let roots =
-            vec![home_dir.join(".agents").join("agents"), cwd.join("agents").join("agents")];
+        let roots = vec![home_dir.join(".agent").join("agent"), cwd.join("agent").join("agent")];
 
         Self { roots }
     }

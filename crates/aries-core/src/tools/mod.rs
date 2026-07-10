@@ -16,6 +16,8 @@ pub mod webfetch;
 pub mod websearch;
 pub mod write;
 
+use aries_extension::skill::SkillDefinition;
+
 pub use crate::tools::agent::{AgentArgs, AgentOutput, AgentTool};
 pub use crate::tools::bash::{BashArgs, BashOutput, BashTool};
 pub use crate::tools::batch::{BatchArgs, BatchOutput, BatchTool};
@@ -59,7 +61,7 @@ pub fn create_tools(
     cwd: &std::path::Path,
     sender: &tokio::sync::mpsc::UnboundedSender<crate::event::AgentEvent>,
     lsp_client: Option<&aries_lspclient::SharedLspClient>,
-    available_skills: &[aries_extension::skill::definition::SkillDefinition],
+    skills: &[SkillDefinition],
 ) -> Vec<Box<dyn rig_core::tool::ToolDyn>> {
     let cwd = cwd.to_path_buf();
     let mut tools: Vec<Box<dyn rig_core::tool::ToolDyn>> = Vec::with_capacity(tool_names.len());
@@ -85,10 +87,10 @@ pub fn create_tools(
             question::NAME => Box::new(AskUserQuestionTool),
             read::NAME => Box::new(ReadTool),
             skill::NAME => {
-                if available_skills.is_empty() {
+                if skills.is_empty() {
                     continue;
                 }
-                Box::new(SkillTool::new(available_skills.to_vec()))
+                Box::new(SkillTool::new(skills.to_vec()))
             },
             update_plan::NAME => Box::new(UpdatePlanTool::new(sender.clone())),
             webfetch::NAME => Box::new(WebFetchTool),

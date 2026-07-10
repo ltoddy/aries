@@ -1,7 +1,7 @@
-pub mod config;
-pub mod error;
-pub mod loader;
-pub mod tool;
+mod definition;
+mod error;
+mod loader;
+mod tool;
 
 use std::collections::HashMap;
 
@@ -15,7 +15,7 @@ use rmcp::transport::{ConfigureCommandExt, StreamableHttpClientTransport, TokioC
 use rmcp::{RoleClient, ServiceExt};
 use tracing::info;
 
-pub use self::config::{HttpConfig, McpConfig, McpServerConfig, SseConfig, StdioConfig};
+pub use self::definition::{Http, McpDefinition, McpServerConfig, Sse, Stdio};
 pub use self::error::{McpConnectError, McpParseError};
 pub use self::loader::McpsLoader;
 pub use self::tool::NamespacedMcpTool;
@@ -24,13 +24,15 @@ pub type McpLoadResult<T> = Result<T, McpParseError>;
 pub type McpConnectResult<T> = Result<T, McpConnectError>;
 
 pub async fn connect(
-    config: McpConfig,
+    mcps: &[McpDefinition],
 ) -> (Vec<RunningService<RoleClient, ClientInfo>>, Vec<Box<dyn ToolDyn>>) {
     let mut tools = Vec::<Box<dyn ToolDyn>>::new();
     let mut services = Vec::<RunningService<RoleClient, ClientInfo>>::new();
 
-    for (server_name, server_config) in config.mcp_servers {
-        match connect_one(&server_name, server_config).await {
+    let mcp_servers = mcps.into_iter().flat_map(|c| &c.mcp_servers).collect::<Vec<_>>();
+
+    for (server_name, server_config) in mcp_servers {
+        match connect_one(server_name, server_config).await {
             Ok((service, server_tools)) => {
                 tools.extend(server_tools);
                 services.push(service);
@@ -46,7 +48,7 @@ pub async fn connect(
 
 async fn connect_one(
     server_name: impl Into<String>,
-    config: McpServerConfig,
+    config: &McpServerConfig,
 ) -> McpConnectResult<(RunningService<RoleClient, ClientInfo>, Vec<Box<dyn ToolDyn>>)> {
     let server_name = server_name.into();
     let client_info = ClientInfo::default();
@@ -54,9 +56,9 @@ async fn connect_one(
     info!(server = %server_name, "connecting to MCP server");
 
     let service = match config {
-        McpServerConfig::Stdio(StdioConfig { command, args, env }) => {
+        McpServerConfig::Stdio(Stdio { command, args, env }) => {
             let cmd = tokio::process::Command::new(command).configure(|cmd| {
-                cmd.args(&args).envs(&env);
+                cmd.args(args).envs(env);
             });
 
             let child = TokioChildProcess::new(cmd)
@@ -66,26 +68,26 @@ async fn connect_one(
                 .await
                 .map_err(|e| McpConnectError::Connection(e.to_string()))?
         },
-        McpServerConfig::Sse(SseConfig { url, headers }) => {
+        McpServerConfig::Sse(Sse { url, headers }) => {
             let custom_headers: HashMap<HeaderName, HeaderValue> = headers
                 .into_iter()
                 .filter_map(|(k, v)| Some((k.parse().ok()?, v.parse().ok()?)))
                 .collect::<HashMap<_, _>>();
-            let config =
-                StreamableHttpClientTransportConfig::with_uri(url).custom_headers(custom_headers);
+            let config = StreamableHttpClientTransportConfig::with_uri(url.to_owned())
+                .custom_headers(custom_headers);
             let transport = StreamableHttpClientTransport::from_config(config);
             client_info
                 .serve(transport)
                 .await
                 .map_err(|e| McpConnectError::Connection(e.to_string()))?
         },
-        McpServerConfig::Http(HttpConfig { url, headers }) => {
+        McpServerConfig::Http(Http { url, headers }) => {
             let custom_headers: HashMap<HeaderName, HeaderValue> = headers
                 .into_iter()
                 .filter_map(|(k, v)| Some((k.parse().ok()?, v.parse().ok()?)))
                 .collect::<HashMap<_, _>>();
-            let config =
-                StreamableHttpClientTransportConfig::with_uri(url).custom_headers(custom_headers);
+            let config = StreamableHttpClientTransportConfig::with_uri(url.to_owned())
+                .custom_headers(custom_headers);
             let transport = StreamableHttpClientTransport::from_config(config);
             client_info
                 .serve(transport)
@@ -104,7 +106,7 @@ async fn connect_one(
         })
         .collect::<Vec<_>>();
 
-    tracing::info!(server = %server_name, tool_count = tools.len(), "connected to MCP server");
+    info!(server = %server_name, tool_count = tools.len(), "connected to MCP server");
 
     Ok((service, tools))
 }

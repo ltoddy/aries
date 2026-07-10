@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
 use agent_client_protocol::schema::v1::{McpServer, McpServerHttp, McpServerSse, McpServerStdio};
-use aries_extension::mcp::{McpConfig, McpServerConfig};
+use aries_extension::mcp::{McpDefinition, McpServerConfig};
 
 pub struct McpServers(pub Vec<McpServer>);
 
-impl From<McpServers> for McpConfig {
+impl From<McpServers> for McpDefinition {
     fn from(val: McpServers) -> Self {
         let mut mcp_servers = HashMap::new();
 
@@ -30,6 +30,6 @@ impl From<McpServers> for McpConfig {
             mcp_servers.entry(name).or_insert(config);
         }
 
-        McpConfig::new(mcp_servers)
+        McpDefinition::new(mcp_servers)
     }
 }

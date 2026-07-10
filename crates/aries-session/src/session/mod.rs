@@ -11,14 +11,15 @@ use aries_core::agents::{CompactAgent, CompactOutcome, Mode};
 use aries_core::compact::{AutoCompactBreaker, Decision, TokenEstimator};
 use aries_core::event::AgentEvent;
 use aries_core::{compact, preamble};
-use aries_extension::agents::CustomAgentsLoader;
+use aries_extension::agent::CustomAgentsLoader;
 use aries_extension::hook::input::{
     PostCompactHookInput, PostCompactTrigger, PreCompactCustomInstructions, PreCompactHookInput,
-    SessionStartHookInput, SessionStartSource, StopFailureHookInput, StopHookInput,
-    UserPromptSubmitHookInput,
+    SessionEndHookInput, SessionEndReason, SessionStartHookInput, SessionStartSource,
+    StopFailureHookInput, StopHookInput, UserPromptSubmitHookInput,
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
-use aries_extension::mcp::{McpConfig, McpsLoader};
+use aries_extension::mcp::McpDefinition;
+use aries_extension::{AgentExtensions, mcp};
 use aries_init::{ModelConfig, Setting, SettingError};
 use aries_lspclient::{LspServerInfo, SharedLspClient, warm_up};
 use aries_memory::MemoryStore;
@@ -27,16 +28,20 @@ use futures::pin_mut;
 use rig_core::agent::FinalResponse;
 use rig_core::completion::Message;
 use rig_core::message::UserContent;
+use rig_core::tool::ToolDyn;
 use rig_core::wasm_compat::WasmCompatSend;
+use rmcp::RoleClient;
+use rmcp::model::ClientInfo;
+use rmcp::service::RunningService;
 use toasty::Db;
-use tokio::sync::Mutex as AsyncMutex;
+use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
-use crate::session::chat_context::ChatContext;
-use crate::session::chat_history::ChatHistory;
-use crate::session::hook::SessionPromptHook;
+use self::chat_context::ChatContext;
+use self::chat_history::ChatHistory;
+use self::hook::SessionPromptHook;
 use crate::{AriesAgent, AriesClient};
 
 #[derive(Clone)]
@@ -61,13 +66,14 @@ pub struct Session {
     transcripts_dir: PathBuf,
 
     cancel_token: CancellationToken,
-    receiver: Arc<AsyncMutex<UnboundedReceiver<AgentEvent>>>,
+    receiver: Arc<Mutex<UnboundedReceiver<AgentEvent>>>,
 
     compact_breaker: AutoCompactBreaker,
     hooks_executor: Arc<HooksExecutor>,
     memory_store: MemoryStore,
 
-    mcp_config: McpConfig,
+    mcp_clients: Arc<Vec<RunningService<RoleClient, ClientInfo>>>,
+    extensions: AgentExtensions,
 
     last_assistant_message: Option<String>,
 }
@@ -81,8 +87,7 @@ impl Session {
         config: ModelConfig,
         setting: Setting,
         db: Db,
-        hooks_executor: Arc<HooksExecutor>,
-        external_mcp_config: McpConfig,
+        external_mcp_config: McpDefinition,
     ) -> anyhow::Result<Self> {
         Self::build(
             id,
@@ -91,7 +96,6 @@ impl Session {
             config,
             setting,
             db,
-            hooks_executor,
             external_mcp_config,
             SessionStartSource::Startup,
         )
@@ -106,8 +110,7 @@ impl Session {
         config: ModelConfig,
         setting: Setting,
         db: Db,
-        hooks_executor: Arc<HooksExecutor>,
-        external_mcp_config: McpConfig,
+        external_mcp_config: McpDefinition,
     ) -> anyhow::Result<Self> {
         Self::build(
             id,
@@ -116,7 +119,6 @@ impl Session {
             config,
             setting,
             db,
-            hooks_executor,
             external_mcp_config,
             SessionStartSource::Resume,
         )
@@ -131,8 +133,7 @@ impl Session {
         config: ModelConfig,
         setting: Setting,
         db: Db,
-        hooks_executor: Arc<HooksExecutor>,
-        external_mcp_config: McpConfig,
+        _external_mcp_config: McpDefinition,
         source: SessionStartSource,
     ) -> anyhow::Result<Self> {
         let id = id.into();
@@ -155,9 +156,8 @@ impl Session {
 
         let lsp_client = Self::warm_up_lsp(cwd).await;
 
-        let mcp_loader = McpsLoader::new(cwd);
-        let mut mcp_config = mcp_loader.load().await.unwrap_or_default();
-        mcp_config.update(external_mcp_config);
+        let extensions = AgentExtensions::new(cwd).await;
+        let (mcp_clients, mcp_tools) = mcp::connect(&extensions.mcps).await;
 
         let agent_loader = CustomAgentsLoader::new(cwd);
         let _custom_agents = agent_loader.load().await; // TODO
@@ -173,8 +173,18 @@ impl Session {
         let mode = Mode::default();
         let client = AriesClient::new(&config)?;
         let (agent, receiver) = client
-            .agent(mode, config.clone(), cwd, lsp_client.clone(), memory, mcp_config.clone())
+            .agent(
+                mode,
+                config.clone(),
+                cwd,
+                lsp_client.clone(),
+                memory,
+                extensions.clone(),
+                mcp_tools,
+            )
             .await?;
+
+        let hooks_executor = Arc::new(HooksExecutor::new(extensions.hooks.clone()));
 
         let input = SessionStartHookInput::new(&id, cwd, source, config.model(), mode);
         hooks_executor.fire_session_start(input).await;
@@ -195,12 +205,13 @@ impl Session {
             session_dir,
             transcripts_dir,
             cancel_token: CancellationToken::new(),
-            receiver: Arc::new(AsyncMutex::new(receiver)),
+            receiver: Arc::new(Mutex::new(receiver)),
             compact_breaker: AutoCompactBreaker::new(),
             hooks_executor,
             memory_store: mem_store,
+            mcp_clients: Arc::new(mcp_clients),
+            extensions,
             last_assistant_message: None,
-            mcp_config,
         })
     }
 
@@ -215,42 +226,49 @@ impl Session {
             .ok_or_else(|| SettingError::not_found(&alias))?;
 
         self.client = AriesClient::new(config)?;
-        let memory = Self::load_memory(&self.memory_store).await;
-        let (agent, agent_events) = self
-            .client
-            .agent(
-                self.mode,
-                self.config.clone(),
-                self.cwd.clone(),
-                self.lsp_client.clone(),
-                memory,
-                self.mcp_config.clone(),
-            )
-            .await?;
-        self.agent = agent;
-        self.receiver = Arc::new(AsyncMutex::new(agent_events));
+        // let memory = Self::load_memory(&self.memory_store).await;
+        // let (agent, agent_events) = self
+        //     .client
+        //     .agent(
+        //         self.mode,
+        //         self.config.clone(),
+        //         self.cwd.clone(),
+        //         self.lsp_client.clone(),
+        //         memory,
+        //         self.extensions.clone(),
+        //         self.mcp_tools.to_vec(),
+        //     )
+        //     .await?;
+
+        // TODO: Agent 自己实现
+
+        // self.agent = agent;
+        // self.receiver = Arc::new(Mutex::new(agent_events));
         self.config = config.to_owned();
         self.setting.active = alias;
         Ok(())
     }
 
     pub async fn set_mode(&mut self, mode: Mode) -> anyhow::Result<()> {
-        let memory = Self::load_memory(&self.memory_store).await;
-        let (agent, agent_events) = self
-            .client
-            .agent(
-                mode,
-                self.config.clone(),
-                self.cwd.clone(),
-                self.lsp_client.clone(),
-                memory,
-                self.mcp_config.clone(),
-            )
-            .await?;
+        // let memory = Self::load_memory(&self.memory_store).await;
+        // let (agent, agent_events) = self
+        //     .client
+        //     .agent(
+        //         mode,
+        //         self.config.clone(),
+        //         self.cwd.clone(),
+        //         self.lsp_client.clone(),
+        //         memory,
+        //         self.extensions.clone(),
+        //         self.mcp_tools.to_vec(),
+        //     )
+        //     .await?;
+        //
+        // TODO 应该由 agent 重新自己切换
 
         self.mode = mode;
-        self.agent = agent;
-        self.receiver = Arc::new(AsyncMutex::new(agent_events));
+        // self.agent = agent;
+        // self.receiver = Arc::new(Mutex::new(agent_events));
         Ok(())
     }
 
@@ -551,6 +569,13 @@ impl Session {
 
     pub fn transcript_path(&self) -> &Path {
         &self.transcripts_dir
+    }
+
+    pub async fn close(&self) {
+        let input = SessionEndHookInput::new(&self.id, &self.cwd, SessionEndReason::Logout)
+            .transcript_path(&self.transcripts_dir);
+
+        self.hooks_executor.fire_session_end(input).await;
     }
 
     // TODO

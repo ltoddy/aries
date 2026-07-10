@@ -18,26 +18,23 @@ impl SkillsLoader {
         let cwd = cwd.as_ref();
         let home_dir = std::env::home_dir().unwrap_or_else(|| PathBuf::from("~"));
 
-        let roots =
-            vec![cwd.join(".agents").join("skills"), home_dir.join(".agents").join("skills")];
+        let roots = vec![cwd.join(".agent").join("skills"), home_dir.join(".agent").join("skills")];
 
         Self { roots }
     }
 
-    pub async fn load(self) -> anyhow::Result<Vec<SkillDefinition>> {
-        let entries = walk_dirs(&self.roots, true, true)?;
+    pub async fn load(self) -> Vec<SkillDefinition> {
+        let Ok(entries) = walk_dirs(&self.roots, true, true) else { return vec![] };
 
         let file_paths = entries
             .into_iter()
             .filter(|entry| entry.file_name().eq(&Some(OsStr::new(Self::FILENAME))))
             .collect::<Vec<_>>();
 
-        let skills = stream::iter(file_paths)
+        stream::iter(file_paths)
             .filter_map(|file_path| async move { FrontmatterDocument::read(file_path).await.ok() })
             .map(|doc| SkillDefinition::new(doc.location, doc.frontmatter, doc.body))
             .collect()
-            .await;
-
-        Ok(skills)
+            .await
     }
 }
