@@ -8,9 +8,9 @@ use rig_core::completion::ToolDefinition;
 use rig_core::tool::Tool;
 use tokio::fs;
 
-use self::args::WriteArgs;
-use self::error::WriteError;
-use self::output::WriteOutput;
+pub use self::args::WriteArgs;
+pub use self::error::WriteError;
+pub use self::output::WriteOutput;
 
 pub const NAME: &str = "Write";
 

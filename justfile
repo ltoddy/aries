@@ -14,7 +14,7 @@ clippy:
     @cargo clippy
 
 test:
-    @cargo test
+    @cargo test --workspace --lib --bins --tests
 
 fmt:
     @cargo +nightly fmt --all

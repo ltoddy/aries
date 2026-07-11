@@ -3,17 +3,13 @@ use serde::{Deserialize, Serialize};
 use crate::{RenderError, ToolOutputRender};
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct WriteOutput {
-    pub success: bool,
+pub struct ReadOutput {
+    pub content: String,
 }
 
-impl ToolOutputRender for WriteOutput {
+impl ToolOutputRender for ReadOutput {
     fn render_output(raw: &str) -> Result<String, RenderError> {
         let output: Self = serde_json::from_str(raw)?;
-        Ok(if output.success {
-            "File written successfully".to_owned()
-        } else {
-            "Failed to write file".to_owned()
-        })
+        Ok(output.content)
     }
 }
