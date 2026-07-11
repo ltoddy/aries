@@ -1,7 +1,14 @@
 pub mod bash;
+pub mod codesearch;
 pub mod edit;
+pub mod glob;
+pub mod grep;
+pub mod ls;
 pub mod multiedit;
+pub mod question;
 pub mod read;
+pub mod webfetch;
+pub mod websearch;
 pub mod write;
 
 #[derive(Debug, thiserror::Error)]

@@ -1,0 +1,35 @@
+use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize};
+
+use crate::{RenderError, ToolArgsRender};
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GlobArgs {
+    pub pattern: String,
+    pub base_dir: Option<PathBuf>,
+}
+
+impl GlobArgs {
+    pub fn title(&self) -> String {
+        match &self.base_dir {
+            Some(base_dir) => {
+                format!("Find files matching {} in {}", self.pattern, base_dir.display())
+            }
+            None => format!("Find files matching {}", self.pattern),
+        }
+    }
+}
+
+impl ToolArgsRender for GlobArgs {
+    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+        let args: Self = serde_json::from_str(raw)?;
+
+        let mut first = args.pattern;
+        if let Some(base_dir) = args.base_dir {
+            first.push_str(&format!(", base_dir = {}", base_dir.display()));
+        }
+
+        Ok((first, None))
+    }
+}
