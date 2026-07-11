@@ -13,6 +13,9 @@ check:
 clippy:
     @cargo clippy
 
+test:
+    @cargo test
+
 fmt:
     @cargo +nightly fmt --all
 

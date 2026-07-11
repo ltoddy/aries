@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/aries-acp",
+    "crates/aries-agent",
     "crates/aries-cli",
     "crates/aries-context",
     "crates/aries-core",
@@ -17,6 +18,7 @@ members = [
     "crates/aries-session",
     "crates/aries-telemetry",
     "crates/aries-tokenopt",
+    "crates/aries-tools",
     "crates/aries-workflow",
 ]
 default-members = ["crates/aries-cli"]
@@ -52,6 +54,7 @@ serde = "1"
 serde_json = "1.0"
 serde_repr = "0.1"
 serde_yaml = "0.9"
+tempfile = "3"
 terminal_size = "0.4"
 thiserror = "2.0"
 toasty = "0.7"
