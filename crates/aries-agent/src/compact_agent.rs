@@ -10,7 +10,7 @@ use rig_core::message::{AssistantContent, ReasoningContent, UserContent};
 use rig_core::{completion, message};
 use tracing::info;
 
-use crate::agents::AriesAgent;
+use crate::agent::AriesAgent;
 
 const PREAMBLE: &str = include_str!("prompts/compact.md");
 const NAME: &str = "Archivist";

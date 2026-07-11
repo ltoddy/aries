@@ -7,10 +7,10 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::Context;
-use aries_core::agents::{CompactAgent, CompactOutcome, Mode};
+use aries_agent::event::AgentEvent;
+use aries_agent::{CompactAgent, CompactOutcome, Mode, preamble};
+use aries_core::compact;
 use aries_core::compact::{AutoCompactBreaker, Decision, TokenEstimator};
-use aries_core::event::AgentEvent;
-use aries_core::{compact, preamble};
 use aries_extension::agent::CustomAgentsLoader;
 use aries_extension::hook::input::{
     PostCompactHookInput, PostCompactTrigger, PreCompactCustomInstructions, PreCompactHookInput,

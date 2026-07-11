@@ -8,8 +8,9 @@ use rig_core::completion;
 use rig_core::tool::ToolDyn;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
-use crate::agents::{AGENT_LOOP_MAX_TURNS, AriesAgent, Mode};
+use crate::agent::{AGENT_LOOP_MAX_TURNS, AriesAgent};
 use crate::event::AgentEvent;
+use crate::mode::Mode;
 use crate::tools;
 
 pub struct AgentBuilder<C>
@@ -157,7 +158,7 @@ where
 
         match self.mode {
             Mode::Build | Mode::General => {
-                tools.push(Box::new(tools::agent::AgentTool::<C>::new(
+                tools.push(Box::new(tools::AgentTool::<C>::new(
                     self.client.clone(),
                     self.model.clone(),
                     self.cwd.clone(),

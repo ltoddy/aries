@@ -3,10 +3,9 @@ pub mod session;
 
 use std::path::Path;
 
-use aries_core::agents::{AgentBuilder, Mode};
-use aries_core::event::AgentEvent;
+use aries_agent::event::AgentEvent;
+use aries_agent::{AgentBuilder, AriesResult, Mode};
 use aries_core::extractor::{ExtractedMemory, MemoryExtractor};
-use aries_core::{AriesResult, agents};
 use aries_extension::AgentExtensions;
 use aries_init::ModelConfig;
 use aries_lspclient::SharedLspClient;
@@ -165,10 +164,10 @@ impl AriesClient {
 
 #[derive(Clone)]
 pub enum AriesAgent {
-    Anthropic(agents::AriesAgent<anthropic::completion::CompletionModel>),
-    Azure(agents::AriesAgent<azure::CompletionModel>),
-    Deepseek(agents::AriesAgent<deepseek::CompletionModel>),
-    OpenAI(agents::AriesAgent<openai::CompletionModel>),
+    Anthropic(aries_agent::AriesAgent<anthropic::completion::CompletionModel>),
+    Azure(aries_agent::AriesAgent<azure::CompletionModel>),
+    Deepseek(aries_agent::AriesAgent<deepseek::CompletionModel>),
+    OpenAI(aries_agent::AriesAgent<openai::CompletionModel>),
 }
 
 impl AriesAgent {

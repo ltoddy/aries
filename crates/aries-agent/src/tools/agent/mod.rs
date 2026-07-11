@@ -1,6 +1,8 @@
+mod args;
+mod output;
+
 use std::path::PathBuf;
 
-pub use aries_tools::agent::{AgentArgs, AgentOutput, NAME};
 use futures::StreamExt;
 use rig_core::agent::{MultiTurnStreamItem, StreamingError};
 use rig_core::client::CompletionClient;
@@ -8,8 +10,13 @@ use rig_core::completion::{Message, ToolDefinition};
 use rig_core::tool::Tool;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::agents::{AgentBuilder, Mode};
+pub use self::args::AgentArgs;
+pub use self::output::AgentOutput;
+use crate::builder::AgentBuilder;
 use crate::event::AgentEvent;
+use crate::mode::Mode;
+
+pub const NAME: &str = "Agent";
 
 pub struct AgentTool<C>
 where
@@ -49,7 +56,7 @@ where
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
             name: Self::NAME.to_owned(),
-            description: include_str!("agent.md").to_owned(),
+            description: include_str!("description.md").to_owned(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {

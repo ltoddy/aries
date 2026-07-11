@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time;
 
-use aries_core::tools::{AgentOutput, agent};
+use aries_agent::tools::AgentOutput;
 use aries_extension::hook::input::{
     PostToolUseFailureHookInput, PostToolUseHookInput, PreToolUseHookInput, SubagentStartHookInput,
     SubagentStopHookInput,
@@ -87,7 +87,7 @@ where
         let tool_input: Value =
             serde_json::from_str(args).unwrap_or_else(|_| Value::String(args.to_owned()));
 
-        if tool_name == agent::NAME {
+        if tool_name == aries_agent::tools::agent::NAME {
             let input = SubagentStartHookInput::new(&self.session_id, &self.cwd, "", "")
                 .transcript_path(&self.transcript_path);
             self.executor.fire_subagent_start(input).await;
@@ -178,7 +178,7 @@ where
             return HookAction::cont();
         }
 
-        if tool_name == agent::NAME {
+        if tool_name == aries_agent::tools::agent::NAME {
             let input = SubagentStopHookInput::new(
                 &self.session_id,
                 &self.cwd,

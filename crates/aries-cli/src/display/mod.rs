@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 use std::io::Write;
 
-use aries_core::event::{AgentEvent, AgentSignal};
-use aries_core::tools;
+use aries_agent::event::{AgentEvent, AgentSignal};
 use aries_tools::update_plan::{PlanEntry, PlanEntryPriority, PlanEntryStatus};
 use itertools::Itertools;
 use rig_core::agent::MultiTurnStreamItem;
@@ -73,7 +72,7 @@ pub fn format_tool_call_args(
         return format_unknown_call(tool_name, args, theme);
     }
 
-    let (first, rest) = tools::format_tool_args(tool_name, args);
+    let (first, rest) = aries_agent::tools::format_tool_args(tool_name, args);
 
     (format!("{} {}", theme.cyan_text(tool_name), theme.yellow_text(&first)), rest)
 }
@@ -81,7 +80,7 @@ pub fn format_tool_call_args(
 fn is_known_tool(tool_name: &str) -> bool {
     matches!(
         tool_name,
-        aries_tools::agent::NAME
+        aries_agent::tools::agent::NAME
             | aries_tools::bash::NAME
             | aries_tools::batch::NAME
             | aries_tools::codesearch::NAME
@@ -102,7 +101,7 @@ fn is_known_tool(tool_name: &str) -> bool {
 }
 
 pub fn format_tool_result_output(tool_name: &str, result: &str, theme: Theme) -> String {
-    let output = tools::format_tool_output(tool_name, result);
+    let output = aries_agent::tools::format_tool_output(tool_name, result);
     let output = if output.is_empty() { "No output".to_string() } else { output };
 
     let _ = tool_name;

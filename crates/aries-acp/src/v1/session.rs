@@ -9,7 +9,7 @@ use agent_client_protocol::schema::v1::{
     SessionInfo, SetSessionConfigOptionRequest, SetSessionConfigOptionResponse,
 };
 use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
-use aries_core::agents::Mode;
+use aries_agent::Mode;
 use aries_init::Setting;
 use tracing::info;
 

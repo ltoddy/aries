@@ -8,7 +8,7 @@ use std::path::Path;
 
 use aries_extension::skill::definition::SkillDefinition;
 
-use crate::agents::Mode;
+use crate::mode::Mode;
 
 pub async fn render(
     cwd: impl AsRef<Path>,

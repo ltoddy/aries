@@ -5,10 +5,10 @@ use agent_client_protocol::schema::v1::{
     ToolCallContent, ToolCallId, ToolCallLocation, ToolCallStatus, ToolCallUpdate,
     ToolCallUpdateFields, ToolKind,
 };
-use aries_core::event::{AgentEvent, AgentSignal};
-use aries_core::tools::format_tool_output;
+use aries_agent::event::{AgentEvent, AgentSignal};
+use aries_agent::tools::{agent, format_tool_output};
 use aries_tools::{
-    agent, bash, batch, codesearch, edit, glob, grep, ls, lsp, multiedit, question, read, skill,
+    bash, batch, codesearch, edit, glob, grep, ls, lsp, multiedit, question, read, skill,
     update_plan, webfetch, websearch, write,
 };
 use itertools::Itertools;

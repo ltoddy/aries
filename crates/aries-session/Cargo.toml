@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 anyhow.workspace = true
+aries-agent = { version = "0.1.0", path = "../aries-agent" }
 aries-context = { path = "../aries-context" }
 aries-core = { path = "../aries-core" }
 aries-extension = { path = "../aries-extension" }

@@ -1,6 +1,5 @@
+use aries_tools::{RenderError, ToolArgsRender};
 use serde::{Deserialize, Serialize};
-
-use crate::{RenderError, ToolArgsRender};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AgentArgs {

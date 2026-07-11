@@ -1,4 +1,3 @@
-pub mod agent;
 pub mod bash;
 pub mod batch;
 pub mod codesearch;

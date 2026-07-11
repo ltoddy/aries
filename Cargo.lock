@@ -143,8 +143,8 @@ version = "0.1.0"
 dependencies = [
  "agent-client-protocol",
  "anyhow",
+ "aries-agent",
  "aries-context",
- "aries-core",
  "aries-extension",
  "aries-init",
  "aries-session",
@@ -160,6 +160,24 @@ dependencies = [
 [[package]]
 name = "aries-agent"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aries-extension",
+ "aries-filesystem",
+ "aries-lspclient",
+ "aries-tools",
+ "futures",
+ "git2",
+ "itertools",
+ "nanoid 0.5.0",
+ "regex-lite",
+ "rig-core",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
 
 [[package]]
 name = "aries-cli"
@@ -168,8 +186,8 @@ dependencies = [
  "agent-client-protocol",
  "anyhow",
  "aries-acp",
+ "aries-agent",
  "aries-context",
- "aries-core",
  "aries-init",
  "aries-logger",
  "aries-persistence",
@@ -205,31 +223,18 @@ dependencies = [
 name = "aries-core"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "aries-extension",
- "aries-filesystem",
- "aries-lspclient",
  "aries-memory",
  "aries-tools",
- "futures",
- "git2",
- "itertools",
- "nanoid 0.5.0",
- "regex-lite",
  "rig-core",
  "schemars 1.2.1",
  "serde",
  "serde_json",
- "thiserror 2.0.18",
- "tokio",
- "tracing",
 ]
 
 [[package]]
 name = "aries-extension"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "aries-filesystem",
  "futures",
  "http",
@@ -337,6 +342,7 @@ name = "aries-session"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aries-agent",
  "aries-context",
  "aries-core",
  "aries-extension",

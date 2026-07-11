@@ -1,7 +1,3 @@
-pub mod builder;
-pub mod compact;
-pub mod mode;
-
 use futures::StreamExt;
 use rig_core::agent::{Agent, FinalResponse, MultiTurnStreamItem, PromptHook, StreamingResult};
 use rig_core::completion::{CompletionModel, Message};
@@ -9,9 +5,6 @@ use rig_core::streaming::StreamingPrompt;
 use rig_core::wasm_compat::WasmCompatSend;
 use tokio::sync::mpsc::UnboundedSender;
 
-pub use crate::agents::builder::AgentBuilder;
-pub use crate::agents::compact::{CompactAgent, CompactOutcome};
-pub use crate::agents::mode::Mode;
 use crate::event::AgentEvent;
 use crate::{AriesError, AriesResult};
 
