@@ -5,11 +5,12 @@ use std::path::Path;
 
 use aries_agent::event::AgentEvent;
 use aries_agent::{AgentBuilder, AriesResult, Mode};
-use aries_core::extractor::{ExtractedMemory, MemoryExtractor};
 use aries_extension::AgentExtensions;
 use aries_init::ModelConfig;
 use aries_lspclient::SharedLspClient;
-use aries_memory::{ManifestEntry, MemoryFrontmatter, MemoryStore};
+use aries_memory::{
+    ExtractedMemory, ManifestEntry, MemoryExtractor, MemoryFrontmatter, MemoryStore,
+};
 use rig_core::agent::{FinalResponse, PromptHook};
 use rig_core::completion::Message;
 use rig_core::providers::{anthropic, azure, deepseek, openai};

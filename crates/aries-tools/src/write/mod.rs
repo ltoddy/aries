@@ -16,6 +16,12 @@ pub const NAME: &str = "Write";
 
 pub struct WriteTool;
 
+impl Default for WriteTool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WriteTool {
     pub fn new() -> Self {
         Self {}

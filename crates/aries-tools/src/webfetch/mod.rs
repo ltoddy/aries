@@ -13,6 +13,12 @@ pub const NAME: &str = "WebFetch";
 
 pub struct WebFetchTool;
 
+impl Default for WebFetchTool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WebFetchTool {
     pub fn new() -> Self {
         Self {}

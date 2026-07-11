@@ -16,6 +16,12 @@ pub const NAME: &str = "MultiEdit";
 
 pub struct MultiEditTool;
 
+impl Default for MultiEditTool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MultiEditTool {
     pub fn new() -> Self {
         Self {}

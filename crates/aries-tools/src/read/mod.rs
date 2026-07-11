@@ -16,6 +16,12 @@ pub const NAME: &str = "Read";
 
 pub struct ReadTool;
 
+impl Default for ReadTool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ReadTool {
     pub fn new() -> Self {
         Self {}

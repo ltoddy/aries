@@ -13,6 +13,12 @@ pub const NAME: &str = "WebSearch";
 
 pub struct WebSearchTool;
 
+impl Default for WebSearchTool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WebSearchTool {
     pub fn new() -> Self {
         Self {}

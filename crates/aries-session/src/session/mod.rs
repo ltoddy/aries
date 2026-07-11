@@ -8,9 +8,10 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use aries_agent::event::AgentEvent;
-use aries_agent::{CompactAgent, CompactOutcome, Mode, preamble};
-use aries_core::compact;
-use aries_core::compact::{AutoCompactBreaker, Decision, TokenEstimator};
+use aries_agent::{Mode, preamble};
+use aries_compact::{
+    self, AutoCompactBreaker, CompactAgent, CompactOutcome, Decision, TokenEstimator,
+};
 use aries_extension::agent::CustomAgentsLoader;
 use aries_extension::hook::input::{
     PostCompactHookInput, PostCompactTrigger, PreCompactCustomInstructions, PreCompactHookInput,
@@ -298,9 +299,9 @@ impl Session {
             return Err(anyhow::anyhow!(reason));
         }
 
-        compact::micro_compact(self.chat_context.history_mut());
+        aries_compact::micro_compact(self.chat_context.history_mut());
 
-        let window = compact::ContextWindow::for_model(self.config.model());
+        let window = aries_compact::ContextWindow::for_model(self.config.model());
         let compact_threshold = window.auto_compact_threshold();
         let estimate_tokens =
             self.chat_context.history().estimate_tokens().saturating_add(prompt.estimate_tokens());
@@ -419,7 +420,7 @@ impl Session {
             CompactOutcome::Success((compressed, compact_summary)) => {
                 self.chat_context.overwrite(compressed).await;
 
-                let window = compact::ContextWindow::for_model(self.config.model());
+                let window = aries_compact::ContextWindow::for_model(self.config.model());
                 let post_tokens = self.chat_context.history().estimate_tokens();
                 let threshold = window.auto_compact_threshold();
                 if post_tokens >= threshold {

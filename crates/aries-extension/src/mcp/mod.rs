@@ -29,7 +29,7 @@ pub async fn connect(
     let mut tools = Vec::<Box<dyn ToolDyn>>::new();
     let mut services = Vec::<RunningService<RoleClient, ClientInfo>>::new();
 
-    let mcp_servers = mcps.into_iter().flat_map(|c| &c.mcp_servers).collect::<Vec<_>>();
+    let mcp_servers = mcps.iter().flat_map(|c| &c.mcp_servers).collect::<Vec<_>>();
 
     for (server_name, server_config) in mcp_servers {
         match connect_one(server_name, server_config).await {
@@ -70,7 +70,7 @@ async fn connect_one(
         },
         McpServerConfig::Sse(Sse { url, headers }) => {
             let custom_headers: HashMap<HeaderName, HeaderValue> = headers
-                .into_iter()
+                .iter()
                 .filter_map(|(k, v)| Some((k.parse().ok()?, v.parse().ok()?)))
                 .collect::<HashMap<_, _>>();
             let config = StreamableHttpClientTransportConfig::with_uri(url.to_owned())
@@ -83,7 +83,7 @@ async fn connect_one(
         },
         McpServerConfig::Http(Http { url, headers }) => {
             let custom_headers: HashMap<HeaderName, HeaderValue> = headers
-                .into_iter()
+                .iter()
                 .filter_map(|(k, v)| Some((k.parse().ok()?, v.parse().ok()?)))
                 .collect::<HashMap<_, _>>();
             let config = StreamableHttpClientTransportConfig::with_uri(url.to_owned())

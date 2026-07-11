@@ -18,6 +18,12 @@ pub const NAME: &str = "Bash";
 
 pub struct BashTool;
 
+impl Default for BashTool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BashTool {
     pub fn new() -> Self {
         Self {}

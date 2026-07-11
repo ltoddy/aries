@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Context;
+use aries_agent::AriesAgent;
 use aries_filesystem::jsonl;
 use regex_lite::Regex;
 use rig_core::client::CompletionClient;
@@ -10,9 +11,7 @@ use rig_core::message::{AssistantContent, ReasoningContent, UserContent};
 use rig_core::{completion, message};
 use tracing::info;
 
-use crate::agent::AriesAgent;
-
-const PREAMBLE: &str = include_str!("prompts/compact.md");
+const PREAMBLE: &str = include_str!("preamble.md");
 const NAME: &str = "Archivist";
 const DESCRIPTION: &str = "Summarises a conversation transcript into a structured digest.";
 

@@ -1,11 +1,12 @@
-use aries_memory::MemoryType;
 use rig_core::client::CompletionClient;
 use rig_core::completion::CompletionModel;
 use rig_core::extractor::Extractor;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-const PREAMBLE: &str = include_str!("prompts/memory.md");
+use crate::MemoryType;
+
+const PREAMBLE: &str = include_str!("preamble.md");
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ExtractedMemories {

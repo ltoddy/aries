@@ -1,6 +1,5 @@
 pub mod agent;
 pub mod builder;
-pub mod compact_agent;
 pub mod event;
 pub mod mode;
 pub mod preamble;
@@ -41,6 +40,5 @@ pub type AriesResult<T, E = AriesError> = Result<T, E>;
 // Re-exports to match the old `aries_core` paths
 pub use crate::agent::{AGENT_LOOP_MAX_TURNS, AriesAgent};
 pub use crate::builder::AgentBuilder;
-pub use crate::compact_agent::{CompactAgent, CompactOutcome, compact_summary};
 pub use crate::event::{AgentEvent, AgentSignal, earse};
 pub use crate::mode::Mode;
