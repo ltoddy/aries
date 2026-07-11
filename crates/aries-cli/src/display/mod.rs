@@ -3,7 +3,7 @@ use std::io::Write;
 
 use aries_core::event::{AgentEvent, AgentSignal};
 use aries_core::tools;
-use aries_core::tools::update_plan::{PlanEntry, PlanEntryPriority, PlanEntryStatus};
+use aries_tools::update_plan::{PlanEntry, PlanEntryPriority, PlanEntryStatus};
 use itertools::Itertools;
 use rig_core::agent::MultiTurnStreamItem;
 use rig_core::message::ToolResultContent;
@@ -81,23 +81,23 @@ pub fn format_tool_call_args(
 fn is_known_tool(tool_name: &str) -> bool {
     matches!(
         tool_name,
-        tools::agent::NAME
-            | tools::bash::NAME
-            | tools::batch::NAME
-            | tools::codesearch::NAME
-            | tools::edit::NAME
-            | tools::glob::NAME
-            | tools::grep::NAME
-            | tools::ls::NAME
-            | tools::lsp::NAME
-            | tools::multiedit::NAME
-            | tools::question::NAME
-            | tools::read::NAME
-            | tools::skill::NAME
-            | tools::update_plan::NAME
-            | tools::webfetch::NAME
-            | tools::websearch::NAME
-            | tools::write::NAME
+        aries_tools::agent::NAME
+            | aries_tools::bash::NAME
+            | aries_tools::batch::NAME
+            | aries_tools::codesearch::NAME
+            | aries_tools::edit::NAME
+            | aries_tools::glob::NAME
+            | aries_tools::grep::NAME
+            | aries_tools::ls::NAME
+            | aries_tools::lsp::NAME
+            | aries_tools::multiedit::NAME
+            | aries_tools::question::NAME
+            | aries_tools::read::NAME
+            | aries_tools::skill::NAME
+            | aries_tools::update_plan::NAME
+            | aries_tools::webfetch::NAME
+            | aries_tools::websearch::NAME
+            | aries_tools::write::NAME
     )
 }
 

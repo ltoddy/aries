@@ -1,40 +1,32 @@
 pub mod agent;
-pub mod bash;
-pub mod batch;
-pub mod codesearch;
-pub mod edit;
-pub mod glob;
-pub mod grep;
-pub mod ls;
-pub mod lsp;
-pub mod multiedit;
-pub mod question;
-pub mod read;
-pub mod skill;
-pub mod update_plan;
-pub mod webfetch;
-pub mod websearch;
-pub mod write;
+
+use std::path::PathBuf;
 
 use aries_extension::skill::SkillDefinition;
+use aries_tools::bash::{BashArgs, BashOutput, BashTool};
+use aries_tools::batch::{BatchArgs, BatchOutput, BatchTool};
+use aries_tools::codesearch::{CodeSearchArgs, CodeSearchOutput, CodeSearchTool};
+use aries_tools::edit::{EditArgs, EditOutput, EditTool};
+use aries_tools::glob::{GlobArgs, GlobOutput, GlobTool};
+use aries_tools::grep::{GrepArgs, GrepOutput, GrepTool};
+use aries_tools::ls::{LsArgs, LsOutput, LsTool};
+use aries_tools::lsp::{LspArgs, LspOutput, LspTool};
+use aries_tools::multiedit::{MultiEditArgs, MultiEditOutput, MultiEditTool};
+use aries_tools::question::{AskUserQuestionArgs, AskUserQuestionOutput, AskUserQuestionTool};
+use aries_tools::read::{ReadArgs, ReadOutput, ReadTool};
+use aries_tools::skill::{SkillArgs, SkillOutput, SkillTool};
+use aries_tools::update_plan::{UpdatePlanArgs, UpdatePlanOutput, UpdatePlanTool};
+use aries_tools::webfetch::{WebFetchArgs, WebFetchOutput, WebFetchTool};
+use aries_tools::websearch::{WebSearchArgs, WebSearchOutput, WebSearchTool};
+use aries_tools::write::{WriteArgs, WriteOutput, WriteTool};
+use aries_tools::{
+    bash, batch, codesearch, edit, glob, grep, ls, lsp, multiedit, question, read, skill,
+    update_plan, webfetch, websearch, write,
+};
+use rig_core::tool::Tool;
+use serde_json::Value;
 
 pub use crate::tools::agent::{AgentArgs, AgentOutput, AgentTool};
-pub use crate::tools::bash::{BashArgs, BashOutput, BashTool};
-pub use crate::tools::batch::{BatchArgs, BatchOutput, BatchTool};
-pub use crate::tools::codesearch::{CodeSearchArgs, CodeSearchOutput, CodeSearchTool};
-pub use crate::tools::edit::{EditArgs, EditOutput, EditTool};
-pub use crate::tools::glob::{GlobArgs, GlobOutput, GlobTool};
-pub use crate::tools::grep::{GrepArgs, GrepOutput, GrepTool};
-pub use crate::tools::ls::{LsArgs, LsOutput, LsTool};
-pub use crate::tools::lsp::{LspArgs, LspOutput, LspTool};
-pub use crate::tools::multiedit::{MultiEditArgs, MultiEditOutput, MultiEditTool};
-pub use crate::tools::question::{AskUserQuestionArgs, AskUserQuestionOutput, AskUserQuestionTool};
-pub use crate::tools::read::{ReadArgs, ReadOutput, ReadTool};
-pub use crate::tools::skill::{SkillArgs, SkillOutput, SkillTool};
-pub use crate::tools::update_plan::{UpdatePlanArgs, UpdatePlanOutput, UpdatePlanTool};
-pub use crate::tools::webfetch::{WebFetchArgs, WebFetchOutput, WebFetchTool};
-pub use crate::tools::websearch::{WebSearchArgs, WebSearchOutput, WebSearchTool};
-pub use crate::tools::write::{WriteArgs, WriteOutput, WriteTool};
 
 pub const ALL_TOOL_NAMES: &[&str] = &[
     agent::NAME,
@@ -70,7 +62,9 @@ pub fn create_tools(
         let tool: Box<dyn rig_core::tool::ToolDyn> = match name {
             agent::NAME => continue, // generic over client, skip
             bash::NAME => Box::new(BashTool),
-            batch::NAME => Box::new(BatchTool::new(cwd.clone())),
+            batch::NAME => Box::new(BatchTool::new(cwd.clone(), move |tool_name, params, cwd| {
+                Box::pin(dispatch_batch_call(tool_name, params, cwd))
+            })),
             codesearch::NAME => Box::new(CodeSearchTool),
             edit::NAME => Box::new(EditTool),
             glob::NAME => Box::new(GlobTool::new(cwd.clone())),
@@ -92,7 +86,17 @@ pub fn create_tools(
                 }
                 Box::new(SkillTool::new(skills.to_vec()))
             },
-            update_plan::NAME => Box::new(UpdatePlanTool::new(sender.clone())),
+            update_plan::NAME => {
+                let sender = sender.clone();
+                Box::new(UpdatePlanTool::new(move |entries| {
+                    let event = crate::event::AgentEvent::from_plan(true, "main", entries);
+                    sender.send(event).map_err(|_| {
+                        aries_tools::update_plan::UpdatePlanError::SendFailed(
+                            "receiver dropped".to_owned(),
+                        )
+                    })
+                }))
+            },
             webfetch::NAME => Box::new(WebFetchTool),
             websearch::NAME => Box::new(WebSearchTool),
             write::NAME => Box::new(WriteTool),
@@ -102,6 +106,102 @@ pub fn create_tools(
     }
 
     tools
+}
+
+async fn dispatch_batch_call(
+    tool_name: String,
+    params: Value,
+    cwd: PathBuf,
+) -> Result<Value, String> {
+    match tool_name.as_str() {
+        bash::NAME => {
+            let args: BashArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
+            Tool::call(&BashTool, args)
+                .await
+                .map(|res| serde_json::to_value(res).unwrap())
+                .map_err(|e| e.to_string())
+        },
+        read::NAME => {
+            let args: ReadArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
+            Tool::call(&ReadTool, args)
+                .await
+                .map(|res| serde_json::to_value(res).unwrap())
+                .map_err(|e| e.to_string())
+        },
+        write::NAME => {
+            let args: WriteArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
+            Tool::call(&WriteTool, args)
+                .await
+                .map(|res| serde_json::to_value(res).unwrap())
+                .map_err(|e| e.to_string())
+        },
+        glob::NAME => {
+            let args: GlobArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
+            Tool::call(&GlobTool::new(cwd), args)
+                .await
+                .map(|res| serde_json::to_value(res).unwrap())
+                .map_err(|e| e.to_string())
+        },
+        grep::NAME => {
+            let args: GrepArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
+            Tool::call(&GrepTool::new(cwd), args)
+                .await
+                .map(|res| serde_json::to_value(res).unwrap())
+                .map_err(|e| e.to_string())
+        },
+        ls::NAME => {
+            let args: LsArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
+            Tool::call(&LsTool::new(cwd), args)
+                .await
+                .map(|res| serde_json::to_value(res).unwrap())
+                .map_err(|e| e.to_string())
+        },
+        multiedit::NAME => {
+            let args: MultiEditArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
+            Tool::call(&MultiEditTool, args)
+                .await
+                .map(|res| serde_json::to_value(res).unwrap())
+                .map_err(|e| e.to_string())
+        },
+        edit::NAME => {
+            let args: EditArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
+            Tool::call(&EditTool, args)
+                .await
+                .map(|res| serde_json::to_value(res).unwrap())
+                .map_err(|e| e.to_string())
+        },
+        question::NAME => {
+            let args: AskUserQuestionArgs =
+                serde_json::from_value(params).map_err(|e| e.to_string())?;
+            Tool::call(&AskUserQuestionTool, args)
+                .await
+                .map(|res| serde_json::to_value(res).unwrap())
+                .map_err(|e| e.to_string())
+        },
+        agent::NAME => Err("AgentTool is not allowed in batch".to_string()),
+        webfetch::NAME => {
+            let args: WebFetchArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
+            Tool::call(&WebFetchTool, args)
+                .await
+                .map(|res| serde_json::to_value(res).unwrap())
+                .map_err(|e| e.to_string())
+        },
+        websearch::NAME => {
+            let args: WebSearchArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
+            Tool::call(&WebSearchTool, args)
+                .await
+                .map(|res| serde_json::to_value(res).unwrap())
+                .map_err(|e| e.to_string())
+        },
+        codesearch::NAME => {
+            let args: CodeSearchArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
+            Tool::call(&CodeSearchTool, args)
+                .await
+                .map(|res| serde_json::to_value(res).unwrap())
+                .map_err(|e| e.to_string())
+        },
+        _ => Err(format!("Tool '{}' not found or not supported in batch", tool_name)),
+    }
 }
 
 pub fn format_tool_args(tool_name: &str, raw_json: &str) -> (String, Option<String>) {
@@ -154,16 +254,4 @@ pub fn format_tool_output(tool_name: &str, raw_json: &str) -> String {
     result.unwrap_or_else(|_| raw_json.to_string())
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum RenderError {
-    #[error("failed to deserialize tool data: {0}")]
-    Deserialize(#[from] serde_json::Error),
-}
-
-pub trait ToolArgsRender {
-    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError>;
-}
-
-pub trait ToolOutputRender {
-    fn render_output(raw: &str) -> Result<String, RenderError>;
-}
+pub use aries_tools::{RenderError, ToolArgsRender, ToolOutputRender};

@@ -1,208 +1,16 @@
-use std::fmt::{Display, Formatter};
+mod args;
+mod error;
+mod output;
+
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
-use aries_lspclient::{DocumentSymbolItem, LspResult, SharedLspClient};
+use aries_lspclient::{LspResult, SharedLspClient};
 use rig_core::completion::ToolDefinition;
 use rig_core::tool::Tool;
-use serde::{Deserialize, Serialize};
 
-use crate::tools::{RenderError, ToolArgsRender, ToolOutputRender};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub enum LspOperation {
-    GoToDefinition,
-    FindReferences,
-    Hover,
-    DocumentSymbol,
-    WorkspaceSymbol,
-    GoToImplementation,
-    PrepareCallHierarchy,
-    IncomingCalls,
-    OutgoingCalls,
-}
-
-impl Display for LspOperation {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LspOperation::GoToDefinition => write!(f, "goToDefinition"),
-            LspOperation::FindReferences => write!(f, "findReferences"),
-            LspOperation::Hover => write!(f, "hover"),
-            LspOperation::DocumentSymbol => write!(f, "documentSymbol"),
-            LspOperation::WorkspaceSymbol => write!(f, "workspaceSymbol"),
-            LspOperation::GoToImplementation => write!(f, "goToImplementation"),
-            LspOperation::PrepareCallHierarchy => write!(f, "prepareCallHierarchy"),
-            LspOperation::IncomingCalls => write!(f, "incomingCalls"),
-            LspOperation::OutgoingCalls => write!(f, "outgoingCalls"),
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct LspArgs {
-    pub operation: LspOperation,
-    pub file_path: Option<PathBuf>,
-    pub line: Option<u32>,
-    pub character: Option<u32>,
-    pub query: Option<String>,
-}
-
-impl LspArgs {
-    pub fn title(&self) -> String {
-        match (&self.file_path, &self.query) {
-            (Some(path), _) => format!("Run {} on {}", self.operation, path.display()),
-            (None, Some(query)) => format!("Run {} for {}", self.operation, query),
-            (None, None) => format!("Run {}", self.operation),
-        }
-    }
-}
-
-impl ToolArgsRender for LspArgs {
-    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
-        let args: Self = serde_json::from_str(raw)?;
-
-        let mut first = format!("{}", args.operation);
-        if let Some(path) = args.file_path {
-            first.push_str(&format!(" {}", path.display()));
-        }
-        if let Some(line) = args.line {
-            first.push_str(&format!(":{line}"));
-        }
-        if let Some(character) = args.character {
-            first.push_str(&format!(":{character}"));
-        }
-        if let Some(query) = args.query {
-            first.push_str(&format!(" query = {query}"));
-        }
-
-        Ok((first, None))
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct LspOutput {
-    pub result: LspResult,
-}
-
-impl ToolOutputRender for LspOutput {
-    fn render_output(raw: &str) -> Result<String, RenderError> {
-        let output: Self = serde_json::from_str(raw)?;
-        let content = match &output.result {
-            LspResult::Definition(locations)
-            | LspResult::References(locations)
-            | LspResult::Implementation(locations) => locations
-                .iter()
-                .map(|loc| {
-                    format!(
-                        "{}:{}:{}",
-                        loc.uri.strip_prefix("file://").unwrap_or(&loc.uri),
-                        loc.range.start.line + 1,
-                        loc.range.start.character + 1
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join("\n"),
-            LspResult::Hover(Some(hover)) => extract_hover_text(&hover.contents),
-            LspResult::Hover(None) => String::new(),
-            LspResult::DocumentSymbol(symbols) => symbols
-                .iter()
-                .map(|s| match s {
-                    DocumentSymbolItem::Flat(s) => {
-                        let loc = format!(
-                            "{}:{}",
-                            s.location.uri.strip_prefix("file://").unwrap_or(&s.location.uri),
-                            s.location.range.start.line + 1
-                        );
-                        format!("{} [{}] {}", s.name, s.kind, loc)
-                    },
-                    DocumentSymbolItem::Hierarchical(s) => {
-                        format!("{} [{}] line {}", s.name, s.kind, s.range.start.line + 1)
-                    },
-                })
-                .collect::<Vec<_>>()
-                .join("\n"),
-            LspResult::WorkspaceSymbol(symbols) => symbols
-                .iter()
-                .map(|s| {
-                    let loc = format!(
-                        "{}:{}",
-                        s.location.uri.strip_prefix("file://").unwrap_or(&s.location.uri),
-                        s.location.range.start.line + 1
-                    );
-                    format!("{} [{}] {}", s.name, s.kind, loc)
-                })
-                .collect::<Vec<_>>()
-                .join("\n"),
-            LspResult::PrepareCallHierarchy(items) => items
-                .iter()
-                .map(|item| {
-                    format!(
-                        "{} [{}] {}",
-                        item.name,
-                        item.kind,
-                        item.uri.strip_prefix("file://").unwrap_or(&item.uri)
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join("\n"),
-            LspResult::IncomingCalls(calls) => calls
-                .iter()
-                .map(|c| {
-                    format!(
-                        "{} [{}] {}",
-                        c.from.name,
-                        c.from.kind,
-                        c.from.uri.strip_prefix("file://").unwrap_or(&c.from.uri)
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join("\n"),
-            LspResult::OutgoingCalls(calls) => calls
-                .iter()
-                .map(|c| {
-                    format!(
-                        "{} [{}] {}",
-                        c.to.name,
-                        c.to.kind,
-                        c.to.uri.strip_prefix("file://").unwrap_or(&c.to.uri)
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join("\n"),
-        };
-        Ok(content)
-    }
-}
-
-fn extract_hover_text(contents: &serde_json::Value) -> String {
-    match contents {
-        serde_json::Value::String(s) => s.clone(),
-        serde_json::Value::Object(obj) => {
-            obj.get("value").and_then(|v| v.as_str()).unwrap_or_default().to_owned()
-        },
-        serde_json::Value::Array(arr) => arr
-            .iter()
-            .filter_map(|item| match item {
-                serde_json::Value::String(s) => Some(s.as_str()),
-                serde_json::Value::Object(obj) => obj.get("value").and_then(|v| v.as_str()),
-                _ => None,
-            })
-            .collect::<Vec<_>>()
-            .join("\n"),
-        _ => String::new(),
-    }
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum LspError {
-    #[error("LSP operation failed: {0}")]
-    OperationFailed(String),
-    #[error("Invalid input: {0}")]
-    InvalidInput(String),
-    #[error("{0}")]
-    IO(#[from] std::io::Error),
-}
+pub use self::args::{LspArgs, LspOperation};
+pub use self::error::LspError;
+pub use self::output::LspOutput;
 
 pub const NAME: &str = "Lsp";
 
@@ -248,7 +56,7 @@ impl Tool for LspTool {
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
             name: Self::NAME.to_owned(),
-            description: include_str!("lsp.md").to_owned(),
+            description: include_str!("description.md").to_owned(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {

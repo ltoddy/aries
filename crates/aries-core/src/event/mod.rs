@@ -1,8 +1,7 @@
+use aries_tools::update_plan::PlanEntry;
 use rig_core::agent::MultiTurnStreamItem;
 use rig_core::message::Text;
 use rig_core::streaming::StreamedAssistantContent;
-
-use crate::tools::update_plan::PlanEntry;
 
 #[derive(Debug, Clone)]
 pub struct AgentEvent {

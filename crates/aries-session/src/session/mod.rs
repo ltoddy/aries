@@ -28,7 +28,6 @@ use futures::pin_mut;
 use rig_core::agent::FinalResponse;
 use rig_core::completion::Message;
 use rig_core::message::UserContent;
-use rig_core::tool::ToolDyn;
 use rig_core::wasm_compat::WasmCompatSend;
 use rmcp::RoleClient;
 use rmcp::model::ClientInfo;

@@ -1,60 +1,15 @@
 use std::path::PathBuf;
 
-use anyhow::Result;
+pub use aries_tools::agent::{AgentArgs, AgentOutput, NAME};
 use futures::StreamExt;
 use rig_core::agent::{MultiTurnStreamItem, StreamingError};
 use rig_core::client::CompletionClient;
 use rig_core::completion::{Message, ToolDefinition};
 use rig_core::tool::Tool;
-use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::agents::{AgentBuilder, Mode};
 use crate::event::AgentEvent;
-use crate::tools::{RenderError, ToolArgsRender, ToolOutputRender};
-
-pub const NAME: &str = "Agent";
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct AgentArgs {
-    pub description: String,
-    pub prompt: String,
-    pub mode: String,
-    pub task_id: Option<String>,
-}
-
-impl AgentArgs {
-    pub fn title(&self) -> String {
-        format!("Launch {} subagent: {}", self.mode, self.description)
-    }
-}
-
-impl ToolArgsRender for AgentArgs {
-    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
-        let args: Self = serde_json::from_str(raw)?;
-
-        let mut first = args.description;
-        first.push_str(&format!(", mode = {}", args.mode));
-        if let Some(task_id) = &args.task_id {
-            first.push_str(&format!(", task_id = {}", task_id));
-        }
-
-        Ok((first, Some(args.prompt)))
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct AgentOutput {
-    pub task_id: String,
-    pub result: String,
-}
-
-impl ToolOutputRender for AgentOutput {
-    fn render_output(raw: &str) -> Result<String, RenderError> {
-        let output: Self = serde_json::from_str(raw)?;
-        Ok(output.result)
-    }
-}
 
 pub struct AgentTool<C>
 where

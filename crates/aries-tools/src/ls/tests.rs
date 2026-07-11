@@ -6,16 +6,10 @@ use super::*;
 
 #[test]
 fn test_ls_args_title() {
-    let args = LsArgs {
-        path: Some(PathBuf::from("/tmp")),
-        ignore: None,
-    };
+    let args = LsArgs { path: Some(PathBuf::from("/tmp")), ignore: None };
     assert_eq!(args.title(), "List the /tmp directory's contents");
 
-    let args = LsArgs {
-        path: None,
-        ignore: None,
-    };
+    let args = LsArgs { path: None, ignore: None };
     assert_eq!(args.title(), "List the . directory's contents");
 }
 
@@ -23,26 +17,12 @@ fn test_ls_args_title() {
 async fn test_ls_lists_directory() {
     let tmp = tempfile::TempDir::new().unwrap();
     let tool = LsTool::new(tmp.path().to_path_buf());
-    let result = tool
-        .call(LsArgs {
-            path: None,
-            ignore: None,
-        })
-        .await
-        .unwrap();
+    let result = tool.call(LsArgs { path: None, ignore: None }).await.unwrap();
     assert!(result.entries.is_empty());
 
     // Create a file and verify it appears
-    tokio::fs::write(tmp.path().join("hello.txt"), "content")
-        .await
-        .unwrap();
-    let result = tool
-        .call(LsArgs {
-            path: None,
-            ignore: None,
-        })
-        .await
-        .unwrap();
+    tokio::fs::write(tmp.path().join("hello.txt"), "content").await.unwrap();
+    let result = tool.call(LsArgs { path: None, ignore: None }).await.unwrap();
     assert!(result.entries.iter().any(|e| e == "hello.txt"));
 }
 
@@ -53,13 +33,8 @@ async fn test_ls_filters_by_ignore() {
     tokio::fs::write(tmp.path().join("b.log"), "").await.unwrap();
 
     let tool = LsTool::new(tmp.path().to_path_buf());
-    let result = tool
-        .call(LsArgs {
-            path: None,
-            ignore: Some(vec!["*.log".to_string()]),
-        })
-        .await
-        .unwrap();
+    let result =
+        tool.call(LsArgs { path: None, ignore: Some(vec!["*.log".to_string()]) }).await.unwrap();
     assert!(result.entries.iter().any(|e| e == "a.txt"));
     assert!(!result.entries.iter().any(|e| e == "b.log"));
 }

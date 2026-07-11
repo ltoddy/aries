@@ -19,6 +19,7 @@ aries-logger = { path = "../aries-logger" }
 aries-persistence = { path = "../aries-persistence" }
 aries-session = { path = "../aries-session" }
 aries-tokenopt = { path = "../aries-tokenopt" }
+aries-tools = { path = "../aries-tools" }
 clap = { workspace = true, features = ["derive"] }
 colored.workspace = true
 dark-light.workspace = true
@@ -29,8 +30,8 @@ itertools.workspace = true
 nanoid.workspace = true
 prettytable.workspace = true
 rig-core.workspace = true
-rustyline-derive.workspace = true
 rustyline.workspace = true
+rustyline-derive.workspace = true
 serde_json.workspace = true
 terminal_size.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "fs", "process"] }

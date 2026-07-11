@@ -15,7 +15,7 @@ impl GlobArgs {
         match &self.base_dir {
             Some(base_dir) => {
                 format!("Find files matching {} in {}", self.pattern, base_dir.display())
-            }
+            },
             None => format!("Find files matching {}", self.pattern),
         }
     }

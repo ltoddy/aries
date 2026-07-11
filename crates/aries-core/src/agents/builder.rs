@@ -118,31 +118,31 @@ where
 
     fn build_tools(&self, available_skills: &[SkillDefinition]) -> Vec<Box<dyn ToolDyn>> {
         let mut names: Vec<&str> = vec![
-            tools::bash::NAME,
-            tools::read::NAME,
-            tools::glob::NAME,
-            tools::grep::NAME,
-            tools::ls::NAME,
-            tools::codesearch::NAME,
-            tools::webfetch::NAME,
-            tools::websearch::NAME,
+            aries_tools::bash::NAME,
+            aries_tools::read::NAME,
+            aries_tools::glob::NAME,
+            aries_tools::grep::NAME,
+            aries_tools::ls::NAME,
+            aries_tools::codesearch::NAME,
+            aries_tools::webfetch::NAME,
+            aries_tools::websearch::NAME,
         ];
 
         match self.mode {
             Mode::Build | Mode::General => {
                 names.extend_from_slice(&[
-                    tools::write::NAME,
-                    tools::multiedit::NAME,
-                    tools::edit::NAME,
-                    tools::batch::NAME,
-                    tools::update_plan::NAME,
+                    aries_tools::write::NAME,
+                    aries_tools::multiedit::NAME,
+                    aries_tools::edit::NAME,
+                    aries_tools::batch::NAME,
+                    aries_tools::update_plan::NAME,
                 ]);
-                names.push(tools::question::NAME);
-                names.push(tools::skill::NAME);
-                names.push(tools::lsp::NAME);
+                names.push(aries_tools::question::NAME);
+                names.push(aries_tools::skill::NAME);
+                names.push(aries_tools::lsp::NAME);
             },
             Mode::Plan => {
-                names.push(tools::question::NAME);
+                names.push(aries_tools::question::NAME);
             },
             Mode::Explore => {},
         }

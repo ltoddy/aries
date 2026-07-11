@@ -1,6 +1,5 @@
 use agent_client_protocol::schema::v1 as schema;
-use aries_core::tools::update_plan;
-use aries_core::tools::update_plan::{PlanEntryPriority, PlanEntryStatus};
+use aries_tools::update_plan::{self, PlanEntryPriority, PlanEntryStatus};
 
 pub struct PlanEntry(update_plan::PlanEntry);
 

@@ -4,9 +4,14 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+aries-extension = { path = "../aries-extension" }
+aries-filesystem = { path = "../aries-filesystem" }
+aries-lspclient = { path = "../aries-lspclient" }
 dialoguer.workspace = true
+futures.workspace = true
 globset.workspace = true
 ignore.workspace = true
+itertools.workspace = true
 regex-lite.workspace = true
 reqwest.workspace = true
 rig-core.workspace = true

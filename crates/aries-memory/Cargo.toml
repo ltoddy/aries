@@ -9,4 +9,4 @@ itertools.workspace = true
 schemars.workspace = true
 serde = { workspace = true, features = ["derive"] }
 tokio = { workspace = true, features = ["io-util"] }
-tracing = { workspace = true }
+tracing.workspace = true

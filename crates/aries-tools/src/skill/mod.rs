@@ -1,75 +1,19 @@
-use std::io;
-use std::path::PathBuf;
+mod args;
+mod error;
+mod output;
+#[cfg(test)]
+mod tests;
 
-use anyhow::Result;
 use aries_extension::skill::definition::SkillDefinition;
 use aries_filesystem::path_to_uri;
 use aries_filesystem::walk::walk_dir;
 use itertools::Itertools;
 use rig_core::completion::ToolDefinition;
 use rig_core::tool::Tool;
-use serde::{Deserialize, Serialize};
 
-use crate::tools::{RenderError, ToolArgsRender, ToolOutputRender};
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct SkillArgs {
-    pub name: String,
-}
-
-impl SkillArgs {
-    pub fn title(&self) -> String {
-        format!("Load skill {}", self.name)
-    }
-}
-
-impl ToolArgsRender for SkillArgs {
-    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
-        let args: Self = serde_json::from_str(raw)?;
-        let first = args.name;
-        Ok((first, None))
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct SkillOutput {
-    pub title: String,
-    pub output: String,
-    pub metadata: SkillMetadata,
-}
-
-impl ToolOutputRender for SkillOutput {
-    fn render_output(raw: &str) -> Result<String, RenderError> {
-        let output: Self = serde_json::from_str(raw)?;
-        Ok(output.output)
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct SkillMetadata {
-    pub name: String,
-    pub dir: PathBuf,
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum SkillError {
-    #[error("Failed to load skills: {0}")]
-    Load(#[from] io::Error),
-    #[error("Skill \"{name}\" not found. Available skills: {available}")]
-    NotFound { name: String, available: String },
-    #[error("Skill \"{name}\" is not listed in available_skills. Available skills: {available}")]
-    NotAllowed { name: String, available: String },
-}
-
-impl SkillError {
-    pub fn not_found(name: String, available: String) -> Self {
-        Self::NotFound { name, available }
-    }
-
-    pub fn not_allowed(name: String, available: String) -> Self {
-        Self::NotAllowed { name, available }
-    }
-}
+pub use self::args::SkillArgs;
+pub use self::error::SkillError;
+pub use self::output::{SkillMetadata, SkillOutput};
 
 pub const NAME: &str = "Skill";
 
@@ -100,7 +44,7 @@ impl Tool for SkillTool {
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
             name: Self::NAME.to_owned(),
-            description: include_str!("skill.md").to_owned(),
+            description: include_str!("description.md").to_owned(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -141,7 +85,8 @@ impl Tool for SkillTool {
             format!("# Skill: {}", skill.frontmatter.name),
             skill.body.clone(),
             format!("Base directory for this skill: {}", path_to_uri(dir)),
-            "Relative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.".to_owned(),
+            "Relative paths in this skill (e.g., scripts/, reference/) are relative to this base directory."
+                .to_owned(),
             "Note: file list is sampled.".to_owned(),
             "<skill_files>".to_owned(),
             files,

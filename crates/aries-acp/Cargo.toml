@@ -11,6 +11,7 @@ aries-core = { path = "../aries-core" }
 aries-extension = { path = "../aries-extension" }
 aries-init = { path = "../aries-init" }
 aries-session = { path = "../aries-session" }
+aries-tools = { path = "../aries-tools" }
 itertools.workspace = true
 parking_lot.workspace = true
 rig-core.workspace = true
