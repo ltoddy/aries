@@ -4,8 +4,8 @@ mod output;
 
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input, MultiSelect, Select};
-use rig_core::completion::ToolDefinition;
 use rig_core::tool::Tool;
+use serde_json::Value;
 
 pub use self::args::{AskUserQuestionArgs, AskUserQuestionOption};
 pub use self::error::AskUserQuestionError;
@@ -33,40 +33,40 @@ impl Tool for AskUserQuestionTool {
     type Args = AskUserQuestionArgs;
     type Output = AskUserQuestionOutput;
 
-    async fn definition(&self, _prompt: String) -> ToolDefinition {
-        ToolDefinition {
-            name: Self::NAME.to_owned(),
-            description: include_str!("description.md").to_owned(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "question": {
-                        "type": "string",
-                        "description": "The question to ask the user"
-                    },
-                    "options": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "label": { "type": "string" },
-                                "description": { "type": "string" }
-                            },
-                            "required": ["label"]
-                        }
-                    },
-                    "multiple": {
-                        "type": "boolean",
-                        "description": "Allow selecting multiple options"
-                    },
-                    "custom": {
-                        "type": "boolean",
-                        "description": "Allow the user to type a custom answer (default true)"
+    fn description(&self) -> String {
+        include_str!("description.md").to_owned()
+    }
+
+    fn parameters(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "question": {
+                    "type": "string",
+                    "description": "The question to ask the user"
+                },
+                "options": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "label": { "type": "string" },
+                            "description": { "type": "string" }
+                        },
+                        "required": ["label"]
                     }
                 },
-                "required": ["question"]
-            }),
-        }
+                "multiple": {
+                    "type": "boolean",
+                    "description": "Allow selecting multiple options"
+                },
+                "custom": {
+                    "type": "boolean",
+                    "description": "Allow the user to type a custom answer (default true)"
+                }
+            },
+            "required": ["question"]
+        })
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {

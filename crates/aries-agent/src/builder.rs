@@ -1,17 +1,16 @@
 use std::path::PathBuf;
 
+use aries_event::AgentEvent;
 use aries_extension::AgentExtensions;
-use aries_extension::skill::definition::SkillDefinition;
 use aries_lspclient::SharedLspClient;
+use aries_mode::Mode;
+use aries_tools::agent;
 use rig_core::client::CompletionClient;
 use rig_core::completion;
 use rig_core::tool::ToolDyn;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::agent::{AGENT_LOOP_MAX_TURNS, AriesAgent};
-use crate::event::AgentEvent;
-use crate::mode::Mode;
-use crate::tools;
 
 pub struct AgentBuilder<C>
 where
@@ -96,7 +95,7 @@ where
             )
             .await;
 
-            let mut tools = self.build_tools(&self.extensions.skills);
+            let mut tools = self.build_tools();
             tools.extend(self.mcp_tools);
 
             (preamble, tools)
@@ -117,48 +116,17 @@ where
         (AriesAgent::new(inner, name, preamble, Some(self.sender)), self.receiver)
     }
 
-    fn build_tools(&self, available_skills: &[SkillDefinition]) -> Vec<Box<dyn ToolDyn>> {
-        let mut names: Vec<&str> = vec![
-            aries_tools::bash::NAME,
-            aries_tools::read::NAME,
-            aries_tools::glob::NAME,
-            aries_tools::grep::NAME,
-            aries_tools::ls::NAME,
-            aries_tools::codesearch::NAME,
-            aries_tools::webfetch::NAME,
-            aries_tools::websearch::NAME,
-        ];
-
-        match self.mode {
-            Mode::Build | Mode::General => {
-                names.extend_from_slice(&[
-                    aries_tools::write::NAME,
-                    aries_tools::multiedit::NAME,
-                    aries_tools::edit::NAME,
-                    aries_tools::batch::NAME,
-                    aries_tools::update_plan::NAME,
-                ]);
-                names.push(aries_tools::question::NAME);
-                names.push(aries_tools::skill::NAME);
-                names.push(aries_tools::lsp::NAME);
-            },
-            Mode::Plan => {
-                names.push(aries_tools::question::NAME);
-            },
-            Mode::Explore => {},
-        }
-
-        let mut tools = tools::create_tools(
-            &names,
+    fn build_tools(&self) -> Vec<Box<dyn ToolDyn>> {
+        let mut tools = aries_tools::create_tools_from_mode(
+            self.mode,
             &self.cwd,
-            &self.sender,
-            self.lsp_client.as_ref(),
-            available_skills,
+            self.lsp_client.clone(),
+            &self.extensions.skills,
         );
 
         match self.mode {
             Mode::Build | Mode::General => {
-                tools.push(Box::new(tools::AgentTool::<C>::new(
+                tools.push(Box::new(agent::AgentTool::<C>::new(
                     self.client.clone(),
                     self.model.clone(),
                     self.cwd.clone(),

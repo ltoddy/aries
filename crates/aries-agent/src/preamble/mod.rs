@@ -7,8 +7,7 @@ mod skill;
 use std::path::Path;
 
 use aries_extension::skill::definition::SkillDefinition;
-
-use crate::mode::Mode;
+use aries_mode::Mode;
 
 pub async fn render(
     cwd: impl AsRef<Path>,

@@ -6,8 +6,8 @@ mod tests;
 
 use std::process::Stdio;
 
-use rig_core::completion::ToolDefinition;
 use rig_core::tool::Tool;
+use serde_json::Value;
 use tokio::process::Command;
 
 pub use self::args::BashArgs;
@@ -51,21 +51,21 @@ impl Tool for BashTool {
     type Args = BashArgs;
     type Output = BashOutput;
 
-    async fn definition(&self, _prompt: String) -> ToolDefinition {
-        ToolDefinition {
-            name: Self::NAME.to_owned(),
-            description: include_str!("description.md").to_owned(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "command": {
-                        "type": "string",
-                        "description": "The shell command to execute"
-                    }
-                },
-                "required": ["command"]
-            }),
-        }
+    fn description(&self) -> String {
+        include_str!("description.md").to_owned()
+    }
+
+    fn parameters(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "description": "The shell command to execute"
+                }
+            },
+            "required": ["command"]
+        })
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {

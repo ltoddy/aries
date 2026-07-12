@@ -1,11 +1,11 @@
+use aries_event::AgentEvent;
 use futures::StreamExt;
-use rig_core::agent::{Agent, FinalResponse, MultiTurnStreamItem, PromptHook, StreamingResult};
+use rig_core::agent::{Agent, AgentHook, MultiTurnStreamItem, PromptResponse, StreamingResult};
 use rig_core::completion::{CompletionModel, Message};
 use rig_core::streaming::StreamingPrompt;
 use rig_core::wasm_compat::WasmCompatSend;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::event::AgentEvent;
 use crate::{AriesError, AriesResult};
 
 pub const AGENT_LOOP_MAX_TURNS: usize = 200;
@@ -44,16 +44,16 @@ where
         prompt: impl Into<Message> + WasmCompatSend,
         history: I,
         hook: P,
-    ) -> AriesResult<FinalResponse>
+    ) -> AriesResult<PromptResponse>
     where
         I: IntoIterator<Item = T>,
         T: Into<Message>,
-        P: PromptHook<M> + 'static,
+        P: AgentHook<M> + 'static,
     {
-        let stream = self.inner.stream_prompt(prompt).with_history(history).with_hook(hook).await;
+        let stream = self.inner.stream_prompt(prompt).history(history).add_hook(hook).await;
         tokio::pin!(stream);
 
-        let mut final_res = FinalResponse::empty();
+        let mut final_res = PromptResponse::empty();
         while let Some(chunk) = stream.next().await {
             match chunk {
                 Ok(item) => {
@@ -82,7 +82,7 @@ where
         I: IntoIterator<Item = T>,
         T: Into<Message>,
     {
-        self.inner.stream_prompt(prompt).with_history(history).await
+        self.inner.stream_prompt(prompt).history(history).await
     }
 
     pub fn system_prompt(&self) -> &str {

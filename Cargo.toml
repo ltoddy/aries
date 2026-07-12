@@ -5,6 +5,7 @@ members = [
     "crates/aries-cli",
     "crates/aries-compact",
     "crates/aries-context",
+    "crates/aries-event",
     "crates/aries-extension",
     "crates/aries-filesystem",
     "crates/aries-harness",
@@ -12,6 +13,7 @@ members = [
     "crates/aries-logger",
     "crates/aries-lspclient",
     "crates/aries-memory",
+    "crates/aries-mode",
     "crates/aries-persistence",
     "crates/aries-sandbox",
     "crates/aries-selfimprove",
@@ -45,7 +47,7 @@ parking_lot = "0.12"
 prettytable = { package = "prettytable-rs", version = "0.10" }
 regex-lite = "0.1"
 reqwest = "0.13"
-rig-core = "0.39"
+rig-core = "0.40"
 rmcp = "1.8"
 rustyline = "18.0"
 rustyline-derive = "0.12"
@@ -57,7 +59,7 @@ serde_yaml = "0.9"
 tempfile = "3"
 terminal_size = "0.4"
 thiserror = "2.0"
-toasty = "0.7"
+toasty = "0.8"
 tokio = "1"
 tokio-util = "0.7"
 toml = "1.1"

@@ -2,9 +2,9 @@ mod args;
 mod error;
 mod output;
 
-use rig_core::completion::ToolDefinition;
 use rig_core::tool::Tool;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 pub use self::args::CodeSearchArgs;
 pub use self::error::CodeSearchError;
@@ -71,25 +71,25 @@ impl Tool for CodeSearchTool {
     type Args = CodeSearchArgs;
     type Output = CodeSearchOutput;
 
-    async fn definition(&self, _prompt: String) -> ToolDefinition {
-        ToolDefinition {
-            name: Self::NAME.to_owned(),
-            description: include_str!("description.md").to_owned(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Search query to find relevant context for APIs, Libraries, and SDKs. For example, 'React useState hook examples', 'Python pandas dataframe filtering'."
-                    },
-                    "tokens_num": {
-                        "type": "number",
-                        "description": "Number of tokens to return (1000-50000). Default is 5000 tokens."
-                    }
+    fn description(&self) -> String {
+        include_str!("description.md").to_owned()
+    }
+
+    fn parameters(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Search query to find relevant context for APIs, Libraries, and SDKs. For example, 'React useState hook examples', 'Python pandas dataframe filtering'."
                 },
-                "required": ["query"]
-            }),
-        }
+                "tokens_num": {
+                    "type": "number",
+                    "description": "Number of tokens to return (1000-50000). Default is 5000 tokens."
+                }
+            },
+            "required": ["query"]
+        })
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {

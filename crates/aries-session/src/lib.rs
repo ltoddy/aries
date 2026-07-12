@@ -3,15 +3,16 @@ pub mod session;
 
 use std::path::Path;
 
-use aries_agent::event::AgentEvent;
-use aries_agent::{AgentBuilder, AriesResult, Mode};
+use aries_agent::{AgentBuilder, AriesResult};
+use aries_event::AgentEvent;
 use aries_extension::AgentExtensions;
 use aries_init::ModelConfig;
 use aries_lspclient::SharedLspClient;
 use aries_memory::{
     ExtractedMemory, ManifestEntry, MemoryExtractor, MemoryFrontmatter, MemoryStore,
 };
-use rig_core::agent::{FinalResponse, PromptHook};
+use aries_mode::Mode;
+use rig_core::agent::{AgentHook, PromptResponse};
 use rig_core::completion::Message;
 use rig_core::providers::{anthropic, azure, deepseek, openai};
 use rig_core::tool::ToolDyn;
@@ -178,14 +179,14 @@ impl AriesAgent {
         prompt: impl Into<Message> + WasmCompatSend,
         history: I,
         hook: P,
-    ) -> AriesResult<FinalResponse>
+    ) -> AriesResult<PromptResponse>
     where
         I: IntoIterator<Item = T>,
         T: Into<Message>,
-        P: PromptHook<anthropic::completion::CompletionModel>
-            + PromptHook<azure::CompletionModel>
-            + PromptHook<deepseek::CompletionModel>
-            + PromptHook<openai::CompletionModel>
+        P: AgentHook<anthropic::completion::CompletionModel>
+            + AgentHook<azure::CompletionModel>
+            + AgentHook<deepseek::CompletionModel>
+            + AgentHook<openai::CompletionModel>
             + 'static,
     {
         match self {

@@ -4,11 +4,11 @@ mod output;
 #[cfg(test)]
 mod tests;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use globset::{Glob, GlobSetBuilder};
-use rig_core::completion::ToolDefinition;
 use rig_core::tool::Tool;
+use serde_json::Value;
 use tokio::fs;
 
 pub use self::args::LsArgs;
@@ -22,7 +22,9 @@ pub struct LsTool {
 }
 
 impl LsTool {
-    pub fn new(cwd: PathBuf) -> Self {
+    pub fn new(cwd: impl AsRef<Path>) -> Self {
+        let cwd = cwd.as_ref().to_path_buf();
+
         Self { cwd }
     }
 }
@@ -33,27 +35,27 @@ impl Tool for LsTool {
     type Args = LsArgs;
     type Output = LsOutput;
 
-    async fn definition(&self, _prompt: String) -> ToolDefinition {
-        ToolDefinition {
-            name: Self::NAME.to_owned(),
-            description: include_str!("description.md").to_owned(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "The path to the directory to list (optional)"
+    fn description(&self) -> String {
+        include_str!("description.md").to_owned()
+    }
+
+    fn parameters(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "The path to the directory to list (optional)"
+                },
+                "ignore": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
                     },
-                    "ignore": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
-                        "description": "Optional list of glob patterns to ignore"
-                    }
+                    "description": "Optional list of glob patterns to ignore"
                 }
-            }),
-        }
+            }
+        })
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {

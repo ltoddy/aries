@@ -4,8 +4,8 @@ mod output;
 #[cfg(test)]
 mod tests;
 
-use rig_core::completion::ToolDefinition;
 use rig_core::tool::Tool;
+use serde_json::Value;
 use tokio::fs;
 
 pub use self::args::{EditOperation, MultiEditArgs};
@@ -34,42 +34,42 @@ impl Tool for MultiEditTool {
     type Args = MultiEditArgs;
     type Output = MultiEditOutput;
 
-    async fn definition(&self, _prompt: String) -> ToolDefinition {
-        ToolDefinition {
-            name: Self::NAME.to_owned(),
-            description: include_str!("description.md").to_owned(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "file_path": {
-                        "type": "string",
-                        "description": "The path to the file to modify"
-                    },
-                    "edits": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "old_text": {
-                                    "type": "string",
-                                    "description": "The text to replace"
-                                },
-                                "new_text": {
-                                    "type": "string",
-                                    "description": "The edited text to replace the old_text"
-                                },
-                                "replace_all": {
-                                    "type": "boolean",
-                                    "description": "Replace all occurrences of old_text"
-                                }
-                            },
-                            "required": ["old_text", "new_text"]
-                        }
-                    }
+    fn description(&self) -> String {
+        include_str!("description.md").to_owned()
+    }
+
+    fn parameters(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "file_path": {
+                    "type": "string",
+                    "description": "The path to the file to modify"
                 },
-                "required": ["file_path", "edits"]
-            }),
-        }
+                "edits": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "old_text": {
+                                "type": "string",
+                                "description": "The text to replace"
+                            },
+                            "new_text": {
+                                "type": "string",
+                                "description": "The edited text to replace the old_text"
+                            },
+                            "replace_all": {
+                                "type": "boolean",
+                                "description": "Replace all occurrences of old_text"
+                            }
+                        },
+                        "required": ["old_text", "new_text"]
+                    }
+                }
+            },
+            "required": ["file_path", "edits"]
+        })
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {

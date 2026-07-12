@@ -2,8 +2,8 @@ mod args;
 mod error;
 mod output;
 
-use rig_core::completion::ToolDefinition;
 use rig_core::tool::Tool;
+use serde_json::Value;
 
 pub use self::args::WebFetchArgs;
 pub use self::error::WebFetchError;
@@ -31,26 +31,26 @@ impl Tool for WebFetchTool {
     type Args = WebFetchArgs;
     type Output = WebFetchOutput;
 
-    async fn definition(&self, _prompt: String) -> ToolDefinition {
-        ToolDefinition {
-            name: Self::NAME.to_owned(),
-            description: include_str!("description.md").to_owned(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "url": {
-                        "type": "string",
-                        "description": "The URL to fetch content from"
-                    },
-                    "format": {
-                        "type": "string",
-                        "description": "The format to return the content in (markdown, text, or html)",
-                        "enum": ["markdown", "text", "html"]
-                    }
+    fn description(&self) -> String {
+        include_str!("description.md").to_owned()
+    }
+
+    fn parameters(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "The URL to fetch content from"
                 },
-                "required": ["url"]
-            }),
-        }
+                "format": {
+                    "type": "string",
+                    "description": "The format to return the content in (markdown, text, or html)",
+                    "enum": ["markdown", "text", "html"]
+                }
+            },
+            "required": ["url"]
+        })
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {

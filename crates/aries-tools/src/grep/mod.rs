@@ -9,8 +9,8 @@ use std::path::PathBuf;
 use globset::GlobBuilder;
 use ignore::WalkBuilder;
 use regex_lite::Regex;
-use rig_core::completion::ToolDefinition;
 use rig_core::tool::Tool;
+use serde_json::Value;
 use tokio::fs;
 
 pub use self::args::GrepArgs;
@@ -35,25 +35,25 @@ impl Tool for GrepTool {
     type Args = GrepArgs;
     type Output = GrepOutput;
 
-    async fn definition(&self, _prompt: String) -> ToolDefinition {
-        ToolDefinition {
-            name: Self::NAME.to_owned(),
-            description: include_str!("description.md").to_owned(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "pattern": {
-                        "type": "string",
-                        "description": "The regular expression to search for"
-                    },
-                    "include": {
-                        "type": "string",
-                        "description": "Optional glob pattern to filter files (e.g., src/**/*.rs)"
-                    }
+    fn description(&self) -> String {
+        include_str!("description.md").to_owned()
+    }
+
+    fn parameters(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "pattern": {
+                    "type": "string",
+                    "description": "The regular expression to search for"
                 },
-                "required": ["pattern"]
-            }),
-        }
+                "include": {
+                    "type": "string",
+                    "description": "Optional glob pattern to filter files (e.g., src/**/*.rs)"
+                }
+            },
+            "required": ["pattern"]
+        })
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {

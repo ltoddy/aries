@@ -80,7 +80,7 @@ where
                 },
             };
 
-        let summary = final_res.response().trim();
+        let summary = final_res.output().trim();
         if summary.is_empty() {
             return CompactOutcome::Empty;
         }

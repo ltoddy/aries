@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::update_plan::{PlanEntry, PlanEntryPriority, PlanEntryStatus};
 use crate::{RenderError, ToolArgsRender};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -15,29 +16,6 @@ impl UpdatePlanArgs {
             format!("Update plan with {} items", self.items.len())
         }
     }
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct PlanEntry {
-    pub content: String,
-    pub priority: PlanEntryPriority,
-    pub status: PlanEntryStatus,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum PlanEntryPriority {
-    High,
-    Medium,
-    Low,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum PlanEntryStatus {
-    Pending,
-    InProgress,
-    Completed,
 }
 
 impl ToolArgsRender for UpdatePlanArgs {

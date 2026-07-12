@@ -2,16 +2,21 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time;
 
-use aries_agent::tools::AgentOutput;
 use aries_extension::hook::input::{
     PostToolUseFailureHookInput, PostToolUseHookInput, PreToolUseHookInput, SubagentStartHookInput,
     SubagentStopHookInput,
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
 use aries_persistence::ToolCallRepository;
+use aries_tools::agent::AgentOutput;
 use parking_lot::Mutex;
-use rig_core::agent::{HookAction, PromptHook, ToolCallHookAction};
-use rig_core::completion::{CompletionModel, CompletionResponse, Message};
+use rig_core::OneOrMany;
+use rig_core::agent::{
+    AgentHook, Flow, HookContext, InvalidToolCallContext, StepEvent, StepEventKind,
+};
+use rig_core::completion::{CompletionModel, CompletionResponse, Usage};
+use rig_core::message::{AssistantContent, Message};
+use rig_core::tool::{ToolOutcome, ToolResultExtensions};
 use serde_json::Value;
 use toasty::Db;
 
@@ -57,37 +62,53 @@ impl SessionPromptHook {
             tool_call_repo,
         }
     }
-}
 
-impl<M> PromptHook<M> for SessionPromptHook
-where
-    M: CompletionModel,
-{
-    async fn on_completion_call(&self, _prompt: &Message, _history: &[Message]) -> HookAction {
-        HookAction::cont()
+    async fn on_completion_call(
+        &self,
+        _prompt: &Message,
+        _history: &[Message],
+        _turn: usize,
+    ) -> Flow {
+        Flow::cont()
     }
 
-    async fn on_completion_response(
+    async fn on_completion_response<M>(
         &self,
         _prompt: &Message,
         _response: &CompletionResponse<M::Response>,
-    ) -> HookAction {
-        HookAction::cont()
+    ) -> Flow
+    where
+        M: CompletionModel,
+    {
+        Flow::cont()
+    }
+
+    async fn on_model_turn_finished(
+        &self,
+        _turn: usize,
+        _content: &OneOrMany<AssistantContent>,
+        _usage: Usage,
+    ) -> Flow {
+        Flow::cont()
+    }
+
+    async fn on_invalid_tool_call(&self, _cx: &InvalidToolCallContext) -> Flow {
+        Flow::cont()
     }
 
     async fn on_tool_call(
         &self,
         tool_name: &str,
-        _tool_call_id: Option<String>,
+        _tool_call_id: Option<&str>,
         internal_call_id: &str,
         args: &str,
-    ) -> ToolCallHookAction {
+    ) -> Flow {
         let call_at = time::Instant::now();
 
         let tool_input: Value =
             serde_json::from_str(args).unwrap_or_else(|_| Value::String(args.to_owned()));
 
-        if tool_name == aries_agent::tools::agent::NAME {
+        if tool_name == aries_tools::agent::NAME {
             let input = SubagentStartHookInput::new(&self.session_id, &self.cwd, "", "")
                 .transcript_path(&self.transcript_path);
             self.executor.fire_subagent_start(input).await;
@@ -108,12 +129,12 @@ where
             HookDecision::Continue => {
                 let mut last_tool_call_at = self.last_tool_call_at.lock();
                 *last_tool_call_at = Some(call_at);
-                ToolCallHookAction::cont()
+                Flow::cont()
             },
             HookDecision::Terminate { reason } => {
                 let mut last_tool_call_at = self.last_tool_call_at.lock();
                 *last_tool_call_at = None;
-                ToolCallHookAction::terminate(reason)
+                Flow::terminate(reason)
             },
         }
     }
@@ -121,11 +142,13 @@ where
     async fn on_tool_result(
         &self,
         tool_name: &str,
-        _tool_call_id: Option<String>,
+        _tool_call_id: Option<&str>,
         internal_call_id: &str,
         args: &str,
         result: &str,
-    ) -> HookAction {
+        _outcome: &ToolOutcome,
+        _extensions: &ToolResultExtensions,
+    ) -> Flow {
         let duration_ms = self
             .last_tool_call_at
             .lock()
@@ -175,10 +198,10 @@ where
             };
 
             self.executor.fire_post_tool_use_failure(input).await;
-            return HookAction::cont();
+            return Flow::cont();
         }
 
-        if tool_name == aries_agent::tools::agent::NAME {
+        if tool_name == aries_tools::agent::NAME {
             let input = SubagentStopHookInput::new(
                 &self.session_id,
                 &self.cwd,
@@ -213,11 +236,11 @@ where
 
         self.executor.fire_post_tool_use(input).await;
 
-        HookAction::cont()
+        Flow::cont()
     }
 
-    async fn on_text_delta(&self, _text_delta: &str, _aggregated_text: &str) -> HookAction {
-        HookAction::cont()
+    async fn on_text_delta(&self, _delta: &str, _aggregated: &str) -> Flow {
+        Flow::cont()
     }
 
     async fn on_tool_call_delta(
@@ -225,16 +248,91 @@ where
         _tool_call_id: &str,
         _internal_call_id: &str,
         _tool_name: Option<&str>,
-        _tool_call_delta: &str,
-    ) -> HookAction {
-        HookAction::cont()
+        _delta: &str,
+    ) -> Flow {
+        Flow::cont()
     }
 
-    async fn on_stream_completion_response_finish(
+    async fn on_stream_response_finish<M>(
         &self,
         _prompt: &Message,
         _response: &<M as CompletionModel>::StreamingResponse,
-    ) -> HookAction {
-        HookAction::cont()
+    ) -> Flow
+    where
+        M: CompletionModel,
+    {
+        Flow::cont()
+    }
+}
+
+impl<M> AgentHook<M> for SessionPromptHook
+where
+    M: CompletionModel,
+{
+    async fn on_event(&self, _ctx: &HookContext, event: StepEvent<'_, M>) -> Flow {
+        match event {
+            StepEvent::CompletionCall { prompt, history, turn } => {
+                self.on_completion_call(prompt, history, turn).await
+            },
+            StepEvent::CompletionResponse { prompt, response } => {
+                self.on_completion_response::<M>(prompt, response).await
+            },
+            StepEvent::ModelTurnFinished { turn, content, usage } => {
+                self.on_model_turn_finished(turn, content, usage).await
+            },
+            StepEvent::InvalidToolCall(cx) => self.on_invalid_tool_call(cx).await,
+            StepEvent::ToolCall { tool_name, tool_call_id, internal_call_id, args } => {
+                self.on_tool_call(tool_name, tool_call_id, internal_call_id, args).await
+            },
+            StepEvent::ToolResult {
+                tool_name,
+                tool_call_id,
+                internal_call_id,
+                args,
+                result,
+                outcome,
+                extensions,
+            } => {
+                self.on_tool_result(
+                    tool_name,
+                    tool_call_id,
+                    internal_call_id,
+                    args,
+                    result,
+                    outcome,
+                    extensions,
+                )
+                .await
+            },
+            StepEvent::TextDelta { delta, aggregated } => {
+                self.on_text_delta(delta, aggregated).await
+            },
+            StepEvent::ToolCallDelta { tool_call_id, internal_call_id, tool_name, delta } => {
+                self.on_tool_call_delta(tool_call_id, internal_call_id, tool_name, delta).await
+            },
+            StepEvent::StreamResponseFinish { prompt, response } => {
+                self.on_stream_response_finish::<M>(prompt, response).await
+            },
+            _ => Flow::cont(),
+        }
+    }
+
+    async fn resolve_tool_call(
+        &self,
+        ctx: &HookContext,
+        tool_name: &str,
+        tool_call_id: Option<&str>,
+        internal_call_id: &str,
+        args: &str,
+    ) -> (Flow, Option<Value>) {
+        let event = StepEvent::ToolCall { tool_name, tool_call_id, internal_call_id, args };
+
+        let flow = <Self as AgentHook<M>>::on_event(self, ctx, event).await;
+        (flow, None)
+    }
+
+    fn observes(&self, kind: StepEventKind) -> bool {
+        let _ = kind;
+        true
     }
 }

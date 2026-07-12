@@ -1,12 +1,13 @@
 pub mod agent;
 pub mod builder;
-pub mod event;
-pub mod mode;
 pub mod preamble;
 pub mod tools;
 
 use rig_core::agent::StreamingError;
 use rig_core::completion::CompletionError;
+
+pub use crate::agent::{AGENT_LOOP_MAX_TURNS, AriesAgent};
+pub use crate::builder::AgentBuilder;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AriesError {
@@ -36,9 +37,3 @@ impl AriesError {
 }
 
 pub type AriesResult<T, E = AriesError> = Result<T, E>;
-
-// Re-exports to match the old `aries_core` paths
-pub use crate::agent::{AGENT_LOOP_MAX_TURNS, AriesAgent};
-pub use crate::builder::AgentBuilder;
-pub use crate::event::{AgentEvent, AgentSignal, earse};
-pub use crate::mode::Mode;

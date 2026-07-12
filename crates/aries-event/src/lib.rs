@@ -1,4 +1,3 @@
-use aries_tools::update_plan::PlanEntry;
 use rig_core::agent::MultiTurnStreamItem;
 use rig_core::message::Text;
 use rig_core::streaming::StreamedAssistantContent;
@@ -7,34 +6,23 @@ use rig_core::streaming::StreamedAssistantContent;
 pub struct AgentEvent {
     pub main: bool,   // 是否是 main agent
     pub name: String, // agent name
-    pub signal: AgentSignal,
+    pub stream_item: MultiTurnStreamItem<()>,
 }
 
 impl AgentEvent {
     pub fn from_stream<R>(
         main: bool,
         name: impl Into<String>,
-        item: MultiTurnStreamItem<R>,
+        stream_item: MultiTurnStreamItem<R>,
     ) -> Self {
         let name = name.into();
-        let item = earse(item);
-        Self { main, name, signal: AgentSignal::Stream(item) }
-    }
-
-    pub fn from_plan(main: bool, name: impl Into<String>, entries: Vec<PlanEntry>) -> Self {
-        Self { main, name: name.into(), signal: AgentSignal::PlanUpdate(entries) }
+        let stream_item = earse(stream_item);
+        Self { main, name, stream_item }
     }
 }
 
-#[derive(Debug, Clone)]
-#[allow(clippy::large_enum_variant)]
-pub enum AgentSignal {
-    Stream(MultiTurnStreamItem<()>),
-    PlanUpdate(Vec<PlanEntry>),
-}
-
-pub fn earse<R>(item: MultiTurnStreamItem<R>) -> MultiTurnStreamItem<()> {
-    match item {
+pub fn earse<R>(stream_item: MultiTurnStreamItem<R>) -> MultiTurnStreamItem<()> {
+    match stream_item {
         MultiTurnStreamItem::StreamAssistantItem(content) => {
             match content {
                 StreamedAssistantContent::Text(t) => {
@@ -61,6 +49,9 @@ pub fn earse<R>(item: MultiTurnStreamItem<R>) -> MultiTurnStreamItem<()> {
                 },
                 StreamedAssistantContent::Final(_) => {
                     MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Final(()))
+                },
+                StreamedAssistantContent::Unknown(v) => {
+                    MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Unknown(v))
                 },
             }
         },

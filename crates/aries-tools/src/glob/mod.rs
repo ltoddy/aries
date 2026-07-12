@@ -7,8 +7,8 @@ mod tests;
 use std::path::{Path, PathBuf};
 
 use ignore::WalkBuilder;
-use rig_core::completion::ToolDefinition;
 use rig_core::tool::Tool;
+use serde_json::Value;
 
 pub use self::args::GlobArgs;
 pub use self::error::GlobError;
@@ -21,7 +21,9 @@ pub struct GlobTool {
 }
 
 impl GlobTool {
-    pub fn new(cwd: PathBuf) -> Self {
+    pub fn new(cwd: impl AsRef<Path>) -> Self {
+        let cwd = cwd.as_ref().to_path_buf();
+
         Self { cwd }
     }
 }
@@ -32,25 +34,25 @@ impl Tool for GlobTool {
     type Args = GlobArgs;
     type Output = GlobOutput;
 
-    async fn definition(&self, _prompt: String) -> ToolDefinition {
-        ToolDefinition {
-            name: Self::NAME.to_owned(),
-            description: include_str!("description.md").to_owned(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "pattern": {
-                        "type": "string",
-                        "description": "The glob pattern to match against (e.g., src/**/*.rs)"
-                    },
-                    "base_dir": {
-                        "type": "string",
-                        "description": "Base directory for the glob pattern"
-                    }
+    fn description(&self) -> String {
+        include_str!("description.md").to_owned()
+    }
+
+    fn parameters(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "pattern": {
+                    "type": "string",
+                    "description": "The glob pattern to match against (e.g., src/**/*.rs)"
                 },
-                "required": ["pattern"]
-            }),
-        }
+                "base_dir": {
+                    "type": "string",
+                    "description": "Base directory for the glob pattern"
+                }
+            },
+            "required": ["pattern"]
+        })
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {

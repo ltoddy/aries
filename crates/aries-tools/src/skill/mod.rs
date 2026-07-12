@@ -8,8 +8,8 @@ use aries_extension::skill::definition::SkillDefinition;
 use aries_filesystem::path_to_uri;
 use aries_filesystem::walk::walk_dir;
 use itertools::Itertools;
-use rig_core::completion::ToolDefinition;
 use rig_core::tool::Tool;
+use serde_json::Value;
 
 pub use self::args::SkillArgs;
 pub use self::error::SkillError;
@@ -41,21 +41,21 @@ impl Tool for SkillTool {
     type Args = SkillArgs;
     type Output = SkillOutput;
 
-    async fn definition(&self, _prompt: String) -> ToolDefinition {
-        ToolDefinition {
-            name: Self::NAME.to_owned(),
-            description: include_str!("description.md").to_owned(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "description": "The name of the skill from available_skills"
-                    }
-                },
-                "required": ["name"]
-            }),
-        }
+    fn description(&self) -> String {
+        include_str!("description.md").to_owned()
+    }
+
+    fn parameters(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "The name of the skill from available_skills"
+                }
+            },
+            "required": ["name"]
+        })
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {

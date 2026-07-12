@@ -5,8 +5,8 @@ mod output;
 use std::path::{Path, PathBuf};
 
 use aries_lspclient::{LspResult, SharedLspClient};
-use rig_core::completion::ToolDefinition;
 use rig_core::tool::Tool;
+use serde_json::Value;
 
 pub use self::args::{LspArgs, LspOperation};
 pub use self::error::LspError;
@@ -20,7 +20,9 @@ pub struct LspTool {
 }
 
 impl LspTool {
-    pub fn new(client: SharedLspClient, cwd: PathBuf) -> Self {
+    pub fn new(client: SharedLspClient, cwd: impl AsRef<Path>) -> Self {
+        let cwd = cwd.as_ref().to_path_buf();
+
         Self { client, cwd }
     }
 
@@ -53,50 +55,50 @@ impl Tool for LspTool {
     type Args = LspArgs;
     type Output = LspOutput;
 
-    async fn definition(&self, _prompt: String) -> ToolDefinition {
-        ToolDefinition {
-            name: Self::NAME.to_owned(),
-            description: include_str!("description.md").to_owned(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "operation": {
-                        "type": "string",
-                        "description": "The LSP operation to perform",
-                        "enum": [
-                            "goToDefinition",
-                            "findReferences",
-                            "hover",
-                            "documentSymbol",
-                            "workspaceSymbol",
-                            "goToImplementation",
-                            "prepareCallHierarchy",
-                            "incomingCalls",
-                            "outgoingCalls"
-                        ]
-                    },
-                    "file_path": {
-                        "type": "string",
-                        "description": "The file path to perform the operation on"
-                    },
-                    "line": {
-                        "type": "number",
-                        "description": "The line number to perform the operation at"
-                    },
-                    "character": {
-                        "type": "number",
-                        "description": "The character position to perform the operation at"
-                    },
-                    "query": {
-                        "type": "string",
-                        "description": "The query string for operations that require it"
-                    }
+    fn description(&self) -> String {
+        include_str!("description.md").to_owned()
+    }
+
+    fn parameters(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "operation": {
+                    "type": "string",
+                    "description": "The LSP operation to perform",
+                    "enum": [
+                        "goToDefinition",
+                        "findReferences",
+                        "hover",
+                        "documentSymbol",
+                        "workspaceSymbol",
+                        "goToImplementation",
+                        "prepareCallHierarchy",
+                        "incomingCalls",
+                        "outgoingCalls"
+                    ]
                 },
-                "required": [
-                    "operation"
-                ]
-            }),
-        }
+                "file_path": {
+                    "type": "string",
+                    "description": "The file path to perform the operation on"
+                },
+                "line": {
+                    "type": "number",
+                    "description": "The line number to perform the operation at"
+                },
+                "character": {
+                    "type": "number",
+                    "description": "The character position to perform the operation at"
+                },
+                "query": {
+                    "type": "string",
+                    "description": "The query string for operations that require it"
+                }
+            },
+            "required": [
+                "operation"
+            ]
+        })
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {

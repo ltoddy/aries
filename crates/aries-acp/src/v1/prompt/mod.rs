@@ -8,7 +8,7 @@ use agent_client_protocol::schema::v1::{
     PromptRequest, PromptResponse, SessionNotification, StopReason,
 };
 use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
-use aries_agent::event::AgentEvent;
+use aries_event::AgentEvent;
 use parking_lot::Mutex;
 use rig_core::message::ToolCall;
 use tracing::{info, info_span};

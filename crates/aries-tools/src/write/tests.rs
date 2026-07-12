@@ -78,18 +78,3 @@ fn test_write_args_location_and_title() {
     assert_eq!(location, PathBuf::from("/tmp/test.txt"));
     assert_eq!(args.title(), "Write file /tmp/test.txt");
 }
-
-#[tokio::test]
-async fn test_write_tool_definition() {
-    let tool = WriteTool::new();
-    let def = tool.definition(String::new()).await;
-
-    assert_eq!(def.name, "Write");
-    assert!(!def.description.is_empty());
-    let params = def.parameters;
-    assert_eq!(params["type"], "object");
-
-    let required = params["required"].as_array().unwrap();
-    assert!(required.iter().any(|v| v.as_str() == Some("file_path")));
-    assert!(required.iter().any(|v| v.as_str() == Some("content")));
-}

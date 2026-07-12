@@ -5,16 +5,19 @@ edition = "2024"
 
 [dependencies]
 anyhow.workspace = true
-aries-agent = { version = "0.1.0", path = "../aries-agent" }
+aries-agent = { path = "../aries-agent" }
 aries-compact = { path = "../aries-compact" }
 aries-context = { path = "../aries-context" }
+aries-event = { path = "../aries-event" }
 aries-extension = { path = "../aries-extension" }
 aries-filesystem = { path = "../aries-filesystem" }
 aries-init = { path = "../aries-init" }
 aries-logger = { path = "../aries-logger" }
 aries-lspclient = { path = "../aries-lspclient" }
 aries-memory = { path = "../aries-memory" }
+aries-mode = { path = "../aries-mode" }
 aries-persistence = { path = "../aries-persistence" }
+aries-tools = {  path = "../aries-tools" }
 futures.workspace = true
 nanoid.workspace = true
 parking_lot.workspace = true

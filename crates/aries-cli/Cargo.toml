@@ -12,8 +12,9 @@ path = "src/main.rs"
 agent-client-protocol.workspace = true
 anyhow.workspace = true
 aries-acp = { path = "../aries-acp" }
-aries-agent = { version = "0.1.0", path = "../aries-agent" }
+aries-agent = { path = "../aries-agent" }
 aries-context = { path = "../aries-context" }
+aries-event = { path = "../aries-event" }
 aries-init = { path = "../aries-init" }
 aries-logger = { path = "../aries-logger" }
 aries-persistence = { path = "../aries-persistence" }

@@ -4,8 +4,8 @@ mod output;
 #[cfg(test)]
 mod tests;
 
-use rig_core::completion::ToolDefinition;
 use rig_core::tool::Tool;
+use serde_json::Value;
 use tokio::fs;
 
 pub use self::args::ReadArgs;
@@ -34,25 +34,25 @@ impl Tool for ReadTool {
     type Args = ReadArgs;
     type Output = ReadOutput;
 
-    async fn definition(&self, _prompt: String) -> ToolDefinition {
-        ToolDefinition {
-            name: Self::NAME.to_owned(),
-            description: include_str!("description.md").to_owned(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "file_path": {
-                        "type": "string",
-                        "description": "The path to the file to read"
-                    },
-                    "offset": {
-                        "type": "number",
-                        "description": "The line number to start reading from (1-indexed)"
-                    }
+    fn description(&self) -> String {
+        include_str!("description.md").to_owned()
+    }
+
+    fn parameters(&self) -> Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "file_path": {
+                    "type": "string",
+                    "description": "The path to the file to read"
                 },
-                "required": ["file_path"]
-            }),
-        }
+                "offset": {
+                    "type": "number",
+                    "description": "The line number to start reading from (1-indexed)"
+                }
+            },
+            "required": ["file_path"]
+        })
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {

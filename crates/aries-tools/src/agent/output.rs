@@ -1,9 +1,11 @@
-use aries_tools::{RenderError, ToolOutputRender};
 use serde::{Deserialize, Serialize};
+
+use crate::{RenderError, ToolOutputRender};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AgentOutput {
-    pub task_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub task_id: Option<String>,
     pub result: String,
 }
 

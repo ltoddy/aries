@@ -4,9 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+aries-event = { path = "../aries-event" }
 aries-extension = { path = "../aries-extension" }
 aries-filesystem = { path = "../aries-filesystem" }
 aries-lspclient = { path = "../aries-lspclient" }
+aries-mode = { path = "../aries-mode" }
 aries-tools = { path = "../aries-tools" }
 futures.workspace = true
 git2.workspace = true

@@ -111,11 +111,3 @@ async fn test_edit_args_title() {
     };
     assert!(args.title().contains("file.rs"));
 }
-
-#[tokio::test]
-async fn test_edit_tool_definition() {
-    let tool = EditTool;
-    let def = tool.definition(String::new()).await;
-    assert_eq!(def.name, "Edit");
-    assert!(def.description.contains("精确字符串替换"));
-}

@@ -7,11 +7,11 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::Context;
-use aries_agent::event::AgentEvent;
-use aries_agent::{Mode, preamble};
+use aries_agent::preamble;
 use aries_compact::{
     self, AutoCompactBreaker, CompactAgent, CompactOutcome, Decision, TokenEstimator,
 };
+use aries_event::AgentEvent;
 use aries_extension::agent::CustomAgentsLoader;
 use aries_extension::hook::input::{
     PostCompactHookInput, PostCompactTrigger, PreCompactCustomInstructions, PreCompactHookInput,
@@ -24,9 +24,10 @@ use aries_extension::{AgentExtensions, mcp};
 use aries_init::{ModelConfig, Setting, SettingError};
 use aries_lspclient::{LspServerInfo, SharedLspClient, warm_up};
 use aries_memory::MemoryStore;
+use aries_mode::Mode;
 use aries_persistence::SessionRepository;
 use futures::pin_mut;
-use rig_core::agent::FinalResponse;
+use rig_core::agent::PromptResponse;
 use rig_core::completion::Message;
 use rig_core::message::UserContent;
 use rig_core::wasm_compat::WasmCompatSend;
@@ -334,14 +335,14 @@ impl Session {
             }
         };
 
-        self.last_assistant_message = Some(final_res.response().to_owned());
-        if let Some(his) = final_res.history() {
+        self.last_assistant_message = Some(final_res.output().to_owned());
+        if let Some(his) = final_res.messages() {
             self.chat_history.extend(his.iter().cloned());
             self.chat_context.extend(his.iter().cloned()).await;
         }
 
         let input = StopHookInput::new(&self.id, &self.cwd, false)
-            .last_assistant_message(final_res.response());
+            .last_assistant_message(final_res.output());
         self.hooks_executor.fire_stop(input).await;
 
         // Spawn background memory extraction task
@@ -350,7 +351,7 @@ impl Session {
             let model: String = self.config.model();
             let memory_store = self.memory_store.clone();
             let user_msg = user_msg_for_memory.clone();
-            let assistant_resp = final_res.response().to_owned();
+            let assistant_resp = final_res.output().to_owned();
             tokio::spawn(async move {
                 client.extract_memories(&model, &user_msg, &assistant_resp, &memory_store).await;
             });
@@ -471,7 +472,7 @@ impl Session {
         prompt: impl Into<Message> + WasmCompatSend,
         history: &[Message],
         cb: &mut Option<F>,
-    ) -> anyhow::Result<FinalResponse>
+    ) -> anyhow::Result<PromptResponse>
     where
         F: FnMut(AgentEvent) -> Fut,
         Fut: Future<Output = ()>,
@@ -489,7 +490,7 @@ impl Session {
         pin_mut!(prompt_fut);
 
         let mut events_guard = self.receiver.lock().await;
-        let mut final_res = FinalResponse::empty();
+        let mut final_res = PromptResponse::empty();
 
         loop {
             tokio::select! {
