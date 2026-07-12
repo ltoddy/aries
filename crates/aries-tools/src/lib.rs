@@ -43,6 +43,12 @@ pub fn create_tools_from_mode(
     lsp_client: Option<aries_lspclient::SharedLspClient>,
     skills: &[SkillDefinition],
 ) -> Vec<Box<dyn ToolDyn>> {
+    let tool_names = tool_names_from_mode(mode);
+
+    create_tools_from_tool_names(&tool_names, cwd, lsp_client, skills)
+}
+
+pub fn tool_names_from_mode(mode: Mode) -> Vec<&'static str> {
     let mut tool_names = vec![
         bash::NAME,
         read::NAME,
@@ -69,7 +75,7 @@ pub fn create_tools_from_mode(
         Mode::Explore => {},
     }
 
-    create_tools_from_tool_names(&tool_names, cwd, lsp_client, skills)
+    tool_names
 }
 
 pub fn create_tools_from_tool_names(

@@ -9,9 +9,9 @@ aries-extension = { path = "../aries-extension" }
 aries-filesystem = { path = "../aries-filesystem" }
 aries-lspclient = { path = "../aries-lspclient" }
 aries-mode = { path = "../aries-mode" }
+aries-preamble = { path = "../aries-preamble" }
 aries-tools = { path = "../aries-tools" }
 futures.workspace = true
-git2.workspace = true
 itertools.workspace = true
 rig-core.workspace = true
 thiserror.workspace = true

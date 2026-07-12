@@ -1,4 +1,3 @@
-mod env;
 mod instruction;
 pub mod memory;
 mod repo;
@@ -23,7 +22,7 @@ pub async fn render(
             let mut preamble = mode.bare_preamble().to_string();
 
             preamble.push('\n');
-            preamble.push_str(&env::render(&cwd, model));
+            preamble.push_str(&aries_preamble::env::section(&cwd, model));
             preamble.push('\n');
 
             if let Some(repo_prompt) = repo::render(&cwd).await {

@@ -167,9 +167,9 @@ dependencies = [
  "aries-filesystem",
  "aries-lspclient",
  "aries-mode",
+ "aries-preamble",
  "aries-tools",
  "futures",
- "git2",
  "itertools",
  "rig-core",
  "thiserror 2.0.18",
@@ -336,6 +336,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "aries-preamble"
+version = "0.1.0"
+dependencies = [
+ "git2",
+]
+
+[[package]]
 name = "aries-sandbox"
 version = "0.1.0"
 
@@ -394,6 +401,7 @@ dependencies = [
  "aries-filesystem",
  "aries-lspclient",
  "aries-mode",
+ "aries-preamble",
  "dialoguer",
  "futures",
  "globset",

@@ -131,6 +131,7 @@ where
                     self.model.clone(),
                     self.cwd.clone(),
                     self.sender.clone(),
+                    self.extensions.agents.clone(),
                 )));
             },
             _ => {},

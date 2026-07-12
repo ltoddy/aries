@@ -5,12 +5,12 @@ pub mod skill;
 
 use std::path::Path;
 
-use crate::agent::{AgentDefinition, CustomAgentsLoader};
+use crate::agent::{AgentDefinition, AgentsLoader};
 use crate::hook::{HooksLoader, HooksPreset};
 use crate::mcp::{McpDefinition, McpsLoader};
 use crate::skill::{SkillDefinition, SkillsLoader};
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct AgentExtensions {
     pub agents: Vec<AgentDefinition>,
     pub hooks: Vec<HooksPreset>,
@@ -22,7 +22,7 @@ impl AgentExtensions {
     pub async fn new(cwd: impl AsRef<Path>) -> Self {
         let cwd = cwd.as_ref();
 
-        let agent_loader = CustomAgentsLoader::new(cwd);
+        let agent_loader = AgentsLoader::new(cwd);
         let hook_loader = HooksLoader::new(cwd);
         let mcp_loader = McpsLoader::new(cwd);
         let skill_loader = SkillsLoader::new(cwd);
@@ -38,6 +38,6 @@ impl AgentExtensions {
     }
 
     pub fn empty() -> Self {
-        Self { agents: vec![], hooks: vec![], mcps: vec![], skills: vec![] }
+        Self::default()
     }
 }

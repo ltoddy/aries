@@ -6,7 +6,7 @@
 - [x] 支持使用 SWE-bench 进行评测
 - [x] island
 - [x] 支持 mcp
-- [ ] custom agent 支持
+- [x] custom agent 支持
 - [ ] 支持 Workflow
 - [ ] agent (参考 https://github.com/vercel/eve 对 agent 的目录结构设计来支持)
 - [ ] token 使用优化

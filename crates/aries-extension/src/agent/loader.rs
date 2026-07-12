@@ -7,11 +7,11 @@ use itertools::Itertools;
 
 use crate::agent::AgentDefinition;
 
-pub struct CustomAgentsLoader {
+pub struct AgentsLoader {
     roots: Vec<PathBuf>,
 }
 
-impl CustomAgentsLoader {
+impl AgentsLoader {
     pub fn new(cwd: impl AsRef<Path>) -> Self {
         let cwd = cwd.as_ref();
         let home_dir = std::env::home_dir().unwrap_or_else(|| PathBuf::from("~"));

@@ -12,7 +12,6 @@ use aries_compact::{
     self, AutoCompactBreaker, CompactAgent, CompactOutcome, Decision, TokenEstimator,
 };
 use aries_event::AgentEvent;
-use aries_extension::agent::CustomAgentsLoader;
 use aries_extension::hook::input::{
     PostCompactHookInput, PostCompactTrigger, PreCompactCustomInstructions, PreCompactHookInput,
     SessionEndHookInput, SessionEndReason, SessionStartHookInput, SessionStartSource,
@@ -159,9 +158,6 @@ impl Session {
 
         let extensions = AgentExtensions::new(cwd).await;
         let (mcp_clients, mcp_tools) = mcp::connect(&extensions.mcps).await;
-
-        let agent_loader = CustomAgentsLoader::new(cwd);
-        let _custom_agents = agent_loader.load().await; // TODO
 
         let mem_store = MemoryStore::new(&root_dir, cwd).await;
         let memory = Self::load_memory(&mem_store).await;
