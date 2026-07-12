@@ -1,0 +1,38 @@
+crates/aries-tools/src/lib.rs
+  s_2c97c3b24e7f1e::t_a8b89dcda682a5 47
+  s_2c97c3b24e7f1e::t_100bc3d2577d0d 48-49
+  s_2c97c3b24e7f1e::t_d50d074d6cff7c 46
+  s_2c97c3b24e7f1e::t_4efbba7418ef17 50-51
+crates/aries-agent/src/builder.rs
+  s_2c97c3b24e7f1e::t_cf511ef2de6178 134
+crates/aries-tools/src/agent/mod.rs
+  s_2c97c3b24e7f1e::t_e5062269e44ace 24
+  s_2c97c3b24e7f1e::t_d7a4aaf2f6a4e7 7,35,47,52-58
+  s_2c97c3b24e7f1e::t_04ab59eb4cb8cf 129
+  s_2c97c3b24e7f1e::t_c3328bd373bf92 22-23
+  s_2c97c3b24e7f1e::t_bdae2d302f875f 72,74-81,83-86,88-89
+  s_2c97c3b24e7f1e::t_87360ff41effc9 19
+  s_2c97c3b24e7f1e::t_0cef5ebbe77f36 73,82
+  s_2c97c3b24e7f1e::t_11ed4f82c020cc 118-128
+  s_2c97c3b24e7f1e::t_c90ba673708380 25
+  s_2c97c3b24e7f1e::t_dee7034422fa71 87
+  s_2c97c3b24e7f1e::t_cc2d8e1a922a2e 130-132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "b31098000705ab1736106ef2a4d11b89709eaf54",
+  "prompts": {},
+  "sessions": {
+    "s_2c97c3b24e7f1e": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a5266c0b7ffe5e11829347f",
+        "model": "openrouter-3o__dev"
+      },
+      "human_author": "liutao.rs <liutao.rs@bytedance.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
