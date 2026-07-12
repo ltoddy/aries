@@ -6,54 +6,34 @@ mod skill;
 use std::path::Path;
 
 use aries_extension::skill::definition::SkillDefinition;
-use aries_mode::Mode;
 
-pub async fn render(
+pub async fn sections(
     cwd: impl AsRef<Path>,
-    mode: Mode,
     model: impl Into<String>,
     available_skills: &[SkillDefinition],
     memory: Option<&str>,
-) -> String {
-    let model = model.into();
+) -> Vec<String> {
+    let cwd = cwd.as_ref();
+    let mut sections = Vec::new();
 
-    match mode {
-        Mode::Build | Mode::General => {
-            let mut preamble = mode.bare_preamble().to_string();
+    sections.push(aries_preamble::env::section(cwd, model));
 
-            preamble.push('\n');
-            preamble.push_str(&aries_preamble::env::section(&cwd, model));
-            preamble.push('\n');
-
-            if let Some(repo_prompt) = repo::render(&cwd).await {
-                preamble.push('\n');
-                preamble.push_str(&repo_prompt);
-                preamble.push('\n');
-            }
-
-            if !available_skills.is_empty() {
-                preamble.push('\n');
-                preamble.push_str(&skill::render(available_skills));
-                preamble.push('\n');
-            }
-
-            if let Some(mem) = memory {
-                preamble.push('\n');
-                preamble.push_str(mem);
-                preamble.push('\n');
-            }
-
-            let loader = instruction::AgentsmdFileLoader::new(&cwd);
-            if let Some(content) = loader.read().await {
-                preamble.push('\n');
-                preamble
-                    .push_str(&format!("Instructions from: {}\n", loader.file_path().display()));
-                preamble.push_str(&content);
-                preamble.push('\n');
-            }
-
-            preamble
-        },
-        _ => mode.bare_preamble().to_string(),
+    if let Some(section) = repo::render(cwd).await {
+        sections.push(section);
     }
+
+    if !available_skills.is_empty() {
+        sections.push(skill::render(available_skills));
+    }
+
+    if let Some(mem) = memory {
+        sections.push(mem.to_owned());
+    }
+
+    let loader = instruction::AgentsmdFileLoader::new(cwd);
+    if let Some(content) = loader.read().await {
+        sections.push(format!("Instructions from: {}\n{content}", loader.file_path().display()));
+    }
+
+    sections
 }

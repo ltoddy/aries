@@ -1,6 +1,7 @@
 use aries_event::AgentEvent;
+use aries_mode::Mode;
 use futures::StreamExt;
-use rig_core::agent::{Agent, AgentHook, MultiTurnStreamItem, PromptResponse, StreamingResult};
+use rig_core::agent::{Agent, AgentHook, MultiTurnStreamItem, PromptResponse};
 use rig_core::completion::{CompletionModel, Message};
 use rig_core::streaming::StreamingPrompt;
 use rig_core::wasm_compat::WasmCompatSend;
@@ -16,10 +17,9 @@ where
     M: CompletionModel,
 {
     inner: Agent<M>,
-
-    preamble: String,
     name: String,
-
+    bare_preamble: String,
+    sections: Vec<String>,
     sender: Option<UnboundedSender<AgentEvent>>,
 }
 
@@ -30,13 +30,15 @@ where
     pub fn new(
         inner: Agent<M>,
         name: impl Into<String>,
-        preamble: impl Into<String>,
+        bare_preamble: impl Into<String>,
+        sections: &[String],
         sender: Option<UnboundedSender<AgentEvent>>,
     ) -> Self {
         let name = name.into();
-        let preamble = preamble.into();
+        let bare_preamble = bare_preamble.into();
+        let sections = sections.to_vec();
 
-        Self { inner, preamble, name, sender }
+        Self { inner, name, bare_preamble, sections, sender }
     }
 
     pub async fn prompt<I, T, P>(
@@ -73,23 +75,23 @@ where
         Ok(final_res)
     }
 
-    pub async fn stream_prompt<I, T>(
-        &mut self,
-        prompt: impl Into<Message> + WasmCompatSend,
-        history: I,
-    ) -> StreamingResult<<M>::StreamingResponse>
-    where
-        I: IntoIterator<Item = T>,
-        T: Into<Message>,
-    {
-        self.inner.stream_prompt(prompt).history(history).await
+    pub fn set_mode(&mut self, mode: Mode) {
+        let bare_preamble = mode.bare_preamble();
+
+        let mut preamble = String::new();
+        preamble.push_str(bare_preamble);
+        preamble.push('\n');
+        for section in &self.sections {
+            preamble.push('\n');
+            preamble.push_str(section);
+        }
+
+        self.bare_preamble = bare_preamble.to_owned();
+        self.inner.preamble = Some(preamble);
     }
 
-    pub fn system_prompt(&self) -> &str {
-        &self.preamble
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn system_prompt(&self) -> String {
+        let preamble = self.inner.preamble.clone();
+        preamble.unwrap_or_default()
     }
 }

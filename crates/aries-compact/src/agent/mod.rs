@@ -56,7 +56,7 @@ where
             .default_max_turns(Self::COMPACTION_MAX_TURNS)
             .build();
 
-        Self { inner: AriesAgent::new(agent, NAME, PREAMBLE, None), transcript_path }
+        Self { inner: AriesAgent::new(agent, NAME, PREAMBLE, &[], None), transcript_path }
     }
 
     pub async fn compact(&mut self, messages: &[Message]) -> CompactOutcome {

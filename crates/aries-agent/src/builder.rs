@@ -23,7 +23,6 @@ where
     cwd: PathBuf,
     memory: Option<String>,
     lsp_client: Option<SharedLspClient>,
-    use_tools: bool,
 
     extensions: AgentExtensions,
     mcp_tools: Vec<Box<dyn ToolDyn>>,
@@ -48,7 +47,6 @@ where
             cwd,
             memory: None,
             lsp_client: None,
-            use_tools: true,
             extensions: AgentExtensions::empty(),
             mcp_tools: vec![],
             sender,
@@ -66,11 +64,6 @@ where
         self
     }
 
-    pub fn with_use_tools(mut self, use_tools: bool) -> Self {
-        self.use_tools = use_tools;
-        self
-    }
-
     pub fn with_extensions(mut self, extensions: AgentExtensions) -> Self {
         self.extensions = extensions;
         self
@@ -85,23 +78,24 @@ where
         let mode = self.mode;
         let name = mode.name();
 
-        let (preamble, tools) = if self.use_tools {
-            let preamble = crate::preamble::render(
-                &self.cwd,
-                mode,
-                &self.model,
-                &self.extensions.skills,
-                self.memory.as_deref(),
-            )
-            .await;
+        let sections = crate::preamble::sections(
+            &self.cwd,
+            &self.model,
+            &self.extensions.skills,
+            self.memory.as_deref(),
+        )
+        .await;
 
-            let mut tools = self.build_tools();
-            tools.extend(self.mcp_tools);
+        let mut preamble = String::new();
+        preamble.push_str(mode.bare_preamble());
+        preamble.push('\n');
+        for section in &sections {
+            preamble.push('\n');
+            preamble.push_str(section);
+        }
 
-            (preamble, tools)
-        } else {
-            (mode.bare_preamble().to_owned(), vec![])
-        };
+        let mut tools = self.build_tools();
+        tools.extend(self.mcp_tools);
 
         let inner = self
             .client
@@ -113,7 +107,10 @@ where
             .default_max_turns(AGENT_LOOP_MAX_TURNS)
             .build();
 
-        (AriesAgent::new(inner, name, preamble, Some(self.sender)), self.receiver)
+        (
+            AriesAgent::new(inner, name, mode.bare_preamble(), &sections, Some(self.sender)),
+            self.receiver,
+        )
     }
 
     fn build_tools(&self) -> Vec<Box<dyn ToolDyn>> {

@@ -62,7 +62,7 @@ impl Frontmatter {
             Some(tools) if !tools.is_empty() => {
                 HashSet::from_iter(tools.iter().map(String::as_str))
             },
-            _ => HashSet::from_iter(all_tools.into_iter().map(|&s| s)),
+            _ => HashSet::from_iter(all_tools.iter().copied()),
         };
 
         if let Some(disallowed) = &self.disallowed_tools {

@@ -197,7 +197,16 @@ impl AriesAgent {
         }
     }
 
-    pub fn system_prompt(&self) -> &str {
+    pub fn set_mode(&mut self, mode: Mode) {
+        match self {
+            AriesAgent::Anthropic(a) => a.set_mode(mode),
+            AriesAgent::Azure(a) => a.set_mode(mode),
+            AriesAgent::Deepseek(a) => a.set_mode(mode),
+            AriesAgent::OpenAI(a) => a.set_mode(mode),
+        }
+    }
+
+    pub fn system_prompt(&self) -> String {
         match self {
             AriesAgent::Anthropic(a) => a.system_prompt(),
             AriesAgent::Azure(a) => a.system_prompt(),

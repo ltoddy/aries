@@ -247,25 +247,8 @@ impl Session {
     }
 
     pub async fn set_mode(&mut self, mode: Mode) -> anyhow::Result<()> {
-        // let memory = Self::load_memory(&self.memory_store).await;
-        // let (agent, agent_events) = self
-        //     .client
-        //     .agent(
-        //         mode,
-        //         self.config.clone(),
-        //         self.cwd.clone(),
-        //         self.lsp_client.clone(),
-        //         memory,
-        //         self.extensions.clone(),
-        //         self.mcp_tools.to_vec(),
-        //     )
-        //     .await?;
-        //
-        // TODO 应该由 agent 重新自己切换
-
+        self.agent.set_mode(mode);
         self.mode = mode;
-        // self.agent = agent;
-        // self.receiver = Arc::new(Mutex::new(agent_events));
         Ok(())
     }
 
@@ -540,7 +523,7 @@ impl Session {
         self.id.clone()
     }
 
-    pub fn system_prompt(&self) -> &str {
+    pub fn system_prompt(&self) -> String {
         self.agent.system_prompt()
     }
 
