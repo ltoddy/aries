@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Context;
-use aries_context::GlobalContext;
+use aries_init::GlobalContext;
 use clap::Parser;
 use prettytable::{Cell, Row, Table, row};
 

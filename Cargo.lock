@@ -144,7 +144,6 @@ dependencies = [
  "agent-client-protocol",
  "anyhow",
  "aries-agent",
- "aries-context",
  "aries-event",
  "aries-extension",
  "aries-init",
@@ -172,10 +171,7 @@ dependencies = [
  "futures",
  "git2",
  "itertools",
- "nanoid",
  "rig-core",
- "serde",
- "serde_json",
  "thiserror 2.0.18",
  "tokio",
 ]
@@ -188,7 +184,6 @@ dependencies = [
  "anyhow",
  "aries-acp",
  "aries-agent",
- "aries-context",
  "aries-event",
  "aries-init",
  "aries-logger",
@@ -227,13 +222,6 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing",
-]
-
-[[package]]
-name = "aries-context"
-version = "0.1.0"
-dependencies = [
- "whoami",
 ]
 
 [[package]]
@@ -286,6 +274,7 @@ name = "aries-init"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aries-persistence",
  "dirs",
  "prettytable-rs",
  "serde",
@@ -361,7 +350,6 @@ dependencies = [
  "anyhow",
  "aries-agent",
  "aries-compact",
- "aries-context",
  "aries-event",
  "aries-extension",
  "aries-filesystem",

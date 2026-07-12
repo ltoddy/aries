@@ -4,7 +4,6 @@ members = [
     "crates/aries-agent",
     "crates/aries-cli",
     "crates/aries-compact",
-    "crates/aries-context",
     "crates/aries-event",
     "crates/aries-extension",
     "crates/aries-filesystem",

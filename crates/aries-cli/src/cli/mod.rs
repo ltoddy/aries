@@ -6,11 +6,11 @@ pub mod session;
 pub mod setup;
 
 use std::collections::HashMap;
+use std::env::current_dir;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use aries_context::GlobalContext;
-use aries_init::SettingLoader;
+use aries_init::{GlobalContext, SettingLoader};
 use aries_session::SessionRegistry;
 use clap::{Parser, Subcommand};
 use prompt::PromptArgs;
@@ -58,10 +58,10 @@ pub async fn run_session(gctx: GlobalContext, session_id: impl Into<String>) -> 
 
     aries_logger::init(gctx.root_dir.join("logs"));
 
-    let current_dir = gctx.current_dir.display().to_string();
+    let current_dir = current_dir().expect("could not determine current directory");
     let session_id = session_id.into();
 
-    let mut session = registry.try_session(&current_dir, &session_id).await?;
+    let mut session = registry.try_session(current_dir.display().to_string(), &session_id).await?;
     let session_id = session.id();
     let _session_span = info_span!("session", session_id = %session_id).entered();
 
@@ -71,6 +71,7 @@ pub async fn run_session(gctx: GlobalContext, session_id: impl Into<String>) -> 
         model_config.model(),
         session.id(),
         &gctx,
+        &current_dir,
     );
 
     loop {

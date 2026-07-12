@@ -1,6 +1,7 @@
 use std::io::{self, BufWriter};
+use std::path::Path;
 
-use aries_context::GlobalContext;
+use aries_init::GlobalContext;
 use ferris_says::say;
 use terminal_size::{Width, terminal_size};
 
@@ -9,10 +10,12 @@ pub fn welcome(
     model: impl Into<String>,
     session_id: impl Into<String>,
     context: &GlobalContext,
+    cwd: impl AsRef<Path>,
 ) {
     let provider = provider.into();
     let model = model.into();
     let session_id = session_id.into();
+    let cwd = cwd.as_ref();
 
     let name = env!("CARGO_BIN_NAME");
     let version = env!("CARGO_PKG_VERSION");
@@ -26,7 +29,7 @@ pub fn welcome(
         format!("{name} v{version}"),
         format!("{model} · {provider}"),
         format!("session: {session_id}"),
-        format!("Work at: {}", context.current_dir.display()),
+        format!("Work at: {}", cwd.display()),
     ]
     .join("\n");
 

@@ -2,9 +2,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use anyhow::Context;
-use aries_context::GlobalContext;
 use aries_extension::mcp::McpDefinition;
-use aries_init::Setting;
+use aries_init::{GlobalContext, Setting};
 use aries_persistence::SessionRepository;
 use toasty::Db;
 use tracing::{Instrument, info_span};
@@ -22,11 +21,9 @@ pub struct SessionRegistry {
 
 impl SessionRegistry {
     pub async fn new(gctx: GlobalContext, setting: Setting) -> anyhow::Result<Self> {
-        let mut db = aries_persistence::connect(&gctx.root_dir)
+        let db = aries_persistence::connect(&gctx.root_dir)
             .await
             .with_context(|| format!("connecting to database at {}", gctx.root_dir.display()))?;
-        let _ = aries_persistence::migrate(&mut db).await;
-
         let session_repo = SessionRepository::new(db.clone());
 
         Ok(Self { gctx, setting, db, active_sessions: Default::default(), session_repo })

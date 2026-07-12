@@ -5,7 +5,7 @@ mod input;
 mod theme;
 mod welcome;
 
-use aries_context::GlobalContext;
+use aries_init::GlobalContext;
 use clap::Parser;
 
 use crate::cli::model::{self, ModelCommand};
@@ -15,9 +15,9 @@ use crate::cli::session::{self, SessionCommand};
 async fn main() -> anyhow::Result<()> {
     let args = cli::Args::parse();
 
-    aries_init::init().await;
-
     let gctx = GlobalContext::new()?;
+    aries_init::init(&gctx.root_dir).await;
+
     match args.command {
         Some(cli::Subcommands::Setup) => cli::setup::execute(gctx).await,
         Some(cli::Subcommands::Acp(args)) => cli::acp::execute(args, gctx).await,

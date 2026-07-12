@@ -1,6 +1,5 @@
 use anyhow::Context;
-use aries_context::GlobalContext;
-use aries_init::SettingLoader;
+use aries_init::{GlobalContext, SettingLoader};
 use clap::Parser;
 use dialoguer::Select;
 use dialoguer::theme::ColorfulTheme;

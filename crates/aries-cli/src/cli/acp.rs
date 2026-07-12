@@ -1,6 +1,5 @@
 use agent_client_protocol::Stdio;
-use aries_context::GlobalContext;
-use aries_init::SettingLoader;
+use aries_init::{GlobalContext, SettingLoader};
 use clap::Parser;
 
 #[derive(clap::ValueEnum, Debug, Clone)]

@@ -1,5 +1,4 @@
-use aries_context::GlobalContext;
-use aries_init::{ModelConfig, Provider, Setting, SettingLoader};
+use aries_init::{GlobalContext, ModelConfig, Provider, Setting, SettingLoader};
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input, Select};
 
@@ -7,9 +6,6 @@ use crate::theme::Theme;
 
 pub async fn execute(gctx: GlobalContext) -> anyhow::Result<()> {
     let theme = Theme::default();
-
-    let mut db = aries_persistence::connect(&gctx.root_dir).await?;
-    let _ = aries_persistence::migrate(&mut db).await;
 
     let setting = setup()?;
     let loader = SettingLoader::new(gctx.root_dir);

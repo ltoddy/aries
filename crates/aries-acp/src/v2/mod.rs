@@ -7,8 +7,7 @@ pub mod prompt;
 pub mod session;
 
 use agent_client_protocol::{Agent, ConnectTo, on_receive_notification, on_receive_request};
-use aries_context::GlobalContext;
-use aries_init::Setting;
+use aries_init::{GlobalContext, Setting};
 
 // WIP
 

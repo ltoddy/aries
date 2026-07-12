@@ -13,9 +13,6 @@ aries-tools = { path = "../aries-tools" }
 futures.workspace = true
 git2.workspace = true
 itertools.workspace = true
-nanoid.workspace = true
 rig-core.workspace = true
-serde.workspace = true
-serde_json.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["fs", "process"] }

@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 anyhow.workspace = true
+aries-persistence = { version = "0.1.0", path = "../aries-persistence" }
 dirs.workspace = true
 prettytable.workspace = true
 serde = { workspace = true, features = ["derive"] }

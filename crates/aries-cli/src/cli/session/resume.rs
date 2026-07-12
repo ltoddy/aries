@@ -1,4 +1,4 @@
-use aries_context::GlobalContext;
+use aries_init::GlobalContext;
 use clap::Parser;
 
 use crate::cli::run_session;
