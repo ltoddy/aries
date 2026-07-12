@@ -3,20 +3,13 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Frontmatter {
-    pub name: String,
-    pub description: String,
-    pub tools: Option<Vec<String>>,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct CustomAgentDefinition {
+pub struct AgentDefinition {
     location: PathBuf,
     pub frontmatter: Frontmatter,
     pub body: String,
 }
 
-impl CustomAgentDefinition {
+impl AgentDefinition {
     pub fn new(
         location: impl AsRef<Path>,
         frontmatter: Frontmatter,
@@ -30,4 +23,11 @@ impl CustomAgentDefinition {
     pub fn location(&self) -> &Path {
         &self.location
     }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Frontmatter {
+    pub name: String,
+    pub description: String,
+    pub tools: Option<Vec<String>>,
 }

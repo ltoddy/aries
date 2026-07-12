@@ -5,14 +5,14 @@ pub mod skill;
 
 use std::path::Path;
 
-use crate::agent::{CustomAgentDefinition, CustomAgentsLoader};
+use crate::agent::{AgentDefinition, CustomAgentsLoader};
 use crate::hook::{HooksLoader, HooksPreset};
 use crate::mcp::{McpDefinition, McpsLoader};
 use crate::skill::{SkillDefinition, SkillsLoader};
 
 #[derive(Clone)]
 pub struct AgentExtensions {
-    pub agents: Vec<CustomAgentDefinition>,
+    pub agents: Vec<AgentDefinition>,
     pub hooks: Vec<HooksPreset>,
     pub mcps: Vec<McpDefinition>,
     pub skills: Vec<SkillDefinition>,
