@@ -1,0 +1,32 @@
+crates/aries-acp/Cargo.toml
+  s_332e65b69d7d31::t_540d447e7d6142 16
+crates/aries-tools/src/lib.rs
+  s_332e65b69d7d31::t_84e5ee1b002220 98
+crates/aries-acp/src/v1/prompt/message.rs
+  s_332e65b69d7d31::t_8593530c00724a 35-36,40-41,51
+  s_332e65b69d7d31::t_89765944ac5758 33-34
+  s_332e65b69d7d31::t_efa5028edfb3b7 19-24
+  s_332e65b69d7d31::t_42de5e636ef43a 42-45
+  s_332e65b69d7d31::t_d5abe93550d4a5 25
+  s_332e65b69d7d31::t_d2121389cd14ce 2-3,6,18,32,37-39,46-50,52
+Cargo.toml
+  s_332e65b69d7d31::t_a1a9736dfa088f 32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "33667d514ead13d1de43b8cfd7f4151661b8ff58",
+  "prompts": {},
+  "sessions": {
+    "s_332e65b69d7d31": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a557ef51f90dcad63305fc9",
+        "model": "c_o_new_thinking__dev"
+      },
+      "human_author": "liutao.rs <liutao.rs@bytedance.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
