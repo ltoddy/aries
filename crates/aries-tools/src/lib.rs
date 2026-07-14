@@ -23,18 +23,28 @@ use aries_mode::Mode;
 use itertools::Itertools;
 use rig_core::tool::ToolDyn;
 
-#[derive(Debug, thiserror::Error)]
-pub enum RenderError {
-    #[error("failed to deserialize tool data: {0}")]
-    Deserialize(#[from] serde_json::Error),
-}
+pub const ALL_TOOL_NAMES: &[&str] = &[
+    agent::NAME,
+    bash::NAME,
+    batch::NAME,
+    codesearch::NAME,
+    edit::NAME,
+    glob::NAME,
+    grep::NAME,
+    ls::NAME,
+    lsp::NAME,
+    multiedit::NAME,
+    question::NAME,
+    read::NAME,
+    skill::NAME,
+    update_plan::NAME,
+    webfetch::NAME,
+    websearch::NAME,
+    write::NAME,
+];
 
-pub trait ToolArgsRender {
-    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError>;
-}
-
-pub trait ToolOutputRender {
-    fn render_output(raw: &str) -> Result<String, RenderError>;
+pub fn is_builtin_tool(tool_name: &str) -> bool {
+    ALL_TOOL_NAMES.contains(&tool_name)
 }
 
 pub fn create_tools_from_mode(

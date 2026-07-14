@@ -2,8 +2,6 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{RenderError, ToolArgsRender};
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EditArgs {
     pub file_path: PathBuf,
@@ -23,8 +21,8 @@ impl EditArgs {
     }
 }
 
-impl ToolArgsRender for EditArgs {
-    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+impl EditArgs {
+    pub fn render_args(raw: &str) -> Result<(String, Option<String>), serde_json::Error> {
         let args: Self = serde_json::from_str(raw)?;
 
         let mut first = format!("{}", args.file_path.display());

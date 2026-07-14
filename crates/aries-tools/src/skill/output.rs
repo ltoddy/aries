@@ -2,8 +2,6 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{RenderError, ToolOutputRender};
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SkillOutput {
     pub title: String,
@@ -11,8 +9,8 @@ pub struct SkillOutput {
     pub metadata: SkillMetadata,
 }
 
-impl ToolOutputRender for SkillOutput {
-    fn render_output(raw: &str) -> Result<String, RenderError> {
+impl SkillOutput {
+    pub fn render_output(raw: &str) -> Result<String, serde_json::Error> {
         let output: Self = serde_json::from_str(raw)?;
         Ok(output.output)
     }

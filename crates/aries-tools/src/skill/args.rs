@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{RenderError, ToolArgsRender};
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SkillArgs {
     pub name: String,
@@ -13,8 +11,8 @@ impl SkillArgs {
     }
 }
 
-impl ToolArgsRender for SkillArgs {
-    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+impl SkillArgs {
+    pub fn render_args(raw: &str) -> Result<(String, Option<String>), serde_json::Error> {
         let args: Self = serde_json::from_str(raw)?;
         let first = args.name;
         Ok((first, None))

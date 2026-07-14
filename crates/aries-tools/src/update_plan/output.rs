@@ -1,15 +1,14 @@
 use serde::{Deserialize, Serialize};
 
 use crate::update_plan::PlanEntry;
-use crate::{RenderError, ToolOutputRender};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct UpdatePlanOutput {
     pub items: Vec<PlanEntry>,
 }
 
-impl ToolOutputRender for UpdatePlanOutput {
-    fn render_output(raw: &str) -> Result<String, RenderError> {
+impl UpdatePlanOutput {
+    pub fn render_output(raw: &str) -> Result<String, serde_json::Error> {
         let output: Self = serde_json::from_str(raw)?;
         if output.items.is_empty() {
             return Ok("Plan cleared.".to_owned());

@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{RenderError, ToolArgsRender};
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BashArgs {
     pub command: String,
@@ -18,8 +16,8 @@ impl BashArgs {
     }
 }
 
-impl ToolArgsRender for BashArgs {
-    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+impl BashArgs {
+    pub fn render_args(raw: &str) -> Result<(String, Option<String>), serde_json::Error> {
         let args: Self = serde_json::from_str(raw)?;
         let first = args.command;
         Ok((first, None))

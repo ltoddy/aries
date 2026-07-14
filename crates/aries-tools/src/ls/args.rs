@@ -2,8 +2,6 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{RenderError, ToolArgsRender};
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LsArgs {
     pub path: Option<PathBuf>,
@@ -17,8 +15,8 @@ impl LsArgs {
     }
 }
 
-impl ToolArgsRender for LsArgs {
-    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+impl LsArgs {
+    pub fn render_args(raw: &str) -> Result<(String, Option<String>), serde_json::Error> {
         let args: Self = serde_json::from_str(raw)?;
         let first = args.path.unwrap_or_else(|| PathBuf::from(".")).display().to_string();
         Ok((first, None))

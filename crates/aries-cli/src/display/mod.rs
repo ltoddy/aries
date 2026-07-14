@@ -20,8 +20,8 @@ use aries_tools::webfetch::WebFetchArgs;
 use aries_tools::websearch::WebSearchArgs;
 use aries_tools::write::WriteArgs;
 use aries_tools::{
-    ToolArgsRender, agent, bash, batch, codesearch, edit, glob, grep, ls, lsp, multiedit, question,
-    read, skill, update_plan, webfetch, websearch, write,
+    agent, bash, batch, codesearch, edit, glob, grep, ls, lsp, multiedit, question, read, skill,
+    update_plan, webfetch, websearch, write,
 };
 use itertools::Itertools;
 use rig_core::agent::MultiTurnStreamItem;
@@ -88,7 +88,7 @@ pub fn format_tool_call_args(
     args: &str,
     theme: &Theme,
 ) -> (String, Option<String>) {
-    if !is_known_tool(tool_name) {
+    if !aries_tools::is_builtin_tool(tool_name) {
         return format_unknown_call(tool_name, args, theme);
     }
 
@@ -116,29 +116,6 @@ pub fn format_tool_call_args(
     let (first, rest) = result.unwrap_or_else(|_| (args.to_string(), None));
 
     (format!("{} {}", theme.cyan_text(tool_name), theme.yellow_text(&first)), rest)
-}
-
-fn is_known_tool(tool_name: &str) -> bool {
-    matches!(
-        tool_name,
-        aries_tools::agent::NAME
-            | aries_tools::bash::NAME
-            | aries_tools::batch::NAME
-            | aries_tools::codesearch::NAME
-            | aries_tools::edit::NAME
-            | aries_tools::glob::NAME
-            | aries_tools::grep::NAME
-            | aries_tools::ls::NAME
-            | aries_tools::lsp::NAME
-            | aries_tools::multiedit::NAME
-            | aries_tools::question::NAME
-            | aries_tools::read::NAME
-            | aries_tools::skill::NAME
-            | aries_tools::update_plan::NAME
-            | aries_tools::webfetch::NAME
-            | aries_tools::websearch::NAME
-            | aries_tools::write::NAME
-    )
 }
 
 pub fn format_tool_result_output(tool_name: &str, result: &str, theme: Theme) -> String {

@@ -139,6 +139,7 @@ impl SessionPromptHook {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn on_tool_result(
         &self,
         tool_name: &str,

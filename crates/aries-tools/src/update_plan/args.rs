@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 
 use crate::update_plan::{PlanEntry, PlanEntryPriority, PlanEntryStatus};
-use crate::{RenderError, ToolArgsRender};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct UpdatePlanArgs {
@@ -18,8 +17,8 @@ impl UpdatePlanArgs {
     }
 }
 
-impl ToolArgsRender for UpdatePlanArgs {
-    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+impl UpdatePlanArgs {
+    pub fn render_args(raw: &str) -> Result<(String, Option<String>), serde_json::Error> {
         let args: Self = serde_json::from_str(raw)?;
 
         let first = format!("{} plan entries", args.items.len());

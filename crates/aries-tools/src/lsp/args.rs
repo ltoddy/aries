@@ -3,8 +3,6 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{RenderError, ToolArgsRender};
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum LspOperation {
@@ -54,8 +52,8 @@ impl LspArgs {
     }
 }
 
-impl ToolArgsRender for LspArgs {
-    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+impl LspArgs {
+    pub fn render_args(raw: &str) -> Result<(String, Option<String>), serde_json::Error> {
         let args: Self = serde_json::from_str(raw)?;
 
         let mut first = format!("{}", args.operation);

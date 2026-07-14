@@ -16,8 +16,8 @@ use aries_tools::webfetch::WebFetchOutput;
 use aries_tools::websearch::WebSearchOutput;
 use aries_tools::write::WriteOutput;
 use aries_tools::{
-    ToolOutputRender, agent, bash, batch, codesearch, edit, glob, grep, ls, lsp, multiedit,
-    question, read, skill, update_plan, webfetch, websearch, write,
+    agent, bash, batch, codesearch, edit, glob, grep, ls, lsp, multiedit, question, read, skill,
+    update_plan, webfetch, websearch, write,
 };
 
 pub fn format_tool_output(tool_name: &str, raw_json: &str) -> String {

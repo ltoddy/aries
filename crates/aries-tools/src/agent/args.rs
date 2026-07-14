@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{RenderError, ToolArgsRender};
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AgentArgs {
     pub description: String,
@@ -16,8 +14,8 @@ impl AgentArgs {
     }
 }
 
-impl ToolArgsRender for AgentArgs {
-    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+impl AgentArgs {
+    pub fn render_args(raw: &str) -> Result<(String, Option<String>), serde_json::Error> {
         let args: Self = serde_json::from_str(raw)?;
 
         let mut first = args.description;

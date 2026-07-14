@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{RenderError, ToolOutputRender};
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BashOutput {
     pub stdout: String,
@@ -9,8 +7,8 @@ pub struct BashOutput {
     pub exit_code: i32,
 }
 
-impl ToolOutputRender for BashOutput {
-    fn render_output(raw: &str) -> Result<String, RenderError> {
+impl BashOutput {
+    pub fn render_output(raw: &str) -> Result<String, serde_json::Error> {
         let output: Self = serde_json::from_str(raw)?;
         let mut text = String::new();
         if !output.stdout.is_empty() {

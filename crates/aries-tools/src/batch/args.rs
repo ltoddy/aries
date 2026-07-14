@@ -1,8 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{RenderError, ToolArgsRender};
-
 pub const NAME: &str = "Batch";
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -22,8 +20,8 @@ impl BatchArgs {
     }
 }
 
-impl ToolArgsRender for BatchArgs {
-    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+impl BatchArgs {
+    pub fn render_args(raw: &str) -> Result<(String, Option<String>), serde_json::Error> {
         let args: Self = serde_json::from_str(raw)?;
 
         let first = format!("{} tool calls", args.calls.len());

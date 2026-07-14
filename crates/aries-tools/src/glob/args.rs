@@ -2,8 +2,6 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{RenderError, ToolArgsRender};
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GlobArgs {
     pub pattern: String,
@@ -21,8 +19,8 @@ impl GlobArgs {
     }
 }
 
-impl ToolArgsRender for GlobArgs {
-    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+impl GlobArgs {
+    pub fn render_args(raw: &str) -> Result<(String, Option<String>), serde_json::Error> {
         let args: Self = serde_json::from_str(raw)?;
 
         let mut first = args.pattern;

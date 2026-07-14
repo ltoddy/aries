@@ -1,15 +1,13 @@
 use aries_lspclient::{DocumentSymbolItem, LspResult};
 use serde::{Deserialize, Serialize};
 
-use crate::{RenderError, ToolOutputRender};
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LspOutput {
     pub result: LspResult,
 }
 
-impl ToolOutputRender for LspOutput {
-    fn render_output(raw: &str) -> Result<String, RenderError> {
+impl LspOutput {
+    pub fn render_output(raw: &str) -> Result<String, serde_json::Error> {
         let output: Self = serde_json::from_str(raw)?;
         let content = match &output.result {
             LspResult::Definition(locations)

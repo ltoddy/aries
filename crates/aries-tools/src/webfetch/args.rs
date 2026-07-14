@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{RenderError, ToolArgsRender};
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WebFetchArgs {
     pub url: String,
@@ -14,8 +12,8 @@ impl WebFetchArgs {
     }
 }
 
-impl ToolArgsRender for WebFetchArgs {
-    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+impl WebFetchArgs {
+    pub fn render_args(raw: &str) -> Result<(String, Option<String>), serde_json::Error> {
         let args: Self = serde_json::from_str(raw)?;
         let first = args.url;
         Ok((first, None))

@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{RenderError, ToolArgsRender};
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WebSearchArgs {
     pub query: String,
@@ -14,8 +12,8 @@ impl WebSearchArgs {
     }
 }
 
-impl ToolArgsRender for WebSearchArgs {
-    fn render_args(raw: &str) -> Result<(String, Option<String>), RenderError> {
+impl WebSearchArgs {
+    pub fn render_args(raw: &str) -> Result<(String, Option<String>), serde_json::Error> {
         let args: Self = serde_json::from_str(raw)?;
         let first = args.query;
         Ok((first, None))
