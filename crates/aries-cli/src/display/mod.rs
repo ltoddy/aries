@@ -2,6 +2,27 @@ use std::collections::HashMap;
 use std::io::Write;
 
 use aries_event::AgentEvent;
+use aries_tools::agent::AgentArgs;
+use aries_tools::bash::BashArgs;
+use aries_tools::batch::BatchArgs;
+use aries_tools::codesearch::CodeSearchArgs;
+use aries_tools::edit::EditArgs;
+use aries_tools::glob::GlobArgs;
+use aries_tools::grep::GrepArgs;
+use aries_tools::ls::LsArgs;
+use aries_tools::lsp::LspArgs;
+use aries_tools::multiedit::MultiEditArgs;
+use aries_tools::question::AskUserQuestionArgs;
+use aries_tools::read::ReadArgs;
+use aries_tools::skill::SkillArgs;
+use aries_tools::update_plan::UpdatePlanArgs;
+use aries_tools::webfetch::WebFetchArgs;
+use aries_tools::websearch::WebSearchArgs;
+use aries_tools::write::WriteArgs;
+use aries_tools::{
+    ToolArgsRender, agent, bash, batch, codesearch, edit, glob, grep, ls, lsp, multiedit, question,
+    read, skill, update_plan, webfetch, websearch, write,
+};
 use itertools::Itertools;
 use rig_core::agent::MultiTurnStreamItem;
 use rig_core::message::ToolResultContent;
@@ -71,7 +92,28 @@ pub fn format_tool_call_args(
         return format_unknown_call(tool_name, args, theme);
     }
 
-    let (first, rest) = aries_agent::tools::format_tool_args(tool_name, args);
+    let result = match tool_name {
+        agent::NAME => AgentArgs::render_args(args),
+        bash::NAME => BashArgs::render_args(args),
+        batch::NAME => BatchArgs::render_args(args),
+        codesearch::NAME => CodeSearchArgs::render_args(args),
+        edit::NAME => EditArgs::render_args(args),
+        glob::NAME => GlobArgs::render_args(args),
+        grep::NAME => GrepArgs::render_args(args),
+        ls::NAME => LsArgs::render_args(args),
+        lsp::NAME => LspArgs::render_args(args),
+        multiedit::NAME => MultiEditArgs::render_args(args),
+        question::NAME => AskUserQuestionArgs::render_args(args),
+        read::NAME => ReadArgs::render_args(args),
+        skill::NAME => SkillArgs::render_args(args),
+        update_plan::NAME => UpdatePlanArgs::render_args(args),
+        webfetch::NAME => WebFetchArgs::render_args(args),
+        websearch::NAME => WebSearchArgs::render_args(args),
+        write::NAME => WriteArgs::render_args(args),
+        _ => Ok((args.to_string(), None)),
+    };
+
+    let (first, rest) = result.unwrap_or_else(|_| (args.to_string(), None));
 
     (format!("{} {}", theme.cyan_text(tool_name), theme.yellow_text(&first)), rest)
 }

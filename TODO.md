@@ -10,6 +10,7 @@
 - [ ] 支持 Workflow
 - [ ] agent (参考 https://github.com/vercel/eve 对 agent 的目录结构设计来支持)
 - [ ] token 使用优化
+- [ ] 优化 Tool 的实现
 - [ ] 支持 design.md
 - [ ] 支持 cron
 - [ ] acp 协议 v2 支持

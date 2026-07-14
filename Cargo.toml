@@ -29,6 +29,7 @@ resolver = "3"
 [workspace.dependencies]
 agent-client-protocol = "1.2"
 anyhow = "1"
+base64 = "0.22"
 clap = "4"
 colored = "3"
 dark-light = "2.0"

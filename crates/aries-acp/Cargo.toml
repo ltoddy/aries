@@ -13,6 +13,7 @@ aries-init = { path = "../aries-init" }
 aries-mode = { path = "../aries-mode" }
 aries-session = { path = "../aries-session" }
 aries-tools = { path = "../aries-tools" }
+base64.workspace = true
 itertools.workspace = true
 parking_lot.workspace = true
 rig-core.workspace = true

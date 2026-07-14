@@ -95,6 +95,7 @@ pub fn create_tools_from_tool_names(
             codesearch::NAME => tools.push(Box::new(codesearch::CodeSearchTool::new())),
             edit::NAME => tools.push(Box::new(edit::EditTool::new())),
             glob::NAME => tools.push(Box::new(glob::GlobTool::new(cwd))),
+            grep::NAME => tools.push(Box::new(grep::GrepTool::new(cwd.to_path_buf()))),
             ls::NAME => tools.push(Box::new(ls::LsTool::new(cwd))),
             lsp::NAME => {
                 if let Some(lsp_client) = lsp_client.clone() {
