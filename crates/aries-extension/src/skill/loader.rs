@@ -14,11 +14,15 @@ pub struct SkillsLoader {
 impl SkillsLoader {
     pub const FILENAME: &str = "SKILL.md";
 
-    pub fn new(cwd: impl AsRef<Path>) -> Self {
+    pub fn new(cwd: impl AsRef<Path>, home_dir: impl AsRef<Path>) -> Self {
         let cwd = cwd.as_ref();
-        let home_dir = std::env::home_dir().unwrap_or_else(|| PathBuf::from("~"));
+        let home_dir = home_dir.as_ref();
 
-        let roots = vec![cwd.join(".agent").join("skills"), home_dir.join(".agent").join("skills")];
+        let roots = vec![
+            home_dir.join(".agents").join("skills"),
+            home_dir.join(".agents").join("plugins").join("skills"),
+            cwd.join(".agents").join("skills"),
+        ];
 
         Self { roots }
     }

@@ -13,11 +13,15 @@ pub struct McpsLoader {
 impl McpsLoader {
     pub const FILENAME: &str = "mcp.json";
 
-    pub fn new(cwd: impl AsRef<Path>) -> Self {
+    pub fn new(cwd: impl AsRef<Path>, home_dir: impl AsRef<Path>) -> Self {
         let cwd = cwd.as_ref();
-        let home_dir = std::env::home_dir().unwrap_or_else(|| PathBuf::from("~"));
+        let home_dir = home_dir.as_ref();
 
-        let roots = vec![cwd.join(".agent").join("mcps"), home_dir.join(".agent").join("mcps")];
+        let roots = vec![
+            home_dir.join(".agents").join("mcps"),
+            home_dir.join(".agents").join("plugins").join("mcps"),
+            cwd.join(".agents").join("mcps"),
+        ];
 
         Self { roots }
     }

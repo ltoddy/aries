@@ -7,6 +7,7 @@
 - [x] island
 - [x] 支持 mcp
 - [x] custom agent 支持
+- [x] 支持 plugin
 - [ ] 支持 Workflow
 - [ ] agent (参考 https://github.com/vercel/eve 对 agent 的目录结构设计来支持)
 - [ ] token 使用优化
@@ -15,7 +16,6 @@
 - [ ] 支持 design.md
 - [ ] 支持 cron
 - [ ] acp 协议 v2 支持
-- [ ] 支持 plugin
 - [ ] command
 - [ ] 通过 rsync 实现本机的 sandbox
 - [ ] 支持 Browser Use

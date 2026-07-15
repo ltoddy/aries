@@ -12,11 +12,15 @@ pub struct HooksLoader {
 impl HooksLoader {
     pub const FILENAME: &str = "hooks.json";
 
-    pub fn new(cwd: impl AsRef<Path>) -> Self {
+    pub fn new(cwd: impl AsRef<Path>, home_dir: impl AsRef<Path>) -> Self {
         let cwd = cwd.as_ref();
-        let home_dir = std::env::home_dir().unwrap_or_else(|| PathBuf::from("~"));
+        let home_dir = home_dir.as_ref();
 
-        let roots = vec![cwd.join(".agent").join("hooks"), home_dir.join(".agent").join("hooks")];
+        let roots = vec![
+            home_dir.join(".agents").join("hooks"),
+            home_dir.join(".agents").join("plugins").join("hooks"),
+            cwd.join(".agents").join("hooks"),
+        ];
 
         Self { roots }
     }

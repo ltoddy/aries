@@ -3,7 +3,7 @@ pub mod hook;
 pub mod mcp;
 pub mod skill;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::agent::{AgentDefinition, AgentsLoader};
 use crate::hook::{HooksLoader, HooksPreset};
@@ -21,11 +21,12 @@ pub struct AgentExtensions {
 impl AgentExtensions {
     pub async fn new(cwd: impl AsRef<Path>) -> Self {
         let cwd = cwd.as_ref();
+        let home_dir = std::env::home_dir().unwrap_or_else(|| PathBuf::from("~"));
 
-        let agent_loader = AgentsLoader::new(cwd);
-        let hook_loader = HooksLoader::new(cwd);
-        let mcp_loader = McpsLoader::new(cwd);
-        let skill_loader = SkillsLoader::new(cwd);
+        let agent_loader = AgentsLoader::new(cwd, &home_dir);
+        let hook_loader = HooksLoader::new(cwd, &home_dir);
+        let mcp_loader = McpsLoader::new(cwd, &home_dir);
+        let skill_loader = SkillsLoader::new(cwd, &home_dir);
 
         let (agents, hooks, mcps, skills) = tokio::join!(
             agent_loader.load(),
