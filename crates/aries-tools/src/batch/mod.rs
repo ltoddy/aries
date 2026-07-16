@@ -13,6 +13,7 @@ pub use self::error::BatchError;
 pub use self::output::BatchOutput;
 use crate::bash::{BashArgs, BashTool};
 use crate::codesearch::{CodeSearchArgs, CodeSearchTool};
+use crate::context::ToolContext;
 use crate::edit::{EditArgs, EditTool};
 use crate::glob::{GlobArgs, GlobTool};
 use crate::grep::{GrepArgs, GrepTool};
@@ -30,13 +31,12 @@ use crate::{
 
 pub struct BatchTool {
     cwd: PathBuf,
+    ctx: ToolContext,
 }
 
 impl BatchTool {
-    pub fn new(cwd: impl AsRef<Path>) -> Self {
-        let cwd = cwd.as_ref().to_path_buf();
-
-        Self { cwd }
+    pub fn new(cwd: impl AsRef<Path>, ctx: ToolContext) -> Self {
+        Self { cwd: cwd.as_ref().to_path_buf(), ctx }
     }
 }
 
@@ -83,12 +83,13 @@ impl Tool for BatchTool {
             let tool_name = call.tool.clone();
             let params = call.parameters;
             let cwd = self.cwd.clone();
+            let ctx = self.ctx.clone();
 
             let future = async move {
                 if tool_name == NAME {
                     Err("Nested batch calls are not allowed".to_string())
                 } else {
-                    dispatch(tool_name, params, cwd).await
+                    dispatch(tool_name, params, cwd, ctx).await
                 }
             };
             futures.push(future);
@@ -118,7 +119,12 @@ impl Tool for BatchTool {
     }
 }
 
-async fn dispatch(tool_name: String, params: Value, cwd: PathBuf) -> Result<Value, String> {
+async fn dispatch(
+    tool_name: String,
+    params: Value,
+    cwd: PathBuf,
+    ctx: ToolContext,
+) -> Result<Value, String> {
     match tool_name.as_str() {
         bash::NAME => {
             let args: BashArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
@@ -129,14 +135,14 @@ async fn dispatch(tool_name: String, params: Value, cwd: PathBuf) -> Result<Valu
         },
         read::NAME => {
             let args: ReadArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
-            Tool::call(&ReadTool, args)
+            Tool::call(&ReadTool::new(), args)
                 .await
                 .map(|res| serde_json::to_value(res).unwrap())
                 .map_err(|e| e.to_string())
         },
         write::NAME => {
             let args: WriteArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
-            Tool::call(&WriteTool, args)
+            Tool::call(&WriteTool::new(cwd, ctx), args)
                 .await
                 .map(|res| serde_json::to_value(res).unwrap())
                 .map_err(|e| e.to_string())
@@ -164,14 +170,14 @@ async fn dispatch(tool_name: String, params: Value, cwd: PathBuf) -> Result<Valu
         },
         multiedit::NAME => {
             let args: MultiEditArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
-            Tool::call(&MultiEditTool, args)
+            Tool::call(&MultiEditTool::new(cwd, ctx), args)
                 .await
                 .map(|res| serde_json::to_value(res).unwrap())
                 .map_err(|e| e.to_string())
         },
         edit::NAME => {
             let args: EditArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
-            Tool::call(&EditTool, args)
+            Tool::call(&EditTool::new(cwd, ctx), args)
                 .await
                 .map(|res| serde_json::to_value(res).unwrap())
                 .map_err(|e| e.to_string())

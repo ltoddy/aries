@@ -45,6 +45,7 @@ pub struct LspClient {
     _child: Child,
     next_id: AtomicI64,
     pending: Arc<Mutex<HashMap<RequestId, oneshot::Sender<Value>>>>,
+    doc_versions: Arc<Mutex<HashMap<String, i64>>>,
 }
 
 impl LspClient {
@@ -111,6 +112,7 @@ impl LspClient {
             _child: child,
             next_id: AtomicI64::new(1),
             pending,
+            doc_versions: Arc::new(Mutex::new(HashMap::new())),
         })
     }
 
@@ -272,15 +274,45 @@ impl LspClient {
     pub async fn did_open(&self, file_path: impl AsRef<Path>) -> io::Result<()> {
         let content = tokio::fs::read_to_string(file_path.as_ref()).await?;
         let language_id = detect_language_id(file_path.as_ref());
+        let uri = path_to_uri(&file_path);
+        self.doc_versions.lock().insert(uri.clone(), 1);
         let params = serde_json::json!({
             "textDocument": {
-                "uri": path_to_uri(file_path),
+                "uri": uri,
                 "languageId": language_id,
                 "version": 1,
                 "text": content
             }
         });
         self.send_notification("textDocument/didOpen", params).await
+    }
+
+    pub async fn did_change(&self, file_path: impl AsRef<Path>, text: &str) -> io::Result<()> {
+        let uri = path_to_uri(&file_path);
+        let version = {
+            let mut versions = self.doc_versions.lock();
+            let entry = versions.entry(uri.clone()).or_insert(1);
+            *entry += 1;
+            *entry
+        };
+        let params = serde_json::json!({
+            "textDocument": {
+                "uri": uri,
+                "version": version
+            },
+            "contentChanges": [ { "text": text } ]
+        });
+        self.send_notification("textDocument/didChange", params).await
+    }
+
+    pub async fn did_save(&self, file_path: impl AsRef<Path>, text: &str) -> io::Result<()> {
+        let params = serde_json::json!({
+            "textDocument": {
+                "uri": path_to_uri(&file_path)
+            },
+            "text": text
+        });
+        self.send_notification("textDocument/didSave", params).await
     }
 
     pub async fn shutdown(&self) -> anyhow::Result<()> {

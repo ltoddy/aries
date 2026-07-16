@@ -2,6 +2,7 @@ pub mod agent;
 pub mod bash;
 pub mod batch;
 pub mod codesearch;
+pub mod context;
 pub mod edit;
 pub mod glob;
 pub mod grep;
@@ -98,12 +99,14 @@ pub fn create_tools_from_tool_names(
     let tool_names = tool_names.iter().unique().collect_vec();
     let mut tools = Vec::<Box<dyn ToolDyn>>::with_capacity(tool_names.len());
 
+    let ctx = context::ToolContext::new(lsp_client.clone());
+
     for &tool_name in tool_names {
         match tool_name {
             bash::NAME => tools.push(Box::new(bash::BashTool::new())),
-            batch::NAME => tools.push(Box::new(batch::BatchTool::new(cwd))),
+            batch::NAME => tools.push(Box::new(batch::BatchTool::new(cwd, ctx.clone()))),
             codesearch::NAME => tools.push(Box::new(codesearch::CodeSearchTool::new())),
-            edit::NAME => tools.push(Box::new(edit::EditTool::new())),
+            edit::NAME => tools.push(Box::new(edit::EditTool::new(cwd, ctx.clone()))),
             glob::NAME => tools.push(Box::new(glob::GlobTool::new(cwd))),
             grep::NAME => tools.push(Box::new(grep::GrepTool::new(cwd.to_path_buf()))),
             ls::NAME => tools.push(Box::new(ls::LsTool::new(cwd))),
@@ -112,7 +115,9 @@ pub fn create_tools_from_tool_names(
                     tools.push(Box::new(lsp::LspTool::new(lsp_client, cwd)))
                 }
             },
-            multiedit::NAME => tools.push(Box::new(multiedit::MultiEditTool::new())),
+            multiedit::NAME => {
+                tools.push(Box::new(multiedit::MultiEditTool::new(cwd, ctx.clone())))
+            },
             question::NAME => tools.push(Box::new(question::AskUserQuestionTool::new())),
             read::NAME => tools.push(Box::new(read::ReadTool::new())),
             skill::NAME => {
@@ -124,7 +129,7 @@ pub fn create_tools_from_tool_names(
             update_plan::NAME => tools.push(Box::new(update_plan::UpdatePlanTool::new())),
             webfetch::NAME => tools.push(Box::new(webfetch::WebFetchTool::new())),
             websearch::NAME => tools.push(Box::new(websearch::WebSearchTool::new())),
-            write::NAME => tools.push(Box::new(write::WriteTool::new())),
+            write::NAME => tools.push(Box::new(write::WriteTool::new(cwd, ctx.clone()))),
             _ => {},
         }
     }

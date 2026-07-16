@@ -5,6 +5,7 @@ use tempfile::TempDir;
 use tokio::fs;
 
 use super::*;
+use crate::context::ToolContext;
 
 #[tokio::test]
 async fn test_edit_simple_replacement() {
@@ -12,7 +13,7 @@ async fn test_edit_simple_replacement() {
     let file_path = dir.path().join("test.txt");
     fs::write(&file_path, "hello world").await.unwrap();
 
-    let tool = EditTool;
+    let tool = EditTool::new(dir, ToolContext::new(None));
     let result = tool
         .call(EditArgs {
             file_path: file_path.clone(),
@@ -33,7 +34,7 @@ async fn test_edit_replace_all() {
     let file_path = dir.path().join("test.txt");
     fs::write(&file_path, "foo foo foo").await.unwrap();
 
-    let tool = EditTool;
+    let tool = EditTool::new(dir, ToolContext::new(None));
     let result = tool
         .call(EditArgs {
             file_path: file_path.clone(),
@@ -50,7 +51,8 @@ async fn test_edit_replace_all() {
 
 #[tokio::test]
 async fn test_edit_file_not_found() {
-    let tool = EditTool;
+    let dir = TempDir::new().unwrap();
+    let tool = EditTool::new(dir.path(), ToolContext::new(None));
     let result = tool
         .call(EditArgs {
             file_path: "/nonexistent/file.txt".into(),
@@ -69,7 +71,7 @@ async fn test_edit_old_text_not_found() {
     let file_path = dir.path().join("test.txt");
     fs::write(&file_path, "hello world").await.unwrap();
 
-    let tool = EditTool;
+    let tool = EditTool::new(dir, ToolContext::new(None));
     let result = tool
         .call(EditArgs {
             file_path,
@@ -88,7 +90,7 @@ async fn test_edit_multiple_matches_without_replace_all() {
     let file_path = dir.path().join("test.txt");
     fs::write(&file_path, "a a a").await.unwrap();
 
-    let tool = EditTool;
+    let tool = EditTool::new(dir, ToolContext::new(None));
     let result = tool
         .call(EditArgs {
             file_path,

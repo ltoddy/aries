@@ -79,7 +79,7 @@ impl Tool for BashTool {
             .stderr(Stdio::piped())
             .output()
             .await
-            .map_err(|e| BashError::ExecutionFailed(e.to_string()))?;
+            .map_err(BashError::Io)?;
 
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();

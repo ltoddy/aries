@@ -4,6 +4,8 @@ mod output;
 #[cfg(test)]
 mod tests;
 
+use std::path::{Path, PathBuf};
+
 use rig_core::tool::Tool;
 use serde_json::Value;
 use tokio::fs;
@@ -11,20 +13,20 @@ use tokio::fs;
 pub use self::args::EditArgs;
 pub use self::error::EditError;
 pub use self::output::EditOutput;
+use crate::context::ToolContext;
 
 pub const NAME: &str = "Edit";
 
-pub struct EditTool;
-
-impl Default for EditTool {
-    fn default() -> Self {
-        Self::new()
-    }
+pub struct EditTool {
+    _cwd: PathBuf,
+    ctx: ToolContext,
 }
 
 impl EditTool {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(cwd: impl AsRef<Path>, ctx: ToolContext) -> Self {
+        let cwd = cwd.as_ref().to_path_buf();
+
+        Self { _cwd: cwd, ctx }
     }
 }
 
@@ -95,9 +97,11 @@ impl Tool for EditTool {
             content.replacen(&args.old_text, &args.new_text, 1)
         };
 
-        fs::write(&args.file_path, new_content)
+        fs::write(&args.file_path, &new_content)
             .await
             .map_err(|e| EditError::EditError(format!("Failed to write file: {}", e)))?;
+
+        self.ctx.on_file_written(&args.file_path, &new_content).await;
 
         Ok(EditOutput { success: true, message: "Edit applied successfully".to_owned() })
     }

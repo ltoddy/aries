@@ -4,27 +4,30 @@ mod output;
 #[cfg(test)]
 mod tests;
 
+use std::path::{Path, PathBuf};
+
 use rig_core::tool::Tool;
 use serde_json::Value;
+use similar::TextDiff;
 use tokio::fs;
 
 pub use self::args::WriteArgs;
 pub use self::error::WriteError;
-pub use self::output::WriteOutput;
+pub use self::output::{Hunk, WriteKind, WriteOutput};
+use crate::context::ToolContext;
 
 pub const NAME: &str = "Write";
 
-pub struct WriteTool;
-
-impl Default for WriteTool {
-    fn default() -> Self {
-        Self::new()
-    }
+pub struct WriteTool {
+    _cwd: PathBuf,
+    ctx: ToolContext,
 }
 
 impl WriteTool {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(cwd: impl AsRef<Path>, ctx: ToolContext) -> Self {
+        let cwd = cwd.as_ref().to_path_buf();
+
+        Self { _cwd: cwd, ctx }
     }
 }
 
@@ -44,7 +47,7 @@ impl Tool for WriteTool {
             "properties": {
                 "file_path": {
                     "type": "string",
-                    "description": "The path to the file to write"
+                    "description": "The path to the file to write (absolute or relative to the working directory)"
                 },
                 "content": {
                     "type": "string",
@@ -60,8 +63,45 @@ impl Tool for WriteTool {
             fs::create_dir_all(parent).await?;
         }
 
-        fs::write(&args.file_path, args.content).await?;
+        let original_content = fs::read_to_string(&args.file_path).await.ok();
 
-        Ok(WriteOutput { success: true })
+        fs::write(&args.file_path, &args.content).await?;
+        self.ctx.on_file_written(&args.file_path, &args.content).await;
+
+        match original_content {
+            Some(original_content) => {
+                let diff = TextDiff::from_lines(&original_content, &args.content);
+
+                let mut additions = 0_usize;
+                let mut deletions = 0_usize;
+                let mut hunks = Vec::new();
+                for op in diff.ops() {
+                    match op.tag() {
+                        similar::DiffTag::Equal => continue,
+                        similar::DiffTag::Insert => additions += op.new_range().len(),
+                        similar::DiffTag::Delete => deletions += op.old_range().len(),
+                        similar::DiffTag::Replace => {
+                            deletions += op.old_range().len();
+                            additions += op.new_range().len();
+                        },
+                    }
+                    hunks.push(Hunk::from_diff(op, &diff));
+                }
+
+                let output = WriteOutput::for_update(
+                    args.file_path,
+                    original_content,
+                    hunks,
+                    additions,
+                    deletions,
+                );
+                Ok(output)
+            },
+            None => {
+                let additions = args.content.lines().count();
+                let output = WriteOutput::for_create(args.file_path, additions);
+                Ok(output)
+            },
+        }
     }
 }

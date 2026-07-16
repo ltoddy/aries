@@ -6,6 +6,7 @@ use rig_core::tool::Tool;
 use tempfile::TempDir;
 
 use super::*;
+use crate::context::ToolContext;
 
 #[tokio::test]
 async fn test_multiedit_basic() {
@@ -13,7 +14,7 @@ async fn test_multiedit_basic() {
     let file_path = dir.path().join("test.txt");
     fs::write(&file_path, "hello world").unwrap();
 
-    let tool = MultiEditTool;
+    let tool = MultiEditTool::new(dir.path(), ToolContext::new(None));
     let result = tool
         .call(MultiEditArgs {
             file_path: file_path.clone(),
@@ -42,7 +43,7 @@ async fn test_multiedit_creates_file() {
     let dir = TempDir::new().unwrap();
     let file_path = dir.path().join("new_file.txt");
 
-    let tool = MultiEditTool;
+    let tool = MultiEditTool::new(dir.path(), ToolContext::new(None));
     let result = tool
         .call(MultiEditArgs {
             file_path: file_path.clone(),
@@ -65,7 +66,7 @@ async fn test_multiedit_identical_text_error() {
     let file_path = dir.path().join("test.txt");
     fs::write(&file_path, "hello").unwrap();
 
-    let tool = MultiEditTool;
+    let tool = MultiEditTool::new(dir.path(), ToolContext::new(None));
     let result = tool
         .call(MultiEditArgs {
             file_path,

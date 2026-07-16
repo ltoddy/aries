@@ -10,5 +10,5 @@ parking_lot.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 serde_repr.workspace = true
-tokio = { workspace = true, features = ["process", "io-util", "sync", "time"] }
+tokio = { workspace = true, features = ["process", "io-util", "sync", "time", "rt"] }
 tracing.workspace = true

@@ -8,10 +8,13 @@
 - [x] 支持 mcp
 - [x] custom agent 支持
 - [x] 支持 plugin
+- [ ] 优化 Tool 的实现
+  - [x] Write/Edit/MultiEdit 写入后通知 LSP 重建索引 (ToolContext + did_change/did_save)
+  - [x] Write tool 输出结构化 diff (WriteKind / Hunk / additions / deletions)
+  - [x] Write tool 支持相对路径解析
 - [ ] 支持 Workflow
 - [ ] agent (参考 https://github.com/vercel/eve 对 agent 的目录结构设计来支持)
 - [ ] token 使用优化
-- [ ] 优化 Tool 的实现
 - [ ] 支持设置模型 effort
 - [ ] 支持 design.md
 - [ ] 支持 cron

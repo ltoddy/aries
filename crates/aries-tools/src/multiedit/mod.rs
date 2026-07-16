@@ -4,6 +4,8 @@ mod output;
 #[cfg(test)]
 mod tests;
 
+use std::path::{Path, PathBuf};
+
 use rig_core::tool::Tool;
 use serde_json::Value;
 use tokio::fs;
@@ -11,20 +13,19 @@ use tokio::fs;
 pub use self::args::{EditOperation, MultiEditArgs};
 pub use self::error::MultiEditError;
 pub use self::output::MultiEditOutput;
+use crate::context::ToolContext;
 
 pub const NAME: &str = "MultiEdit";
 
-pub struct MultiEditTool;
-
-impl Default for MultiEditTool {
-    fn default() -> Self {
-        Self::new()
-    }
+pub struct MultiEditTool {
+    _cwd: PathBuf,
+    ctx: ToolContext,
 }
 
 impl MultiEditTool {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(cwd: impl AsRef<Path>, ctx: ToolContext) -> Self {
+        let cwd = cwd.as_ref().to_path_buf();
+        Self { _cwd: cwd, ctx }
     }
 }
 
@@ -111,9 +112,10 @@ impl Tool for MultiEditTool {
             let _ = fs::create_dir_all(parent).await;
         }
 
-        fs::write(&args.file_path, content)
+        fs::write(&args.file_path, &content)
             .await
             .map_err(|e| MultiEditError::EditError(format!("Failed to write file: {}", e)))?;
+        self.ctx.on_file_written(&args.file_path, &content).await;
 
         Ok(MultiEditOutput { success: true, message: "Edits applied successfully".to_owned() })
     }

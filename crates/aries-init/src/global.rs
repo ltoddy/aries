@@ -10,8 +10,7 @@ pub struct GlobalContext {
 
 impl GlobalContext {
     pub fn new() -> io::Result<Self> {
-        let home_dir = dirs::home_dir()
-            .ok_or(io::Error::new(io::ErrorKind::NotFound, "Impossible to get your home dir!"))?;
+        let home_dir = std::env::home_dir().unwrap_or_else(|| PathBuf::from("~"));
 
         let root_dir = home_dir.join(".local").join("share").join("aries");
         std::fs::create_dir_all(&root_dir)?;
