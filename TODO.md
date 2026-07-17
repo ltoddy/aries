@@ -11,6 +11,7 @@
 - [ ] 优化 Tool 的实现
   - [x] Write/Edit/MultiEdit 写入后通知 LSP 重建索引 (ToolContext + did_change/did_save)
   - [x] Write tool 输出结构化 diff (WriteKind / Hunk / additions / deletions)
+  - [x] UpdatePlan 支持 active_form、校验空字段、全部完成自动清空
 - [ ] 支持 Workflow
 - [ ] agent (参考 https://github.com/vercel/eve 对 agent 的目录结构设计来支持)
 - [ ] token 使用优化
@@ -27,3 +28,5 @@
 - [ ] for harness engineering and autonomous agent
 - [ ] 长任务
 - [ ] 对环境进行感知
+- [ ] 是否需要实现投机解码 ?
+- [ ] 实现 MoA (Mixture of Agent)

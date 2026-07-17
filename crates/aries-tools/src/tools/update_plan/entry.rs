@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PlanEntry {
     pub content: String,
+    pub active_form: String,
     pub priority: PlanEntryPriority,
     pub status: PlanEntryStatus,
 }
@@ -50,6 +51,18 @@ impl PlanEntryStatus {
             PlanEntryStatus::InProgress => "◐",
             PlanEntryStatus::Completed => "☑",
         }
+    }
+
+    pub fn is_pending(self) -> bool {
+        self == PlanEntryStatus::Pending
+    }
+
+    pub fn is_in_progress(self) -> bool {
+        self == PlanEntryStatus::InProgress
+    }
+
+    pub fn is_completed(self) -> bool {
+        self == PlanEntryStatus::Completed
     }
 }
 

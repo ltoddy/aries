@@ -10,19 +10,24 @@ impl PlanEntry {
 }
 
 impl From<PlanEntry> for schema::PlanEntry {
-    fn from(val: PlanEntry) -> Self {
-        let priority = match val.0.priority {
+    fn from(PlanEntry(v): PlanEntry) -> Self {
+        let update_plan::PlanEntry { content, active_form, priority, status } = v;
+
+        let priority = match priority {
             PlanEntryPriority::High => schema::PlanEntryPriority::High,
             PlanEntryPriority::Medium => schema::PlanEntryPriority::Medium,
             PlanEntryPriority::Low => schema::PlanEntryPriority::Low,
         };
 
-        let status = match val.0.status {
+        let status = match status {
             PlanEntryStatus::Pending => schema::PlanEntryStatus::Pending,
             PlanEntryStatus::InProgress => schema::PlanEntryStatus::InProgress,
             PlanEntryStatus::Completed => schema::PlanEntryStatus::Completed,
         };
 
-        schema::PlanEntry::new(val.0.content, priority, status)
+        let mut meta = serde_json::Map::new();
+        meta.insert("activeForm".to_owned(), serde_json::Value::String(active_form));
+
+        schema::PlanEntry::new(content, priority, status).meta(meta)
     }
 }

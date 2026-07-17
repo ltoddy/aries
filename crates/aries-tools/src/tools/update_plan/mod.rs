@@ -2,6 +2,8 @@ mod args;
 mod entry;
 mod error;
 mod output;
+#[cfg(test)]
+mod tests;
 
 use rig_core::tool::Tool;
 use serde_json::Value;
@@ -47,11 +49,12 @@ impl Tool for UpdatePlanTool {
                     "items": {
                         "type": "object",
                         "properties": {
-                            "content": { "type": "string" },
+                            "content": { "type": "string", "description": "Imperative form of the task (e.g. \"Run tests\")" },
+                            "active_form": { "type": "string", "description": "Present continuous form shown while executing (e.g. \"Running tests\")" },
                             "priority": { "type": "string", "enum": ["high", "medium", "low"] },
                             "status": { "type": "string", "enum": ["pending", "in_progress", "completed"] }
                         },
-                        "required": ["content", "priority", "status"]
+                        "required": ["content", "active_form", "priority", "status"]
                     }
                 }
             },
@@ -60,6 +63,15 @@ impl Tool for UpdatePlanTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        Ok(UpdatePlanOutput { items: args.items })
+        if args.items.iter().any(|v| v.content.trim().is_empty()) {
+            return Err(UpdatePlanError::EmptyContent);
+        }
+        if args.items.iter().any(|v| v.active_form.trim().is_empty()) {
+            return Err(UpdatePlanError::EmptyActiveForm);
+        }
+
+        let all_done = args.items.iter().all(|v| v.status.is_completed());
+        let items = if all_done { Vec::new() } else { args.items };
+        Ok(UpdatePlanOutput { items })
     }
 }
