@@ -1,0 +1,44 @@
+crates/aries-tools/src/tools/update_plan/entry.rs
+  s_fb34e7338edd98::t_1c9332f9428cf0 8
+crates/aries-tools/src/tools/update_plan/description.md
+  s_fb34e7338edd98::t_f3b431d2e8bd9d 32
+  s_fb34e7338edd98::t_7e59bf886009c7 5-31,33,37-38,43-44
+crates/aries-acp/src/v1/prompt/plan.rs
+  s_fb34e7338edd98::t_3f01b3664243c2 13
+  s_fb34e7338edd98::t_d6b5796b12b653 14-16,22,28-31
+crates/aries-tools/src/tools/update_plan/output.rs
+  s_fb34e7338edd98::t_eeae870d363dff 14-16,21-25
+crates/aries-tools/src/tools/update_plan/mod.rs
+  s_fb34e7338edd98::t_89870acbbef439 67-75
+  s_fb34e7338edd98::t_8f849899bd2df4 52
+  s_fb34e7338edd98::t_d576d6df20c473 53,57
+  s_fb34e7338edd98::t_c7eb91fc48a1df 5-6
+  s_fb34e7338edd98::t_5db2049d9c1043 66
+crates/aries-tools/src/tools/update_plan/error.rs
+  s_fb34e7338edd98::t_339a999040b112 3-4,6
+  s_fb34e7338edd98::t_2c102e1171030d 5
+crates/aries-tools/src/tools/update_plan/tests.rs
+  s_fb34e7338edd98::t_d16b0b5e1ca429 13
+  s_fb34e7338edd98::t_fee7e7ad1a0f33 12,14,21,30,36-43,45-48,50-66,69-83
+  s_fb34e7338edd98::t_449e5c84857a58 9-11
+  s_fb34e7338edd98::t_6dcca3f1b777be 15
+  s_fb34e7338edd98::t_ea278fb83511c7 7-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "785d04db2ec43ba87a593e4a64347a0e219dbdd1",
+  "prompts": {},
+  "sessions": {
+    "s_fb34e7338edd98": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a53979a44cfdfb8b60d1410",
+        "model": "openrouter-3o__dev"
+      },
+      "human_author": "liutao.rs <liutao.rs@bytedance.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
