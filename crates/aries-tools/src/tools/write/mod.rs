@@ -19,7 +19,7 @@ use crate::context::ToolContext;
 pub const NAME: &str = "Write";
 
 pub struct WriteTool {
-    _cwd: PathBuf,
+    cwd: PathBuf,
     ctx: ToolContext,
 }
 
@@ -27,7 +27,7 @@ impl WriteTool {
     pub fn new(cwd: impl AsRef<Path>, ctx: ToolContext) -> Self {
         let cwd = cwd.as_ref().to_path_buf();
 
-        Self { _cwd: cwd, ctx }
+        Self { cwd, ctx }
     }
 }
 
@@ -59,14 +59,23 @@ impl Tool for WriteTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        if let Some(parent) = args.file_path.parent() {
+        let file_path = if args.file_path.is_relative() {
+            self.cwd.join(&args.file_path)
+        } else {
+            args.file_path
+        };
+
+        if let Some(parent) = file_path.parent() {
             fs::create_dir_all(parent).await?;
         }
 
-        let original_content = fs::read_to_string(&args.file_path).await.ok();
+        let original_content = fs::read_to_string(&file_path).await.ok();
+        if let Some(ref original_content) = original_content {
+            let _ = self.ctx.file_checkpoint.push(&file_path, original_content).await;
+        }
 
-        fs::write(&args.file_path, &args.content).await?;
-        self.ctx.on_file_written(&args.file_path, &args.content).await;
+        fs::write(&file_path, &args.content).await?;
+        self.ctx.on_file_written(&file_path, &args.content).await;
 
         match original_content {
             Some(original_content) => {
@@ -89,7 +98,7 @@ impl Tool for WriteTool {
                 }
 
                 let output = WriteOutput::for_update(
-                    args.file_path,
+                    file_path,
                     original_content,
                     hunks,
                     additions,
@@ -99,7 +108,7 @@ impl Tool for WriteTool {
             },
             None => {
                 let additions = args.content.lines().count();
-                let output = WriteOutput::for_create(args.file_path, additions);
+                let output = WriteOutput::for_create(file_path, additions);
                 Ok(output)
             },
         }

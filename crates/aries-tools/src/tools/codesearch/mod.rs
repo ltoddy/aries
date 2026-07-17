@@ -81,7 +81,7 @@ impl Tool for CodeSearchTool {
             "properties": {
                 "query": {
                     "type": "string",
-                    "description": "Search query to find relevant context for APIs, Libraries, and SDKs. For example, 'React useState hook examples', 'Python pandas dataframe filtering'."
+                    "description": "Search query to find relevant mod for APIs, Libraries, and SDKs. For example, 'React useState hook examples', 'Python pandas dataframe filtering'."
                 },
                 "tokens_num": {
                     "type": "number",

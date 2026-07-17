@@ -8,7 +8,7 @@ pub struct CodeSearchArgs {
 
 impl CodeSearchArgs {
     pub fn title(&self) -> String {
-        format!("Search code context for {}", self.query)
+        format!("Search code mod for {}", self.query)
     }
 }
 

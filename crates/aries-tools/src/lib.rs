@@ -1,21 +1,5 @@
-pub mod agent;
-pub mod bash;
-pub mod batch;
-pub mod codesearch;
 pub mod context;
-pub mod edit;
-pub mod glob;
-pub mod grep;
-pub mod ls;
-pub mod lsp;
-pub mod multiedit;
-pub mod question;
-pub mod read;
-pub mod skill;
-pub mod update_plan;
-pub mod webfetch;
-pub mod websearch;
-pub mod write;
+pub mod tools;
 
 use std::path::Path;
 
@@ -23,6 +7,7 @@ use aries_extension::skill::SkillDefinition;
 use aries_mode::Mode;
 use itertools::Itertools;
 use rig_core::tool::ToolDyn;
+pub use tools::*;
 
 pub const ALL_TOOL_NAMES: &[&str] = &[
     agent::NAME,

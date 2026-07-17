@@ -1,10 +1,15 @@
+mod file_checkpoint;
+
 use std::path::Path;
 
 use aries_lspclient::SharedLspClient;
 
-#[derive(Clone, Default)]
+use crate::context::file_checkpoint::SharedFileCheckpoint;
+
+#[derive(Clone)]
 pub struct ToolContext {
-    pub lsp_client: Option<SharedLspClient>,
+    lsp_client: Option<SharedLspClient>,
+    pub file_checkpoint: SharedFileCheckpoint,
 }
 
 impl std::fmt::Debug for ToolContext {
@@ -15,7 +20,9 @@ impl std::fmt::Debug for ToolContext {
 
 impl ToolContext {
     pub fn new(lsp_client: Option<SharedLspClient>) -> Self {
-        Self { lsp_client }
+        let file_checkpoint = SharedFileCheckpoint::new();
+
+        Self { lsp_client, file_checkpoint }
     }
 
     pub async fn on_file_written(&self, file_path: impl AsRef<Path>, content: impl Into<String>) {

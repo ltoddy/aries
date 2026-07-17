@@ -13,7 +13,7 @@ async fn test_edit_simple_replacement() {
     let file_path = dir.path().join("test.txt");
     fs::write(&file_path, "hello world").await.unwrap();
 
-    let tool = EditTool::new(dir, ToolContext::new(None));
+    let tool = EditTool::new(dir.path(), ToolContext::new(None));
     let result = tool
         .call(EditArgs {
             file_path: file_path.clone(),
@@ -34,7 +34,7 @@ async fn test_edit_replace_all() {
     let file_path = dir.path().join("test.txt");
     fs::write(&file_path, "foo foo foo").await.unwrap();
 
-    let tool = EditTool::new(dir, ToolContext::new(None));
+    let tool = EditTool::new(dir.path(), ToolContext::new(None));
     let result = tool
         .call(EditArgs {
             file_path: file_path.clone(),
