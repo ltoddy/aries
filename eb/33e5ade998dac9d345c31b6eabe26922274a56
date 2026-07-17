@@ -1,0 +1,26 @@
+crates/aries-tools/src/tools/write/mod.rs
+  s_fb34e7338edd98::t_71f214f32a5dda 77-78
+  s_fb34e7338edd98::t_fda37ab43a2ad1 72
+  s_fb34e7338edd98::t_133e5311900e8a 22,101
+  s_fb34e7338edd98::t_e88b07043c9589 111
+  s_fb34e7338edd98::t_400d60f03fa5e6 30
+  s_fb34e7338edd98::t_3ca6eb8483cd44 73-75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "eb33e5ade998dac9d345c31b6eabe26922274a56",
+  "prompts": {},
+  "sessions": {
+    "s_fb34e7338edd98": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a53979a44cfdfb8b60d1410",
+        "model": "openrouter-3o__dev"
+      },
+      "human_author": null
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
