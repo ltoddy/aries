@@ -176,7 +176,7 @@ impl LspClient {
         line: u32,
         character: u32,
     ) -> anyhow::Result<LspResult> {
-        let params = text_document_position_params(file_path, line, character);
+        let params = text_document_position_params(file_path, line, character).await;
         let result = self.send_request("textDocument/definition", params).await?;
         let locations =
             serde_json::from_value::<Option<Vec<Location>>>(result)?.unwrap_or_default();
@@ -189,7 +189,7 @@ impl LspClient {
         line: u32,
         character: u32,
     ) -> anyhow::Result<LspResult> {
-        let mut params = text_document_position_params(file_path, line, character);
+        let mut params = text_document_position_params(file_path, line, character).await;
         params["context"] = serde_json::json!({ "includeDeclaration": true });
         let result = self.send_request("textDocument/references", params).await?;
         let locations =
@@ -203,7 +203,7 @@ impl LspClient {
         line: u32,
         character: u32,
     ) -> anyhow::Result<LspResult> {
-        let params = text_document_position_params(file_path, line, character);
+        let params = text_document_position_params(file_path, line, character).await;
         let result = self.send_request("textDocument/hover", params).await?;
         let hover = serde_json::from_value::<Option<Hover>>(result)?;
         Ok(LspResult::Hover(hover))
@@ -212,7 +212,7 @@ impl LspClient {
     pub async fn document_symbol(&self, file_path: impl AsRef<Path>) -> anyhow::Result<LspResult> {
         let params = serde_json::json!({
             "textDocument": {
-                "uri": path_to_uri(file_path)
+                "uri": path_to_uri(file_path).await,
             }
         });
         let result = self.send_request("textDocument/documentSymbol", params).await?;
@@ -235,7 +235,7 @@ impl LspClient {
         line: u32,
         character: u32,
     ) -> anyhow::Result<LspResult> {
-        let params = text_document_position_params(file_path, line, character);
+        let params = text_document_position_params(file_path, line, character).await;
         let result = self.send_request("textDocument/implementation", params).await?;
         let locations =
             serde_json::from_value::<Option<Vec<Location>>>(result)?.unwrap_or_default();
@@ -248,7 +248,7 @@ impl LspClient {
         line: u32,
         character: u32,
     ) -> anyhow::Result<LspResult> {
-        let params = text_document_position_params(file_path, line, character);
+        let params = text_document_position_params(file_path, line, character).await;
         let result = self.send_request("textDocument/prepareCallHierarchy", params).await?;
         let items =
             serde_json::from_value::<Option<Vec<CallHierarchyItem>>>(result)?.unwrap_or_default();
@@ -274,7 +274,7 @@ impl LspClient {
     pub async fn did_open(&self, file_path: impl AsRef<Path>) -> io::Result<()> {
         let content = tokio::fs::read_to_string(file_path.as_ref()).await?;
         let language_id = detect_language_id(file_path.as_ref());
-        let uri = path_to_uri(&file_path);
+        let uri = path_to_uri(&file_path).await;
         self.doc_versions.lock().insert(uri.clone(), 1);
         let params = serde_json::json!({
             "textDocument": {
@@ -288,7 +288,7 @@ impl LspClient {
     }
 
     pub async fn did_change(&self, file_path: impl AsRef<Path>, text: &str) -> io::Result<()> {
-        let uri = path_to_uri(&file_path);
+        let uri = path_to_uri(&file_path).await;
         let version = {
             let mut versions = self.doc_versions.lock();
             let entry = versions.entry(uri.clone()).or_insert(1);
@@ -308,7 +308,7 @@ impl LspClient {
     pub async fn did_save(&self, file_path: impl AsRef<Path>, text: &str) -> io::Result<()> {
         let params = serde_json::json!({
             "textDocument": {
-                "uri": path_to_uri(&file_path)
+                "uri": path_to_uri(&file_path).await,
             },
             "text": text
         });
@@ -322,10 +322,14 @@ impl LspClient {
     }
 }
 
-fn text_document_position_params(file_path: impl AsRef<Path>, line: u32, character: u32) -> Value {
+async fn text_document_position_params(
+    file_path: impl AsRef<Path>,
+    line: u32,
+    character: u32,
+) -> Value {
     serde_json::json!({
         "textDocument": {
-            "uri": path_to_uri(file_path)
+            "uri": path_to_uri(file_path).await,
         },
         "position": {
             "line": line.saturating_sub(1),

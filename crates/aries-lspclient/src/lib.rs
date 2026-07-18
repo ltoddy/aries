@@ -23,7 +23,7 @@ pub async fn warm_up(
         err
     })?;
 
-    let root_uri = path_to_uri(project_dir.as_ref());
+    let root_uri = path_to_uri(project_dir).await;
     let shared = Arc::new(lsp);
 
     let init = shared.clone();

@@ -59,19 +59,16 @@ impl Tool for SkillTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        let name = args.name;
         let available = self.available_skills_display();
 
         let skill = self
             .skills
             .iter()
-            .find(|s| s.frontmatter.name == name)
-            .ok_or_else(|| SkillError::not_allowed(name.clone(), available.clone()))?;
+            .find(|s| s.frontmatter.name == args.name)
+            .ok_or_else(|| SkillError::not_allowed(&args.name, &available))?;
 
-        let dir = skill
-            .location
-            .parent()
-            .ok_or_else(|| SkillError::not_found(name.clone(), available.clone()))?;
+        let dir =
+            skill.location.parent().ok_or_else(|| SkillError::not_found(&args.name, &available))?;
 
         let entries = walk_dir(dir, true, true)?;
         let files = entries
@@ -80,25 +77,34 @@ impl Tool for SkillTool {
             .map(|f| format!("<file>{}</file>", f.display()))
             .join("\n");
 
-        let output = [
+        let mut lines = vec![
             format!(r#"<skill_content name="{}">"#, skill.frontmatter.name),
             format!("# Skill: {}", skill.frontmatter.name),
             skill.body.clone(),
-            format!("Base directory for this skill: {}", path_to_uri(dir)),
+            format!("Base directory for this skill: {}", path_to_uri(dir).await),
             "Relative paths in this skill (e.g., scripts/, reference/) are relative to this base directory."
                 .to_owned(),
-            "Note: file list is sampled.".to_owned(),
+        ];
+
+        if let Some(allowed_tools) = &skill.frontmatter.allowed_tools
+            && !allowed_tools.is_empty()
+        {
+            lines.push(format!("Allowed tools for this skill: {}", allowed_tools.join(", ")));
+        }
+
+        lines.extend([
             "<skill_files>".to_owned(),
             files,
             "</skill_files>".to_owned(),
             "</skill_content>".to_owned(),
-        ]
-        .join("\n");
+        ]);
+
+        let output = lines.join("\n");
 
         Ok(SkillOutput {
-            title: format!("Loaded skill: {name}"),
+            title: format!("Loaded skill: {}", args.name),
             output,
-            metadata: SkillMetadata { name, dir: dir.to_path_buf() },
+            metadata: SkillMetadata { name: args.name, dir: dir.to_path_buf() },
         })
     }
 }

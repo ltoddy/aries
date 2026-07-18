@@ -10,17 +10,14 @@ use url::Url;
 
 use crate::walk::walk_dir;
 
-pub fn path_to_uri(path: impl AsRef<Path>) -> String {
+pub async fn path_to_uri(path: impl AsRef<Path>) -> String {
     let path = path.as_ref();
-    let absolute_path = if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/")).join(path)
-    };
+    let path =
+        tokio::fs::canonicalize(path).await.unwrap_or_else(|_| PathBuf::from("/").join(path));
 
-    Url::from_file_path(&absolute_path)
+    Url::from_file_path(&path)
         .map(|u| u.to_string())
-        .unwrap_or_else(|_| format!("file://{}", absolute_path.display()))
+        .unwrap_or_else(|_| format!("file://{}", path.display()))
 }
 
 pub fn count_files(root: impl AsRef<Path>) -> io::Result<usize> {

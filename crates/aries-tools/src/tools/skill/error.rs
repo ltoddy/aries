@@ -11,11 +11,17 @@ pub enum SkillError {
 }
 
 impl SkillError {
-    pub fn not_found(name: String, available: String) -> Self {
+    pub fn not_found(name: impl Into<String>, available: impl Into<String>) -> Self {
+        let name = name.into();
+        let available = available.into();
+
         Self::NotFound { name, available }
     }
 
-    pub fn not_allowed(name: String, available: String) -> Self {
+    pub fn not_allowed(name: impl Into<String>, available: impl Into<String>) -> Self {
+        let name = name.into();
+        let available = available.into();
+
         Self::NotAllowed { name, available }
     }
 }

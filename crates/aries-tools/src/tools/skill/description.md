@@ -1,8 +1,26 @@
-加载并注入一个由系统提示词中 `available_skills` 列出的专用 skill。
+在主对话中加载并执行一个由系统提示词中 `available_skills` 列出的专用 skill。技能提供了特定领域的能力与知识。
 
-- `name` 必须与 `available_skills` 中的某个 skill 名称完全一致；否则会以「未在 available_skills 中」的错误返回。
-- 调用后返回 `<skill_content>` 块，包含：
-  - skill 的正文（指令）；
-  - skill 所在目录的 base URI；
-  - 通过 `walk_dir` 列出的目录下文件清单（仅文件，目录被忽略），每项形如 `<file>...</file>`。
-- skill 内部以相对路径引用的脚本/资源（如 `scripts/`、`reference/`），都相对于 base 目录解析。
+当用户请求某项任务时，先检查是否有匹配的技能可用。
+
+## 如何调用
+
+- `name` 必须与 `available_skills` 中的某个 skill 名称一致。
+- 若名称不在 `available_skills` 中，会以「未在 available_skills 中」的错误返回。
+
+## 重要约束
+
+- 当某个技能匹配用户请求时，这是一个**强制要求**：在就该任务生成任何其他回复之前，先调用相应的 Skill 工具；
+- 绝不要在没有真正调用本工具的情况下提及某个技能；
+- 不要调用一个已经在运行/已加载的技能；
+- 不要用本工具来执行内置 CLI 命令（如 `/help`、`/clear` 等）。
+
+## 返回内容
+
+调用后返回 `<skill_content>` 块，包含：
+
+- skill 的正文（指令）；
+- skill 所在目录的 base URI；
+- 若技能声明了 `allowed-tools`，会列出该技能建议使用的工具集；
+- 通过目录遍历列出的文件清单（仅文件，目录被忽略），每项形如 `<file>...</file>`。
+
+skill 内部以相对路径引用的脚本/资源（如 `scripts/`、`reference/`），都相对于 base 目录解析。
