@@ -5,6 +5,7 @@ use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input, Select};
 
 #[derive(Clone, Debug, Parser)]
+#[command(about = "Add a new model configuration")]
 pub struct AddModelArgs {}
 
 pub async fn execute(_: AddModelArgs, gctx: GlobalContext) -> anyhow::Result<()> {

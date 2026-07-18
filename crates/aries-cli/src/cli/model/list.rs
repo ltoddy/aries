@@ -3,6 +3,7 @@ use aries_init::{GlobalContext, SettingLoader};
 use clap::Parser;
 
 #[derive(Clone, Debug, Parser)]
+#[command(about = "List all configured models")]
 pub struct ListModelArgs {}
 
 pub async fn execute(_: ListModelArgs, gctx: GlobalContext) -> anyhow::Result<()> {

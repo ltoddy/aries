@@ -6,6 +6,7 @@ use clap::Parser;
 use prettytable::{Cell, Row, Table, row};
 
 #[derive(Clone, Debug, Parser)]
+#[command(about = "List chat sessions")]
 pub struct ListSessionsArgs {
     #[arg(help = "Only list sessions for the specified working directory (absolute path)")]
     cwd: Option<PathBuf>,

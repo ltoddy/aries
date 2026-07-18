@@ -9,8 +9,9 @@ pub enum AcpVersion {
 }
 
 #[derive(Parser, Debug, Clone)]
+#[command(about = "Start an Agent Communication Protocol (ACP) server")]
 pub struct AcpArgs {
-    #[arg(value_enum, default_value = "v1")]
+    #[arg(value_enum, default_value = "v1", help = "ACP protocol version (v1 or v2)")]
     pub version: AcpVersion,
 }
 

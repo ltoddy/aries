@@ -11,9 +11,11 @@ use crate::display::print_agent_event;
 use crate::theme::Theme;
 
 #[derive(Parser, Debug, Clone)]
+#[command(about = "Send a one-shot prompt to the AI")]
 pub struct PromptArgs {
+    #[arg(help = "The prompt text")]
     pub prompt: String,
-    #[arg(long)]
+    #[arg(long, help = "Override session ID (auto-generated if not provided)")]
     pub session_id: Option<String>,
 }
 

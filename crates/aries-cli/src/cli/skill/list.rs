@@ -9,6 +9,7 @@ use prettytable::{Cell, Row, Table, row};
 use crate::text;
 
 #[derive(Clone, Debug, Parser)]
+#[command(about = "List available skills")]
 pub struct ListSkillArgs {}
 
 pub async fn execute(_args: ListSkillArgs, gctx: GlobalContext) -> anyhow::Result<()> {

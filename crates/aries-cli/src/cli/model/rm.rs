@@ -5,6 +5,7 @@ use dialoguer::Select;
 use dialoguer::theme::ColorfulTheme;
 
 #[derive(Clone, Debug, Parser)]
+#[command(about = "Remove a model configuration")]
 pub struct RmModelArgs {}
 
 pub async fn execute(_: RmModelArgs, gctx: GlobalContext) -> anyhow::Result<()> {

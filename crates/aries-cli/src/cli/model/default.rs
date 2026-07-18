@@ -5,6 +5,7 @@ use dialoguer::Select;
 use dialoguer::theme::ColorfulTheme;
 
 #[derive(Clone, Debug, Parser)]
+#[command(about = "Set the default model")]
 pub struct DefaultModelArgs {}
 
 pub async fn execute(_: DefaultModelArgs, gctx: GlobalContext) -> anyhow::Result<()> {

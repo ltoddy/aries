@@ -6,9 +6,11 @@ use clap::Parser;
 use futures::stream::{self, StreamExt};
 
 #[derive(Clone, Debug, Parser)]
+#[command(about = "Delete old chat sessions")]
 pub struct PruneSessionsArgs {
+    #[arg(help = "Session IDs to delete")]
     session_ids: Option<Vec<String>>,
-    #[arg(long, default_value_t = false)]
+    #[arg(long, default_value_t = false, help = "Delete all sessions")]
     all: bool,
 }
 

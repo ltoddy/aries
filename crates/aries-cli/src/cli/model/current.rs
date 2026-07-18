@@ -3,6 +3,7 @@ use aries_init::{GlobalContext, SettingLoader};
 use clap::Parser;
 
 #[derive(Clone, Debug, Parser)]
+#[command(about = "Show the currently active model")]
 pub struct CurrentModelArgs {}
 
 pub async fn execute(_: CurrentModelArgs, gctx: GlobalContext) -> anyhow::Result<()> {

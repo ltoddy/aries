@@ -16,6 +16,11 @@ clippy:
 test:
     @cargo test --workspace --lib --bins --tests
 
+# cargo +stable install cargo-llvm-cov --locked
+# rustup component add llvm-tools-preview
+test-cov:
+    @cargo llvm-cov --workspace --lib --bins --tests
+
 fmt:
     @cargo +nightly fmt --all
 

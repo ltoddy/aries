@@ -9,10 +9,11 @@ mod welcome;
 use aries_init::GlobalContext;
 use clap::Parser;
 
+use crate::cli::agent::{self, AgentCommand};
+use crate::cli::mcp::{self, McpCommand};
 use crate::cli::model::{self, ModelCommand};
 use crate::cli::session::{self, SessionCommand};
-use crate::cli::skill;
-use crate::cli::skill::SkillCommand;
+use crate::cli::skill::{self, SkillCommand};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -23,19 +24,19 @@ async fn main() -> anyhow::Result<()> {
 
     match args.command {
         Some(cli::Subcommands::Acp(args)) => cli::acp::execute(args, gctx).await,
-        Some(cli::Subcommands::Agent { .. }) => {
-            todo!()
-        }
+        Some(cli::Subcommands::Agent { command }) => match command {
+            AgentCommand::List(args) => agent::list::execute(args, gctx).await,
+        },
         Some(cli::Subcommands::Doctor) => {
             todo!()
-        }
+        },
         Some(cli::Subcommands::Exec(args)) => cli::exec::execute(args).await,
         Some(cli::Subcommands::Hook { .. }) => {
             todo!()
-        }
-        Some(cli::Subcommands::Mcp { .. }) => {
-            todo!()
-        }
+        },
+        Some(cli::Subcommands::Mcp { command }) => match command {
+            McpCommand::List(args) => mcp::list::execute(args, gctx).await,
+        },
         Some(cli::Subcommands::Model { command }) => match command {
             ModelCommand::Add(args) => model::add::execute(args, gctx).await,
             ModelCommand::Current(args) => model::current::execute(args, gctx).await,

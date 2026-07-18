@@ -4,8 +4,13 @@ use clap::Parser;
 use tokio::process::Command;
 
 #[derive(Parser, Debug, Clone)]
+#[command(about = "Execute a shell command")]
 pub struct ExecArgs {
-    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+    #[arg(
+        trailing_var_arg = true,
+        allow_hyphen_values = true,
+        help = "The command and its arguments"
+    )]
     pub command: Vec<String>,
 }
 

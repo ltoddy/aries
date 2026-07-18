@@ -4,7 +4,9 @@ use clap::Parser;
 use crate::cli::run_session;
 
 #[derive(Clone, Debug, Parser)]
+#[command(about = "Resume a previous chat session")]
 pub struct ResumeSessionsArgs {
+    #[arg(help = "The session ID to resume")]
     session_id: String,
 }
 
