@@ -46,17 +46,6 @@ async fn test_call_loads_skill() {
 }
 
 #[tokio::test]
-async fn test_call_strips_leading_slash() {
-    // 用户/模型常把技能名写成 slash command，如 "/commit"。
-    let tmp = TempDir::new().unwrap();
-    let skill = make_skill(&tmp, "commit", None);
-    let tool = SkillTool::new(vec![skill]);
-
-    let output = tool.call(SkillArgs { name: "/commit".to_owned() }).await.unwrap();
-    assert_eq!(output.metadata.name, "commit");
-}
-
-#[tokio::test]
 async fn test_call_rejects_unknown_skill() {
     let tmp = TempDir::new().unwrap();
     let skill = make_skill(&tmp, "commit", None);

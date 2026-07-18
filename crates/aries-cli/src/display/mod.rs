@@ -23,11 +23,11 @@ use aries_tools::{
     agent, bash, batch, codesearch, edit, glob, grep, ls, lsp, multiedit, question, read, skill,
     update_plan, webfetch, websearch, write,
 };
-use itertools::Itertools;
 use rig_core::agent::MultiTurnStreamItem;
 use rig_core::message::ToolResultContent;
 use rig_core::streaming::{StreamedAssistantContent, StreamedUserContent};
 
+use crate::text;
 use crate::theme::Theme;
 
 pub fn print_agent_event(
@@ -123,7 +123,7 @@ pub fn format_tool_result_output(tool_name: &str, result: &str, theme: Theme) ->
     let output = if output.is_empty() { "No output".to_string() } else { output };
 
     let _ = tool_name;
-    theme.dimmed(&preview(output)).to_string()
+    theme.dimmed(&text::preview(output)).to_string()
 }
 
 pub fn display_token_usage(usage: &rig_core::completion::Usage, theme: &Theme) {
@@ -146,19 +146,4 @@ pub fn format_unknown_call(tool_name: &str, args: &str, theme: &Theme) -> (Strin
         format!("{} {}", theme.cyan_text(tool_name), theme.yellow_text("(unknown tool)")),
         Some(args_str),
     )
-}
-
-pub fn preview(content: impl Into<String>) -> String {
-    const MAX_LINES: usize = 5;
-
-    let content = content.into();
-    let lines: Vec<_> = content.lines().map(|line| format!("| {line}")).collect();
-    let len = lines.len();
-
-    if len > MAX_LINES {
-        let preview = lines[..MAX_LINES].iter().join("\n");
-        format!("{}\n+ ... ({} more lines truncated)", preview, len - MAX_LINES)
-    } else {
-        lines.join("\n")
-    }
 }

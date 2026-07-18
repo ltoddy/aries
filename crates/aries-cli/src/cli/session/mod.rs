@@ -4,9 +4,9 @@ pub mod resume;
 
 use clap::Subcommand;
 
-use crate::cli::session::list::ListSessionsArgs;
-use crate::cli::session::prune::PruneSessionsArgs;
-use crate::cli::session::resume::ResumeSessionsArgs;
+use self::list::ListSessionsArgs;
+use self::prune::PruneSessionsArgs;
+use self::resume::ResumeSessionsArgs;
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum SessionCommand {

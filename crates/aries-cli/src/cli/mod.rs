@@ -4,6 +4,7 @@ pub mod model;
 pub mod prompt;
 pub mod session;
 pub mod setup;
+pub mod skill;
 
 use std::collections::HashMap;
 use std::env::current_dir;
@@ -22,6 +23,7 @@ use crate::cli::acp::AcpArgs;
 use crate::cli::exec::ExecArgs;
 use crate::cli::model::ModelCommand;
 use crate::cli::session::SessionCommand;
+use crate::cli::skill::SkillCommand;
 use crate::display::print_agent_event;
 use crate::theme::Theme;
 use crate::{commands, input, welcome};
@@ -35,18 +37,25 @@ pub struct Args {
 #[derive(Subcommand, Debug, Clone)]
 pub enum Subcommands {
     Acp(AcpArgs),
+    Agent {},
+    Doctor,
     Exec(ExecArgs),
+    Hook {},
+    Mcp {},
+    Model {
+        #[command(subcommand)]
+        command: ModelCommand,
+    },
     Prompt(PromptArgs),
     Session {
         #[command(subcommand)]
         command: SessionCommand,
     },
-    Model {
-        #[command(subcommand)]
-        command: ModelCommand,
-    },
     Setup,
-    Doctor,
+    Skill {
+        #[command(subcommand)]
+        command: SkillCommand,
+    },
 }
 
 pub async fn run_session(gctx: GlobalContext, session_id: impl Into<String>) -> anyhow::Result<()> {

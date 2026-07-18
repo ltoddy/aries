@@ -2,6 +2,7 @@ mod cli;
 mod commands;
 mod display;
 mod input;
+mod text;
 mod theme;
 mod welcome;
 
@@ -10,6 +11,8 @@ use clap::Parser;
 
 use crate::cli::model::{self, ModelCommand};
 use crate::cli::session::{self, SessionCommand};
+use crate::cli::skill;
+use crate::cli::skill::SkillCommand;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -19,14 +22,20 @@ async fn main() -> anyhow::Result<()> {
     aries_init::init(&gctx.root_dir).await;
 
     match args.command {
-        Some(cli::Subcommands::Setup) => cli::setup::execute(gctx).await,
         Some(cli::Subcommands::Acp(args)) => cli::acp::execute(args, gctx).await,
+        Some(cli::Subcommands::Agent { .. }) => {
+            todo!()
+        }
+        Some(cli::Subcommands::Doctor) => {
+            todo!()
+        }
         Some(cli::Subcommands::Exec(args)) => cli::exec::execute(args).await,
-        Some(cli::Subcommands::Session { command }) => match command {
-            SessionCommand::List(args) => session::list::execute(args, gctx).await,
-            SessionCommand::Prune(args) => session::prune::execute(args, gctx).await,
-            SessionCommand::Resume(args) => session::resume::execute(args, gctx).await,
-        },
+        Some(cli::Subcommands::Hook { .. }) => {
+            todo!()
+        }
+        Some(cli::Subcommands::Mcp { .. }) => {
+            todo!()
+        }
         Some(cli::Subcommands::Model { command }) => match command {
             ModelCommand::Add(args) => model::add::execute(args, gctx).await,
             ModelCommand::Current(args) => model::current::execute(args, gctx).await,
@@ -35,6 +44,15 @@ async fn main() -> anyhow::Result<()> {
             ModelCommand::Rm(args) => model::rm::execute(args, gctx).await,
         },
         Some(cli::Subcommands::Prompt(args)) => cli::prompt::execute(args, gctx).await,
+        Some(cli::Subcommands::Session { command }) => match command {
+            SessionCommand::List(args) => session::list::execute(args, gctx).await,
+            SessionCommand::Prune(args) => session::prune::execute(args, gctx).await,
+            SessionCommand::Resume(args) => session::resume::execute(args, gctx).await,
+        },
+        Some(cli::Subcommands::Setup) => cli::setup::execute(gctx).await,
+        Some(cli::Subcommands::Skill { command }) => match command {
+            SkillCommand::List(args) => skill::list::execute(args, gctx).await,
+        },
         _ => cli::run_session(gctx, nanoid::nanoid!()).await,
     }
 }
