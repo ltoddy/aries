@@ -13,6 +13,7 @@
   - [x] Write tool 输出结构化 diff (WriteKind / Hunk / additions / deletions)
   - [x] UpdatePlan 支持 active_form、校验空字段、全部完成自动清空
   - [x] Skill tool 增强：allowed-tools、强制调用规则
+  - [x] Read tool 流式读取、limit 参数、行号输出
 - [ ] 支持 Workflow
 - [ ] agent (参考 https://github.com/vercel/eve 对 agent 的目录结构设计来支持)
 - [ ] token 使用优化

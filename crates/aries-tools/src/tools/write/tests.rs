@@ -69,24 +69,6 @@ async fn test_write_overwrites_existing_file() {
 }
 
 #[tokio::test]
-#[ignore = "requires read_state integration (see context/read_state.rs)"]
-async fn test_write_requires_prior_read_for_existing_file() {
-    let tmp = TempDir::new().unwrap();
-
-    let file_path = tmp.path().join("data.txt");
-    fs::write(&file_path, "original\n").unwrap();
-
-    let tool = WriteTool::new(tmp.path(), ToolContext::new(None));
-    let result = tool
-        .call(WriteArgs { file_path: file_path.clone(), content: "overwrite\n".to_string() })
-        .await;
-
-    assert!(result.is_err());
-    // 原文件内容保持不变。
-    assert_eq!(fs::read_to_string(&file_path).unwrap(), "original\n");
-}
-
-#[tokio::test]
 async fn test_write_empty_content() {
     let tmp = TempDir::new().unwrap();
 

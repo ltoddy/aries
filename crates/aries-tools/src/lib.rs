@@ -104,7 +104,7 @@ pub fn create_tools_from_tool_names(
                 tools.push(Box::new(multiedit::MultiEditTool::new(cwd, ctx.clone())))
             },
             question::NAME => tools.push(Box::new(question::AskUserQuestionTool::new())),
-            read::NAME => tools.push(Box::new(read::ReadTool::new())),
+            read::NAME => tools.push(Box::new(read::ReadTool::new(cwd))),
             skill::NAME => {
                 if skills.is_empty() {
                     continue;

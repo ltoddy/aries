@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 pub struct ReadArgs {
     pub file_path: PathBuf,
     pub offset: Option<usize>,
+    pub limit: Option<usize>,
 }
 
 impl ReadArgs {
@@ -25,6 +26,9 @@ impl ReadArgs {
         let mut first = format!("{}", args.file_path.display());
         if let Some(offset) = args.offset {
             first.push_str(&format!(", offset = {offset}"));
+        }
+        if let Some(limit) = args.limit {
+            first.push_str(&format!(", limit = {limit}"));
         }
 
         Ok((first, None))
