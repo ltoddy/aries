@@ -2,6 +2,7 @@ pub mod agent;
 pub mod bash;
 pub mod batch;
 pub mod codesearch;
+mod diff;
 pub mod edit;
 pub mod glob;
 pub mod grep;

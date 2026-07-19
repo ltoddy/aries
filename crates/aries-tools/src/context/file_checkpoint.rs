@@ -9,6 +9,12 @@ use parking_lot::Mutex;
 #[derive(Clone, Debug)]
 pub struct SharedFileCheckpoint(Arc<Mutex<FileCheckpoint>>);
 
+impl Default for SharedFileCheckpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SharedFileCheckpoint {
     const MB: usize = 1024 * 1024; // 超过 1 MB 什么也不做, 避免占用内存
 

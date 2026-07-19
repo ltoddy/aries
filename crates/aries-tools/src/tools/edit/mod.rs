@@ -14,11 +14,12 @@ pub use self::args::EditArgs;
 pub use self::error::EditError;
 pub use self::output::EditOutput;
 use crate::context::ToolContext;
+use crate::tools::diff;
 
 pub const NAME: &str = "Edit";
 
 pub struct EditTool {
-    _cwd: PathBuf,
+    cwd: PathBuf,
     ctx: ToolContext,
 }
 
@@ -26,7 +27,7 @@ impl EditTool {
     pub fn new(cwd: impl AsRef<Path>, ctx: ToolContext) -> Self {
         let cwd = cwd.as_ref().to_path_buf();
 
-        Self { _cwd: cwd, ctx }
+        Self { cwd, ctx }
     }
 }
 
@@ -66,29 +67,29 @@ impl Tool for EditTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        if !args.file_path.exists() {
-            return Err(EditError::EditError(
-                "File does not exist. Use write_file to create new files.".to_owned(),
-            ));
-        }
-
-        let content = fs::read_to_string(&args.file_path)
-            .await
-            .map_err(|e| EditError::EditError(format!("Failed to read file: {}", e)))?;
+        let file_path = if args.file_path.is_relative() {
+            self.cwd.join(&args.file_path)
+        } else {
+            args.file_path
+        };
 
         if args.old_text == args.new_text {
-            return Err(EditError::EditError(
-                "oldString and newString cannot be identical".to_owned(),
-            ));
+            return Err(EditError::identical_text());
+        }
+        if !file_path.exists() {
+            return Err(EditError::file_not_found(file_path));
         }
 
+        self.ctx.guard_write(&file_path).await?;
+
+        let content = fs::read_to_string(&file_path).await?;
         if !content.contains(&args.old_text) {
-            return Err(EditError::EditError("oldString not found in content".to_owned()));
+            return Err(EditError::old_text_not_found());
         }
 
         let occurrences = content.matches(&args.old_text).count();
         if occurrences > 1 && !args.replace_all {
-            return Err(EditError::EditError("Found multiple matches for oldString. Provide more surrounding lines in oldString to identify the correct match or use replaceAll.".to_owned()));
+            return Err(EditError::multiple_matches(occurrences));
         }
 
         let new_content = if args.replace_all {
@@ -97,12 +98,13 @@ impl Tool for EditTool {
             content.replacen(&args.old_text, &args.new_text, 1)
         };
 
-        fs::write(&args.file_path, &new_content)
-            .await
-            .map_err(|e| EditError::EditError(format!("Failed to write file: {}", e)))?;
+        let _ = self.ctx.file_checkpoint.push(&file_path, &content).await;
+        fs::write(&file_path, &new_content).await?;
 
-        self.ctx.on_file_written(&args.file_path, &new_content).await;
+        self.ctx.on_file_written(&file_path, &new_content).await;
 
-        Ok(EditOutput { success: true, message: "Edit applied successfully".to_owned() })
+        let (hunks, additions, deletions) = diff::diff(&content, &new_content);
+
+        Ok(EditOutput::new(file_path, content, hunks, additions, deletions))
     }
 }

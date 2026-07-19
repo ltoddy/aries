@@ -8,13 +8,13 @@ use std::path::{Path, PathBuf};
 
 use rig_core::tool::Tool;
 use serde_json::Value;
-use similar::TextDiff;
 use tokio::fs;
 
 pub use self::args::WriteArgs;
 pub use self::error::WriteError;
-pub use self::output::{Hunk, WriteKind, WriteOutput};
+pub use self::output::{WriteKind, WriteOutput};
 use crate::context::ToolContext;
+use crate::tools::diff;
 
 pub const NAME: &str = "Write";
 
@@ -79,23 +79,7 @@ impl Tool for WriteTool {
 
         match original_content {
             Some(original_content) => {
-                let diff = TextDiff::from_lines(&original_content, &args.content);
-
-                let mut additions = 0_usize;
-                let mut deletions = 0_usize;
-                let mut hunks = Vec::new();
-                for op in diff.ops() {
-                    match op.tag() {
-                        similar::DiffTag::Equal => continue,
-                        similar::DiffTag::Insert => additions += op.new_range().len(),
-                        similar::DiffTag::Delete => deletions += op.old_range().len(),
-                        similar::DiffTag::Replace => {
-                            deletions += op.old_range().len();
-                            additions += op.new_range().len();
-                        },
-                    }
-                    hunks.push(Hunk::from_diff(op, &diff));
-                }
+                let (hunks, additions, deletions) = diff::diff(&original_content, &args.content);
 
                 let output = WriteOutput::for_update(
                     file_path,

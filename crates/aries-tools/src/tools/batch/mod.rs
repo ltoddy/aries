@@ -135,7 +135,7 @@ async fn dispatch(
         },
         read::NAME => {
             let args: ReadArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
-            Tool::call(&ReadTool::new(cwd), args)
+            Tool::call(&ReadTool::new(cwd, ctx), args)
                 .await
                 .map(|res| serde_json::to_value(res).unwrap())
                 .map_err(|e| e.to_string())

@@ -14,18 +14,19 @@ pub use self::args::{EditOperation, MultiEditArgs};
 pub use self::error::MultiEditError;
 pub use self::output::MultiEditOutput;
 use crate::context::ToolContext;
+use crate::tools::diff;
 
 pub const NAME: &str = "MultiEdit";
 
 pub struct MultiEditTool {
-    _cwd: PathBuf,
+    cwd: PathBuf,
     ctx: ToolContext,
 }
 
 impl MultiEditTool {
     pub fn new(cwd: impl AsRef<Path>, ctx: ToolContext) -> Self {
         let cwd = cwd.as_ref().to_path_buf();
-        Self { _cwd: cwd, ctx }
+        Self { cwd, ctx }
     }
 }
 
@@ -74,19 +75,25 @@ impl Tool for MultiEditTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        let mut content = if args.file_path.exists() {
-            fs::read_to_string(&args.file_path)
-                .await
-                .map_err(|e| MultiEditError::EditError(format!("Failed to read file: {}", e)))?
+        let file_path = if args.file_path.is_relative() {
+            self.cwd.join(&args.file_path)
         } else {
-            String::new()
+            args.file_path
         };
+
+        let original_content = if file_path.exists() {
+            self.ctx.guard_write(&file_path).await?;
+            let content = fs::read_to_string(&file_path).await?;
+            Some(content)
+        } else {
+            None
+        };
+
+        let mut content = original_content.clone().unwrap_or_default();
 
         for edit in args.edits {
             if edit.old_text == edit.new_text {
-                return Err(MultiEditError::EditError(
-                    "old_text and new_text cannot be identical".to_owned(),
-                ));
+                return Err(MultiEditError::identical_text());
             }
 
             if edit.old_text.is_empty() {
@@ -95,10 +102,7 @@ impl Tool for MultiEditTool {
             }
 
             if !content.contains(&edit.old_text) {
-                return Err(MultiEditError::EditError(format!(
-                    "old_text not found in file (must match exactly including whitespace): {:?}",
-                    edit.old_text
-                )));
+                return Err(MultiEditError::old_text_not_found(edit.old_text));
             }
 
             if edit.replace_all {
@@ -108,15 +112,32 @@ impl Tool for MultiEditTool {
             }
         }
 
-        if let Some(parent) = args.file_path.parent() {
+        if let Some(parent) = file_path.parent() {
             let _ = fs::create_dir_all(parent).await;
         }
 
-        fs::write(&args.file_path, &content)
-            .await
-            .map_err(|e| MultiEditError::EditError(format!("Failed to write file: {}", e)))?;
-        self.ctx.on_file_written(&args.file_path, &content).await;
+        if let Some(ref original_content) = original_content {
+            let _ = self.ctx.file_checkpoint.push(&file_path, original_content).await;
+        }
 
-        Ok(MultiEditOutput { success: true, message: "Edits applied successfully".to_owned() })
+        fs::write(&file_path, &content).await?;
+        self.ctx.on_file_written(&file_path, &content).await;
+
+        match original_content {
+            Some(original_content) => {
+                let (hunks, additions, deletions) = diff::diff(&original_content, &content);
+                Ok(MultiEditOutput::for_update(
+                    file_path,
+                    original_content,
+                    hunks,
+                    additions,
+                    deletions,
+                ))
+            },
+            None => {
+                let additions = content.lines().count();
+                Ok(MultiEditOutput::for_create(file_path, additions))
+            },
+        }
     }
 }

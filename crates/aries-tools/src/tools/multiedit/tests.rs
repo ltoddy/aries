@@ -7,14 +7,22 @@ use tempfile::TempDir;
 
 use super::*;
 use crate::context::ToolContext;
+use crate::write::WriteKind;
+
+/// 写入文件并在共享 ctx 中登记一次完整读取，模拟“先 Read 后 MultiEdit”。
+async fn seed_file(ctx: &ToolContext, path: &std::path::Path, content: &str) {
+    fs::write(path, content).unwrap();
+    ctx.on_file_read(path, false).await;
+}
 
 #[tokio::test]
 async fn test_multiedit_basic() {
     let dir = TempDir::new().unwrap();
     let file_path = dir.path().join("test.txt");
-    fs::write(&file_path, "hello world").unwrap();
+    let ctx = ToolContext::new(None);
+    seed_file(&ctx, &file_path, "hello world").await;
 
-    let tool = MultiEditTool::new(dir.path(), ToolContext::new(None));
+    let tool = MultiEditTool::new(dir.path(), ctx);
     let result = tool
         .call(MultiEditArgs {
             file_path: file_path.clone(),
@@ -34,7 +42,9 @@ async fn test_multiedit_basic() {
         .await
         .unwrap();
 
-    assert!(result.success);
+    assert_eq!(result.kind, WriteKind::Update);
+    assert_eq!(result.original_content.as_deref(), Some("hello world"));
+    assert!(!result.structured_patch.is_empty());
     assert_eq!(fs::read_to_string(&file_path).unwrap(), "hi earth");
 }
 
@@ -56,7 +66,8 @@ async fn test_multiedit_creates_file() {
         .await
         .unwrap();
 
-    assert!(result.success);
+    assert_eq!(result.kind, WriteKind::Create);
+    assert!(result.original_content.is_none());
     assert_eq!(fs::read_to_string(&file_path).unwrap(), "new content");
 }
 
@@ -64,9 +75,10 @@ async fn test_multiedit_creates_file() {
 async fn test_multiedit_identical_text_error() {
     let dir = TempDir::new().unwrap();
     let file_path = dir.path().join("test.txt");
-    fs::write(&file_path, "hello").unwrap();
+    let ctx = ToolContext::new(None);
+    seed_file(&ctx, &file_path, "hello").await;
 
-    let tool = MultiEditTool::new(dir.path(), ToolContext::new(None));
+    let tool = MultiEditTool::new(dir.path(), ctx);
     let result = tool
         .call(MultiEditArgs {
             file_path,
@@ -78,7 +90,29 @@ async fn test_multiedit_identical_text_error() {
         })
         .await;
 
-    assert!(result.is_err());
+    assert!(matches!(result, Err(MultiEditError::IdenticalText)));
+}
+
+#[tokio::test]
+async fn test_multiedit_rejects_unread_file() {
+    let dir = TempDir::new().unwrap();
+    let file_path = dir.path().join("test.txt");
+    // 已存在但未经 Read：应被读后写校验拒绝。
+    fs::write(&file_path, "hello world").unwrap();
+
+    let tool = MultiEditTool::new(dir.path(), ToolContext::new(None));
+    let result = tool
+        .call(MultiEditArgs {
+            file_path,
+            edits: vec![EditOperation {
+                old_text: "hello".to_owned(),
+                new_text: "hi".to_owned(),
+                replace_all: false,
+            }],
+        })
+        .await;
+
+    assert!(matches!(result, Err(MultiEditError::Guard(_))));
 }
 
 #[tokio::test]

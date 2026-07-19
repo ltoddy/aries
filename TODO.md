@@ -14,6 +14,8 @@
   - [x] UpdatePlan 支持 active_form、校验空字段、全部完成自动清空
   - [x] Skill tool 增强：allowed-tools、强制调用规则
   - [x] Read tool 流式读取、limit 参数、行号输出
+  - [x] 抽取 `diff` 到共享 `tools/diff.rs`（Write/Edit/MultiEdit 复用）
+  - [x] ToolContext 新增 read_state + guard_write（写前校验文件已完整读取且未被外部修改）
 - [ ] 支持 Workflow
 - [ ] agent (参考 https://github.com/vercel/eve 对 agent 的目录结构设计来支持)
 - [ ] token 使用优化

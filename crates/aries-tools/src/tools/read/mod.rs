@@ -14,6 +14,7 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 pub use self::args::ReadArgs;
 pub use self::error::ReadError;
 pub use self::output::ReadOutput;
+use crate::context::ToolContext;
 
 pub const NAME: &str = "Read";
 
@@ -24,13 +25,14 @@ const SEPARATOR: char = '→';
 
 pub struct ReadTool {
     cwd: PathBuf,
+    ctx: ToolContext,
 }
 
 impl ReadTool {
-    pub fn new(cwd: impl AsRef<Path>) -> Self {
+    pub fn new(cwd: impl AsRef<Path>, ctx: ToolContext) -> Self {
         let cwd = cwd.as_ref().to_path_buf();
 
-        Self { cwd }
+        Self { cwd, ctx }
     }
 }
 
@@ -76,9 +78,12 @@ impl Tool for ReadTool {
             return Err(ReadError::is_a_directory(file_path));
         }
 
+        let is_partial = args.offset.is_some() || args.limit.is_some();
+
         let file = fs::File::open(&file_path).await?;
         let metadata = file.metadata().await?;
         if metadata.len() == 0 {
+            self.ctx.on_file_read(&file_path, is_partial).await;
             return Ok(ReadOutput { content: EMPTY_FILE_NOTICE.to_owned() });
         }
 
@@ -103,6 +108,7 @@ impl Tool for ReadTool {
         }
 
         let content = content_lines.join("\n");
+        self.ctx.on_file_read(&file_path, is_partial).await;
 
         Ok(ReadOutput { content })
     }
