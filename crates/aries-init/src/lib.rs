@@ -11,4 +11,6 @@ pub async fn init(root_dir: impl AsRef<Path>) {
         .await
         .expect("Unable to connect to local aries database");
     let _ = aries_persistence::migrate(&mut db).await;
+
+    tokio::task::spawn(aries_persistence::gc(db));
 }

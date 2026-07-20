@@ -1,5 +1,6 @@
 use jiff::Timestamp;
 use toasty::Db;
+use toasty::codegen_support::List;
 use toasty::stmt::IntoExpr;
 
 // 用于记录节省了多少 token
@@ -8,13 +9,13 @@ use toasty::stmt::IntoExpr;
 pub struct TokenAudit {
     #[key]
     #[auto(increment)]
-    id: u64,
+    pub id: u64,
 
-    command: String,
-    original_tokens: u64,
-    optimized_tokens: u64,
-    saved_tokens: u64,
-    savings_percent: f64,
+    pub command: String,
+    pub original_tokens: u64,
+    pub optimized_tokens: u64,
+    pub saved_tokens: u64,
+    pub savings_percent: f64,
 
     #[index]
     #[auto]
@@ -47,5 +48,18 @@ impl TokenAuditRepository {
             .savings_percent(savings_percent)
             .exec(&mut self.db)
             .await
+    }
+
+    pub async fn find_by_created_at_less_than(
+        &mut self,
+        created_at: Timestamp,
+    ) -> toasty::Result<Vec<TokenAudit>> {
+        TokenAudit::filter(TokenAudit::fields().created_at().lt(created_at))
+            .exec(&mut self.db)
+            .await
+    }
+
+    pub async fn delete_by_id_in(&mut self, ids: impl IntoExpr<List<u64>>) -> toasty::Result<()> {
+        TokenAudit::filter(TokenAudit::fields().id().in_list(ids)).delete().exec(&mut self.db).await
     }
 }

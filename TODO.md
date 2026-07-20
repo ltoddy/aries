@@ -26,6 +26,7 @@
 - [ ] command
 - [ ] 通过 rsync 实现本机的 sandbox
 - [ ] 支持 Browser Use
+- [ ] 支持 Computer Use
 - [ ] 支持自我进化
 - [ ] 遥测与 tracing (记录每个工具调用预估耗费的 token, 用于统计，针对工具做优化)
 - [ ] 优化 island，展示 token 消耗与类似 Github 的活跃图
@@ -34,3 +35,4 @@
 - [ ] 对环境进行感知
 - [ ] 是否需要实现投机解码 ?
 - [ ] 实现 MoA (Mixture of Agent)
+- [ ] 支持 worktree (我在想如果通过 rsync 实现 sandbox 之后是不是就不需要支持 worktree 了？)

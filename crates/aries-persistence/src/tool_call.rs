@@ -1,13 +1,13 @@
 use jiff::Timestamp;
 use toasty::Db;
-use toasty::stmt::IntoExpr;
+use toasty::stmt::{IntoExpr, List};
 
 #[derive(Debug, Clone, toasty::Model)]
 #[table = "tool_calls"]
 pub struct ToolCall {
     #[key]
     #[auto(increment)]
-    id: u64,
+    pub id: u64,
 
     pub session_id: String,
     pub tool_call_id: String,
@@ -49,5 +49,16 @@ impl ToolCallRepository {
             .was_successful(was_successful)
             .exec(&mut self.db)
             .await
+    }
+
+    pub async fn find_by_created_at_less_than(
+        &mut self,
+        created_at: Timestamp,
+    ) -> toasty::Result<Vec<ToolCall>> {
+        ToolCall::filter(ToolCall::fields().created_at().lt(created_at)).exec(&mut self.db).await
+    }
+
+    pub async fn delete_by_id_in(&mut self, ids: impl IntoExpr<List<u64>>) -> toasty::Result<()> {
+        ToolCall::filter(ToolCall::fields().id().in_list(ids)).delete().exec(&mut self.db).await
     }
 }
