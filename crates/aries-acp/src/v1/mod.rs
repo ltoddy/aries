@@ -19,7 +19,7 @@ use self::initialize::initialize;
 use self::logout::logout;
 use self::prompt::prompt;
 use self::session::{
-    close_session, list_session, load_session, new_session, resume_session,
+    close_session, delete_session, list_session, load_session, new_session, resume_session,
     set_session_config_option,
 };
 
@@ -60,6 +60,15 @@ pub async fn run(
                 let registry = registry.clone();
                 async move |req, responder, cx| {
                     list_session(req, responder, cx, registry.clone()).await
+                }
+            },
+            on_receive_request!(),
+        )
+        .on_receive_request(
+            {
+                let registry = registry.clone();
+                async move |req, responder, cx| {
+                    delete_session(req, responder, cx, registry.clone()).await
                 }
             },
             on_receive_request!(),

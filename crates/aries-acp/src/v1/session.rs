@@ -2,11 +2,12 @@ use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
 use agent_client_protocol::schema::v1::{
-    CloseSessionRequest, CloseSessionResponse, ListSessionsRequest, ListSessionsResponse,
-    LoadSessionRequest, LoadSessionResponse, NewSessionRequest, NewSessionResponse,
-    ResumeSessionRequest, ResumeSessionResponse, SessionConfigId, SessionConfigOption,
-    SessionConfigOptionCategory, SessionConfigSelectOption, SessionConfigSelectOptions,
-    SessionInfo, SetSessionConfigOptionRequest, SetSessionConfigOptionResponse,
+    CloseSessionRequest, CloseSessionResponse, DeleteSessionRequest, DeleteSessionResponse,
+    ListSessionsRequest, ListSessionsResponse, LoadSessionRequest, LoadSessionResponse,
+    NewSessionRequest, NewSessionResponse, ResumeSessionRequest, ResumeSessionResponse,
+    SessionConfigId, SessionConfigOption, SessionConfigOptionCategory, SessionConfigSelectOption,
+    SessionConfigSelectOptions, SessionInfo, SetSessionConfigOptionRequest,
+    SetSessionConfigOptionResponse,
 };
 use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
 use aries_init::Setting;
@@ -104,6 +105,24 @@ pub async fn close_session(
     registry.close_session(session_id).await;
 
     let resp = CloseSessionResponse::new();
+    responder.respond(resp)
+}
+
+pub async fn delete_session(
+    req: DeleteSessionRequest,
+    responder: Responder<DeleteSessionResponse>,
+    _: ConnectionTo<Client>,
+    registry: SharedRegistry,
+) -> Result<(), Error> {
+    let session_id = req.session_id.to_string();
+    info!("Received delete session request for {session_id}");
+
+    let mut registry = registry.lock().await;
+    if let Err(err) = registry.delete_session(session_id).await {
+        return responder.respond_with_internal_error(err.to_string());
+    }
+
+    let resp = DeleteSessionResponse::new();
     responder.respond(resp)
 }
 

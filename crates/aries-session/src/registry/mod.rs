@@ -60,6 +60,24 @@ impl SessionRegistry {
         }
     }
 
+    pub async fn delete_session(&mut self, session_id: impl Into<String>) -> anyhow::Result<()> {
+        let session_id = session_id.into();
+
+        if let Some(removed) = self.active_sessions.remove(&session_id) {
+            removed.close().await;
+        }
+
+        if let Ok(session) = self.session_repo.find_last_by_session_id(&session_id).await {
+            self.session_repo
+                .delete_by_session_id(&session_id)
+                .await
+                .with_context(|| format!("Failed to delete session {session_id} from database"))?;
+            let _ = tokio::fs::remove_dir_all(&session.root_dir).await;
+        }
+
+        Ok(())
+    }
+
     pub async fn try_session(
         &mut self,
         project_dir: impl Into<String>,

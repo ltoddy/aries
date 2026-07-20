@@ -14,7 +14,7 @@ impl Display for PlanEntry {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mark = self.status.mark();
 
-        write!(f, "\t{mark}{}{}", self.priority, self.content)
+        write!(f, "\t{mark} {}{}", self.priority, self.content)
     }
 }
 
