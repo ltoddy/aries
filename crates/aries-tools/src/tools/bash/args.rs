@@ -3,6 +3,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BashArgs {
     pub command: String,
+    #[serde(default)]
+    pub timeout: Option<u64>,
+    #[serde(default)]
+    pub description: Option<String>,
 }
 
 impl BashArgs {
@@ -19,7 +23,6 @@ impl BashArgs {
 impl BashArgs {
     pub fn render_args(raw: &str) -> Result<(String, Option<String>), serde_json::Error> {
         let args: Self = serde_json::from_str(raw)?;
-        let first = args.command;
-        Ok((first, None))
+        Ok((args.command, args.description))
     }
 }

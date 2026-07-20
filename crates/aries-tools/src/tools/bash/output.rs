@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+const MAX_OUTPUT_CHARS: usize = 30_000;
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BashOutput {
     pub stdout: String,
@@ -8,6 +10,10 @@ pub struct BashOutput {
 }
 
 impl BashOutput {
+    pub fn new(stdout: impl Into<String>, stderr: impl Into<String>, exit_code: i32) -> Self {
+        Self { stdout: truncate(stdout), stderr: truncate(stderr), exit_code }
+    }
+
     pub fn render_output(raw: &str) -> Result<String, serde_json::Error> {
         let output: Self = serde_json::from_str(raw)?;
         let mut text = String::new();
@@ -28,4 +34,17 @@ impl BashOutput {
         }
         Ok(text)
     }
+}
+
+fn truncate(content: impl Into<String>) -> String {
+    let content = content.into();
+
+    let mut char_indices = content.char_indices();
+    let Some((idx, _)) = char_indices.nth(MAX_OUTPUT_CHARS) else {
+        return content;
+    };
+
+    let head = &content[..idx];
+    let truncated_lines = content[idx..].lines().count();
+    format!("{head}\n... [{truncated_lines} lines truncated] ...")
 }

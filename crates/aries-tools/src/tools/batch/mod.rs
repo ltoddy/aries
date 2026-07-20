@@ -128,7 +128,7 @@ async fn dispatch(
     match tool_name.as_str() {
         bash::NAME => {
             let args: BashArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
-            Tool::call(&BashTool, args)
+            Tool::call(&BashTool::new(cwd), args)
                 .await
                 .map(|res| serde_json::to_value(res).unwrap())
                 .map_err(|e| e.to_string())

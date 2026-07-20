@@ -88,7 +88,7 @@ pub fn create_tools_from_tool_names(
 
     for &tool_name in tool_names {
         match tool_name {
-            bash::NAME => tools.push(Box::new(bash::BashTool::new())),
+            bash::NAME => tools.push(Box::new(bash::BashTool::new(cwd))),
             batch::NAME => tools.push(Box::new(batch::BatchTool::new(cwd, ctx.clone()))),
             codesearch::NAME => tools.push(Box::new(codesearch::CodeSearchTool::new())),
             edit::NAME => tools.push(Box::new(edit::EditTool::new(cwd, ctx.clone()))),
