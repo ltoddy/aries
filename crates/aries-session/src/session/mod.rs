@@ -20,7 +20,7 @@ use aries_extension::hook::input::{
 use aries_extension::hook::{HookDecision, HooksExecutor};
 use aries_extension::mcp::McpDefinition;
 use aries_extension::{AgentExtensions, mcp};
-use aries_init::{ModelConfig, Setting, SettingError};
+use aries_init::{GlobalContext, ModelConfig, Setting, SettingError};
 use aries_lspclient::{LspServerInfo, SharedLspClient, warm_up};
 use aries_memory::MemoryStore;
 use aries_mode::Mode;
@@ -47,6 +47,8 @@ use crate::{AriesAgent, AriesClient};
 #[derive(Clone)]
 pub struct Session {
     id: String,
+
+    gctx: GlobalContext,
 
     setting: Setting,
     config: ModelConfig,
@@ -82,7 +84,7 @@ impl Session {
     #[allow(clippy::too_many_arguments)]
     pub async fn new(
         id: impl Into<String>,
-        root_dir: impl AsRef<Path>,
+        gctx: GlobalContext,
         cwd: impl AsRef<Path>,
         config: ModelConfig,
         setting: Setting,
@@ -92,7 +94,7 @@ impl Session {
         Self::build(
             id,
             cwd,
-            root_dir,
+            gctx,
             config,
             setting,
             db,
@@ -105,7 +107,7 @@ impl Session {
     #[allow(clippy::too_many_arguments)]
     pub async fn load(
         id: impl Into<String>,
-        root_dir: impl AsRef<Path>,
+        gctx: GlobalContext,
         cwd: impl AsRef<Path>,
         config: ModelConfig,
         setting: Setting,
@@ -115,7 +117,7 @@ impl Session {
         Self::build(
             id,
             cwd,
-            root_dir,
+            gctx,
             config,
             setting,
             db,
@@ -129,7 +131,7 @@ impl Session {
     async fn build(
         id: impl Into<String>,
         cwd: impl AsRef<Path>,
-        root_dir: impl AsRef<Path>,
+        gctx: GlobalContext,
         config: ModelConfig,
         setting: Setting,
         db: Db,
@@ -138,8 +140,7 @@ impl Session {
     ) -> anyhow::Result<Self> {
         let id = id.into();
         let cwd = cwd.as_ref();
-        let root_dir = root_dir.as_ref();
-        let session_dir = root_dir.join(format!("session-{id}"));
+        let session_dir = gctx.root_dir.join(format!("session-{id}"));
         let transcripts_dir = session_dir.join("transcripts");
 
         #[rustfmt::skip]
@@ -159,7 +160,7 @@ impl Session {
         let extensions = AgentExtensions::new(cwd).await;
         let (mcp_clients, mcp_tools) = mcp::connect(&extensions.mcps).await;
 
-        let mem_store = MemoryStore::new(&root_dir, cwd).await;
+        let mem_store = MemoryStore::new(&gctx.memory_dir).await;
         let memory = Self::load_memory(&mem_store).await;
 
         let chat_history = ChatHistory::new(&session_dir).await;
@@ -188,6 +189,7 @@ impl Session {
 
         Ok(Self {
             id,
+            gctx,
             setting,
             config,
             cwd: cwd.to_path_buf(),
@@ -558,7 +560,6 @@ impl Session {
         self.hooks_executor.fire_session_end(input).await;
     }
 
-    // TODO
     async fn load_memory(store: &MemoryStore) -> Option<String> {
         let manifest = store.read_manifest().await.unwrap_or(None);
         let prompt = preamble::memory::render(store.dir(), manifest.as_deref());

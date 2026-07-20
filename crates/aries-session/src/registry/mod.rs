@@ -117,7 +117,7 @@ impl SessionRegistry {
 
         let session = Session::new(
             &session_id,
-            &self.gctx.root_dir,
+            self.gctx.clone(),
             &cwd,
             model_config,
             self.setting.clone(),
@@ -159,7 +159,7 @@ impl SessionRegistry {
 
         let session = Session::load(
             &session.session_id,
-            &self.gctx.root_dir,
+            self.gctx.clone(),
             session.cwd,
             model_config,
             self.setting.clone(),

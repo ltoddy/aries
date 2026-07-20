@@ -19,7 +19,7 @@ use crate::cli::skill::{self, SkillCommand};
 async fn main() -> anyhow::Result<()> {
     let args = cli::Args::parse();
 
-    let gctx = GlobalContext::new()?;
+    let gctx = GlobalContext::new().await;
     aries_init::init(&gctx.root_dir).await;
 
     match args.command {

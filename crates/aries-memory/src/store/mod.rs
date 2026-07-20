@@ -8,7 +8,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
-use tracing::{info, warn};
+use tracing::info;
 
 #[derive(Clone)]
 pub struct MemoryStore {
@@ -18,13 +18,8 @@ pub struct MemoryStore {
 impl MemoryStore {
     const MANIFEST_FILENAME: &str = "MEMORY.md";
 
-    pub async fn new(root_dir: impl AsRef<Path>, project_path: impl AsRef<Path>) -> Self {
-        let root_dir = root_dir.as_ref();
-        let dir = root_dir.join("projects").join(sanitize_project_path(project_path));
-
-        if let Err(err) = tokio::fs::create_dir_all(&dir).await {
-            warn!(error = %err, path = %dir.display(), "failed to create memory directory");
-        }
+    pub async fn new(dir: impl AsRef<Path>) -> Self {
+        let dir = dir.as_ref().to_path_buf();
 
         Self { dir }
     }
@@ -97,13 +92,6 @@ fn to_filename(name: &str) -> String {
 
     let trimmed = slug.trim_matches('_').replace("__", "_");
     format!("{}.md", trimmed)
-}
-
-fn sanitize_project_path(path: impl AsRef<Path>) -> String {
-    let path = path.as_ref();
-    let path = path.to_string_lossy();
-
-    path.replace(std::path::MAIN_SEPARATOR, "_")
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
