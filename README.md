@@ -6,6 +6,10 @@
 
 ![terminal](docs/assets/terminal.png)
 
+## MSRV
+
+本项目最低支持的 Rust 版本（MSRV）为 **1.85.0**（Rust 2024 edition）。
+
 ## 安装
 
 目前仅支持源码安装，还未发布到 crates.io 上。

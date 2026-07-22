@@ -5,6 +5,7 @@ mod output;
 mod tests;
 
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 use ignore::WalkBuilder;
 use rig_core::tool::Tool;
@@ -15,6 +16,8 @@ pub use self::error::GlobError;
 pub use self::output::GlobOutput;
 
 pub const NAME: &str = "Glob";
+
+const MAX_RESULTS: usize = 100;
 
 pub struct GlobTool {
     cwd: PathBuf,
@@ -49,6 +52,14 @@ impl Tool for GlobTool {
                 "base_dir": {
                     "type": "string",
                     "description": "Base directory for the glob pattern"
+                },
+                "hidden": {
+                    "type": "boolean",
+                    "description": "Include hidden files (starting with '.'). Defaults to false."
+                },
+                "respect_gitignore": {
+                    "type": "boolean",
+                    "description": "Respect .gitignore and other ignore rules. Defaults to true."
                 }
             },
             "required": ["pattern"]
@@ -71,37 +82,38 @@ impl Tool for GlobTool {
         let set = globset::GlobSetBuilder::new().add(pattern).build()?;
 
         let mut walker = WalkBuilder::new(&base_dir);
-        walker.hidden(true).ignore(true);
+        walker
+            .hidden(!args.hidden)
+            .git_ignore(args.respect_gitignore)
+            .ignore(args.respect_gitignore);
 
-        let files = tokio::task::spawn_blocking(move || -> Vec<String> {
-            let mut matches = Vec::<_>::new();
-            for entry in walker.build() {
-                let entry = match entry {
-                    Ok(entry) => entry,
-                    Err(_) => continue,
-                };
+        let mut matches = Vec::<(String, SystemTime)>::new();
+        for entry in walker.build() {
+            let Ok(entry) = entry else { continue };
 
-                let relative = match entry.path().strip_prefix(&base_dir) {
-                    Ok(relative) => relative,
-                    Err(_) => continue,
-                };
+            let Ok(relative) = entry.path().strip_prefix(&base_dir) else { continue };
 
-                if !set.is_match(relative) {
-                    continue;
-                }
-
-                let filename = match relative.to_str().map(ToOwned::to_owned) {
-                    Some(r) => r,
-                    None => continue,
-                };
-
-                matches.push(filename);
+            if !set.is_match(relative) {
+                continue;
             }
-            matches
-        })
-        .await
-        .map_err(|err| GlobError::Walk(err.to_string()))?;
 
-        Ok(GlobOutput { files })
+            let Some(filename) = relative.to_str().map(ToOwned::to_owned) else { continue };
+
+            let modified = entry
+                .metadata()
+                .ok()
+                .and_then(|m| m.modified().ok())
+                .unwrap_or_else(|| SystemTime::UNIX_EPOCH);
+
+            matches.push((filename, modified));
+        }
+
+        matches.sort_by(|prev, next| next.1.cmp(&prev.1));
+
+        let truncated = matches.len() > MAX_RESULTS;
+        let files =
+            matches.into_iter().take(MAX_RESULTS).map(|(filename, _)| filename).collect::<Vec<_>>();
+
+        Ok(GlobOutput { files, truncated })
     }
 }

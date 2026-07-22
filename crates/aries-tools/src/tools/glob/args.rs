@@ -6,6 +6,12 @@ use serde::{Deserialize, Serialize};
 pub struct GlobArgs {
     pub pattern: String,
     pub base_dir: Option<PathBuf>,
+
+    #[serde(default)]
+    pub hidden: bool,
+
+    #[serde(default = "default_respect_gitignore")]
+    pub respect_gitignore: bool,
 }
 
 impl GlobArgs {
@@ -30,4 +36,8 @@ impl GlobArgs {
 
         Ok((first, None))
     }
+}
+
+fn default_respect_gitignore() -> bool {
+    true
 }

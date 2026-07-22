@@ -31,8 +31,15 @@
 - [ ] 遥测与 tracing (记录每个工具调用预估耗费的 token, 用于统计，针对工具做优化)
 - [ ] 优化 island，展示 token 消耗与类似 Github 的活跃图
 - [ ] for harness engineering and autonomous agent
-- [ ] 长任务
+- [ ] 长程任务
 - [ ] 对环境进行感知
 - [ ] 是否需要实现投机解码 ?
 - [ ] 实现 MoA (Mixture of Agent)
 - [ ] 支持 worktree (我在想如果通过 rsync 实现 sandbox 之后是不是就不需要支持 worktree 了？)
+- [ ] 支持 handoff
+- [ ] 长期记忆改成 全局记忆以及项目记忆
+- [ ] 支持 Agent Teams
+- [ ] 支持 Bare mode 快速启动 Agent
+- [ ] 支持 checkpoint
+- [ ] 支持 remote control
+- [ ] Bun 被 Rust 重写这个事情，超大规模多 Agent 协同也是一个挑战场景。

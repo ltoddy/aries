@@ -5,3 +5,9 @@ pub enum GlobError {
     #[error("Walk error: {0}")]
     Walk(String),
 }
+
+impl GlobError {
+    pub fn walk(s: impl Into<String>) -> GlobError {
+        Self::Walk(s.into())
+    }
+}
