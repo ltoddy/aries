@@ -4,6 +4,22 @@ use serde::{Deserialize, Serialize};
 pub struct GrepArgs {
     pub pattern: String,
     pub include: Option<String>,
+
+    #[serde(default)]
+    pub output_mode: OutputMode,
+
+    #[serde(default)]
+    pub case_insensitive: bool,
+
+    #[serde(default = "default_show_line_numbers")]
+    pub show_line_numbers: bool,
+
+    pub context_before: Option<usize>,
+    pub context_after: Option<usize>,
+    pub context: Option<usize>,
+
+    #[serde(default = "default_head_limit")]
+    pub head_limit: usize,
 }
 
 impl GrepArgs {
@@ -26,4 +42,21 @@ impl GrepArgs {
 
         Ok((first, None))
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OutputMode {
+    Content,
+    #[default]
+    FilesWithMatches,
+    Count,
+}
+
+fn default_show_line_numbers() -> bool {
+    true
+}
+
+fn default_head_limit() -> usize {
+    250
 }

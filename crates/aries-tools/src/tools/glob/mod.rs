@@ -87,7 +87,7 @@ impl Tool for GlobTool {
             .git_ignore(args.respect_gitignore)
             .ignore(args.respect_gitignore);
 
-        let mut matches = Vec::<(String, SystemTime)>::new();
+        let mut matches = Vec::<(PathBuf, SystemTime)>::new();
         for entry in walker.build() {
             let Ok(entry) = entry else { continue };
 
@@ -97,23 +97,21 @@ impl Tool for GlobTool {
                 continue;
             }
 
-            let Some(filename) = relative.to_str().map(ToOwned::to_owned) else { continue };
-
             let modified = entry
                 .metadata()
                 .ok()
                 .and_then(|m| m.modified().ok())
-                .unwrap_or_else(|| SystemTime::UNIX_EPOCH);
+                .unwrap_or(SystemTime::UNIX_EPOCH);
 
-            matches.push((filename, modified));
+            matches.push((relative.to_path_buf(), modified));
         }
 
-        matches.sort_by(|prev, next| next.1.cmp(&prev.1));
+        matches.sort_by_key(|next| std::cmp::Reverse(next.1));
 
         let truncated = matches.len() > MAX_RESULTS;
         let files =
             matches.into_iter().take(MAX_RESULTS).map(|(filename, _)| filename).collect::<Vec<_>>();
 
-        Ok(GlobOutput { files, truncated })
+        Ok(GlobOutput::new(files, truncated))
     }
 }

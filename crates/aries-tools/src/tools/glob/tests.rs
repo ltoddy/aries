@@ -29,7 +29,7 @@ async fn test_glob_finds_files() {
 
     let tool = GlobTool::new(tmp.path().to_path_buf());
     let result = tool.call(glob_args("*.rs")).await.unwrap();
-    assert!(result.files.contains(&"a.rs".to_string()));
+    assert!(result.files.contains(&PathBuf::from("a.rs")));
 }
 
 #[tokio::test]
@@ -40,7 +40,7 @@ async fn test_glob_recursive() {
 
     let tool = GlobTool::new(tmp.path().to_path_buf());
     let result = tool.call(glob_args("**/*.rs")).await.unwrap();
-    assert_eq!(result.files, vec!["sub/b.rs"]);
+    assert_eq!(result.files, vec![PathBuf::from("sub/b.rs")]);
     assert!(!result.truncated);
 }
 
@@ -56,7 +56,7 @@ async fn test_glob_sorts_by_mtime_newest_first() {
     let result = tool.call(glob_args("*.rs")).await.unwrap();
 
     // 降序：最新在前。
-    assert_eq!(result.files, vec!["new.rs", "old.rs"]);
+    assert_eq!(result.files, vec![PathBuf::from("new.rs"), PathBuf::from("old.rs")]);
 }
 
 #[tokio::test]
@@ -106,5 +106,5 @@ async fn test_glob_hidden_files() {
         respect_gitignore: true,
     };
     let hidden_result = tool.call(args).await.unwrap();
-    assert!(hidden_result.files.contains(&".hidden.rs".to_string()));
+    assert!(hidden_result.files.contains(&PathBuf::from(".hidden.rs")));
 }
