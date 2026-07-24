@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use aries_filesystem::document::FrontmatterDocument;
 use aries_filesystem::walk::walk_dirs;
 use futures::stream::{self, StreamExt};
+use itertools::Itertools;
 
 use crate::skill::SkillDefinition;
 
@@ -35,10 +36,17 @@ impl SkillsLoader {
             .filter(|entry| entry.file_name().eq(&Some(OsStr::new(Self::FILENAME))))
             .collect::<Vec<_>>();
 
-        stream::iter(file_paths)
+        let skills = stream::iter(file_paths)
             .filter_map(|file_path| async move { FrontmatterDocument::read(file_path).await.ok() })
             .map(|doc| SkillDefinition::new(doc.location, doc.frontmatter, doc.body))
-            .collect()
-            .await
+            .collect::<Vec<_>>()
+            .await;
+
+        let mut skills = skills
+            .into_iter()
+            .sorted_by(|a, b| a.frontmatter.name.cmp(&b.frontmatter.name))
+            .collect::<Vec<_>>();
+        skills.dedup_by(|a, b| a.frontmatter.name == b.frontmatter.name);
+        skills
     }
 }

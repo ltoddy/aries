@@ -80,10 +80,7 @@ async fn test_bash_args_title() {
 #[test]
 fn test_rewrite_single_command() {
     let tool = BashTool::new(std::env::temp_dir());
-    assert_eq!(
-        tool.attempt_rewrite_last_command("echo hello").unwrap(),
-        "aries exec echo hello"
-    );
+    assert_eq!(tool.attempt_rewrite_last_command("echo hello").unwrap(), "aries exec echo hello");
 }
 
 #[test]
