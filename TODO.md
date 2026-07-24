@@ -8,7 +8,7 @@
 - [x] 支持 mcp
 - [x] custom agent 支持
 - [x] 支持 plugin
-- [ ] 优化 Tool 的实现
+- [x] 优化 Tool 的实现
   - [x] Write/Edit/MultiEdit 写入后通知 LSP 重建索引 (ToolContext + did_change/did_save)
   - [x] Write tool 输出结构化 diff (WriteKind / Hunk / additions / deletions)
   - [x] UpdatePlan 支持 active_form、校验空字段、全部完成自动清空
@@ -16,7 +16,9 @@
   - [x] Read tool 流式读取、limit 参数、行号输出
   - [x] 抽取 `diff` 到共享 `tools/diff.rs`（Write/Edit/MultiEdit 复用）
   - [x] ToolContext 新增 read_state + guard_write（写前校验文件已完整读取且未被外部修改）
+- [ ] 可视化数据库保存的数据
 - [ ] 支持 Workflow
+- [ ] 优化长期记忆系统
 - [ ] agent (参考 https://github.com/vercel/eve 对 agent 的目录结构设计来支持)
 - [ ] token 使用优化
 - [ ] 支持设置模型 effort
@@ -43,3 +45,12 @@
 - [ ] 支持 checkpoint
 - [ ] 支持 remote control
 - [ ] Bun 被 Rust 重写这个事情，超大规模多 Agent 协同也是一个挑战场景。
+
+
+## 讨论
+
+- 如何量化评估 Agent 性能好坏
+- 如何保证 Agent 行为一致性.
+- 工具调用失败，如何感知，如何处理。
+- 如何感知注意力丢失。
+- Agent 可观测性如何建设

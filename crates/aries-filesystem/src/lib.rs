@@ -1,5 +1,6 @@
 pub mod document;
 pub mod jsonl;
+pub mod lock;
 pub mod walk;
 
 use std::io;

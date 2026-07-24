@@ -5,10 +5,12 @@ edition = "2024"
 
 [dependencies]
 anyhow.workspace = true
-aries-persistence = { version = "0.1.0", path = "../aries-persistence" }
+aries-filesystem = { path = "../aries-filesystem" }
+aries-persistence = { path = "../aries-persistence" }
 prettytable.workspace = true
 serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
 tokio = { workspace = true, features = ["fs"] }
 toml.workspace = true
+tracing.workspace = true
 whoami.workspace = true
