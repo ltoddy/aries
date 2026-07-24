@@ -74,3 +74,85 @@ async fn test_bash_args_title() {
     let empty_args = bash_args("");
     assert_eq!(empty_args.title(), "Run a shell command");
 }
+
+// --- tests for attempt_rewrite_last_command ---
+
+#[test]
+fn test_rewrite_single_command() {
+    let tool = BashTool::new(std::env::temp_dir());
+    assert_eq!(
+        tool.attempt_rewrite_last_command("echo hello").unwrap(),
+        "aries exec echo hello"
+    );
+}
+
+#[test]
+fn test_rewrite_two_commands_with_and_and() {
+    let tool = BashTool::new(std::env::temp_dir());
+    assert_eq!(
+        tool.attempt_rewrite_last_command("echo hello && ls -la").unwrap(),
+        "echo hello && aries exec ls -la"
+    );
+}
+
+#[test]
+fn test_rewrite_two_commands_with_semicolon() {
+    let tool = BashTool::new(std::env::temp_dir());
+    assert_eq!(
+        tool.attempt_rewrite_last_command("echo hello; echo world").unwrap(),
+        "echo hello; aries exec echo world"
+    );
+}
+
+#[test]
+fn test_rewrite_two_commands_with_or_or() {
+    let tool = BashTool::new(std::env::temp_dir());
+    assert_eq!(
+        tool.attempt_rewrite_last_command("false || echo fallback").unwrap(),
+        "false || aries exec echo fallback"
+    );
+}
+
+#[test]
+fn test_rewrite_pipeline() {
+    let tool = BashTool::new(std::env::temp_dir());
+    // 管道中每个段是独立的 command 节点，最后一个段前插入 aries exec。
+    assert_eq!(
+        tool.attempt_rewrite_last_command("cat file | grep foo | wc -l").unwrap(),
+        "cat file | grep foo | aries exec wc -l"
+    );
+}
+
+#[test]
+fn test_rewrite_newline_separated() {
+    let tool = BashTool::new(std::env::temp_dir());
+    assert_eq!(
+        tool.attempt_rewrite_last_command("echo hello\necho world").unwrap(),
+        "echo hello\naries exec echo world"
+    );
+}
+
+#[test]
+fn test_rewrite_three_commands() {
+    let tool = BashTool::new(std::env::temp_dir());
+    assert_eq!(
+        tool.attempt_rewrite_last_command("echo a; echo b; echo c").unwrap(),
+        "echo a; echo b; aries exec echo c"
+    );
+}
+
+#[test]
+fn test_rewrite_empty_returns_none() {
+    let tool = BashTool::new(std::env::temp_dir());
+    // 空字符串无法解析出 command 节点。
+    assert!(tool.attempt_rewrite_last_command("").is_none());
+}
+
+#[test]
+fn test_rewrite_with_comment() {
+    let tool = BashTool::new(std::env::temp_dir());
+    assert_eq!(
+        tool.attempt_rewrite_last_command("echo hello # this is a comment").unwrap(),
+        "aries exec echo hello # this is a comment"
+    );
+}

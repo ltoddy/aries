@@ -11,6 +11,7 @@ use std::time::Duration;
 use rig_core::tool::Tool;
 use serde_json::Value;
 use tokio::process::Command;
+use tree_sitter::{Language, Node, Parser};
 
 pub use self::args::BashArgs;
 pub use self::error::BashError;
@@ -20,29 +21,30 @@ pub const NAME: &str = "Bash";
 
 pub struct BashTool {
     cwd: PathBuf,
+    language: Language,
 }
 
 impl BashTool {
-    pub fn new(cwd: impl AsRef<Path>) -> Self {
-        let cwd = cwd.as_ref().to_path_buf();
-        Self { cwd }
-    }
-
     const DEFAULT_TIMEOUT_MS: u64 = 120_000;
     const MAX_TIMEOUT_MS: u64 = 600_000;
-    const SHELL_OPERATORS: &[&str] = &["&&", "||", "|", ";", "&"];
 
-    fn rewrite_last_command(cmd: impl Into<String>) -> String {
-        let cmd = cmd.into();
-        let tokens = cmd.split_whitespace().collect::<Vec<_>>();
-        let insert_at =
-            tokens.iter().rposition(|t| Self::SHELL_OPERATORS.contains(t)).map_or(0, |i| i + 1);
+    pub fn new(cwd: impl AsRef<Path>) -> Self {
+        let cwd = cwd.as_ref().to_path_buf();
+        let language = tree_sitter_bash::LANGUAGE.into();
 
-        let mut result = Vec::with_capacity(tokens.len() + 2);
-        result.extend_from_slice(&tokens[..insert_at]);
-        result.push("aries exec");
-        result.extend_from_slice(&tokens[insert_at..]);
-        result.join(" ")
+        Self { cwd, language }
+    }
+
+    fn attempt_rewrite_last_command(&self, cmd: &str) -> Option<String> {
+        let mut parser = Parser::new();
+        parser.set_language(&self.language).ok()?;
+
+        let tree = parser.parse(cmd, None)?;
+        let last = find_last_node(tree.root_node())?;
+
+        let pos = last.start_byte();
+
+        Some(format!("{}aries exec {}", &cmd[..pos], &cmd[pos..]))
     }
 }
 
@@ -82,7 +84,7 @@ impl Tool for BashTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        let arg = Self::rewrite_last_command(args.command);
+        let arg = self.attempt_rewrite_last_command(&args.command).unwrap_or_else(|| args.command);
 
         let timeout = args
             .timeout
@@ -112,4 +114,20 @@ impl Tool for BashTool {
 
         Ok(BashOutput::new(stdout, stderr, exit_code))
     }
+}
+
+fn find_last_node(node: Node) -> Option<Node> {
+    let mut last = None::<Node>;
+
+    for child in node.children(&mut node.walk()) {
+        if child.kind() == "command" {
+            last = Some(child);
+        }
+
+        if let Some(node) = find_last_node(child) {
+            last = Some(node);
+        }
+    }
+
+    last
 }
