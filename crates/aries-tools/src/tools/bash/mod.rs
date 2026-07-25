@@ -84,7 +84,7 @@ impl Tool for BashTool {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        let arg = self.attempt_rewrite_last_command(&args.command).unwrap_or_else(|| args.command);
+        let arg = self.attempt_rewrite_last_command(&args.command).unwrap_or(args.command);
 
         let timeout = args
             .timeout

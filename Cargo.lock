@@ -278,6 +278,7 @@ dependencies = [
  "ferris-says",
  "futures",
  "itertools 0.15.0",
+ "jiff",
  "nanoid",
  "prettytable-rs",
  "rig-core",
@@ -287,6 +288,8 @@ dependencies = [
  "terminal_size",
  "tokio",
  "tracing",
+ "tree-sitter",
+ "tree-sitter-bash",
 ]
 
 [[package]]

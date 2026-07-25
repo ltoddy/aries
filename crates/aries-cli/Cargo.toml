@@ -28,6 +28,7 @@ dialoguer.workspace = true
 ferris-says.workspace = true
 futures.workspace = true
 itertools.workspace = true
+jiff.workspace = true
 nanoid.workspace = true
 prettytable.workspace = true
 rig-core.workspace = true
@@ -37,3 +38,5 @@ serde_json.workspace = true
 terminal_size.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "fs", "process"] }
 tracing.workspace = true
+tree-sitter.workspace = true
+tree-sitter-bash.workspace = true

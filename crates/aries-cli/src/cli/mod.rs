@@ -7,6 +7,7 @@ pub mod prompt;
 pub mod session;
 pub mod setup;
 pub mod skill;
+pub mod stats;
 
 use std::collections::HashMap;
 use std::env::current_dir;
@@ -28,6 +29,7 @@ use crate::cli::mcp::McpCommand;
 use crate::cli::model::ModelCommand;
 use crate::cli::session::SessionCommand;
 use crate::cli::skill::SkillCommand;
+use crate::cli::stats::StatsCommand;
 use crate::display::print_agent_event;
 use crate::theme::Theme;
 use crate::{commands, input, welcome};
@@ -73,6 +75,10 @@ pub enum Subcommands {
     },
     #[command(about = "Initialize or update Aries configuration")]
     Setup,
+    Stats {
+        #[command(subcommand)]
+        command: StatsCommand,
+    },
     #[command(about = "Manage skills (custom tools)")]
     Skill {
         #[command(subcommand)]

@@ -20,7 +20,7 @@
   - 输出被截断 (Anthropic 的接口可以设置 max_tokens)
   - 上下文超长
   - [x] 429 status code 限流等
-- [ ] acp 协议 v2 支持
+- [ ] acp 协议 v2 支持 (https://agentclientprotocol.com/protocol/v2/overview 等什么时候不再是 draft 了, 立马跟进实现)
 - [ ] 优化长期记忆系统
 - [ ] 优化 mcp 启动 (超时，连接速度，连接异常)
 - [ ] 支持 worktree
@@ -30,7 +30,7 @@
 - [ ] 支持设置模型 effort
 - [ ] 支持 design.md
 - [ ] 支持 cron
-- [ ] 可视化数据库保存的数据
+- [x] 可视化数据库保存的数据（`aries stats tool` / `aries stats bash`：工具调用次数、bash 命令使用频率）
 - [ ] command
 - [ ] 通过 rsync 实现本机的 sandbox
 - [ ] 支持 Browser Use

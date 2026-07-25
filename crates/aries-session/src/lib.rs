@@ -40,7 +40,6 @@ pub enum AriesClient {
 impl AriesClient {
     pub fn new(config: &ModelConfig) -> anyhow::Result<Self> {
         let http_client = reqwest::Client::builder()
-            .timeout(Duration::from_mins(1))
             .build()
             .expect("Failed to build http client for llm provider");
 

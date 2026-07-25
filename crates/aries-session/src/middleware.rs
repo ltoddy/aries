@@ -3,6 +3,12 @@ use reqwest_retry::{Retryable, RetryableStrategy};
 
 pub struct RetryStrategy;
 
+impl Default for RetryStrategy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RetryStrategy {
     pub fn new() -> Self {
         Self {}

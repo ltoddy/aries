@@ -58,6 +58,13 @@ impl ToolCallRepository {
         ToolCall::filter(ToolCall::fields().created_at().lt(created_at)).exec(&mut self.db).await
     }
 
+    pub async fn find_by_created_at_greater_than(
+        &mut self,
+        created_at: Timestamp,
+    ) -> toasty::Result<Vec<ToolCall>> {
+        ToolCall::filter(ToolCall::fields().created_at().gt(created_at)).exec(&mut self.db).await
+    }
+
     pub async fn delete_by_id_in(&mut self, ids: impl IntoExpr<List<u64>>) -> toasty::Result<()> {
         ToolCall::filter(ToolCall::fields().id().in_list(ids)).delete().exec(&mut self.db).await
     }

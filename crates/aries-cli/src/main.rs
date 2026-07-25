@@ -14,6 +14,7 @@ use crate::cli::mcp::{self, McpCommand};
 use crate::cli::model::{self, ModelCommand};
 use crate::cli::session::{self, SessionCommand};
 use crate::cli::skill::{self, SkillCommand};
+use crate::cli::stats::StatsCommand;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -51,6 +52,10 @@ async fn main() -> anyhow::Result<()> {
             SessionCommand::Resume(args) => session::resume::execute(args, gctx).await,
         },
         Some(cli::Subcommands::Setup) => cli::setup::execute(gctx).await,
+        Some(cli::Subcommands::Stats { command }) => match command {
+            StatsCommand::Bash(args) => cli::stats::bash::execute(gctx, args).await,
+            StatsCommand::Tool(args) => cli::stats::tool::execute(gctx, args).await,
+        },
         Some(cli::Subcommands::Skill { command }) => match command {
             SkillCommand::List(args) => skill::list::execute(args, gctx).await,
         },
