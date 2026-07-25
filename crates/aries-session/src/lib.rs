@@ -1,7 +1,9 @@
+pub mod middleware;
 pub mod registry;
 pub mod session;
 
 use std::path::Path;
+use std::time::Duration;
 
 use aries_agent::{AgentBuilder, AriesResult};
 use aries_event::AgentEvent;
@@ -12,6 +14,9 @@ use aries_memory::{
     ExtractedMemory, ManifestEntry, MemoryExtractor, MemoryFrontmatter, MemoryStore,
 };
 use aries_mode::Mode;
+use reqwest_middleware::ClientWithMiddleware;
+use reqwest_retry::RetryTransientMiddleware;
+use reqwest_retry::policies::ExponentialBackoff;
 use rig_core::agent::{AgentHook, PromptResponse};
 use rig_core::completion::Message;
 use rig_core::providers::{anthropic, azure, deepseek, openai};
@@ -20,24 +25,37 @@ use rig_core::wasm_compat::WasmCompatSend;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tracing::{info, warn};
 
+use crate::middleware::RetryStrategy;
 pub use crate::registry::SessionRegistry;
 pub use crate::session::Session;
 
 #[derive(Clone)]
 pub enum AriesClient {
-    Anthropic(anthropic::Client),
-    Azure(azure::Client),
-    Deepseek(deepseek::Client),
-    OpenAI(openai::CompletionsClient),
+    Anthropic(anthropic::Client<ClientWithMiddleware>),
+    Azure(azure::Client<ClientWithMiddleware>),
+    Deepseek(deepseek::Client<ClientWithMiddleware>),
+    OpenAI(openai::CompletionsClient<ClientWithMiddleware>),
 }
 
 impl AriesClient {
     pub fn new(config: &ModelConfig) -> anyhow::Result<Self> {
+        let http_client = reqwest::Client::builder()
+            .timeout(Duration::from_mins(1))
+            .build()
+            .expect("Failed to build http client for llm provider");
+
+        let retry = RetryTransientMiddleware::new_with_policy_and_strategy(
+            ExponentialBackoff::builder().base(1).build_with_max_retries(5),
+            RetryStrategy::new(),
+        );
+        let http_client = reqwest_middleware::ClientBuilder::new(http_client).with(retry).build();
+
         match config {
             ModelConfig::Anthropic(c) => {
                 let client = anthropic::Client::builder()
                     .api_key(&c.api_key)
                     .base_url(&c.base_url)
+                    .http_client(http_client)
                     .build()?;
                 Ok(AriesClient::Anthropic(client))
             },
@@ -46,17 +64,22 @@ impl AriesClient {
                     .api_key(&c.api_key)
                     .azure_endpoint(c.azure_endpoint.clone())
                     .api_version(&c.api_version)
+                    .http_client(http_client)
                     .build()?;
                 Ok(AriesClient::Azure(client))
             },
             ModelConfig::Deepseek(c) => {
-                let client = deepseek::Client::builder().api_key(&c.api_key).build()?;
+                let client = deepseek::Client::builder()
+                    .api_key(&c.api_key)
+                    .http_client(http_client)
+                    .build()?;
                 Ok(AriesClient::Deepseek(client))
             },
             ModelConfig::OpenAI(c) => {
                 let client = openai::CompletionsClient::builder()
                     .base_url(&c.base_url)
                     .api_key(&c.api_key)
+                    .http_client(http_client)
                     .build()?;
                 Ok(AriesClient::OpenAI(client))
             },
@@ -166,10 +189,12 @@ impl AriesClient {
 
 #[derive(Clone)]
 pub enum AriesAgent {
-    Anthropic(aries_agent::AriesAgent<anthropic::completion::CompletionModel>),
-    Azure(aries_agent::AriesAgent<azure::CompletionModel>),
-    Deepseek(aries_agent::AriesAgent<deepseek::CompletionModel>),
-    OpenAI(aries_agent::AriesAgent<openai::CompletionModel>),
+    Anthropic(
+        aries_agent::AriesAgent<anthropic::completion::CompletionModel<ClientWithMiddleware>>,
+    ),
+    Azure(aries_agent::AriesAgent<azure::CompletionModel<ClientWithMiddleware>>),
+    Deepseek(aries_agent::AriesAgent<deepseek::CompletionModel<ClientWithMiddleware>>),
+    OpenAI(aries_agent::AriesAgent<openai::CompletionModel<ClientWithMiddleware>>),
 }
 
 impl AriesAgent {
@@ -183,10 +208,10 @@ impl AriesAgent {
     where
         I: IntoIterator<Item = T>,
         T: Into<Message>,
-        P: AgentHook<anthropic::completion::CompletionModel>
-            + AgentHook<azure::CompletionModel>
-            + AgentHook<deepseek::CompletionModel>
-            + AgentHook<openai::CompletionModel>
+        P: AgentHook<anthropic::completion::CompletionModel<ClientWithMiddleware>>
+            + AgentHook<azure::CompletionModel<ClientWithMiddleware>>
+            + AgentHook<deepseek::CompletionModel<ClientWithMiddleware>>
+            + AgentHook<openai::CompletionModel<ClientWithMiddleware>>
             + 'static,
     {
         match self {

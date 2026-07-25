@@ -7,7 +7,6 @@ members = [
     "crates/aries-event",
     "crates/aries-extension",
     "crates/aries-filesystem",
-    "crates/aries-harness",
     "crates/aries-init",
     "crates/aries-logger",
     "crates/aries-lspclient",
@@ -48,7 +47,9 @@ parking_lot = "0.12"
 prettytable = { package = "prettytable-rs", version = "0.10" }
 regex-lite = "0.1"
 reqwest = "0.13"
-rig-core = "0.40"
+reqwest-middleware = "0.5"
+reqwest-retry = "0.9"
+rig-core = { version = "0.40" }
 rmcp = "1.8"
 rustyline = "18.0"
 rustyline-derive = "0.12"
