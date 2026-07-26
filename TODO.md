@@ -36,7 +36,11 @@
 - [ ] 通过 rsync 实现本机的 sandbox
 - [ ] 支持 Browser Use
 - [ ] 支持 Computer Use
-- [ ] 支持自我进化
+- [ ] 支持自我进化 (想要达到的目标, 从单体进化逐步走向群体进化,单体进化: 一个 Agent 变聪明了, 另一个 Agent 不知道, 希望逐步走向进化成果可以像基因一样跨个体共享, 群体遗传!)
+  - hermes agent 实现自进化有两种方式:
+    1. 动态 Skill 生成, 每次完成一轮对话,后台会启动一个审查 Agent (这段对话有什么值得记忆的经验? 这个任务模式值值得抽象成 skill ? 整个执行过程有什么可改进的,如果值得就把经验结构化成一个 skill 包)，如果连续跑了十论都没有生成新的 skill 系统会提示: 你是不是改把最近学到的经验整理一下. 同时在未来遇到新的边界 case 以生成的 skill 也会再次更新.
+    2. RL 训练, 使用更强大模型，批量生成高质量的 Agent 执行轨迹, 清洗压缩成训练数据，然后使用 GRPO 算法训练小模型.
+  - GEP 架构 参考项目: https://github.com/EvoMap/evolver
 - [ ] 遥测与 tracing (记录每个工具调用预估耗费的 token, 用于统计，针对工具做优化)
 - [ ] 优化 island，展示 token 消耗与类似 Github 的活跃图
 - [ ] for harness engineering and autonomous agent
