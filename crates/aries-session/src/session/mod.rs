@@ -30,7 +30,6 @@ use futures::pin_mut;
 use rig_core::agent::PromptResponse;
 use rig_core::completion::Message;
 use rig_core::message::UserContent;
-use rig_core::wasm_compat::WasmCompatSend;
 use rmcp::RoleClient;
 use rmcp::model::ClientInfo;
 use rmcp::service::RunningService;
@@ -38,7 +37,7 @@ use toasty::Db;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_util::sync::CancellationToken;
-use tracing::{info, warn};
+use tracing::info;
 
 pub use self::args::SessionArgs;
 use self::chat_context::ChatContext;
@@ -267,29 +266,24 @@ impl Session {
 
     pub async fn prompt<F, Fut>(
         &mut self,
-        prompt: impl Into<Message> + WasmCompatSend,
-        mut cb: Option<F>,
-    ) -> anyhow::Result<()>
+        prompt: impl Into<Message>,
+        mut callback: F,
+    ) -> aries_agent::AriesResult<()>
     where
         F: FnMut(AgentEvent) -> Fut,
         Fut: Future<Output = ()>,
     {
+        let prompt: Message = prompt.into();
         self.cancel_token = CancellationToken::new();
         self.last_assistant_message = None;
+        let title = self.update_title(&prompt).await;
 
-        let prompt: Message = prompt.into();
-        let title = message_to_simple_text(&prompt);
-        let user_msg_for_memory = title.clone();
-        if let Err(err) = self.session_repo.update_title_by_session_id(&self.id, &title).await {
-            warn!("failed to update title({title}): {err}");
-        }
-
-        let input = UserPromptSubmitHookInput::new(&self.id, &self.cwd, title)
+        let input = UserPromptSubmitHookInput::new(&self.id, &self.cwd, &title)
             .transcript_path(&self.transcripts_dir);
         if let HookDecision::Terminate { reason } =
             self.hooks_executor.fire_user_prompt_submit(input).await
         {
-            return Err(anyhow::anyhow!(reason));
+            return Err(aries_agent::AriesError::hook_terminated(reason));
         }
 
         aries_compact::micro_compact(self.chat_context.history_mut());
@@ -300,16 +294,55 @@ impl Session {
             self.chat_context.history().estimate_tokens().saturating_add(prompt.estimate_tokens());
 
         if estimate_tokens >= compact_threshold {
-            info!(
-                "\n🔄 预估 tokens {estimate_tokens} 已达阈值 {compact_threshold}（上下文窗口 {}），提前触发压缩...",
+            let text = format!(
+                "\n预估 tokens {estimate_tokens} 已达阈值 {compact_threshold}（上下文窗口 {}），提前触发压缩...",
                 window.total
             );
+            info!("{text}");
+            callback(AgentEvent::text(true, self.mode.name(), text)).await;
             self.compact().await;
         }
 
         let final_res = {
-            let snapshot = self.chat_context.history().to_vec();
-            match self.run_prompt(prompt, &snapshot, &mut cb).await {
+            let history = self.chat_context.history().to_vec();
+
+            let hook = SessionPromptHook::new(
+                self.hooks_executor.clone(),
+                &self.id,
+                &self.cwd,
+                &self.transcripts_dir,
+                self.mode.id(),
+                self.mode.name(),
+                self.db.clone(),
+            );
+            let prompt_fut = self.agent.prompt(prompt, history, hook);
+            pin_mut!(prompt_fut);
+
+            let mut guard = self.receiver.lock().await;
+            let mut prompt_res = Ok(PromptResponse::empty());
+
+            loop {
+                tokio::select! {
+                    biased;
+                    _ = self.cancel_token.cancelled() => break,
+                    event = guard.recv() => {
+                        if let Some(event) = event {
+                            callback(event).await;
+                        }
+                    }
+                    res = &mut prompt_fut => {
+                        prompt_res = res;
+                        break;
+                    }
+                }
+            }
+
+            while let Ok(event) = guard.try_recv() {
+                callback(event).await;
+            }
+            drop(guard);
+
+            match prompt_res {
                 Ok(res) => res,
                 Err(err) => {
                     let input = StopFailureHookInput::new(&self.id, &self.cwd, err.to_string())
@@ -342,7 +375,7 @@ impl Session {
             let client = self.client.clone();
             let model: String = self.config.model();
             let memory_store = self.memory_store.clone();
-            let user_msg = user_msg_for_memory.clone();
+            let user_msg = title;
             let assistant_resp = final_res.output().to_owned();
             tokio::spawn(async move {
                 client.extract_memories(&model, &user_msg, &assistant_resp, &memory_store).await;
@@ -350,10 +383,13 @@ impl Session {
         }
 
         if final_res.usage().total_tokens > compact_threshold {
-            info!(
+            let text = format!(
                 "\n🔄 实际 tokens {} 已达阈值 {compact_threshold}，触发压缩...",
                 final_res.usage().total_tokens,
             );
+            info!(text);
+            let event = AgentEvent::text(true, self.mode.name(), text);
+            callback(event).await;
             self.compact().await;
         }
 
@@ -459,64 +495,10 @@ impl Session {
         }
     }
 
-    async fn run_prompt<F, Fut>(
-        &mut self,
-        prompt: impl Into<Message> + WasmCompatSend,
-        history: &[Message],
-        cb: &mut Option<F>,
-    ) -> anyhow::Result<PromptResponse>
-    where
-        F: FnMut(AgentEvent) -> Fut,
-        Fut: Future<Output = ()>,
-    {
-        let hook = SessionPromptHook::new(
-            self.hooks_executor.clone(),
-            &self.id,
-            &self.cwd,
-            &self.transcripts_dir,
-            self.mode.id(),
-            self.mode.name(),
-            self.db.clone(),
-        );
-        let prompt_fut = self.agent.prompt(prompt, history.to_vec(), hook);
-        pin_mut!(prompt_fut);
-
-        let mut events_guard = self.receiver.lock().await;
-        let mut final_res = PromptResponse::empty();
-
-        loop {
-            tokio::select! {
-                biased;
-                _ = self.cancel_token.cancelled() => {
-                    break;
-                }
-                event = events_guard.recv() => {
-                    match event {
-                        Some(event) => {
-                            if let Some(cb) = cb {
-                                cb(event).await;
-                            }
-                        }
-                        None => {
-                            // sender side dropped; ignore further agent events
-                        }
-                    }
-                }
-                res = &mut prompt_fut => {
-                    final_res = res.map_err(|e| anyhow::anyhow!(e))?;
-                    break;
-                }
-            }
-        }
-
-        // Drain any remaining buffered agent events without blocking
-        while let Ok(event) = events_guard.try_recv() {
-            if let Some(cb) = cb {
-                cb(event).await;
-            }
-        }
-
-        Ok(final_res)
+    async fn update_title(&mut self, prompt: &Message) -> String {
+        let title = message_to_simple_text(prompt);
+        let _ = self.session_repo.update_title_by_session_id(&self.id, &title).await;
+        title
     }
 
     async fn warm_up_lsp(dir: impl AsRef<Path>) -> Option<SharedLspClient> {

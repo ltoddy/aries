@@ -3,6 +3,7 @@ use std::env::current_dir;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+use aries_event::AgentEvent;
 use aries_extension::mcp::McpDefinition;
 use aries_init::{GlobalContext, SettingLoader};
 use aries_session::SessionRegistry;
@@ -60,20 +61,15 @@ pub async fn execute(gctx: GlobalContext, bare: bool) -> anyhow::Result<()> {
                 let start = Instant::now();
                 let tool_names: Arc<Mutex<HashMap<String, String>>> =
                     Arc::new(Mutex::new(HashMap::new()));
-                if let Err(err) = session
-                    .prompt(
-                        input,
-                        Some(|event| {
-                            let tool_names = tool_names.clone();
-                            async move {
-                                if let Ok(mut map) = tool_names.lock() {
-                                    print_agent_event(event, theme, &mut map);
-                                }
-                            }
-                        }),
-                    )
-                    .await
-                {
+
+                let callback = async |event: AgentEvent| {
+                    let tool_names = tool_names.clone();
+                    if let Ok(mut map) = tool_names.lock() {
+                        print_agent_event(event, theme, &mut map);
+                    }
+                };
+
+                if let Err(err) = session.prompt(input, callback).await {
                     eprintln!("\n{}: {}", theme.red_text("Error"), err);
                     continue;
                 }

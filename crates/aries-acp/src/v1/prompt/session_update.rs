@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use agent_client_protocol::schema::v1::{
     Content, ContentBlock, ContentChunk, Diff, Plan, SessionUpdate, ToolCall as AcpToolCall,
     ToolCallContent, ToolCallId, ToolCallLocation, ToolCallStatus, ToolCallUpdate,
-    ToolCallUpdateFields, ToolKind,
+    ToolCallUpdateFields, ToolKind, UsageUpdate,
 };
 use aries_event::AgentEvent;
 use aries_tools::tools::format_tool_output;
@@ -48,9 +48,10 @@ impl SessionUpdates {
                     usage.total_tokens,
                     usage.reasoning_tokens,
                 );
-                Self(vec![SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::from(
-                    text,
-                )))])
+                Self(vec![
+                    SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::from(text))),
+                    SessionUpdate::UsageUpdate(UsageUpdate::new(usage.total_tokens, 0)),
+                ])
             },
             _ => Self(Vec::new()),
         }

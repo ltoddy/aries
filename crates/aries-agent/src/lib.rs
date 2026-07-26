@@ -11,9 +11,17 @@ pub use crate::builder::AgentBuilder;
 pub enum AriesError {
     #[error("{0}")]
     Streaming(#[from] StreamingError),
+
+    #[error("hook terminated: {0}")]
+    HookTerminated(String),
 }
 
 impl AriesError {
+    pub fn hook_terminated(reason: impl Into<String>) -> Self {
+        let reason = reason.into();
+        Self::HookTerminated(reason)
+    }
+
     pub fn is_context_exceeded(&self) -> bool {
         const PATTERNS: [&str; 6] = [
             "prompt_too_long",

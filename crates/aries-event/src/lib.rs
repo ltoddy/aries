@@ -10,6 +10,16 @@ pub struct AgentEvent {
 }
 
 impl AgentEvent {
+    pub fn text(main: bool, name: impl Into<String>, text: impl Into<String>) -> Self {
+        let name = name.into();
+        let text = text.into();
+        let stream_item =
+            MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::text(&text));
+        // TODO: 这里使用 assistant 类型不是非常合适,但是又没有提供 user 类型
+
+        Self { main, name, stream_item }
+    }
+
     pub fn from_stream<R>(
         main: bool,
         name: impl Into<String>,

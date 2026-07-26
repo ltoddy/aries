@@ -63,20 +63,15 @@ pub async fn execute(args: ResumeSessionsArgs, gctx: GlobalContext) -> anyhow::R
                 let start = Instant::now();
                 let tool_names: Arc<Mutex<HashMap<String, String>>> =
                     Arc::new(Mutex::new(HashMap::new()));
-                if let Err(err) = session
-                    .prompt(
-                        input,
-                        Some(|event| {
-                            let tool_names = tool_names.clone();
-                            async move {
-                                if let Ok(mut map) = tool_names.lock() {
-                                    print_agent_event(event, theme, &mut map);
-                                }
-                            }
-                        }),
-                    )
-                    .await
-                {
+
+                let callback = async |event| {
+                    let tool_names = tool_names.clone();
+                    if let Ok(mut map) = tool_names.lock() {
+                        print_agent_event(event, theme, &mut map);
+                    }
+                };
+
+                if let Err(err) = session.prompt(input, callback).await {
                     eprintln!("\n{}: {}", theme.red_text("Error"), err);
                     continue;
                 }

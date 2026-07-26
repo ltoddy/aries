@@ -48,7 +48,7 @@ pub async fn prompt(
     let span = info_span!("prompt", session_id = %session_id);
     let _enter = span.enter();
 
-    match session.prompt(prompt, Some(callback)).await {
+    match session.prompt(prompt, callback).await {
         Ok(_) => {
             let mut registry = registry.lock().await;
             registry.putback_session(session);
