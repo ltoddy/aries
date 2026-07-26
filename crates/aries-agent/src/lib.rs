@@ -1,6 +1,5 @@
 pub mod agent;
 pub mod builder;
-pub mod tools;
 
 use rig_core::agent::StreamingError;
 use rig_core::completion::CompletionError;

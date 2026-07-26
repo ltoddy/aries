@@ -5,8 +5,8 @@ use agent_client_protocol::schema::v1::{
     ToolCallContent, ToolCallId, ToolCallLocation, ToolCallStatus, ToolCallUpdate,
     ToolCallUpdateFields, ToolKind,
 };
-use aries_agent::tools::format_tool_output;
 use aries_event::AgentEvent;
+use aries_tools::tools::format_tool_output;
 use aries_tools::{
     agent, bash, batch, codesearch, edit, glob, grep, ls, lsp, multiedit, question, read, skill,
     update_plan, webfetch, websearch, write,

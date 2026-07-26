@@ -98,6 +98,6 @@ impl Tool for LsTool {
         }
 
         entries.sort();
-        Ok(LsOutput { entries })
+        Ok(LsOutput::new(entries))
     }
 }

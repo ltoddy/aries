@@ -119,7 +119,7 @@ pub fn format_tool_call_args(
 }
 
 pub fn format_tool_result_output(tool_name: &str, result: &str, theme: Theme) -> String {
-    let output = aries_agent::tools::format_tool_output(tool_name, result);
+    let output = aries_tools::tools::format_tool_output(tool_name, result);
     let output = if output.is_empty() { "No output".to_string() } else { output };
 
     let _ = tool_name;

@@ -16,3 +16,46 @@ pub mod update_plan;
 pub mod webfetch;
 pub mod websearch;
 pub mod write;
+
+use self::agent::AgentOutput;
+use self::bash::BashOutput;
+use self::batch::BatchOutput;
+use self::codesearch::CodeSearchOutput;
+use self::edit::EditOutput;
+use self::glob::GlobOutput;
+use self::grep::GrepOutput;
+use self::ls::LsOutput;
+use self::lsp::LspOutput;
+use self::multiedit::MultiEditOutput;
+use self::question::AskUserQuestionOutput;
+use self::read::ReadOutput;
+use self::skill::SkillOutput;
+use self::update_plan::UpdatePlanOutput;
+use self::webfetch::WebFetchOutput;
+use self::websearch::WebSearchOutput;
+use self::write::WriteOutput;
+
+pub fn format_tool_output(tool_name: &str, raw_json: &str) -> String {
+    let result = match tool_name {
+        agent::NAME => AgentOutput::render_output(raw_json),
+        bash::NAME => BashOutput::render_output(raw_json),
+        batch::NAME => BatchOutput::render_output(raw_json),
+        codesearch::NAME => CodeSearchOutput::render_output(raw_json),
+        edit::NAME => EditOutput::render_output(raw_json),
+        glob::NAME => GlobOutput::render_output(raw_json),
+        grep::NAME => GrepOutput::render_output(raw_json),
+        ls::NAME => LsOutput::render_output(raw_json),
+        lsp::NAME => LspOutput::render_output(raw_json),
+        multiedit::NAME => MultiEditOutput::render_output(raw_json),
+        question::NAME => AskUserQuestionOutput::render_output(raw_json),
+        read::NAME => ReadOutput::render_output(raw_json),
+        skill::NAME => SkillOutput::render_output(raw_json),
+        update_plan::NAME => UpdatePlanOutput::render_output(raw_json),
+        webfetch::NAME => WebFetchOutput::render_output(raw_json),
+        websearch::NAME => WebSearchOutput::render_output(raw_json),
+        write::NAME => WriteOutput::render_output(raw_json),
+        _ => Ok(raw_json.to_string()),
+    };
+
+    result.unwrap_or_else(|_| raw_json.to_string())
+}

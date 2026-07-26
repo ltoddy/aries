@@ -6,6 +6,10 @@ pub struct LsOutput {
 }
 
 impl LsOutput {
+    pub fn new(entries: Vec<String>) -> Self {
+        Self { entries }
+    }
+
     pub fn render_output(raw: &str) -> Result<String, serde_json::Error> {
         let output: Self = serde_json::from_str(raw)?;
         Ok(output.entries.join("\n"))
