@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use aries_init::{GlobalContext, SettingLoader};
 use aries_session::SessionRegistry;
+use aries_session::session::SessionArgs;
 use clap::Parser;
 use tracing::info_span;
 
@@ -31,7 +32,9 @@ pub async fn execute(args: PromptArgs, gctx: GlobalContext) -> anyhow::Result<()
 
     let current_dir = current_dir().expect("Unable to get current directory");
 
-    let mut session = registry.try_session(current_dir.display().to_string(), &session_id).await?;
+    let session_args = SessionArgs::default();
+    let mut session =
+        registry.try_session(current_dir.display().to_string(), &session_id, session_args).await?;
     let session_id = session.id();
     let _session_span = info_span!("session", session_id = %session_id).entered();
 

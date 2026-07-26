@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 use aries_extension::mcp::McpDefinition;
@@ -9,6 +9,7 @@ use toasty::Db;
 use tracing::{Instrument, info_span};
 
 use crate::Session;
+use crate::session::SessionArgs;
 
 pub struct SessionRegistry {
     gctx: GlobalContext,
@@ -82,6 +83,7 @@ impl SessionRegistry {
         &mut self,
         project_dir: impl Into<String>,
         session_id: impl Into<String>,
+        args: SessionArgs,
     ) -> anyhow::Result<Session> {
         let project_dir = project_dir.into();
         let session_id = session_id.into();
@@ -92,7 +94,7 @@ impl SessionRegistry {
         let mcp_config = McpDefinition::empty();
         match self.session_repo.find_last_by_session_id(&session_id).await {
             Ok(_) => self.load_session(session_id, mcp_config).await,
-            Err(_) => self.new_session(project_dir, mcp_config).await,
+            Err(_) => self.new_session(project_dir, mcp_config, args).await,
         }
     }
 
@@ -108,21 +110,23 @@ impl SessionRegistry {
 
     pub async fn new_session(
         &mut self,
-        cwd: impl Into<String>,
+        cwd: impl AsRef<Path>,
         external_mcp_config: McpDefinition,
+        args: SessionArgs,
     ) -> anyhow::Result<Session> {
-        let cwd = cwd.into();
+        let cwd = cwd.as_ref();
         let session_id = nanoid::nanoid!();
         let model_config = self.setting.active_model()?;
 
         let session = Session::new(
             &session_id,
             self.gctx.clone(),
-            &cwd,
+            cwd,
             model_config,
             self.setting.clone(),
             self.db.clone(),
             external_mcp_config,
+            args,
         )
         .instrument(info_span!("session_init", session_id = %session_id))
         .await
@@ -132,7 +136,7 @@ impl SessionRegistry {
         self.session_repo
             .create(
                 &session.id(),
-                &cwd,
+                cwd.display().to_string(),
                 session.session_dir().display().to_string(),
                 session.transcript_path().display().to_string(),
             )

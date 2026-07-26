@@ -1,11 +1,12 @@
 use std::collections::HashMap;
+use std::env::current_dir;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use aries_extension::mcp::McpDefinition;
 use aries_init::{GlobalContext, SettingLoader};
 use aries_session::SessionRegistry;
-use clap::Parser;
+use aries_session::session::SessionArgs;
 use rustyline::error::ReadlineError;
 use tracing::info_span;
 
@@ -14,15 +15,7 @@ use crate::display::print_agent_event;
 use crate::theme::Theme;
 use crate::{commands, input, welcome};
 
-#[derive(Clone, Debug, Parser)]
-#[command(about = "Resume a previous chat session")]
-pub struct ResumeSessionsArgs {
-    #[arg(help = "The session ID to resume")]
-    session_id: String,
-}
-
-pub async fn execute(args: ResumeSessionsArgs, gctx: GlobalContext) -> anyhow::Result<()> {
-    let session_id = args.session_id;
+pub async fn execute(gctx: GlobalContext, bare: bool) -> anyhow::Result<()> {
     let loader = SettingLoader::new(&gctx.root_dir);
     let setting = loader.load().await?;
     let model_config = setting.active_model()?;
@@ -31,9 +24,13 @@ pub async fn execute(args: ResumeSessionsArgs, gctx: GlobalContext) -> anyhow::R
 
     aries_logger::init(gctx.root_dir.join("logs"));
 
-    let mut session = registry.load_session(&session_id, McpDefinition::empty()).await?;
+    let current_dir = current_dir().expect("could not determine current directory");
+
+    let session_args = SessionArgs::new(bare);
+    let mut session =
+        registry.new_session(&current_dir, McpDefinition::empty(), session_args).await?;
     let session_id = session.id();
-    let _span = info_span!("session", session_id = %session_id).entered();
+    let _session_span = info_span!("session", session_id = %session_id).entered();
 
     let mut reader = input::InputReader::new(session.session_dir())?;
     welcome::welcome(
@@ -41,7 +38,7 @@ pub async fn execute(args: ResumeSessionsArgs, gctx: GlobalContext) -> anyhow::R
         model_config.model(),
         session.id(),
         &gctx,
-        session.current_dir(),
+        &current_dir,
     );
 
     loop {

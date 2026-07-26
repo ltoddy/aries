@@ -16,6 +16,7 @@
   - [x] Read tool 流式读取、limit 参数、行号输出
   - [x] 抽取 `diff` 到共享 `tools/diff.rs`（Write/Edit/MultiEdit 复用）
   - [x] ToolContext 新增 read_state + guard_write（写前校验文件已完整读取且未被外部修改）
+- [x] 支持 Bare mode 快速启动 Agent
 - [ ] 从错误中恢复
   - 输出被截断 (Anthropic 的接口可以设置 max_tokens)
   - 上下文超长
@@ -47,7 +48,6 @@
 - [ ] 支持 handoff
 - [ ] 长期记忆改成 全局记忆以及项目记忆
 - [ ] 支持 Agent Teams
-- [ ] 支持 Bare mode 快速启动 Agent
 - [ ] 支持 checkpoint
 - [ ] 支持 remote control
 - [ ] Bun 被 Rust 重写这个事情，超大规模多 Agent 协同也是一个挑战场景。

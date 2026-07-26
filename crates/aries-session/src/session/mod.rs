@@ -1,5 +1,7 @@
+mod args;
 mod chat_context;
 mod chat_history;
+mod config;
 mod hook;
 
 use std::future::Future;
@@ -39,16 +41,16 @@ use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
+pub use self::args::SessionArgs;
 use self::chat_context::ChatContext;
 use self::chat_history::ChatHistory;
 use self::hook::SessionPromptHook;
+use crate::session::config::SessionConfig;
 use crate::{AriesAgent, AriesClient};
 
 #[derive(Clone)]
 pub struct Session {
     id: String,
-
-    gctx: GlobalContext,
 
     setting: Setting,
     config: ModelConfig,
@@ -90,16 +92,27 @@ impl Session {
         setting: Setting,
         db: Db,
         external_mcp_config: McpDefinition,
+        args: SessionArgs,
     ) -> anyhow::Result<Self> {
+        let id = id.into();
+        let cwd = cwd.as_ref();
+        let session_dir = gctx.root_dir.join(format!("session-{id}"));
+        _ = tokio::fs::create_dir_all(&session_dir).await;
+
+        let session_config = SessionConfig::new(args.bare);
+        session_config.save(&session_dir).await;
+
         Self::build(
             id,
             cwd,
+            session_dir,
             gctx,
             config,
             setting,
             db,
             external_mcp_config,
             SessionStartSource::Startup,
+            args,
         )
         .await
     }
@@ -114,15 +127,24 @@ impl Session {
         db: Db,
         external_mcp_config: McpDefinition,
     ) -> anyhow::Result<Self> {
+        let id = id.into();
+        let cwd = cwd.as_ref();
+        let session_dir = gctx.root_dir.join(format!("session-{id}"));
+        _ = tokio::fs::create_dir_all(&session_dir).await;
+
+        let session_config = SessionConfig::load(&session_dir).await;
+
         Self::build(
             id,
             cwd,
+            session_dir,
             gctx,
             config,
             setting,
             db,
             external_mcp_config,
             SessionStartSource::Resume,
+            SessionArgs::new(session_config.bare),
         )
         .await
     }
@@ -131,16 +153,18 @@ impl Session {
     async fn build(
         id: impl Into<String>,
         cwd: impl AsRef<Path>,
+        session_dir: impl AsRef<Path>,
         gctx: GlobalContext,
         config: ModelConfig,
         setting: Setting,
         db: Db,
         _external_mcp_config: McpDefinition,
         source: SessionStartSource,
+        args: SessionArgs,
     ) -> anyhow::Result<Self> {
         let id = id.into();
         let cwd = cwd.as_ref();
-        let session_dir = gctx.root_dir.join(format!("session-{id}"));
+        let session_dir = session_dir.as_ref();
         let transcripts_dir = session_dir.join("transcripts");
 
         #[rustfmt::skip]
@@ -153,11 +177,12 @@ impl Session {
             .await
             .with_context(|| format!("failed to create session transcripts directory at: {}", transcripts_dir.display()))?;
 
-        aries_logger::register(&id, &session_dir);
+        aries_logger::register(&id, session_dir);
 
         let lsp_client = Self::warm_up_lsp(cwd).await;
 
-        let extensions = AgentExtensions::new(cwd).await;
+        let extensions =
+            if args.bare { AgentExtensions::empty() } else { AgentExtensions::new(cwd).await };
         let (mcp_clients, mcp_tools) = mcp::connect(&extensions.mcps).await;
 
         let mem_store = MemoryStore::new(&gctx.memory_dir).await;
@@ -189,7 +214,6 @@ impl Session {
 
         Ok(Self {
             id,
-            gctx,
             setting,
             config,
             cwd: cwd.to_path_buf(),
@@ -201,7 +225,7 @@ impl Session {
             chat_context,
             db,
             session_repo,
-            session_dir,
+            session_dir: session_dir.to_path_buf(),
             transcripts_dir,
             cancel_token: CancellationToken::new(),
             receiver: Arc::new(Mutex::new(receiver)),
@@ -547,6 +571,10 @@ impl Session {
 
     pub fn session_dir(&self) -> &Path {
         &self.session_dir
+    }
+
+    pub fn current_dir(&self) -> &Path {
+        &self.cwd
     }
 
     pub fn transcript_path(&self) -> &Path {

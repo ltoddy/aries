@@ -31,3 +31,5 @@ toasty = { workspace = true, features = ["jiff", "sqlite"] }
 tokio = { workspace = true, features = ["sync", "macros"] }
 tokio-util.workspace = true
 tracing.workspace = true
+serde = { workspace = true, features = ["derive"] }
+toml.workspace = true

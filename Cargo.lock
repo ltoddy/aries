@@ -457,10 +457,12 @@ dependencies = [
  "reqwest-retry",
  "rig-core",
  "rmcp",
+ "serde",
  "serde_json",
  "toasty",
  "tokio",
  "tokio-util",
+ "toml",
  "tracing",
 ]
 

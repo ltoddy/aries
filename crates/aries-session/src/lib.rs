@@ -3,7 +3,6 @@ pub mod registry;
 pub mod session;
 
 use std::path::Path;
-use std::time::Duration;
 
 use aries_agent::{AgentBuilder, AriesResult};
 use aries_event::AgentEvent;
