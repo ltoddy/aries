@@ -12,7 +12,7 @@ pub fn section(cwd: impl AsRef<Path>) -> String {
     format!("{INSTRUCTION_HEADER}\n\n{}", instruction.render())
 }
 
-pub const FILENAME: &'static str = "AGENTS.md";
+pub const FILENAME: &str = "AGENTS.md";
 
 pub struct AgentsmdReader {
     root: PathBuf,

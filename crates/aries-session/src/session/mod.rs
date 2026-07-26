@@ -9,7 +9,6 @@ use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use anyhow::Context;
 use aries_compact::{
     self, AutoCompactBreaker, CompactAgent, CompactOutcome, Decision, TokenEstimator,
 };
@@ -44,8 +43,8 @@ use tracing::{info, warn};
 pub use self::args::SessionArgs;
 use self::chat_context::ChatContext;
 use self::chat_history::ChatHistory;
+use self::config::SessionConfig;
 use self::hook::SessionPromptHook;
-use crate::session::config::SessionConfig;
 use crate::{AriesAgent, AriesClient};
 
 #[derive(Clone)]
@@ -105,7 +104,6 @@ impl Session {
         Self::build(
             id,
             cwd,
-            session_dir,
             gctx,
             config,
             setting,
@@ -137,7 +135,6 @@ impl Session {
         Self::build(
             id,
             cwd,
-            session_dir,
             gctx,
             config,
             setting,
@@ -153,7 +150,6 @@ impl Session {
     async fn build(
         id: impl Into<String>,
         cwd: impl AsRef<Path>,
-        session_dir: impl AsRef<Path>,
         gctx: GlobalContext,
         config: ModelConfig,
         setting: Setting,
@@ -164,20 +160,12 @@ impl Session {
     ) -> anyhow::Result<Self> {
         let id = id.into();
         let cwd = cwd.as_ref();
-        let session_dir = session_dir.as_ref();
+        let session_dir = gctx.root_dir.join(format!("session-{id}"));
         let transcripts_dir = session_dir.join("transcripts");
 
-        #[rustfmt::skip]
-        tokio::fs::create_dir_all(&session_dir)
-            .await
-            .with_context(|| format!("failed to create session directory at: {}", session_dir.display()))?;
+        let _ = tokio::fs::create_dir_all(&transcripts_dir).await;
 
-        #[rustfmt::skip]
-        tokio::fs::create_dir_all(&transcripts_dir)
-            .await
-            .with_context(|| format!("failed to create session transcripts directory at: {}", transcripts_dir.display()))?;
-
-        aries_logger::register(&id, session_dir);
+        aries_logger::register(&id, &session_dir);
 
         let lsp_client = Self::warm_up_lsp(cwd).await;
 

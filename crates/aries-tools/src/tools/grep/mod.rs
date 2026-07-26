@@ -144,19 +144,17 @@ impl Tool for GrepTool {
 
                     for index in &match_indices {
                         let start = index.saturating_sub(before);
-                        let end = (index + after).min(lines.len());
-                        for i in start..=end {
-                            emit.insert(i);
-                        }
+                        let end = index.saturating_add(after).saturating_add(1).min(lines.len());
+                        emit.extend(start..end);
                     }
 
                     for i in emit {
                         let is_match = match_indices.binary_search(&i).is_ok();
                         let sep = if is_match { ':' } else { '-' };
                         let rendered = if args.show_line_numbers {
-                            format!("{path_display}{sep}{}{sep} {}", i + 1, lines[i])
+                            format!("{path_display}{sep}{}{sep}{}", i + 1, lines[i])
                         } else {
-                            format!("{path_display}{sep} {}", lines[i])
+                            format!("{path_display}{sep}{}", lines[i])
                         };
                         content_lines.push(rendered);
                     }

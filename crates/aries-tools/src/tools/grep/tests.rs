@@ -139,6 +139,38 @@ async fn test_grep_count_mode() {
 }
 
 #[tokio::test]
+async fn test_grep_context_at_file_boundary() {
+    // 匹配落在文件末行时，end 会被 .min(lines.len()) 夹紧，
+    // 半开区间 start..end 不应让索引取到 lines.len() 而越界。
+    let tmp = tempfile::TempDir::new().unwrap();
+    tokio::fs::write(tmp.path().join("a.rs"), "line1\nline2\nMATCH\n").await.unwrap();
+
+    let tool = GrepTool::new(tmp.path().to_path_buf());
+    let mut args = grep_args("MATCH");
+    args.output_mode = OutputMode::Content;
+    args.context_after = Some(5);
+    let result = tool.call(args).await.unwrap();
+    // 末行匹配 + after=5：受文件长度限制，只输出匹配行自身。
+    assert_eq!(result.matches.len(), 1);
+    assert!(result.matches[0].contains("a.rs:3:MATCH"));
+}
+
+#[tokio::test]
+async fn test_grep_context_saturates_no_overflow() {
+    // context 传入极大值时，end 的加法必须饱和，不能溢出 panic。
+    let tmp = tempfile::TempDir::new().unwrap();
+    tokio::fs::write(tmp.path().join("a.rs"), "alpha\nMATCH\nomega\n").await.unwrap();
+
+    let tool = GrepTool::new(tmp.path().to_path_buf());
+    let mut args = grep_args("MATCH");
+    args.output_mode = OutputMode::Content;
+    args.context = Some(usize::MAX);
+    let result = tool.call(args).await.unwrap();
+    // 上下文被夹到文件范围，整文件 3 行全部输出。
+    assert_eq!(result.matches.len(), 3);
+}
+
+#[tokio::test]
 async fn test_grep_head_limit_truncates() {
     let tmp = tempfile::TempDir::new().unwrap();
     for i in 0..10 {
