@@ -3,13 +3,13 @@ mod chat_context;
 mod chat_history;
 mod config;
 mod hook;
+mod instruction;
 
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::Context;
-use aries_agent::preamble;
 use aries_compact::{
     self, AutoCompactBreaker, CompactAgent, CompactOutcome, Decision, TokenEstimator,
 };
@@ -186,7 +186,6 @@ impl Session {
         let (mcp_clients, mcp_tools) = mcp::connect(&extensions.mcps).await;
 
         let mem_store = MemoryStore::new(&gctx.memory_dir).await;
-        let memory = Self::load_memory(&mem_store).await;
 
         let chat_history = ChatHistory::new(&session_dir).await;
         let chat_context = ChatContext::new(&session_dir).await;
@@ -200,8 +199,8 @@ impl Session {
                 mode,
                 config.clone(),
                 cwd,
+                gctx,
                 lsp_client.clone(),
-                memory,
                 extensions.clone(),
                 mcp_tools,
             )
@@ -586,12 +585,6 @@ impl Session {
             .transcript_path(&self.transcripts_dir);
 
         self.hooks_executor.fire_session_end(input).await;
-    }
-
-    async fn load_memory(store: &MemoryStore) -> Option<String> {
-        let manifest = store.read_manifest().await.unwrap_or(None);
-        let prompt = preamble::memory::render(store.dir(), manifest.as_deref());
-        Some(prompt)
     }
 }
 

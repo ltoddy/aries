@@ -1,23 +1,29 @@
 use std::fmt::{Display, Formatter};
 use std::path::Path;
 
-use aries_filesystem::count_files;
+pub fn section(cwd: impl AsRef<Path>) -> String {
+    let cwd = cwd.as_ref();
 
-pub async fn render(cwd: impl AsRef<Path>) -> Option<String> {
-    let files = count_files(cwd).ok()?;
+    let Ok(_) = git2::Repository::discover(cwd) else {
+        return String::from(
+            "<repository>This directory is not part of a git repository.</repository>",
+        );
+    };
 
-    let size = RepositorySize::new(files);
+    let entries = aries_filesystem::walk::walk_dir(cwd, true, true).unwrap_or_default();
+    let files = entries.into_iter().filter(|e| e.is_file()).collect::<Vec<_>>();
 
-    let lines = [
-        "<repository>".to_owned(),
-        format!("  Files: {files}"),
-        format!("  Size classification: {size}"),
-        "</repository>".to_owned(),
-        size.guidance().to_owned(),
+    let size = RepositorySize::new(files.len());
+
+    [
+        "<repository>",
+        "This directory is a git repository.",
+        &format!("  Files: {}", files.len()),
+        &format!("  Size classification: {size}"),
+        size.guidance(),
+        "</repository>",
     ]
-    .join("\n");
-
-    Some(lines)
+    .join("\n")
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

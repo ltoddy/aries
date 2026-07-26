@@ -7,7 +7,7 @@ use std::path::Path;
 use aries_agent::{AgentBuilder, AriesResult};
 use aries_event::AgentEvent;
 use aries_extension::AgentExtensions;
-use aries_init::ModelConfig;
+use aries_init::{GlobalContext, ModelConfig};
 use aries_lspclient::SharedLspClient;
 use aries_memory::{
     ExtractedMemory, ManifestEntry, MemoryExtractor, MemoryFrontmatter, MemoryStore,
@@ -89,8 +89,8 @@ impl AriesClient {
         mode: Mode,
         config: ModelConfig,
         cwd: impl AsRef<Path>,
+        gctx: GlobalContext,
         lsp_client: Option<SharedLspClient>,
-        memory: Option<String>,
         extensions: AgentExtensions,
         mcp_tools: Vec<Box<dyn ToolDyn>>,
     ) -> anyhow::Result<(AriesAgent, UnboundedReceiver<AgentEvent>)> {
@@ -99,8 +99,7 @@ impl AriesClient {
 
         match self {
             AriesClient::Anthropic(c) => {
-                let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd)
-                    .with_memory(memory)
+                let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx)
                     .with_lsp_client(lsp_client)
                     .with_extensions(extensions)
                     .with_mcp_tools(mcp_tools)
@@ -109,8 +108,7 @@ impl AriesClient {
                 Ok((AriesAgent::Anthropic(agent), receiver))
             },
             AriesClient::Azure(c) => {
-                let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd)
-                    .with_memory(memory)
+                let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx)
                     .with_lsp_client(lsp_client)
                     .with_extensions(extensions)
                     .with_mcp_tools(mcp_tools)
@@ -119,8 +117,7 @@ impl AriesClient {
                 Ok((AriesAgent::Azure(agent), receiver))
             },
             AriesClient::Deepseek(c) => {
-                let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd)
-                    .with_memory(memory)
+                let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx)
                     .with_lsp_client(lsp_client)
                     .with_extensions(extensions)
                     .with_mcp_tools(mcp_tools)
@@ -129,8 +126,7 @@ impl AriesClient {
                 Ok((AriesAgent::Deepseek(agent), receiver))
             },
             AriesClient::OpenAI(c) => {
-                let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd)
-                    .with_memory(memory)
+                let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx)
                     .with_lsp_client(lsp_client)
                     .with_extensions(extensions)
                     .with_mcp_tools(mcp_tools)

@@ -1,13 +1,12 @@
 use std::path::Path;
 
-pub fn render(memory_dir: impl AsRef<Path>, memory_manifest: Option<&str>) -> String {
-    let memory_dir = memory_dir.as_ref();
-    let display = memory_dir.display();
+pub fn section(mem_dir: impl AsRef<Path>) -> String {
+    let mem_dir = mem_dir.as_ref();
 
-    let mut prompt = format!(
+    let mut preamble = format!(
         r#"<memory-system>
 
-你拥有一个基于文件的持久化记忆系统，位于 `{display}`。该目录已存在，可直接使用 Write 工具写入。
+你拥有一个基于文件的持久化记忆系统，位于 `{}`。该目录已存在，可直接使用 Write 工具写入。
 
 你应当随时间逐步构建这个记忆系统，使未来的对话能够完整了解用户是谁、用户期望的协作方式、哪些行为需要避免或保持，以及用户交给你的工作背后的上下文。
 
@@ -42,21 +41,19 @@ type: {{user, feedback, project, reference}}
 ```
 
 然后在 `MEMORY.md` 中添加索引条目：`- [标题](文件名.md) — 一句话摘要`
-</memory-system>"#
+</memory-system>"#,
+        mem_dir.display()
     );
 
-    match memory_manifest {
-        Some(content) if !content.trim().is_empty() => {
-            prompt.push_str("\n## MEMORY.md\n\n");
-            prompt.push_str(content.trim());
-            prompt.push('\n');
+    let file_path = mem_dir.join("MEMORY.md");
+    match std::fs::read_to_string(file_path) {
+        Ok(content) => {
+            preamble.push_str(&format!("\n## MEMORY.md\n\n{}", content.trim()));
         },
-        _ => {
-            prompt.push_str(
-                "\n## MEMORY.md\n\n当前 MEMORY.md 为空。当你保存新的记忆时，索引条目将出现在这里。\n",
-            );
+        Err(_) => {
+            preamble.push_str("\n## MEMORY.md\n\n当前 MEMORY.md 为空。\n");
         },
     }
 
-    prompt
+    preamble
 }

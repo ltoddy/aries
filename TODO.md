@@ -21,6 +21,7 @@
   - 输出被截断 (Anthropic 的接口可以设置 max_tokens)
   - 上下文超长
   - [x] 429 status code 限流等
+- [x] Read 工具读取文件时，自动注入所在目录的 AGENTS.md 作为 system-reminder，去重避免重复发送
 - [ ] acp 协议 v2 支持 (https://agentclientprotocol.com/protocol/v2/overview 等什么时候不再是 draft 了, 立马跟进实现)
 - [ ] 优化长期记忆系统
 - [ ] 优化 mcp 启动 (超时，连接速度，连接异常)

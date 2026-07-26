@@ -5,7 +5,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub fn section(cwd: impl AsRef<Path>, model: impl Into<String>) -> String {
     let today = today();
     let cwd = cwd.as_ref();
-    let is_git_repository = git2::Repository::discover(cwd).is_ok();
     let cwd = cwd.display();
 
     [
@@ -14,10 +13,6 @@ pub fn section(cwd: impl AsRef<Path>, model: impl Into<String>) -> String {
         format!("  Working directory: {cwd}"),
         format!("  Platform: {OS}"),
         format!("  Today's date: {today}"),
-        format!(
-            "  Is directory a git repo: Yes/No: {}",
-            if is_git_repository { "yes" } else { "no" }
-        ),
         String::from("</env>"),
     ]
     .join("\n")

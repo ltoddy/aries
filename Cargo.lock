@@ -243,13 +243,12 @@ version = "0.1.0"
 dependencies = [
  "aries-event",
  "aries-extension",
- "aries-filesystem",
+ "aries-init",
  "aries-lspclient",
  "aries-mode",
  "aries-preamble",
  "aries-tools",
  "futures",
- "itertools 0.15.0",
  "rig-core",
  "thiserror 2.0.18",
  "tokio",
@@ -338,7 +337,6 @@ name = "aries-filesystem"
 version = "0.1.0"
 dependencies = [
  "fs4 1.1.0",
- "git2",
  "ignore",
  "itertools 0.15.0",
  "serde",
@@ -420,7 +418,11 @@ dependencies = [
 name = "aries-preamble"
 version = "0.1.0"
 dependencies = [
+ "aries-extension",
+ "aries-filesystem",
+ "aries-init",
  "git2",
+ "itertools 0.15.0",
 ]
 
 [[package]]
@@ -447,6 +449,7 @@ dependencies = [
  "aries-memory",
  "aries-mode",
  "aries-persistence",
+ "aries-preamble",
  "aries-tools",
  "futures",
  "http",

@@ -5,7 +5,6 @@ edition = "2024"
 
 [dependencies]
 fs4 = { workspace = true, features = ["tokio"] }
-git2.workspace = true
 ignore.workspace = true
 itertools.workspace = true
 serde.workspace = true

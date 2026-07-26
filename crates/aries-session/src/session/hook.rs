@@ -12,13 +12,15 @@ use aries_tools::agent::AgentOutput;
 use parking_lot::Mutex;
 use rig_core::OneOrMany;
 use rig_core::agent::{
-    AgentHook, Flow, HookContext, InvalidToolCallContext, StepEvent, StepEventKind,
+    AgentHook, Flow, HookContext, InvalidToolCallContext, RequestPatch, StepEvent, StepEventKind,
 };
 use rig_core::completion::{CompletionModel, CompletionResponse, Usage};
 use rig_core::message::{AssistantContent, Message};
 use rig_core::tool::{ToolOutcome, ToolResultExtensions};
 use serde_json::Value;
 use toasty::Db;
+
+use crate::session::instruction::SharedInstructionContext;
 
 #[derive(Clone)]
 pub struct SessionPromptHook {
@@ -31,6 +33,7 @@ pub struct SessionPromptHook {
     last_tool_call_at: Arc<Mutex<Option<time::Instant>>>,
 
     tool_call_repo: ToolCallRepository,
+    instruction_ctx: SharedInstructionContext,
 }
 
 impl SessionPromptHook {
@@ -44,32 +47,47 @@ impl SessionPromptHook {
         db: Db,
     ) -> Self {
         let session_id = session_id.into();
-        let cwd = cwd.as_ref().to_path_buf();
+        let cwd = cwd.as_ref();
         let transcript_path = transcript_path.as_ref().to_path_buf();
         let agent_id = agent_id.into();
         let agent_type = agent_type.into();
 
         let tool_call_repo = ToolCallRepository::new(db);
+        let instruction_ctx = SharedInstructionContext::new(cwd);
 
         Self {
             executor,
             session_id,
-            cwd,
+            cwd: cwd.to_path_buf(),
             transcript_path,
             agent_id,
             agent_type,
             last_tool_call_at: Default::default(),
             tool_call_repo,
+            instruction_ctx,
         }
     }
 
     async fn on_completion_call(
         &self,
         _prompt: &Message,
-        _history: &[Message],
+        history: &[Message],
         _turn: usize,
     ) -> Flow {
-        Flow::cont()
+        let instructions = self.instruction_ctx.drain().await;
+        if instructions.is_empty() {
+            return Flow::cont();
+        }
+
+        let mut patched = history.to_vec();
+        for instruction in instructions {
+            let reminder = Message::user(format!(
+                "<system-reminder>\n{}\n</system-reminder>",
+                instruction.render()
+            ));
+            patched.push(reminder);
+        }
+        Flow::patch_request(RequestPatch::new().history(patched))
     }
 
     async fn on_completion_response<M>(
@@ -108,10 +126,28 @@ impl SessionPromptHook {
         let tool_input: Value =
             serde_json::from_str(args).unwrap_or_else(|_| Value::String(args.to_owned()));
 
-        if tool_name == aries_tools::agent::NAME {
-            let input = SubagentStartHookInput::new(&self.session_id, &self.cwd, "", "")
+        match tool_name {
+            aries_tools::agent::NAME => {
+                let input = SubagentStartHookInput::new(
+                    &self.session_id,
+                    &self.cwd,
+                    &self.agent_id,
+                    &self.agent_type,
+                )
                 .transcript_path(&self.transcript_path);
-            self.executor.fire_subagent_start(input).await;
+                self.executor.fire_subagent_start(input).await;
+            },
+            aries_tools::read::NAME => {
+                if let Ok(args) =
+                    serde_json::from_value::<aries_tools::read::ReadArgs>(tool_input.clone())
+                {
+                    let file_path = args.file_path;
+                    if let Some(parent) = file_path.parent() {
+                        self.instruction_ctx.visit(parent).await;
+                    }
+                }
+            },
+            _ => {},
         }
 
         let input = PreToolUseHookInput::new(
@@ -162,25 +198,17 @@ impl SessionPromptHook {
             serde_json::from_str(result).unwrap_or_else(|_| Value::String(result.to_owned()));
 
         let was_successful = !result.contains("ToolCallError");
-        {
-            let mut repo = self.tool_call_repo.clone();
-            let session_id = self.session_id.clone();
-            let internal_call_id = internal_call_id.to_owned();
-            let tool_name = tool_name.to_owned();
-            let args = args.to_owned();
-            tokio::spawn(async move {
-                let _ = repo
-                    .create(
-                        session_id,
-                        internal_call_id,
-                        tool_name,
-                        args,
-                        duration_ms,
-                        was_successful,
-                    )
-                    .await;
-            });
-        }
+        let mut repo = self.tool_call_repo.clone();
+        let _ = repo
+            .create(
+                &self.session_id,
+                internal_call_id,
+                tool_name,
+                args,
+                duration_ms,
+                was_successful,
+            )
+            .await;
 
         if !was_successful {
             let input = PostToolUseFailureHookInput::new(

@@ -16,20 +16,21 @@ aries-lspclient = { path = "../aries-lspclient" }
 aries-memory = { path = "../aries-memory" }
 aries-mode = { path = "../aries-mode" }
 aries-persistence = { path = "../aries-persistence" }
+aries-preamble = { path = "../aries-preamble" }
 aries-tools = { path = "../aries-tools" }
 futures.workspace = true
+http.workspace = true
 nanoid.workspace = true
 parking_lot.workspace = true
-http.workspace = true
 reqwest.workspace = true
 reqwest-middleware.workspace = true
 reqwest-retry.workspace = true
 rig-core = { workspace = true, features = ["reqwest-middleware"] }
 rmcp.workspace = true
+serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 toasty = { workspace = true, features = ["jiff", "sqlite"] }
 tokio = { workspace = true, features = ["sync", "macros"] }
 tokio-util.workspace = true
-tracing.workspace = true
-serde = { workspace = true, features = ["derive"] }
 toml.workspace = true
+tracing.workspace = true

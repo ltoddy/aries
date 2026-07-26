@@ -1,7 +1,8 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use aries_event::AgentEvent;
 use aries_extension::AgentExtensions;
+use aries_init::GlobalContext;
 use aries_lspclient::SharedLspClient;
 use aries_mode::Mode;
 use aries_tools::agent;
@@ -21,7 +22,7 @@ where
     model: String,
     mode: Mode,
     cwd: PathBuf,
-    memory: Option<String>,
+    gctx: GlobalContext,
     lsp_client: Option<SharedLspClient>,
 
     extensions: AgentExtensions,
@@ -36,7 +37,14 @@ where
     C: CompletionClient + Clone + Send + Sync + 'static,
     C::CompletionModel: completion::CompletionModel + 'static,
 {
-    pub fn new(client: C, model: impl Into<String>, mode: Mode, cwd: PathBuf) -> Self {
+    pub fn new(
+        client: C,
+        model: impl Into<String>,
+        mode: Mode,
+        cwd: impl AsRef<Path>,
+        gctx: GlobalContext,
+    ) -> Self {
+        let cwd = cwd.as_ref().to_path_buf();
         let model = model.into();
         let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
 
@@ -45,18 +53,13 @@ where
             model,
             mode,
             cwd,
-            memory: None,
+            gctx,
             lsp_client: None,
             extensions: AgentExtensions::empty(),
             mcp_tools: vec![],
             sender,
             receiver,
         }
-    }
-
-    pub fn with_memory(mut self, memory: Option<String>) -> Self {
-        self.memory = memory;
-        self
     }
 
     pub fn with_lsp_client(mut self, lsp_client: Option<SharedLspClient>) -> Self {
@@ -78,34 +81,30 @@ where
         let mode = self.mode;
         let name = mode.name();
 
-        let sections = crate::preamble::sections(
-            &self.cwd,
-            &self.model,
-            &self.extensions.skills,
-            self.memory.as_deref(),
-        )
-        .await;
-
-        let mut preamble = String::new();
-        preamble.push_str(mode.bare_preamble());
-        preamble.push('\n');
-        for section in &sections {
-            preamble.push('\n');
-            preamble.push_str(section);
-        }
-
         let mut tools = self.build_tools();
         tools.extend(self.mcp_tools);
 
-        let inner = self
+        let sections = aries_preamble::sections(
+            self.gctx.clone(),
+            &self.cwd,
+            &self.model,
+            &self.extensions.skills,
+        );
+
+        let mut builder = self
             .client
-            .agent(self.model)
-            .name(name)
-            .description(mode.description())
-            .preamble(&preamble)
+            .agent(&self.model)
             .tools(tools)
             .default_max_turns(AGENT_LOOP_MAX_TURNS)
-            .build();
+            .name(name)
+            .description(mode.description())
+            .preamble(mode.bare_preamble());
+
+        for section in sections.iter() {
+            builder = builder.append_preamble(section);
+        }
+
+        let inner = builder.build();
 
         (
             AriesAgent::new(inner, name, mode.bare_preamble(), &sections, Some(self.sender)),
