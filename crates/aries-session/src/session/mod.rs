@@ -153,7 +153,7 @@ impl Session {
         config: ModelConfig,
         setting: Setting,
         db: Db,
-        _external_mcp_config: McpDefinition,
+        external_mcp_config: McpDefinition,
         source: SessionStartSource,
         args: SessionArgs,
     ) -> anyhow::Result<Self> {
@@ -168,8 +168,9 @@ impl Session {
 
         let lsp_client = Self::warm_up_lsp(cwd).await;
 
-        let extensions =
+        let mut extensions =
             if args.bare { AgentExtensions::empty() } else { AgentExtensions::new(cwd).await };
+        extensions.mcps.push(external_mcp_config);
         let (mcp_clients, mcp_tools) = mcp::connect(&extensions.mcps).await;
 
         let mem_store = MemoryStore::new(&gctx.memory_dir).await;
