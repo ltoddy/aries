@@ -1,11 +1,10 @@
 use aries_session::Session;
+use colored::Colorize;
 
-use crate::theme::Theme;
-
-pub async fn execute(session: &mut Session, theme: &Theme) {
+pub async fn execute(session: &mut Session) {
     if session.compact().await {
-        println!("{}", theme.green_text("对话压缩成功。"))
+        println!("{}", "对话压缩成功。".green())
     } else {
-        eprintln!("{}", theme.red_text("没有可压缩的内容。"))
+        eprintln!("{}", "没有可压缩的内容。".red())
     }
 }

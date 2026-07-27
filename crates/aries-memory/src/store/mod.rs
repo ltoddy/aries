@@ -29,6 +29,7 @@ impl MemoryStore {
         frontmatter: MemoryFrontmatter,
         body: impl Into<String>,
     ) -> Result<(), aries_filesystem::document::DocumentError> {
+        _ = tokio::fs::create_dir_all(&self.dir).await;
         let filename = to_filename(&frontmatter.name);
         let file_path = self.dir.join(&filename);
 

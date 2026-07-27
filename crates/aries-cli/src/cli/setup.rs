@@ -1,22 +1,16 @@
 use aries_init::{GlobalContext, ModelConfig, Provider, Setting, SettingLoader};
+use colored::Colorize;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input, Select};
 
-use crate::theme::Theme;
-
 pub async fn execute(gctx: GlobalContext) -> anyhow::Result<()> {
-    let theme = Theme::default();
-
     let setting = setup()?;
     let loader = SettingLoader::new(gctx.root_dir);
     loader.save(&setting).await?;
 
     let file_path = loader.file_path();
 
-    println!(
-        "{}",
-        theme.green_text(&format!("Configuration saved successfully to {}", file_path.display()))
-    );
+    println!("{}", format!("Configuration saved successfully to {}", file_path.display()).green());
     Ok(())
 }
 

@@ -1,13 +1,12 @@
 use std::process::Stdio;
 
+use colored::Colorize;
 use tokio::process::Command;
 
-use crate::theme::Theme;
-
-pub async fn execute(command: &str, theme: &Theme) {
+pub async fn execute(command: &str) {
     let command = command.trim();
     if command.is_empty() {
-        eprintln!("{}", theme.red_text("No command provided after /shell"));
+        eprintln!("{}", "No command provided after /shell".red());
         return;
     }
 
@@ -23,11 +22,11 @@ pub async fn execute(command: &str, theme: &Theme) {
     {
         Ok(status) => {
             if !status.success() {
-                eprintln!("{}", theme.red_text(&format!("Command failed with status: {}", status)));
+                eprintln!("{}", format!("Command failed with status: {}", status).red());
             }
         },
         Err(e) => {
-            eprintln!("{}", theme.red_text(&format!("Failed to execute command: {}", e)));
+            eprintln!("{}", format!("Failed to execute command: {}", e).red());
         },
     }
 }

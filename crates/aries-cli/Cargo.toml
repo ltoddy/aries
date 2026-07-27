@@ -12,7 +12,6 @@ path = "src/main.rs"
 agent-client-protocol.workspace = true
 anyhow.workspace = true
 aries-acp = { path = "../aries-acp" }
-aries-agent = { path = "../aries-agent" }
 aries-event = { path = "../aries-event" }
 aries-extension = { path = "../aries-extension" }
 aries-init = { path = "../aries-init" }
@@ -23,7 +22,6 @@ aries-tokenopt = { path = "../aries-tokenopt" }
 aries-tools = { path = "../aries-tools" }
 clap = { workspace = true, features = ["derive"] }
 colored.workspace = true
-dark-light.workspace = true
 dialoguer.workspace = true
 ferris-says.workspace = true
 futures.workspace = true

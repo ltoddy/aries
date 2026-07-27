@@ -1,7 +1,6 @@
 use aries_session::Session;
 use clap::{CommandFactory, Parser, Subcommand};
-
-use crate::theme::Theme;
+use colored::Colorize;
 
 pub mod compact;
 pub mod completer;
@@ -45,7 +44,7 @@ impl Command {
     }
 }
 
-pub async fn execute(input: &str, theme: &Theme, session: &mut Session) {
+pub async fn execute(input: &str, session: &mut Session) {
     let input = input.strip_prefix('/').unwrap_or(input);
     let mut args = vec![String::from(env!("CARGO_BIN_NAME"))];
 
@@ -73,14 +72,14 @@ pub async fn execute(input: &str, theme: &Theme, session: &mut Session) {
         Command::Exit => exit::exit(&session.id()),
         Command::Shell { command } => {
             let cmd = command.join(" ");
-            shell::execute(&cmd, theme).await;
+            shell::execute(&cmd).await;
         },
         Command::ClearContext => {
             session.clear_context().await;
-            println!("{}", theme.green_text("Chat context cleared."));
+            println!("{}", "Chat context cleared.".green());
         },
         Command::Compact => {
-            compact::execute(session, theme).await;
+            compact::execute(session).await;
         },
         Command::SystemPrompt => {
             println!("{}", session.system_prompt());

@@ -26,6 +26,9 @@ impl RetryableStrategy for RetryStrategy {
         if status == StatusCode::TOO_MANY_REQUESTS {
             return Some(Retryable::Transient);
         }
+        if status.is_server_error() {
+            return Some(Retryable::Transient);
+        }
         None
     }
 }

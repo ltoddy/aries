@@ -7,10 +7,10 @@ use aries_init::{GlobalContext, SettingLoader};
 use aries_session::SessionRegistry;
 use aries_session::session::SessionArgs;
 use clap::Parser;
+use colored::Colorize;
 use tracing::info_span;
 
 use crate::display::print_agent_event;
-use crate::theme::Theme;
 
 #[derive(Parser, Debug, Clone)]
 #[command(about = "Send a one-shot prompt to the AI")]
@@ -39,15 +39,13 @@ pub async fn execute(args: PromptArgs, gctx: GlobalContext) -> anyhow::Result<()
     let session_id = session.id();
     let _session_span = info_span!("session", session_id = %session_id).entered();
 
-    let theme = Theme::default();
-
-    print!("\n{}: ", theme.magenta_text("Aries"));
+    print!("\n{}: ", "Aries".magenta());
 
     let tool_names: Arc<Mutex<HashMap<String, String>>> = Arc::new(Mutex::new(HashMap::new()));
     let callback = async |event: AgentEvent| {
         let tool_names = tool_names.clone();
         if let Ok(mut map) = tool_names.lock() {
-            print_agent_event(event, theme, &mut map);
+            print_agent_event(event, &mut map);
         }
     };
     session.prompt(&args.prompt, callback).await?;

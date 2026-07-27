@@ -6,12 +6,12 @@ use aries_extension::mcp::McpDefinition;
 use aries_init::{GlobalContext, SettingLoader};
 use aries_session::SessionRegistry;
 use clap::Parser;
+use colored::Colorize;
 use rustyline::error::ReadlineError;
 use tracing::info_span;
 
 use super::display_elapsed;
 use crate::display::print_agent_event;
-use crate::theme::Theme;
 use crate::{commands, input, welcome};
 
 #[derive(Clone, Debug, Parser)]
@@ -45,7 +45,6 @@ pub async fn execute(args: ResumeSessionsArgs, gctx: GlobalContext) -> anyhow::R
     );
 
     loop {
-        let theme = Theme::default();
         let readline = reader.readline(format!("{} › ", gctx.user).as_str());
         match readline {
             Ok(line) => {
@@ -55,11 +54,11 @@ pub async fn execute(args: ResumeSessionsArgs, gctx: GlobalContext) -> anyhow::R
                 }
 
                 if input.starts_with('/') {
-                    commands::execute(input, &theme, &mut session).await;
+                    commands::execute(input, &mut session).await;
                     continue;
                 }
 
-                print!("\n{}: ", theme.magenta_text("Aries"));
+                print!("\n{}: ", "Aries".magenta());
                 let start = Instant::now();
                 let tool_names: Arc<Mutex<HashMap<String, String>>> =
                     Arc::new(Mutex::new(HashMap::new()));
@@ -67,16 +66,16 @@ pub async fn execute(args: ResumeSessionsArgs, gctx: GlobalContext) -> anyhow::R
                 let callback = async |event| {
                     let tool_names = tool_names.clone();
                     if let Ok(mut map) = tool_names.lock() {
-                        print_agent_event(event, theme, &mut map);
+                        print_agent_event(event, &mut map);
                     }
                 };
 
                 if let Err(err) = session.prompt(input, callback).await {
-                    eprintln!("\n{}: {}", theme.red_text("Error"), err);
+                    eprintln!("\n{}: {}", "Error".red(), err);
                     continue;
                 }
 
-                display_elapsed(start, &theme);
+                display_elapsed(start);
             },
             Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
                 commands::exit::exit(&session.id())

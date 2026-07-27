@@ -6,12 +6,12 @@ pub mod run;
 use std::time::Instant;
 
 use clap::Subcommand;
+use colored::Colorize;
 use terminal_size::{Width, terminal_size};
 
 use self::list::ListSessionsArgs;
 use self::prune::PruneSessionsArgs;
 use self::resume::ResumeSessionsArgs;
-use crate::theme::Theme;
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum SessionCommand {
@@ -23,7 +23,7 @@ pub enum SessionCommand {
     Resume(ResumeSessionsArgs),
 }
 
-fn display_elapsed(start: Instant, theme: &Theme) {
+fn display_elapsed(start: Instant) {
     let elapsed = start.elapsed();
     let terminal_width = terminal_size().map(|(Width(w), _)| w as usize).unwrap_or(80);
 
@@ -31,5 +31,5 @@ fn display_elapsed(start: Instant, theme: &Theme) {
     let time = format!("⏱️  耗时: {:.2}s", elapsed.as_secs_f64());
     let remining_width = terminal_width.saturating_sub(prefix.len() + time.len());
     let line = format!("{}{}{}", "─".repeat(5), time, "─".repeat(remining_width));
-    println!("{}\n", theme.dimmed(&line));
+    println!("{}\n", line.dimmed());
 }

@@ -95,7 +95,6 @@ impl Session {
         let id = id.into();
         let cwd = cwd.as_ref();
         let session_dir = gctx.root_dir.join(format!("session-{id}"));
-        _ = tokio::fs::create_dir_all(&session_dir).await;
 
         let session_config = SessionConfig::new(args.bare);
         session_config.save(&session_dir).await;
@@ -127,7 +126,6 @@ impl Session {
         let id = id.into();
         let cwd = cwd.as_ref();
         let session_dir = gctx.root_dir.join(format!("session-{id}"));
-        _ = tokio::fs::create_dir_all(&session_dir).await;
 
         let session_config = SessionConfig::load(&session_dir).await;
 
@@ -161,8 +159,6 @@ impl Session {
         let cwd = cwd.as_ref();
         let session_dir = gctx.root_dir.join(format!("session-{id}"));
         let transcripts_dir = session_dir.join("transcripts");
-
-        let _ = tokio::fs::create_dir_all(&transcripts_dir).await;
 
         aries_logger::register(&id, &session_dir);
 

@@ -3,7 +3,6 @@ mod commands;
 mod display;
 mod input;
 mod text;
-mod theme;
 mod welcome;
 
 use aries_init::GlobalContext;

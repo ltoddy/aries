@@ -158,11 +158,14 @@ impl Setting {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case")]
 pub enum ModelConfig {
+    #[serde(rename = "anthropic")]
     Anthropic(Anthropic),
+    #[serde(rename = "azure")]
     Azure(Azure),
+    #[serde(rename = "deepseek")]
     Deepseek(Deepseek),
+    #[serde(rename = "openai")]
     OpenAI(OpenAI),
 }
 

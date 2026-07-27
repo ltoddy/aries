@@ -23,18 +23,14 @@ use aries_tools::{
     agent, bash, batch, codesearch, edit, glob, grep, ls, lsp, multiedit, question, read, skill,
     update_plan, webfetch, websearch, write,
 };
+use colored::Colorize;
 use rig_core::agent::MultiTurnStreamItem;
 use rig_core::message::ToolResultContent;
 use rig_core::streaming::{StreamedAssistantContent, StreamedUserContent};
 
 use crate::text;
-use crate::theme::Theme;
 
-pub fn print_agent_event(
-    event: AgentEvent,
-    theme: Theme,
-    tool_names: &mut HashMap<String, String>,
-) {
+pub fn print_agent_event(event: AgentEvent, tool_names: &mut HashMap<String, String>) {
     match event.stream_item {
         MultiTurnStreamItem::StreamAssistantItem(content) => match content {
             StreamedAssistantContent::Text(text) => {
@@ -47,9 +43,8 @@ pub fn print_agent_event(
                 tool_names.insert(internal_call_id, tool_call.function.name.clone());
 
                 let args = tool_call.function.arguments.to_string();
-                let (call_str, rest) =
-                    format_tool_call_args(&tool_call.function.name, &args, &theme);
-                println!("\n{} {}", theme.cyan_text("•"), call_str);
+                let (call_str, rest) = format_tool_call_args(&tool_call.function.name, &args);
+                println!("\n{} {}", "•".cyan(), call_str);
                 if let Some(rest) = rest {
                     println!("{}", rest);
                 }
@@ -70,11 +65,11 @@ pub fn print_agent_event(
                 })
                 .collect::<Vec<_>>()
                 .join("\n");
-            let formatted = format_tool_result_output(&tool_name, &raw, theme);
+            let formatted = format_tool_result_output(&tool_name, &raw);
             println!("{formatted}");
         },
         MultiTurnStreamItem::FinalResponse(res) if event.main => {
-            display_token_usage(&res.usage(), &theme);
+            display_token_usage(&res.usage());
         },
         MultiTurnStreamItem::ToolExecutionStart { .. } => {},
         MultiTurnStreamItem::CompletionCall(_) => {},
@@ -83,13 +78,9 @@ pub fn print_agent_event(
     }
 }
 
-pub fn format_tool_call_args(
-    tool_name: &str,
-    args: &str,
-    theme: &Theme,
-) -> (String, Option<String>) {
+pub fn format_tool_call_args(tool_name: &str, args: &str) -> (String, Option<String>) {
     if !aries_tools::is_builtin_tool(tool_name) {
-        return format_unknown_call(tool_name, args, theme);
+        return format_unknown_call(tool_name, args);
     }
 
     let result = match tool_name {
@@ -115,35 +106,32 @@ pub fn format_tool_call_args(
 
     let (first, rest) = result.unwrap_or_else(|_| (args.to_string(), None));
 
-    (format!("{} {}", theme.cyan_text(tool_name), theme.yellow_text(&first)), rest)
+    (format!("{} {}", tool_name.cyan(), first.yellow()), rest)
 }
 
-pub fn format_tool_result_output(tool_name: &str, result: &str, theme: Theme) -> String {
+pub fn format_tool_result_output(tool_name: &str, result: &str) -> String {
     let output = aries_tools::tools::format_tool_output(tool_name, result);
     let output = if output.is_empty() { "No output".to_string() } else { output };
 
     let _ = tool_name;
-    theme.dimmed(&text::preview(output)).to_string()
+    text::preview(output).dimmed().to_string()
 }
 
-pub fn display_token_usage(usage: &rig_core::completion::Usage, theme: &Theme) {
+pub fn display_token_usage(usage: &rig_core::completion::Usage) {
     println!(
         "\n\n{} total={} input={} (cached={}) output={}",
-        theme.dimmed("Token usage:"),
-        theme.dimmed(&usage.total_tokens.to_string()),
-        theme.dimmed(&usage.input_tokens.to_string()),
-        theme.dimmed(&usage.cached_input_tokens.to_string()),
-        theme.dimmed(&usage.output_tokens.to_string())
+        "Token usage:".dimmed(),
+        usage.total_tokens.to_string().dimmed(),
+        usage.input_tokens.to_string().dimmed(),
+        usage.cached_input_tokens.to_string().dimmed(),
+        usage.output_tokens.to_string().dimmed()
     );
 }
 
-pub fn format_unknown_call(tool_name: &str, args: &str, theme: &Theme) -> (String, Option<String>) {
+pub fn format_unknown_call(tool_name: &str, args: &str) -> (String, Option<String>) {
     let args_str = serde_json::from_str::<serde_json::Value>(args)
         .and_then(|value| serde_json::to_string_pretty(&value))
         .unwrap_or_else(|_| args.to_string());
 
-    (
-        format!("{} {}", theme.cyan_text(tool_name), theme.yellow_text("(unknown tool)")),
-        Some(args_str),
-    )
+    (format!("{} {}", tool_name.cyan(), "(unknown tool)".yellow()), Some(args_str))
 }
