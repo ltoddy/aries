@@ -12,7 +12,7 @@ use crate::write::WriteKind;
 /// 写入文件并在共享 ctx 中登记一次完整读取，模拟“先 Read 后 MultiEdit”。
 async fn seed_file(ctx: &ToolContext, path: &std::path::Path, content: &str) {
     fs::write(path, content).unwrap();
-    ctx.on_file_read(path, false).await;
+    ctx.on_file_read(path).await;
 }
 
 #[tokio::test]

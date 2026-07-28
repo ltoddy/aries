@@ -78,12 +78,10 @@ impl Tool for ReadTool {
             return Err(ReadError::is_a_directory(file_path));
         }
 
-        let is_partial = args.offset.is_some() || args.limit.is_some();
-
         let file = fs::File::open(&file_path).await?;
         let metadata = file.metadata().await?;
         if metadata.len() == 0 {
-            self.ctx.on_file_read(&file_path, is_partial).await;
+            self.ctx.on_file_read(&file_path).await;
             return Ok(ReadOutput { content: EMPTY_FILE_NOTICE.to_owned() });
         }
 
@@ -108,7 +106,7 @@ impl Tool for ReadTool {
         }
 
         let content = content_lines.join("\n");
-        self.ctx.on_file_read(&file_path, is_partial).await;
+        self.ctx.on_file_read(&file_path).await;
 
         Ok(ReadOutput { content })
     }

@@ -3,6 +3,7 @@ use rig_core::completion::CompletionModel;
 use rig_core::extractor::Extractor;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 
 use crate::MemoryType;
 
@@ -48,7 +49,10 @@ impl<M: CompletionModel> MemoryExtractor<M> {
 
         match self.inner.extract(&prompt).await {
             Ok(result) => result.memories,
-            Err(_) => Vec::new(),
+            Err(e) => {
+                warn!("failed to extract memories: {e}");
+                Vec::new()
+            },
         }
     }
 }

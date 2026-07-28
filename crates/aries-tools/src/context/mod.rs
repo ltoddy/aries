@@ -37,7 +37,7 @@ impl ToolContext {
         Self { lsp_client, file_checkpoint, read_state }
     }
 
-    pub async fn on_file_read(&self, file_path: impl AsRef<Path>, is_partial: bool) {
+    pub async fn on_file_read(&self, file_path: impl AsRef<Path>) {
         let file_path = file_path.as_ref();
 
         let Some(modified) = Self::modified_at(file_path).await else { return };
@@ -45,7 +45,7 @@ impl ToolContext {
         let file_path =
             fs::canonicalize(file_path).await.unwrap_or_else(|_| file_path.to_path_buf());
 
-        self.read_state.record(file_path, modified, is_partial);
+        self.read_state.record(file_path, modified);
     }
 
     pub async fn guard_write(&self, file_path: impl AsRef<Path>) -> Result<(), GuardWriteError> {
@@ -56,9 +56,6 @@ impl ToolContext {
         let Some(record) = self.read_state.get(&file_path) else {
             return Err(GuardWriteError::NotRead);
         };
-        if record.is_partial {
-            return Err(GuardWriteError::NotRead);
-        }
 
         if let Some(current) = Self::modified_at(file_path).await
             && current > record.timestamp_millis
@@ -77,7 +74,7 @@ impl ToolContext {
             let _ = client.did_save(file_path, &content).await;
         }
 
-        self.on_file_read(file_path, false).await;
+        self.on_file_read(file_path).await;
     }
 
     async fn modified_at(file_path: impl AsRef<Path>) -> Option<u128> {

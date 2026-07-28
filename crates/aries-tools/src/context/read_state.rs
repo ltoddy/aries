@@ -7,7 +7,12 @@ use parking_lot::Mutex;
 #[derive(Clone, Copy, Debug)]
 pub struct ReadRecord {
     pub timestamp_millis: u128,
-    pub is_partial: bool,
+}
+
+impl ReadRecord {
+    pub fn new(timestamp_millis: u128) -> Self {
+        Self { timestamp_millis }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -24,11 +29,11 @@ impl SharedReadState {
         Self(Arc::new(Mutex::new(HashMap::with_capacity(32))))
     }
 
-    pub fn record(&self, file_path: impl Into<PathBuf>, timestamp_millis: u128, is_partial: bool) {
+    pub fn record(&self, file_path: impl Into<PathBuf>, timestamp_millis: u128) {
         let file_path = file_path.into();
 
         let mut guard = self.0.lock();
-        guard.insert(file_path, ReadRecord { timestamp_millis, is_partial });
+        guard.insert(file_path, ReadRecord::new(timestamp_millis));
     }
 
     pub fn get(&self, file_path: impl AsRef<Path>) -> Option<ReadRecord> {
