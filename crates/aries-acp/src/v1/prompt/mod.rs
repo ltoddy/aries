@@ -11,12 +11,13 @@ use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
 use aries_event::AgentEvent;
 use parking_lot::Mutex;
 use rig_core::message::ToolCall;
-use tracing::{info, info_span};
+use tracing::{info, instrument};
 
 use self::message::UserMessage;
 use self::session_update::SessionUpdates;
 use super::SharedRegistry;
 
+#[instrument(name = "acp.prompt", skip_all, fields(session_id = %req.session_id))]
 pub async fn prompt(
     req: PromptRequest,
     responder: Responder<PromptResponse>,
@@ -44,9 +45,6 @@ pub async fn prompt(
             let _ = cx.send_notification(SessionNotification::new(session_id.clone(), u));
         });
     };
-
-    let span = info_span!("prompt", session_id = %session_id);
-    let _enter = span.enter();
 
     match session.prompt(prompt, callback).await {
         Ok(_) => {

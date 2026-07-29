@@ -13,7 +13,7 @@ use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
 use aries_init::Setting;
 use aries_mode::Mode;
 use aries_session::session::SessionArgs;
-use tracing::info;
+use tracing::{info, instrument};
 
 use super::SharedRegistry;
 use crate::v1::mcp::McpServers;
@@ -43,6 +43,7 @@ pub async fn new_session(
     responder.respond(resp)
 }
 
+#[instrument(name = "acp.load_session", skip_all, fields(session_id = %req.session_id))]
 pub async fn load_session(
     req: LoadSessionRequest,
     responder: Responder<LoadSessionResponse>,
@@ -94,6 +95,7 @@ pub async fn list_session(
     responder.respond(resp)
 }
 
+#[instrument(name = "acp.close_session", skip_all, fields(session_id = %req.session_id))]
 pub async fn close_session(
     req: CloseSessionRequest,
     responder: Responder<CloseSessionResponse>,
@@ -110,6 +112,7 @@ pub async fn close_session(
     responder.respond(resp)
 }
 
+#[instrument(name = "acp.delete_session", skip_all, fields(session_id = %req.session_id))]
 pub async fn delete_session(
     req: DeleteSessionRequest,
     responder: Responder<DeleteSessionResponse>,
@@ -128,6 +131,7 @@ pub async fn delete_session(
     responder.respond(resp)
 }
 
+#[instrument(name = "acp.set_session_config_option", skip_all, fields(session_id = %req.session_id))]
 pub async fn set_session_config_option(
     req: SetSessionConfigOptionRequest,
     responder: Responder<SetSessionConfigOptionResponse>,

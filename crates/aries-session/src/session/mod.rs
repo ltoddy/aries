@@ -261,6 +261,7 @@ impl Session {
         Ok(())
     }
 
+    #[tracing::instrument(name = "prompt", skip_all, fields(session_id = %self.id))]
     pub async fn prompt<F, Fut>(
         &mut self,
         prompt: impl Into<Message>,
@@ -393,6 +394,18 @@ impl Session {
         Ok(())
     }
 
+    pub fn sift(&self, query: impl Into<String>, reply: impl Into<String>) {
+        let client = self.client.clone();
+        let model = self.config.model();
+        let memory_store = self.memory_store.clone();
+        let query = query.into();
+        let reply = reply.into();
+        tokio::spawn(async move {
+            client.extract_memories(&model, query, reply, &memory_store).await;
+        });
+    }
+
+    #[tracing::instrument(name = "compact", skip_all, fields(session_id = %self.id))]
     pub async fn compact(&mut self) -> bool {
         match self.compact_breaker.decide() {
             Decision::Skip { wait, consecutive_failures } => {
