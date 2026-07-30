@@ -52,7 +52,8 @@ where
     pub async fn write(&self) -> Result<(), DocumentError> {
         let frontmatter =
             serde_yaml::to_string(&self.frontmatter).map_err(DocumentError::yaml_serialize)?;
-        let content = format!("{}\n{}", frontmatter, self.body);
+
+        let content = [DELIMITER, &frontmatter, DELIMITER, &self.body].join("\n");
         tokio::fs::write(&self.location, content)
             .await
             .map_err(|err| DocumentError::io(&self.location, err))?;

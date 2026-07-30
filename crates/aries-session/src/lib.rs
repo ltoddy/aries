@@ -22,7 +22,6 @@ use rig_core::providers::{anthropic, azure, deepseek, openai};
 use rig_core::tool::ToolDyn;
 use rig_core::wasm_compat::WasmCompatSend;
 use tokio::sync::mpsc::UnboundedReceiver;
-use tracing::{info, warn};
 
 use crate::middleware::RetryStrategy;
 pub use crate::registry::SessionRegistry;
@@ -169,13 +168,9 @@ impl AriesClient {
             let ExtractedMemory { name, description, memory_type, body } = mem;
 
             let frontmatter = MemoryFrontmatter::new(&name, &description, memory_type);
-            match store.write_memory(frontmatter, body).await {
-                Ok(_) => {
-                    let entry = ManifestEntry::new(format!("{name}.md"), description.clone());
-                    let _ = store.append_to_manifest(entry).await;
-                    info!("memory saved: {name} (type: {memory_type:?})");
-                },
-                Err(e) => warn!("failed to write memory {name}: {e}"),
+            if store.write_memory(frontmatter, body).await.is_ok() {
+                let entry = ManifestEntry::new(format!("{name}.md"), description.clone());
+                let _ = store.append_to_manifest(entry).await;
             }
         }
     }
