@@ -5,7 +5,7 @@ mod output;
 #[cfg(test)]
 mod tests;
 
-use rig_core::tool::Tool;
+use rig_agent::tool::{Tool, ToolContext};
 use serde_json::Value;
 
 pub use self::args::UpdatePlanArgs;
@@ -62,7 +62,11 @@ impl Tool for UpdatePlanTool {
         })
     }
 
-    async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
+    async fn call(
+        &self,
+        _context: &mut ToolContext,
+        args: Self::Args,
+    ) -> Result<Self::Output, Self::Error> {
         if args.items.iter().any(|v| v.content.trim().is_empty()) {
             return Err(UpdatePlanError::EmptyContent);
         }

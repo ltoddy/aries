@@ -5,10 +5,9 @@ use anyhow::Context;
 use aries_agent::AriesAgent;
 use aries_filesystem::jsonl;
 use regex_lite::Regex;
-use rig_core::client::CompletionClient;
-use rig_core::completion::Message;
-use rig_core::message::{AssistantContent, ReasoningContent, UserContent};
-use rig_core::{completion, message};
+use rig_agent::client::AgentClientExt;
+use rig_agent::completion::{self, Message};
+use rig_core::message::{self, AssistantContent, ReasoningContent, UserContent};
 use tracing::info;
 
 const PREAMBLE: &str = include_str!("preamble.md");
@@ -44,7 +43,7 @@ where
 
     pub fn new<C>(c: C, model: impl Into<String>, transcript_path: impl AsRef<Path>) -> Self
     where
-        C: CompletionClient<CompletionModel = M> + 'static,
+        C: AgentClientExt<CompletionModel = M> + 'static,
     {
         let transcript_path = transcript_path.as_ref().to_path_buf();
 

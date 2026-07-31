@@ -107,6 +107,7 @@ impl TokenEstimator for ToolResultContent {
         match self {
             ToolResultContent::Text(t) => t.text.estimate_tokens(),
             ToolResultContent::Image(_) => IMAGE_MAX_TOKEN_SIZE,
+            ToolResultContent::Json { value } => value.to_string().estimate_tokens(),
         }
     }
 }

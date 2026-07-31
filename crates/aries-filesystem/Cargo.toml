@@ -6,10 +6,10 @@ edition = "2024"
 [dependencies]
 fs4 = { workspace = true, features = ["tokio"] }
 ignore.workspace = true
-itertools.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["fs", "rt-multi-thread", "macros"] }
+tracing.workspace = true
 url.workspace = true

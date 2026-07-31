@@ -27,11 +27,12 @@ use aries_memory::MemoryStore;
 use aries_mode::Mode;
 use aries_persistence::SessionRepository;
 use futures::pin_mut;
-use rig_core::agent::PromptResponse;
+use rig_agent::agent::PromptResponse;
+use rig_agent::tool::rmcp::McpClientHandler;
+use rig_agent::tool::server::ToolServer;
 use rig_core::completion::Message;
 use rig_core::message::UserContent;
 use rmcp::RoleClient;
-use rmcp::model::ClientInfo;
 use rmcp::service::RunningService;
 use toasty::Db;
 use tokio::sync::Mutex;
@@ -74,7 +75,7 @@ pub struct Session {
     hooks_executor: Arc<HooksExecutor>,
     memory_store: MemoryStore,
 
-    mcp_clients: Arc<Vec<RunningService<RoleClient, ClientInfo>>>,
+    mcp_clients: Arc<Vec<RunningService<RoleClient, McpClientHandler>>>,
     extensions: AgentExtensions,
 
     last_assistant_message: Option<String>,
@@ -167,7 +168,8 @@ impl Session {
         let mut extensions =
             if args.bare { AgentExtensions::empty() } else { AgentExtensions::new(cwd).await };
         extensions.mcps.push(external_mcp_config);
-        let (mcp_clients, mcp_tools) = mcp::connect(&extensions.mcps).await;
+        let tool_server_handle = ToolServer::new().run();
+        let mcp_services = mcp::connect(&extensions.mcps, tool_server_handle.clone()).await;
 
         let mem_store = MemoryStore::new(&gctx.memory_dir).await;
 
@@ -186,7 +188,7 @@ impl Session {
                 gctx,
                 lsp_client.clone(),
                 extensions.clone(),
-                mcp_tools,
+                tool_server_handle,
             )
             .await?;
 
@@ -215,7 +217,7 @@ impl Session {
             compact_breaker: AutoCompactBreaker::new(),
             hooks_executor,
             memory_store: mem_store,
-            mcp_clients: Arc::new(mcp_clients),
+            mcp_clients: Arc::new(mcp_services),
             extensions,
             last_assistant_message: None,
         })
@@ -293,10 +295,10 @@ impl Session {
 
         if estimate_tokens >= compact_threshold {
             let text = format!(
-                "\n预估 tokens {estimate_tokens} 已达阈值 {compact_threshold}（上下文窗口 {}），提前触发压缩...",
+                "\n预估 tokens {estimate_tokens} 已达阈值 {compact_threshold}（上下文窗口 {}），提前触发压缩...\n",
                 window.total
             );
-            info!("{text}");
+            info!(text);
             callback(AgentEvent::text(true, self.mode.name(), text)).await;
             self.compact().await;
         }
@@ -382,7 +384,7 @@ impl Session {
 
         if final_res.usage().total_tokens > compact_threshold {
             let text = format!(
-                "\n🔄 实际 tokens {} 已达阈值 {compact_threshold}，触发压缩...",
+                "\n🔄 实际 tokens {} 已达阈值 {compact_threshold}，触发压缩...\n",
                 final_res.usage().total_tokens,
             );
             info!(text);

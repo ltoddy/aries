@@ -9,7 +9,7 @@ futures.workspace = true
 http.workspace = true
 itertools.workspace = true
 regex-lite.workspace = true
-rig-core = { workspace = true, features = ["rmcp"] }
+rig-agent = { workspace = true, features = ["rmcp"] }
 rmcp = { workspace = true, features = ["client", "transport-child-process", "transport-streamable-http-client", "transport-streamable-http-client-reqwest"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true

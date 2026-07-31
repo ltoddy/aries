@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use rig_core::tool::Tool;
+use rig_agent::tool::Tool;
 use tempfile::TempDir;
 
 use super::*;
@@ -14,9 +14,13 @@ async fn test_write_new_file() {
     let tmp = TempDir::new().unwrap();
     let file_path = tmp.path().join("hello.txt");
 
+    let mut context = rig_agent::tool::ToolContext::new();
     let tool = WriteTool::new(tmp.path(), ToolContext::new(None));
     let result = tool
-        .call(WriteArgs { file_path: file_path.clone(), content: "Hello, world!".to_string() })
+        .call(
+            &mut context,
+            WriteArgs { file_path: file_path.clone(), content: "Hello, world!".to_string() },
+        )
         .await
         .unwrap();
 
@@ -33,9 +37,13 @@ async fn test_write_creates_parent_dirs() {
     let tmp = TempDir::new().unwrap();
 
     let file_path = tmp.path().join("a/b/c/output.txt");
+    let mut context = rig_agent::tool::ToolContext::new();
     let tool = WriteTool::new(tmp.path(), ToolContext::new(None));
     let result = tool
-        .call(WriteArgs { file_path: file_path.clone(), content: "nested content".to_string() })
+        .call(
+            &mut context,
+            WriteArgs { file_path: file_path.clone(), content: "nested content".to_string() },
+        )
         .await
         .unwrap();
 
@@ -52,12 +60,16 @@ async fn test_write_overwrites_existing_file() {
 
     let ctx = ToolContext::new(None);
 
+    let mut context = rig_agent::tool::ToolContext::new();
     let tool = WriteTool::new(tmp.path(), ctx);
     let result = tool
-        .call(WriteArgs {
-            file_path: file_path.clone(),
-            content: "line1\nCHANGED\nline3\n".to_string(),
-        })
+        .call(
+            &mut context,
+            WriteArgs {
+                file_path: file_path.clone(),
+                content: "line1\nCHANGED\nline3\n".to_string(),
+            },
+        )
         .await
         .unwrap();
 
@@ -73,9 +85,10 @@ async fn test_write_empty_content() {
     let tmp = TempDir::new().unwrap();
 
     let file_path = tmp.path().join("empty.txt");
+    let mut context = rig_agent::tool::ToolContext::new();
     let tool = WriteTool::new(tmp.path(), ToolContext::new(None));
     let result = tool
-        .call(WriteArgs { file_path: file_path.clone(), content: String::new() })
+        .call(&mut context, WriteArgs { file_path: file_path.clone(), content: String::new() })
         .await
         .unwrap();
 
@@ -87,12 +100,13 @@ async fn test_write_empty_content() {
 async fn test_write_resolves_relative_path_against_cwd() {
     let tmp = TempDir::new().unwrap();
 
+    let mut context = rig_agent::tool::ToolContext::new();
     let tool = WriteTool::new(tmp.path(), ToolContext::new(None));
     let result = tool
-        .call(WriteArgs {
-            file_path: PathBuf::from("sub/rel.txt"),
-            content: "relative".to_string(),
-        })
+        .call(
+            &mut context,
+            WriteArgs { file_path: PathBuf::from("sub/rel.txt"), content: "relative".to_string() },
+        )
         .await
         .unwrap();
 

@@ -3,7 +3,7 @@
 use std::fs;
 
 use aries_extension::skill::definition::{Frontmatter, SkillDefinition};
-use rig_core::tool::Tool;
+use rig_agent::tool::{Tool, ToolContext};
 use tempfile::TempDir;
 
 use super::*;
@@ -37,9 +37,10 @@ fn make_skill(tmp: &TempDir, name: &str, allowed_tools: Option<Vec<String>>) -> 
 async fn test_call_loads_skill() {
     let tmp = TempDir::new().unwrap();
     let skill = make_skill(&tmp, "commit", None);
+    let mut context = ToolContext::new();
     let tool = SkillTool::new(vec![skill]);
 
-    let output = tool.call(SkillArgs { name: "commit".to_owned() }).await.unwrap();
+    let output = tool.call(&mut context, SkillArgs { name: "commit".to_owned() }).await.unwrap();
     assert_eq!(output.metadata.name, "commit");
     assert!(output.output.contains("<skill_content name=\"commit\">"));
     assert!(output.output.contains("# Skill: commit"));
@@ -49,9 +50,10 @@ async fn test_call_loads_skill() {
 async fn test_call_rejects_unknown_skill() {
     let tmp = TempDir::new().unwrap();
     let skill = make_skill(&tmp, "commit", None);
+    let mut context = ToolContext::new();
     let tool = SkillTool::new(vec![skill]);
 
-    let err = tool.call(SkillArgs { name: "nope".to_owned() }).await.unwrap_err();
+    let err = tool.call(&mut context, SkillArgs { name: "nope".to_owned() }).await.unwrap_err();
     assert!(matches!(err, SkillError::NotAllowed { .. }));
 }
 
@@ -59,9 +61,10 @@ async fn test_call_rejects_unknown_skill() {
 async fn test_call_includes_allowed_tools() {
     let tmp = TempDir::new().unwrap();
     let skill = make_skill(&tmp, "review", Some(vec!["Read".to_owned(), "Grep".to_owned()]));
+    let mut context = ToolContext::new();
     let tool = SkillTool::new(vec![skill]);
 
-    let output = tool.call(SkillArgs { name: "review".to_owned() }).await.unwrap();
+    let output = tool.call(&mut context, SkillArgs { name: "review".to_owned() }).await.unwrap();
     assert!(output.output.contains("Allowed tools for this skill: Read, Grep"));
 }
 
@@ -69,8 +72,9 @@ async fn test_call_includes_allowed_tools() {
 async fn test_call_omits_allowed_tools_when_absent() {
     let tmp = TempDir::new().unwrap();
     let skill = make_skill(&tmp, "commit", None);
+    let mut context = ToolContext::new();
     let tool = SkillTool::new(vec![skill]);
 
-    let output = tool.call(SkillArgs { name: "commit".to_owned() }).await.unwrap();
+    let output = tool.call(&mut context, SkillArgs { name: "commit".to_owned() }).await.unwrap();
     assert!(!output.output.contains("Allowed tools for this skill"));
 }

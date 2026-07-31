@@ -1,10 +1,9 @@
 use aries_event::AgentEvent;
 use aries_mode::Mode;
 use futures::StreamExt;
-use rig_core::agent::{Agent, AgentHook, MultiTurnStreamItem, PromptResponse};
-use rig_core::completion::{CompletionModel, Message};
-use rig_core::streaming::StreamingPrompt;
-use rig_core::wasm_compat::WasmCompatSend;
+use rig_agent::agent::{Agent, AgentHook, MultiTurnStreamItem, PromptResponse};
+use rig_agent::completion::{CompletionModel, Message};
+use rig_agent::streaming::StreamingPrompt;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{AriesError, AriesResult};
@@ -43,14 +42,14 @@ where
 
     pub async fn prompt<I, T, P>(
         &mut self,
-        prompt: impl Into<Message> + WasmCompatSend,
+        prompt: impl Into<Message> + Send,
         history: I,
         hook: P,
     ) -> AriesResult<PromptResponse>
     where
         I: IntoIterator<Item = T>,
         T: Into<Message>,
-        P: AgentHook<M> + 'static,
+        P: AgentHook + 'static,
     {
         let stream = self.inner.stream_prompt(prompt).history(history).add_hook(hook).await;
         tokio::pin!(stream);
@@ -87,11 +86,12 @@ where
         }
 
         self.bare_preamble = bare_preamble.to_owned();
-        self.inner.preamble = Some(preamble);
+        // self.inner.preamble = Some(preamble);
     }
 
     pub fn system_prompt(&self) -> String {
-        let preamble = self.inner.preamble.clone();
-        preamble.unwrap_or_default()
+        // let preamble = self.inner.preamble.clone();
+        // preamble.unwrap_or_default()
+        String::new()
     }
 }

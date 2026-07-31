@@ -24,7 +24,7 @@ use aries_tools::{
     update_plan, webfetch, websearch, write,
 };
 use colored::Colorize;
-use rig_core::agent::MultiTurnStreamItem;
+use rig_agent::agent::MultiTurnStreamItem;
 use rig_core::message::ToolResultContent;
 use rig_core::streaming::{StreamedAssistantContent, StreamedUserContent};
 
@@ -71,9 +71,10 @@ pub fn print_agent_event(event: AgentEvent, tool_names: &mut HashMap<String, Str
         MultiTurnStreamItem::FinalResponse(res) if event.main => {
             display_token_usage(&res.usage());
         },
-        MultiTurnStreamItem::ToolExecutionStart { .. } => {},
         MultiTurnStreamItem::CompletionCall(_) => {},
         MultiTurnStreamItem::FinalResponse(_) => {},
+        MultiTurnStreamItem::ToolExecutionCommitted { .. } => {},
+        MultiTurnStreamItem::ModelTurnRetried { .. } => {},
         _ => {},
     }
 }

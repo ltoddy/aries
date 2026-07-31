@@ -7,7 +7,7 @@ mod tests;
 use std::path::{Path, PathBuf};
 
 use globset::{Glob, GlobSetBuilder};
-use rig_core::tool::Tool;
+use rig_agent::tool::{Tool, ToolContext};
 use serde_json::Value;
 use tokio::fs;
 
@@ -58,7 +58,11 @@ impl Tool for LsTool {
         })
     }
 
-    async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
+    async fn call(
+        &self,
+        _context: &mut ToolContext,
+        args: Self::Args,
+    ) -> Result<Self::Output, Self::Error> {
         let dir_path = match args.path {
             Some(p) => p,
             None => self.cwd.clone(),

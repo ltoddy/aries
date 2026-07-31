@@ -7,10 +7,11 @@ use aries_event::AgentEvent;
 use aries_extension::agent::AgentDefinition;
 use aries_mode::Mode;
 use futures::StreamExt;
-use rig_core::agent::{MultiTurnStreamItem, StreamingError};
-use rig_core::client::CompletionClient;
-use rig_core::streaming::StreamingPrompt;
-use rig_core::tool::Tool;
+use rig_agent::agent::{MultiTurnStreamItem, PromptResponse, StreamingError};
+use rig_agent::client::AgentClientExt;
+use rig_agent::streaming::StreamingPrompt;
+use rig_agent::tool::server::ToolServer;
+use rig_agent::tool::{Tool, ToolContext};
 use serde_json::Value;
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -26,7 +27,7 @@ const DESCRIPTION_TAIL: &str = include_str!("description-tail.md");
 
 pub struct AgentTool<C>
 where
-    C: CompletionClient,
+    C: AgentClientExt,
 {
     client: C,
     model: String,
@@ -37,7 +38,7 @@ where
 
 impl<C> AgentTool<C>
 where
-    C: CompletionClient,
+    C: AgentClientExt,
 {
     pub fn new(
         client: C,
@@ -61,7 +62,7 @@ where
 
 impl<C> Tool for AgentTool<C>
 where
-    C: CompletionClient + Clone + Send + Sync + 'static,
+    C: AgentClientExt + Clone + Send + Sync + 'static,
 {
     const NAME: &'static str = NAME;
     type Error = StreamingError;
@@ -114,7 +115,11 @@ where
         })
     }
 
-    async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
+    async fn call(
+        &self,
+        _context: &mut ToolContext,
+        args: Self::Args,
+    ) -> Result<Self::Output, Self::Error> {
         let (name, preamble, tools, model) = match self.find_agent(&args.mode) {
             Some(AgentDefinition { frontmatter, body, .. }) => {
                 let name = frontmatter.name.clone();
@@ -136,19 +141,22 @@ where
             },
         };
 
+        let tool_server_handle = ToolServer::new().run();
+        tool_server_handle.append_toolset(tools).await;
+
         let agent = self
             .client
             .agent(&model)
             .name(&name)
             .preamble(&preamble)
             .append_preamble(&aries_preamble::env::section(&self.cwd, &model))
-            .tools(tools)
+            .tool_server_handle(tool_server_handle)
             .default_max_turns(DEFAULT_MAX_TURNS)
             .build();
 
         let mut stream = agent.stream_prompt(args.prompt).await;
 
-        let mut final_res = rig_core::agent::PromptResponse::empty();
+        let mut final_res = PromptResponse::empty();
         while let Some(chunk) = stream.next().await {
             let chunk = chunk?;
             let event = AgentEvent::from_stream(false, &name, chunk.clone());

@@ -5,13 +5,13 @@ mod output;
 mod tests;
 
 use std::collections::BTreeSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use globset::GlobBuilder;
 use ignore::WalkBuilder;
 use regex_lite::RegexBuilder;
-use rig_core::tool::Tool;
+use rig_agent::tool::{Tool, ToolContext};
 use serde_json::Value;
 use tokio::fs;
 
@@ -26,7 +26,9 @@ pub struct GrepTool {
 }
 
 impl GrepTool {
-    pub fn new(cwd: PathBuf) -> Self {
+    pub fn new(cwd: impl AsRef<Path>) -> Self {
+        let cwd = cwd.as_ref().to_owned();
+
         Self { cwd }
     }
 }
@@ -87,7 +89,11 @@ impl Tool for GrepTool {
         })
     }
 
-    async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
+    async fn call(
+        &self,
+        _context: &mut ToolContext,
+        args: Self::Args,
+    ) -> Result<Self::Output, Self::Error> {
         let re =
             RegexBuilder::new(&args.pattern).case_insensitive(args.case_insensitive).build()?;
 

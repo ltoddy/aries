@@ -29,6 +29,7 @@ itertools.workspace = true
 jiff.workspace = true
 nanoid.workspace = true
 prettytable.workspace = true
+rig-agent.workspace = true
 rig-core.workspace = true
 rustyline.workspace = true
 rustyline-derive.workspace = true

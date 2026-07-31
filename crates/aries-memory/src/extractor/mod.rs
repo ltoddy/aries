@@ -1,6 +1,6 @@
-use rig_core::client::CompletionClient;
+use rig_agent::client::AgentClientExt;
+use rig_agent::extractor::Extractor;
 use rig_core::completion::CompletionModel;
-use rig_core::extractor::Extractor;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
@@ -30,7 +30,7 @@ pub struct MemoryExtractor<M: CompletionModel> {
 impl<M: CompletionModel> MemoryExtractor<M> {
     pub fn new<C>(client: C, model: impl Into<String>) -> Self
     where
-        C: CompletionClient<CompletionModel = M>,
+        C: AgentClientExt<CompletionModel = M>,
     {
         let inner = client.extractor::<ExtractedMemories>(model).preamble(PREAMBLE).build();
 

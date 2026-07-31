@@ -2,7 +2,7 @@
 
 use std::fs;
 
-use rig_core::tool::Tool;
+use rig_agent::tool::Tool;
 use tempfile::TempDir;
 
 use super::*;
@@ -22,23 +22,27 @@ async fn test_multiedit_basic() {
     let ctx = ToolContext::new(None);
     seed_file(&ctx, &file_path, "hello world").await;
 
+    let mut context = rig_agent::tool::ToolContext::new();
     let tool = MultiEditTool::new(dir.path(), ctx);
     let result = tool
-        .call(MultiEditArgs {
-            file_path: file_path.clone(),
-            edits: vec![
-                EditOperation {
-                    old_text: "hello".to_owned(),
-                    new_text: "hi".to_owned(),
-                    replace_all: false,
-                },
-                EditOperation {
-                    old_text: "world".to_owned(),
-                    new_text: "earth".to_owned(),
-                    replace_all: false,
-                },
-            ],
-        })
+        .call(
+            &mut context,
+            MultiEditArgs {
+                file_path: file_path.clone(),
+                edits: vec![
+                    EditOperation {
+                        old_text: "hello".to_owned(),
+                        new_text: "hi".to_owned(),
+                        replace_all: false,
+                    },
+                    EditOperation {
+                        old_text: "world".to_owned(),
+                        new_text: "earth".to_owned(),
+                        replace_all: false,
+                    },
+                ],
+            },
+        )
         .await
         .unwrap();
 
@@ -53,16 +57,20 @@ async fn test_multiedit_creates_file() {
     let dir = TempDir::new().unwrap();
     let file_path = dir.path().join("new_file.txt");
 
+    let mut context = rig_agent::tool::ToolContext::new();
     let tool = MultiEditTool::new(dir.path(), ToolContext::new(None));
     let result = tool
-        .call(MultiEditArgs {
-            file_path: file_path.clone(),
-            edits: vec![EditOperation {
-                old_text: String::new(),
-                new_text: "new content".to_owned(),
-                replace_all: false,
-            }],
-        })
+        .call(
+            &mut context,
+            MultiEditArgs {
+                file_path: file_path.clone(),
+                edits: vec![EditOperation {
+                    old_text: String::new(),
+                    new_text: "new content".to_owned(),
+                    replace_all: false,
+                }],
+            },
+        )
         .await
         .unwrap();
 
@@ -78,16 +86,20 @@ async fn test_multiedit_identical_text_error() {
     let ctx = ToolContext::new(None);
     seed_file(&ctx, &file_path, "hello").await;
 
+    let mut context = rig_agent::tool::ToolContext::new();
     let tool = MultiEditTool::new(dir.path(), ctx);
     let result = tool
-        .call(MultiEditArgs {
-            file_path,
-            edits: vec![EditOperation {
-                old_text: "hello".to_owned(),
-                new_text: "hello".to_owned(),
-                replace_all: false,
-            }],
-        })
+        .call(
+            &mut context,
+            MultiEditArgs {
+                file_path,
+                edits: vec![EditOperation {
+                    old_text: "hello".to_owned(),
+                    new_text: "hello".to_owned(),
+                    replace_all: false,
+                }],
+            },
+        )
         .await;
 
     assert!(matches!(result, Err(MultiEditError::IdenticalText)));
@@ -100,16 +112,20 @@ async fn test_multiedit_rejects_unread_file() {
     // 已存在但未经 Read：应被读后写校验拒绝。
     fs::write(&file_path, "hello world").unwrap();
 
+    let mut context = rig_agent::tool::ToolContext::new();
     let tool = MultiEditTool::new(dir.path(), ToolContext::new(None));
     let result = tool
-        .call(MultiEditArgs {
-            file_path,
-            edits: vec![EditOperation {
-                old_text: "hello".to_owned(),
-                new_text: "hi".to_owned(),
-                replace_all: false,
-            }],
-        })
+        .call(
+            &mut context,
+            MultiEditArgs {
+                file_path,
+                edits: vec![EditOperation {
+                    old_text: "hello".to_owned(),
+                    new_text: "hi".to_owned(),
+                    replace_all: false,
+                }],
+            },
+        )
         .await;
 
     assert!(matches!(result, Err(MultiEditError::Guard(_))));

@@ -13,7 +13,7 @@ use aries_tools::{
 };
 use itertools::Itertools;
 use parking_lot::Mutex;
-use rig_core::agent::MultiTurnStreamItem;
+use rig_agent::agent::MultiTurnStreamItem;
 use rig_core::message::{ReasoningContent, ToolCall, ToolFunction, ToolResultContent};
 use rig_core::streaming::{StreamedAssistantContent, StreamedUserContent};
 
@@ -26,10 +26,6 @@ impl SessionUpdates {
         match event.stream_item {
             MultiTurnStreamItem::StreamAssistantItem(v) => {
                 Self(Self::from_stream_assistant_content(v, tool_calls))
-            },
-            MultiTurnStreamItem::ToolExecutionStart { tool_call: _, internal_call_id: _ } => {
-                // TODO
-                Self(Vec::new())
             },
             MultiTurnStreamItem::StreamUserItem(v) => {
                 Self(Self::from_stream_user_content(v, tool_calls))
@@ -53,6 +49,14 @@ impl SessionUpdates {
                     SessionUpdate::UsageUpdate(UsageUpdate::new(usage.total_tokens, 0)),
                 ])
             },
+            MultiTurnStreamItem::ToolExecutionCommitted { .. } => {
+                // TODO
+                Self(Vec::new())
+            }
+            MultiTurnStreamItem::ModelTurnRetried { .. } => {
+                // TODO
+                Self(Vec::new())
+            }
             _ => Self(Vec::new()),
         }
     }

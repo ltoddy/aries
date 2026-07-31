@@ -2,7 +2,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use aries_filesystem::jsonl;
-use rig_core::completion::Message;
+use rig_agent::completion::Message;
 use tracing::error;
 
 #[derive(Debug, Clone)]

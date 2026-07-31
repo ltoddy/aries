@@ -2,7 +2,7 @@ mod args;
 mod error;
 mod output;
 
-use rig_core::tool::Tool;
+use rig_agent::tool::{Tool, ToolContext};
 use serde_json::Value;
 
 pub use self::args::WebFetchArgs;
@@ -53,7 +53,11 @@ impl Tool for WebFetchTool {
         })
     }
 
-    async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
+    async fn call(
+        &self,
+        _context: &mut ToolContext,
+        args: Self::Args,
+    ) -> Result<Self::Output, Self::Error> {
         let url = if args.url.starts_with("http://") {
             args.url.replace("http://", "https://")
         } else {

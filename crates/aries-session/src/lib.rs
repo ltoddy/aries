@@ -16,10 +16,10 @@ use aries_mode::Mode;
 use reqwest_middleware::ClientWithMiddleware;
 use reqwest_retry::RetryTransientMiddleware;
 use reqwest_retry::policies::ExponentialBackoff;
-use rig_core::agent::{AgentHook, PromptResponse};
+use rig_agent::agent::{AgentHook, PromptResponse};
+use rig_agent::tool::server::ToolServerHandle;
 use rig_core::completion::Message;
 use rig_core::providers::{anthropic, azure, deepseek, openai};
-use rig_core::tool::ToolDyn;
 use rig_core::wasm_compat::WasmCompatSend;
 use tokio::sync::mpsc::UnboundedReceiver;
 
@@ -91,7 +91,7 @@ impl AriesClient {
         gctx: GlobalContext,
         lsp_client: Option<SharedLspClient>,
         extensions: AgentExtensions,
-        mcp_tools: Vec<Box<dyn ToolDyn>>,
+        tool_server_handle: ToolServerHandle,
     ) -> anyhow::Result<(AriesAgent, UnboundedReceiver<AgentEvent>)> {
         let model = config.model();
         let cwd = cwd.as_ref().to_path_buf();
@@ -101,8 +101,7 @@ impl AriesClient {
                 let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx)
                     .with_lsp_client(lsp_client)
                     .with_extensions(extensions)
-                    .with_mcp_tools(mcp_tools)
-                    .build()
+                    .build(tool_server_handle)
                     .await;
                 Ok((AriesAgent::Anthropic(agent), receiver))
             },
@@ -110,8 +109,7 @@ impl AriesClient {
                 let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx)
                     .with_lsp_client(lsp_client)
                     .with_extensions(extensions)
-                    .with_mcp_tools(mcp_tools)
-                    .build()
+                    .build(tool_server_handle)
                     .await;
                 Ok((AriesAgent::Azure(agent), receiver))
             },
@@ -119,8 +117,7 @@ impl AriesClient {
                 let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx)
                     .with_lsp_client(lsp_client)
                     .with_extensions(extensions)
-                    .with_mcp_tools(mcp_tools)
-                    .build()
+                    .build(tool_server_handle)
                     .await;
                 Ok((AriesAgent::Deepseek(agent), receiver))
             },
@@ -128,8 +125,7 @@ impl AriesClient {
                 let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx)
                     .with_lsp_client(lsp_client)
                     .with_extensions(extensions)
-                    .with_mcp_tools(mcp_tools)
-                    .build()
+                    .build(tool_server_handle)
                     .await;
                 Ok((AriesAgent::OpenAI(agent), receiver))
             },
@@ -197,11 +193,7 @@ impl AriesAgent {
     where
         I: IntoIterator<Item = T>,
         T: Into<Message>,
-        P: AgentHook<anthropic::completion::CompletionModel<ClientWithMiddleware>>
-            + AgentHook<azure::CompletionModel<ClientWithMiddleware>>
-            + AgentHook<deepseek::CompletionModel<ClientWithMiddleware>>
-            + AgentHook<openai::CompletionModel<ClientWithMiddleware>>
-            + 'static,
+        P: AgentHook + 'static,
     {
         match self {
             AriesAgent::Anthropic(a) => a.prompt(prompt, history, hook).await,

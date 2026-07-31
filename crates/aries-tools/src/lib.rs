@@ -6,7 +6,7 @@ use std::path::Path;
 use aries_extension::skill::SkillDefinition;
 use aries_mode::Mode;
 use itertools::Itertools;
-use rig_core::tool::ToolDyn;
+use rig_agent::tool::ToolSet;
 pub use tools::*;
 
 pub const ALL_TOOL_NAMES: &[&str] = &[
@@ -38,7 +38,7 @@ pub fn create_tools_from_mode(
     cwd: impl AsRef<Path>,
     lsp_client: Option<aries_lspclient::SharedLspClient>,
     skills: &[SkillDefinition],
-) -> Vec<Box<dyn ToolDyn>> {
+) -> ToolSet {
     let tool_names = tool_names_from_mode(mode);
 
     create_tools_from_tool_names(&tool_names, cwd, lsp_client, skills)
@@ -79,45 +79,71 @@ pub fn create_tools_from_tool_names(
     cwd: impl AsRef<Path>,
     lsp_client: Option<aries_lspclient::SharedLspClient>,
     skills: &[SkillDefinition],
-) -> Vec<Box<dyn ToolDyn>> {
+) -> ToolSet {
     let cwd = cwd.as_ref();
     let tool_names = tool_names.iter().unique().collect_vec();
-    let mut tools = Vec::<Box<dyn ToolDyn>>::with_capacity(tool_names.len());
+    let mut tool_set = ToolSet::default();
 
     let ctx = context::ToolContext::new(lsp_client.clone());
 
     for &tool_name in tool_names {
         match tool_name {
-            bash::NAME => tools.push(Box::new(bash::BashTool::new(cwd))),
-            batch::NAME => tools.push(Box::new(batch::BatchTool::new(cwd, ctx.clone()))),
-            codesearch::NAME => tools.push(Box::new(codesearch::CodeSearchTool::new())),
-            edit::NAME => tools.push(Box::new(edit::EditTool::new(cwd, ctx.clone()))),
-            glob::NAME => tools.push(Box::new(glob::GlobTool::new(cwd))),
-            grep::NAME => tools.push(Box::new(grep::GrepTool::new(cwd.to_path_buf()))),
-            ls::NAME => tools.push(Box::new(ls::LsTool::new(cwd))),
+            bash::NAME => {
+                tool_set.add_tool(bash::BashTool::new(cwd));
+            },
+            batch::NAME => {
+                tool_set.add_tool(batch::BatchTool::new(cwd, ctx.clone()));
+            },
+            codesearch::NAME => {
+                tool_set.add_tool(codesearch::CodeSearchTool::new());
+            },
+            edit::NAME => {
+                tool_set.add_tool(edit::EditTool::new(cwd, ctx.clone()));
+            },
+            glob::NAME => {
+                tool_set.add_tool(glob::GlobTool::new(cwd));
+            },
+            grep::NAME => {
+                tool_set.add_tool(grep::GrepTool::new(cwd));
+            },
+            ls::NAME => {
+                tool_set.add_tool(ls::LsTool::new(cwd));
+            },
             lsp::NAME => {
                 if let Some(lsp_client) = lsp_client.clone() {
-                    tools.push(Box::new(lsp::LspTool::new(lsp_client, cwd)))
+                    tool_set.add_tool(lsp::LspTool::new(lsp_client, cwd));
                 }
             },
             multiedit::NAME => {
-                tools.push(Box::new(multiedit::MultiEditTool::new(cwd, ctx.clone())))
+                tool_set.add_tool(multiedit::MultiEditTool::new(cwd, ctx.clone()));
             },
-            question::NAME => tools.push(Box::new(question::AskUserQuestionTool::new())),
-            read::NAME => tools.push(Box::new(read::ReadTool::new(cwd, ctx.clone()))),
+            question::NAME => {
+                tool_set.add_tool(question::AskUserQuestionTool::new());
+            },
+            read::NAME => {
+                tool_set.add_tool(read::ReadTool::new(cwd, ctx.clone()));
+            },
             skill::NAME => {
                 if skills.is_empty() {
                     continue;
                 }
-                tools.push(Box::new(skill::SkillTool::new(skills.to_vec())));
+                tool_set.add_tool(skill::SkillTool::new(skills.to_vec()));
             },
-            update_plan::NAME => tools.push(Box::new(update_plan::UpdatePlanTool::new())),
-            webfetch::NAME => tools.push(Box::new(webfetch::WebFetchTool::new())),
-            websearch::NAME => tools.push(Box::new(websearch::WebSearchTool::new())),
-            write::NAME => tools.push(Box::new(write::WriteTool::new(cwd, ctx.clone()))),
+            update_plan::NAME => {
+                tool_set.add_tool(update_plan::UpdatePlanTool::new());
+            },
+            webfetch::NAME => {
+                tool_set.add_tool(webfetch::WebFetchTool::new());
+            },
+            websearch::NAME => {
+                tool_set.add_tool(websearch::WebSearchTool::new());
+            },
+            write::NAME => {
+                tool_set.add_tool(write::WriteTool::new(cwd, ctx.clone()));
+            },
             _ => {},
-        }
+        };
     }
 
-    tools
+    tool_set
 }

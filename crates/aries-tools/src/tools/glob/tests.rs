@@ -27,8 +27,9 @@ async fn test_glob_finds_files() {
     tokio::fs::create_dir(tmp.path().join("sub")).await.unwrap();
     tokio::fs::write(tmp.path().join("sub/b.rs"), "").await.unwrap();
 
+    let mut context = ToolContext::new();
     let tool = GlobTool::new(tmp.path().to_path_buf());
-    let result = tool.call(glob_args("*.rs")).await.unwrap();
+    let result = tool.call(&mut context, glob_args("*.rs")).await.unwrap();
     assert!(result.files.contains(&PathBuf::from("a.rs")));
 }
 
@@ -38,8 +39,9 @@ async fn test_glob_recursive() {
     tokio::fs::create_dir(tmp.path().join("sub")).await.unwrap();
     tokio::fs::write(tmp.path().join("sub/b.rs"), "").await.unwrap();
 
+    let mut context = ToolContext::new();
     let tool = GlobTool::new(tmp.path().to_path_buf());
-    let result = tool.call(glob_args("**/*.rs")).await.unwrap();
+    let result = tool.call(&mut context, glob_args("**/*.rs")).await.unwrap();
     assert_eq!(result.files, vec![PathBuf::from("sub/b.rs")]);
     assert!(!result.truncated);
 }
@@ -52,8 +54,9 @@ async fn test_glob_sorts_by_mtime_newest_first() {
     tokio::time::sleep(std::time::Duration::from_millis(20)).await;
     tokio::fs::write(tmp.path().join("new.rs"), "").await.unwrap();
 
+    let mut context = ToolContext::new();
     let tool = GlobTool::new(tmp.path().to_path_buf());
-    let result = tool.call(glob_args("*.rs")).await.unwrap();
+    let result = tool.call(&mut context, glob_args("*.rs")).await.unwrap();
 
     // 降序：最新在前。
     assert_eq!(result.files, vec![PathBuf::from("new.rs"), PathBuf::from("old.rs")]);
@@ -66,8 +69,9 @@ async fn test_glob_truncates_over_limit() {
         tokio::fs::write(tmp.path().join(format!("f{i}.rs")), "").await.unwrap();
     }
 
+    let mut context = ToolContext::new();
     let tool = GlobTool::new(tmp.path().to_path_buf());
-    let result = tool.call(glob_args("*.rs")).await.unwrap();
+    let result = tool.call(&mut context, glob_args("*.rs")).await.unwrap();
 
     assert_eq!(result.files.len(), MAX_RESULTS);
     assert!(result.truncated);
@@ -78,8 +82,9 @@ async fn test_glob_no_files_found() {
     let tmp = tempfile::TempDir::new().unwrap();
     tokio::fs::write(tmp.path().join("a.txt"), "").await.unwrap();
 
+    let mut context = ToolContext::new();
     let tool = GlobTool::new(tmp.path().to_path_buf());
-    let result = tool.call(glob_args("*.rs")).await.unwrap();
+    let result = tool.call(&mut context, glob_args("*.rs")).await.unwrap();
     assert!(result.files.is_empty());
 
     // render_output 对空结果给出明确提示。
@@ -92,10 +97,11 @@ async fn test_glob_hidden_files() {
     let tmp = tempfile::TempDir::new().unwrap();
     tokio::fs::write(tmp.path().join(".hidden.rs"), "").await.unwrap();
 
+    let mut context = ToolContext::new();
     let tool = GlobTool::new(tmp.path().to_path_buf());
 
     // 默认跳过隐藏文件。
-    let default_result = tool.call(glob_args("*.rs")).await.unwrap();
+    let default_result = tool.call(&mut context, glob_args("*.rs")).await.unwrap();
     assert!(default_result.files.is_empty());
 
     // 显式 hidden=true 时包含隐藏文件。
@@ -105,6 +111,6 @@ async fn test_glob_hidden_files() {
         hidden: true,
         respect_gitignore: true,
     };
-    let hidden_result = tool.call(args).await.unwrap();
+    let hidden_result = tool.call(&mut context, args).await.unwrap();
     assert!(hidden_result.files.contains(&PathBuf::from(".hidden.rs")));
 }

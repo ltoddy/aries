@@ -6,25 +6,24 @@ mod tests;
 
 use std::path::{Path, PathBuf};
 
-use rig_core::tool::Tool;
+use rig_agent::tool::{Tool, ToolContext};
 use serde_json::Value;
 use tokio::fs;
 
 pub use self::args::WriteArgs;
 pub use self::error::WriteError;
 pub use self::output::{WriteKind, WriteOutput};
-use crate::context::ToolContext;
 use crate::tools::diff;
 
 pub const NAME: &str = "Write";
 
 pub struct WriteTool {
     cwd: PathBuf,
-    ctx: ToolContext,
+    ctx: crate::context::ToolContext,
 }
 
 impl WriteTool {
-    pub fn new(cwd: impl AsRef<Path>, ctx: ToolContext) -> Self {
+    pub fn new(cwd: impl AsRef<Path>, ctx: crate::context::ToolContext) -> Self {
         let cwd = cwd.as_ref().to_path_buf();
 
         Self { cwd, ctx }
@@ -58,7 +57,11 @@ impl Tool for WriteTool {
         })
     }
 
-    async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
+    async fn call(
+        &self,
+        _context: &mut ToolContext,
+        args: Self::Args,
+    ) -> Result<Self::Output, Self::Error> {
         let file_path = if args.file_path.is_relative() {
             self.cwd.join(&args.file_path)
         } else {

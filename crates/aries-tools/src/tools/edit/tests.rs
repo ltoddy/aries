@@ -1,6 +1,6 @@
 // This file contains tests generated with AI assistance.
 
-use rig_core::tool::Tool;
+use rig_agent::tool::Tool;
 use tempfile::TempDir;
 use tokio::fs;
 
@@ -20,14 +20,18 @@ async fn test_edit_simple_replacement() {
     let ctx = ToolContext::new(None);
     seed_file(&ctx, &file_path, "hello world").await;
 
+    let mut context = rig_agent::tool::ToolContext::new();
     let tool = EditTool::new(dir.path(), ctx);
     let result = tool
-        .call(EditArgs {
-            file_path: file_path.clone(),
-            old_text: "hello".to_owned(),
-            new_text: "hi".to_owned(),
-            replace_all: false,
-        })
+        .call(
+            &mut context,
+            EditArgs {
+                file_path: file_path.clone(),
+                old_text: "hello".to_owned(),
+                new_text: "hi".to_owned(),
+                replace_all: false,
+            },
+        )
         .await
         .unwrap();
 
@@ -45,14 +49,18 @@ async fn test_edit_replace_all() {
     let ctx = ToolContext::new(None);
     seed_file(&ctx, &file_path, "foo foo foo").await;
 
+    let mut context = rig_agent::tool::ToolContext::new();
     let tool = EditTool::new(dir.path(), ctx);
     let result = tool
-        .call(EditArgs {
-            file_path: file_path.clone(),
-            old_text: "foo".to_owned(),
-            new_text: "bar".to_owned(),
-            replace_all: true,
-        })
+        .call(
+            &mut context,
+            EditArgs {
+                file_path: file_path.clone(),
+                old_text: "foo".to_owned(),
+                new_text: "bar".to_owned(),
+                replace_all: true,
+            },
+        )
         .await
         .unwrap();
 
@@ -63,14 +71,18 @@ async fn test_edit_replace_all() {
 #[tokio::test]
 async fn test_edit_file_not_found() {
     let dir = TempDir::new().unwrap();
+    let mut context = rig_agent::tool::ToolContext::new();
     let tool = EditTool::new(dir.path(), ToolContext::new(None));
     let result = tool
-        .call(EditArgs {
-            file_path: "/nonexistent/file.txt".into(),
-            old_text: "hello".to_owned(),
-            new_text: "hi".to_owned(),
-            replace_all: false,
-        })
+        .call(
+            &mut context,
+            EditArgs {
+                file_path: "/nonexistent/file.txt".into(),
+                old_text: "hello".to_owned(),
+                new_text: "hi".to_owned(),
+                replace_all: false,
+            },
+        )
         .await;
 
     assert!(result.is_err());
@@ -83,14 +95,18 @@ async fn test_edit_old_text_not_found() {
     let ctx = ToolContext::new(None);
     seed_file(&ctx, &file_path, "hello world").await;
 
+    let mut context = rig_agent::tool::ToolContext::new();
     let tool = EditTool::new(dir.path(), ctx);
     let result = tool
-        .call(EditArgs {
-            file_path,
-            old_text: "nonexistent".to_owned(),
-            new_text: "hi".to_owned(),
-            replace_all: false,
-        })
+        .call(
+            &mut context,
+            EditArgs {
+                file_path,
+                old_text: "nonexistent".to_owned(),
+                new_text: "hi".to_owned(),
+                replace_all: false,
+            },
+        )
         .await;
 
     assert!(result.is_err());
@@ -103,14 +119,18 @@ async fn test_edit_multiple_matches_without_replace_all() {
     let ctx = ToolContext::new(None);
     seed_file(&ctx, &file_path, "a a a").await;
 
+    let mut context = rig_agent::tool::ToolContext::new();
     let tool = EditTool::new(dir.path(), ctx);
     let result = tool
-        .call(EditArgs {
-            file_path,
-            old_text: "a".to_owned(),
-            new_text: "b".to_owned(),
-            replace_all: false,
-        })
+        .call(
+            &mut context,
+            EditArgs {
+                file_path,
+                old_text: "a".to_owned(),
+                new_text: "b".to_owned(),
+                replace_all: false,
+            },
+        )
         .await;
 
     assert!(result.is_err());
@@ -123,14 +143,18 @@ async fn test_edit_rejects_unread_file() {
     // 未经 Read，直接编辑：应被读后写校验拒绝。
     fs::write(&file_path, "hello world").await.unwrap();
 
+    let mut context = rig_agent::tool::ToolContext::new();
     let tool = EditTool::new(dir.path(), ToolContext::new(None));
     let result = tool
-        .call(EditArgs {
-            file_path,
-            old_text: "hello".to_owned(),
-            new_text: "hi".to_owned(),
-            replace_all: false,
-        })
+        .call(
+            &mut context,
+            EditArgs {
+                file_path,
+                old_text: "hello".to_owned(),
+                new_text: "hi".to_owned(),
+                replace_all: false,
+            },
+        )
         .await;
 
     assert!(matches!(result, Err(EditError::Guard(_))));
@@ -147,14 +171,18 @@ async fn test_edit_rejects_modified_since_read() {
     tokio::time::sleep(std::time::Duration::from_millis(20)).await;
     fs::write(&file_path, "hello brave world").await.unwrap();
 
+    let mut context = rig_agent::tool::ToolContext::new();
     let tool = EditTool::new(dir.path(), ctx);
     let result = tool
-        .call(EditArgs {
-            file_path,
-            old_text: "hello".to_owned(),
-            new_text: "hi".to_owned(),
-            replace_all: false,
-        })
+        .call(
+            &mut context,
+            EditArgs {
+                file_path,
+                old_text: "hello".to_owned(),
+                new_text: "hi".to_owned(),
+                replace_all: false,
+            },
+        )
         .await;
 
     assert!(matches!(result, Err(EditError::Guard(_))));

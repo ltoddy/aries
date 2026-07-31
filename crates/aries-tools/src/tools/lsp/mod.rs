@@ -5,7 +5,7 @@ mod output;
 use std::path::{Path, PathBuf};
 
 use aries_lspclient::{LspResult, SharedLspClient};
-use rig_core::tool::Tool;
+use rig_agent::tool::{Tool, ToolContext};
 use serde_json::Value;
 
 pub use self::args::{LspArgs, LspOperation};
@@ -101,7 +101,11 @@ impl Tool for LspTool {
         })
     }
 
-    async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
+    async fn call(
+        &self,
+        _context: &mut ToolContext,
+        args: Self::Args,
+    ) -> Result<Self::Output, Self::Error> {
         if let Some(ref file_path) = args.file_path {
             self.client.did_open(file_path).await?;
         }

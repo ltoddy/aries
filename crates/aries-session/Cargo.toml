@@ -25,6 +25,7 @@ parking_lot.workspace = true
 reqwest.workspace = true
 reqwest-middleware.workspace = true
 reqwest-retry.workspace = true
+rig-agent.workspace = true
 rig-core = { workspace = true, features = ["reqwest-middleware"] }
 rmcp.workspace = true
 serde = { workspace = true, features = ["derive"] }

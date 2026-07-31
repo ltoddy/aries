@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
 
-use rig_core::tool::Tool;
+use rig_agent::tool::{Tool, ToolContext};
 use serde_json::Value;
 use tokio::process::Command;
 use tree_sitter::{Language, Node, Parser};
@@ -83,7 +83,11 @@ impl Tool for BashTool {
         })
     }
 
-    async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
+    async fn call(
+        &self,
+        _context: &mut ToolContext,
+        args: Self::Args,
+    ) -> Result<Self::Output, Self::Error> {
         let arg = self.attempt_rewrite_last_command(&args.command).unwrap_or(args.command);
 
         let timeout = args

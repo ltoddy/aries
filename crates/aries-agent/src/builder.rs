@@ -6,16 +6,17 @@ use aries_init::GlobalContext;
 use aries_lspclient::SharedLspClient;
 use aries_mode::Mode;
 use aries_tools::agent;
-use rig_core::client::CompletionClient;
-use rig_core::completion;
-use rig_core::tool::ToolDyn;
+use rig_agent::client::AgentClientExt;
+use rig_agent::completion;
+use rig_agent::tool::ToolSet;
+use rig_agent::tool::server::ToolServerHandle;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::agent::{AGENT_LOOP_MAX_TURNS, AriesAgent};
 
 pub struct AgentBuilder<C>
 where
-    C: CompletionClient,
+    C: AgentClientExt,
     C::CompletionModel: completion::CompletionModel,
 {
     client: C,
@@ -26,7 +27,6 @@ where
     lsp_client: Option<SharedLspClient>,
 
     extensions: AgentExtensions,
-    mcp_tools: Vec<Box<dyn ToolDyn>>,
 
     sender: UnboundedSender<AgentEvent>,
     receiver: UnboundedReceiver<AgentEvent>,
@@ -34,7 +34,7 @@ where
 
 impl<C> AgentBuilder<C>
 where
-    C: CompletionClient + Clone + Send + Sync + 'static,
+    C: AgentClientExt + Clone + Send + Sync + 'static,
     C::CompletionModel: completion::CompletionModel + 'static,
 {
     pub fn new(
@@ -56,7 +56,6 @@ where
             gctx,
             lsp_client: None,
             extensions: AgentExtensions::empty(),
-            mcp_tools: vec![],
             sender,
             receiver,
         }
@@ -72,17 +71,15 @@ where
         self
     }
 
-    pub fn with_mcp_tools(mut self, tools: Vec<Box<dyn ToolDyn>>) -> Self {
-        self.mcp_tools = tools;
-        self
-    }
-
-    pub async fn build(self) -> (AriesAgent<C::CompletionModel>, UnboundedReceiver<AgentEvent>) {
+    pub async fn build(
+        self,
+        tool_server_handle: ToolServerHandle,
+    ) -> (AriesAgent<C::CompletionModel>, UnboundedReceiver<AgentEvent>) {
         let mode = self.mode;
         let name = mode.name();
 
-        let mut tools = self.build_tools();
-        tools.extend(self.mcp_tools);
+        let tools = self.build_tools();
+        tool_server_handle.append_toolset(tools).await;
 
         let sections = aries_preamble::sections(
             self.gctx.clone(),
@@ -94,7 +91,7 @@ where
         let mut builder = self
             .client
             .agent(&self.model)
-            .tools(tools)
+            .tool_server_handle(tool_server_handle)
             .default_max_turns(AGENT_LOOP_MAX_TURNS)
             .name(name)
             .description(mode.description())
@@ -112,7 +109,7 @@ where
         )
     }
 
-    fn build_tools(&self) -> Vec<Box<dyn ToolDyn>> {
+    fn build_tools(&self) -> ToolSet {
         let mut tools = aries_tools::create_tools_from_mode(
             self.mode,
             &self.cwd,
@@ -122,13 +119,13 @@ where
 
         match self.mode {
             Mode::Build | Mode::General => {
-                tools.push(Box::new(agent::AgentTool::<C>::new(
+                tools.add_tool(agent::AgentTool::<C>::new(
                     self.client.clone(),
                     self.model.clone(),
                     self.cwd.clone(),
                     self.sender.clone(),
                     self.extensions.agents.clone(),
-                )));
+                ));
             },
             _ => {},
         }

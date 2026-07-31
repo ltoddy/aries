@@ -1,8 +1,8 @@
 pub mod agent;
 pub mod builder;
 
-use rig_core::agent::StreamingError;
-use rig_core::completion::CompletionError;
+use rig_agent::agent::StreamingError;
+use rig_agent::completion::CompletionError;
 
 pub use crate::agent::{AGENT_LOOP_MAX_TURNS, AriesAgent};
 pub use crate::builder::AgentBuilder;

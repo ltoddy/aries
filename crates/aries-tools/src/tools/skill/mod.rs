@@ -8,7 +8,7 @@ use aries_extension::skill::definition::SkillDefinition;
 use aries_filesystem::path_to_uri;
 use aries_filesystem::walk::walk_dir;
 use itertools::Itertools;
-use rig_core::tool::Tool;
+use rig_agent::tool::{Tool, ToolContext};
 use serde_json::Value;
 
 pub use self::args::SkillArgs;
@@ -58,7 +58,11 @@ impl Tool for SkillTool {
         })
     }
 
-    async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
+    async fn call(
+        &self,
+        _context: &mut ToolContext,
+        args: Self::Args,
+    ) -> Result<Self::Output, Self::Error> {
         let available = self.available_skills_display();
 
         let skill = self

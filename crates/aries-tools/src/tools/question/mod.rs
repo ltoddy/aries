@@ -4,7 +4,7 @@ mod output;
 
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input, MultiSelect, Select};
-use rig_core::tool::Tool;
+use rig_agent::tool::{Tool, ToolContext};
 use serde_json::Value;
 
 pub use self::args::{AskUserQuestionArgs, AskUserQuestionOption};
@@ -69,7 +69,11 @@ impl Tool for AskUserQuestionTool {
         })
     }
 
-    async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
+    async fn call(
+        &self,
+        _context: &mut ToolContext,
+        args: Self::Args,
+    ) -> Result<Self::Output, Self::Error> {
         let mut answers = Vec::new();
         let theme = ColorfulTheme::default();
 

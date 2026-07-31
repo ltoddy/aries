@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 aries-filesystem = { path = "../aries-filesystem" }
 itertools.workspace = true
+rig-agent.workspace = true
 rig-core.workspace = true
 schemars.workspace = true
 serde = { workspace = true, features = ["derive"] }
