@@ -126,7 +126,7 @@ fn test_write_args_location_and_title() {
 
 #[test]
 fn test_render_output_create_and_update() {
-    let create = serde_json::to_string(&WriteOutput {
+    let create = serde_json::to_value(&WriteOutput {
         kind: WriteKind::Create,
         file_path: PathBuf::from("/tmp/new.txt"),
         structured_patch: Vec::new(),
@@ -136,11 +136,11 @@ fn test_render_output_create_and_update() {
     })
     .unwrap();
     assert_eq!(
-        WriteOutput::render_output(&create).unwrap(),
+        WriteOutput::render_output(create).unwrap(),
         "File created successfully at: /tmp/new.txt"
     );
 
-    let update = serde_json::to_string(&WriteOutput {
+    let update = serde_json::to_value(&WriteOutput {
         kind: WriteKind::Update,
         file_path: PathBuf::from("/tmp/old.txt"),
         structured_patch: Vec::new(),
@@ -150,7 +150,7 @@ fn test_render_output_create_and_update() {
     })
     .unwrap();
     assert_eq!(
-        WriteOutput::render_output(&update).unwrap(),
+        WriteOutput::render_output(update).unwrap(),
         "The file /tmp/old.txt has been updated successfully."
     );
 }

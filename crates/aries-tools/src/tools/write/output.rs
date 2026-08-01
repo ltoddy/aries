@@ -53,8 +53,8 @@ impl WriteOutput {
 }
 
 impl WriteOutput {
-    pub fn render_output(raw: &str) -> Result<String, serde_json::Error> {
-        let output: Self = serde_json::from_str(raw)?;
+    pub fn render_output(raw: serde_json::Value) -> Result<String, serde_json::Error> {
+        let output: Self = serde_json::from_value(raw)?;
         let path = output.file_path.display();
         Ok(match output.kind {
             WriteKind::Create => format!("File created successfully at: {}", path),

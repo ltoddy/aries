@@ -88,8 +88,8 @@ async fn test_glob_no_files_found() {
     assert!(result.files.is_empty());
 
     // render_output 对空结果给出明确提示。
-    let raw = serde_json::to_string(&result).unwrap();
-    assert_eq!(GlobOutput::render_output(&raw).unwrap(), "No files found");
+    let raw = serde_json::to_value(&result).unwrap();
+    assert_eq!(GlobOutput::render_output(raw).unwrap(), "No files found");
 }
 
 #[tokio::test]

@@ -148,9 +148,12 @@ impl SessionUpdates {
                                 vec![]
                             },
                             _ => {
+                                let output = serde_json::from_str::<serde_json::Value>(&raw_output)
+                                    .unwrap_or_else(|_| {
+                                        serde_json::Value::String(raw_output.clone())
+                                    });
                                 vec![ToolCallContent::from(ContentBlock::from(format_tool_output(
-                                    &name,
-                                    &raw_output,
+                                    &name, output,
                                 )))]
                             },
                         };

@@ -77,6 +77,7 @@ impl AriesClientProvider {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn agent(
         &self,
         mode: Mode,

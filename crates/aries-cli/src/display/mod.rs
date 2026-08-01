@@ -56,16 +56,11 @@ pub fn print_agent_event(event: AgentEvent, tool_names: &mut HashMap<String, Str
             internal_call_id,
         }) => {
             let tool_name = tool_names.remove(&internal_call_id).unwrap_or_default();
-            let raw = tool_result
-                .content
-                .iter()
-                .filter_map(|c| match c {
-                    ToolResultContent::Text(text) => Some(text.text.as_str()),
-                    _ => None,
-                })
-                .collect::<Vec<_>>()
-                .join("\n");
-            let formatted = format_tool_result_output(&tool_name, &raw);
+            let result = match tool_result.content.first() {
+                ToolResultContent::Json { value } => Some(value),
+                _ => None,
+            };
+            let formatted = format_tool_result_output(&tool_name, result);
             println!("{formatted}");
         },
         MultiTurnStreamItem::FinalResponse(res) if event.main => {
@@ -110,11 +105,12 @@ pub fn format_tool_call_args(tool_name: &str, args: &str) -> (String, Option<Str
     (format!("{} {}", tool_name.cyan(), first.yellow()), rest)
 }
 
-pub fn format_tool_result_output(tool_name: &str, result: &str) -> String {
-    let output = aries_tools::tools::format_tool_output(tool_name, result);
+pub fn format_tool_result_output(tool_name: &str, result: Option<serde_json::Value>) -> String {
+    let output = result
+        .map(|value| aries_tools::tools::format_tool_output(tool_name, value))
+        .unwrap_or_default();
     let output = if output.is_empty() { "No output".to_string() } else { output };
 
-    let _ = tool_name;
     text::preview(output).dimmed().to_string()
 }
 

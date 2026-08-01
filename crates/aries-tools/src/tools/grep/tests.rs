@@ -206,6 +206,6 @@ async fn test_grep_no_matches_found() {
     assert!(!result.truncated);
 
     // render_output 对空结果返回 "No matches found"。
-    let raw = serde_json::to_string(&result).unwrap();
-    assert_eq!(GrepOutput::render_output(&raw).unwrap(), "No matches found");
+    let raw = serde_json::to_value(&result).unwrap();
+    assert_eq!(GrepOutput::render_output(raw).unwrap(), "No matches found");
 }

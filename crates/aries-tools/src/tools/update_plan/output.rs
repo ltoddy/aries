@@ -8,8 +8,8 @@ pub struct UpdatePlanOutput {
 }
 
 impl UpdatePlanOutput {
-    pub fn render_output(raw: &str) -> Result<String, serde_json::Error> {
-        let output: Self = serde_json::from_str(raw)?;
+    pub fn render_output(raw: serde_json::Value) -> Result<String, serde_json::Error> {
+        let output: Self = serde_json::from_value(raw)?;
         if output.items.is_empty() {
             return Ok(String::from(
                 "Plan cleared. Continue to use the plan to track your progress if applicable.",

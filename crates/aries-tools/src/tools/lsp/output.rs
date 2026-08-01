@@ -7,8 +7,8 @@ pub struct LspOutput {
 }
 
 impl LspOutput {
-    pub fn render_output(raw: &str) -> Result<String, serde_json::Error> {
-        let output: Self = serde_json::from_str(raw)?;
+    pub fn render_output(raw: serde_json::Value) -> Result<String, serde_json::Error> {
+        let output: Self = serde_json::from_value(raw)?;
         let content = match &output.result {
             LspResult::Definition(locations)
             | LspResult::References(locations)

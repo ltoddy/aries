@@ -8,8 +8,8 @@ pub struct AgentOutput {
 }
 
 impl AgentOutput {
-    pub fn render_output(raw: &str) -> Result<String, serde_json::Error> {
-        let output: Self = serde_json::from_str(raw)?;
+    pub fn render_output(raw: serde_json::Value) -> Result<String, serde_json::Error> {
+        let output: Self = serde_json::from_value(raw)?;
         Ok(output.result)
     }
 }

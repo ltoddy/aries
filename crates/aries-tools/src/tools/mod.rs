@@ -35,7 +35,7 @@ use self::webfetch::WebFetchOutput;
 use self::websearch::WebSearchOutput;
 use self::write::WriteOutput;
 
-pub fn format_tool_output(tool_name: &str, raw_json: &str) -> String {
+pub fn format_tool_output(tool_name: &str, raw_json: serde_json::Value) -> String {
     let result = match tool_name {
         agent::NAME => AgentOutput::render_output(raw_json),
         bash::NAME => BashOutput::render_output(raw_json),
@@ -54,8 +54,8 @@ pub fn format_tool_output(tool_name: &str, raw_json: &str) -> String {
         webfetch::NAME => WebFetchOutput::render_output(raw_json),
         websearch::NAME => WebSearchOutput::render_output(raw_json),
         write::NAME => WriteOutput::render_output(raw_json),
-        _ => Ok(raw_json.to_string()),
+        _ => return raw_json.to_string(),
     };
 
-    result.unwrap_or_else(|_| raw_json.to_string())
+    result.unwrap_or_else(|_| "No output".to_string())
 }
