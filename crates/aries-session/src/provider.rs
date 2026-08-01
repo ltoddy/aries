@@ -177,7 +177,7 @@ pub enum AriesAgentProvider {
 impl AriesAgentProvider {
     #[inline]
     pub async fn prompt<I, T, P>(
-        &mut self,
+        &self,
         prompt: impl Into<Message> + Send,
         history: I,
         hook: P,

@@ -24,6 +24,10 @@
 - [x] Read 工具读取文件时，自动注入所在目录的 AGENTS.md 作为 system-reminder，去重避免重复发送
 - [ ] acp 协议 v2 支持 (https://agentclientprotocol.com/protocol/v2/overview 等什么时候不再是 draft 了, 立马跟进实现)
 - [ ] 优化长期记忆系统
+  - [x] 历史与上下文持久化异步化：extend 改为 channel + 后台 task 写文件，不再阻塞 prompt 流程
+  - [x] 记忆提取后台化：prompt 后 spawn 后台 task 提取记忆（复用 sift）
+- [x] 上下文压缩：prompt 前按预估 token 预判压缩，prompt 后按实际 token 复核压缩（pre_compact / post_compact），micro_compact 保留更多最近消息
+- [x] 代码优化：prompt 流程提取 helper（fire_stop / append_messages / session_hook 等），agent.prompt 改 &self，callback 改 Fn + Clone
 - [ ] 优化 mcp 启动 (超时，连接速度，连接异常)
 - [ ] 支持 worktree
 - [ ] 支持 Workflow

@@ -27,15 +27,15 @@ use aries_lspclient::{LspServerInfo, SharedLspClient, warm_up};
 use aries_memory::MemoryStore;
 use aries_mode::Mode;
 use aries_persistence::SessionRepository;
-use futures::pin_mut;
 use rig_agent::agent::PromptResponse;
 use rig_agent::tool::rmcp::McpClientHandler;
 use rig_agent::tool::server::{ToolServer, ToolServerHandle};
-use rig_core::completion::Message;
+use rig_core::completion::{Message, Usage};
 use rig_core::message::UserContent;
 use rmcp::RoleClient;
 use rmcp::service::RunningService;
 use toasty::Db;
+use tokio::pin;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_util::sync::CancellationToken;
@@ -285,10 +285,10 @@ impl Session {
     pub async fn prompt<F, Fut>(
         &mut self,
         prompt: impl Into<Message>,
-        mut callback: F,
+        callback: F,
     ) -> aries_agent::AriesResult<()>
     where
-        F: FnMut(AgentEvent) -> Fut,
+        F: Fn(AgentEvent) -> Fut + Clone,
         Fut: Future<Output = ()>,
     {
         let prompt: Message = prompt.into();
@@ -296,49 +296,17 @@ impl Session {
         self.last_assistant_message = None;
         let title = self.update_title(&prompt).await;
 
-        let input = UserPromptSubmitHookInput::new(&self.id, &self.cwd, &title)
-            .transcript_path(&self.transcripts_dir);
-        if let HookDecision::Terminate { reason } =
-            self.hooks_executor.fire_user_prompt_submit(input).await
-        {
-            return Err(aries_agent::AriesError::hook_terminated(reason));
-        }
+        self.fire_user_prompt_submit(&title).await?;
+        self.pre_compact(&prompt, callback.clone()).await;
 
-        aries_compact::micro_compact(self.chat_context.history_mut());
-
-        let window = aries_compact::ContextWindow::for_model(self.config.model());
-        let compact_threshold = window.auto_compact_threshold();
-        let estimate_tokens =
-            self.chat_context.history().estimate_tokens().saturating_add(prompt.estimate_tokens());
-
-        if estimate_tokens >= compact_threshold {
-            let text = format!(
-                "\n预估 tokens {estimate_tokens} 已达阈值 {compact_threshold}（上下文窗口 {}），提前触发压缩...\n",
-                window.total
-            );
-            info!(text);
-            callback(AgentEvent::text(true, self.mode.name(), text)).await;
-            self.compact().await;
-        }
-
-        let final_res = {
+        let prompt_res = {
             let history = self.chat_context.history().to_vec();
-
-            let hook = SessionPromptHook::new(
-                self.hooks_executor.clone(),
-                &self.id,
-                &self.cwd,
-                &self.transcripts_dir,
-                self.mode.id(),
-                self.mode.name(),
-                self.db.clone(),
-            );
-            let prompt_fut = self.agent.prompt(prompt, history, hook);
-            pin_mut!(prompt_fut);
+            let hook = self.session_hook();
+            let future = self.agent.prompt(prompt, history, hook);
+            pin!(future);
 
             let mut guard = self.receiver.lock().await;
             let mut prompt_res = Ok(PromptResponse::empty());
-
             loop {
                 tokio::select! {
                     biased;
@@ -348,68 +316,33 @@ impl Session {
                             callback(event).await;
                         }
                     }
-                    res = &mut prompt_fut => {
+                    res = &mut future => {
                         prompt_res = res;
                         break;
                     }
                 }
             }
-
             while let Ok(event) = guard.try_recv() {
-                callback(event).await;
+                callback.clone()(event).await;
             }
             drop(guard);
 
             match prompt_res {
                 Ok(res) => res,
                 Err(err) => {
-                    let input = StopFailureHookInput::new(&self.id, &self.cwd, err.to_string())
-                        .transcript_path(&self.transcripts_dir)
-                        .error_details(err.to_string());
-
-                    let input = match &self.last_assistant_message.take() {
-                        Some(message) => input.last_assistant_message(message),
-                        None => input,
-                    };
-
-                    self.hooks_executor.fire_stop_failure(input).await;
+                    self.fire_stop_failure(err.to_string()).await;
                     return Err(err);
                 },
             }
         };
 
-        self.last_assistant_message = Some(final_res.output().to_owned());
-        if let Some(his) = final_res.messages() {
-            self.chat_history.extend(his.iter().cloned());
-            self.chat_context.extend(his.iter().cloned()).await;
+        self.last_assistant_message = Some(prompt_res.output().to_owned());
+        if let Some(messages) = prompt_res.messages() {
+            self.append_messages(messages);
         }
-
-        let input = StopHookInput::new(&self.id, &self.cwd, false)
-            .last_assistant_message(final_res.output());
-        self.hooks_executor.fire_stop(input).await;
-
-        // Spawn background memory extraction task
-        {
-            let client = self.client.clone();
-            let model: String = self.config.model();
-            let memory_store = self.memory_store.clone();
-            let user_msg = title;
-            let assistant_resp = final_res.output().to_owned();
-            tokio::spawn(async move {
-                client.extract_memories(&model, &user_msg, &assistant_resp, &memory_store).await;
-            });
-        }
-
-        if final_res.usage().total_tokens > compact_threshold {
-            let text = format!(
-                "\n🔄 实际 tokens {} 已达阈值 {compact_threshold}，触发压缩...\n",
-                final_res.usage().total_tokens,
-            );
-            info!(text);
-            let event = AgentEvent::text(true, self.mode.name(), text);
-            callback(event).await;
-            self.compact().await;
-        }
+        self.fire_stop(prompt_res.output()).await;
+        self.sift(title, prompt_res.output());
+        self.post_compact(prompt_res.usage(), callback).await;
 
         Ok(())
     }
@@ -585,6 +518,102 @@ impl Session {
             .transcript_path(&self.transcripts_dir);
 
         self.hooks_executor.fire_session_end(input).await;
+    }
+
+    fn session_hook(&self) -> SessionPromptHook {
+        SessionPromptHook::new(
+            self.hooks_executor.clone(),
+            &self.id,
+            &self.cwd,
+            &self.transcripts_dir,
+            self.mode.id(),
+            self.mode.name(),
+            self.db.clone(),
+        )
+    }
+
+    async fn fire_user_prompt_submit(
+        &self,
+        prompt: impl Into<String>,
+    ) -> aries_agent::AriesResult<()> {
+        let input = UserPromptSubmitHookInput::new(&self.id, &self.cwd, prompt)
+            .transcript_path(&self.transcripts_dir);
+        if let HookDecision::Terminate { reason } =
+            self.hooks_executor.fire_user_prompt_submit(input).await
+        {
+            return Err(aries_agent::AriesError::hook_terminated(reason));
+        }
+
+        Ok(())
+    }
+
+    async fn fire_stop(&self, assistant_output: impl Into<String>) {
+        let input =
+            StopHookInput::new(&self.id, &self.cwd, false).last_assistant_message(assistant_output);
+        self.hooks_executor.fire_stop(input).await;
+    }
+
+    async fn fire_stop_failure(&self, error: impl Into<String>) {
+        let error = error.into();
+        let input = StopFailureHookInput::new(&self.id, &self.cwd, &error)
+            .transcript_path(&self.transcripts_dir)
+            .error_details(&error);
+
+        let input = match &self.last_assistant_message {
+            Some(message) => input.last_assistant_message(message),
+            None => input,
+        };
+
+        self.hooks_executor.fire_stop_failure(input).await;
+    }
+
+    fn append_messages(&mut self, messages: &[Message]) {
+        if messages.is_empty() {
+            return;
+        }
+
+        self.chat_history.extend(messages.iter().cloned());
+        self.chat_context.extend(messages.iter().cloned());
+    }
+
+    async fn pre_compact<F, Fut>(&mut self, prompt: &Message, mut callback: F)
+    where
+        F: FnMut(AgentEvent) -> Fut,
+        Fut: Future<Output = ()>,
+    {
+        aries_compact::micro_compact(self.chat_context.history_mut());
+
+        let window = aries_compact::ContextWindow::for_model(self.config.model());
+        let compact_threshold = window.auto_compact_threshold();
+        let estimate_tokens =
+            self.chat_context.history().estimate_tokens().saturating_add(prompt.estimate_tokens());
+
+        if estimate_tokens >= compact_threshold {
+            let text = format!(
+                "\n预估 tokens {estimate_tokens} 已达阈值 {compact_threshold}（上下文窗口 {}），提前触发压缩...\n",
+                window.total
+            );
+            callback(AgentEvent::text(true, self.mode.name(), text)).await;
+            self.compact().await;
+        }
+    }
+
+    async fn post_compact<F, Fut>(&mut self, usage: Usage, mut callback: F)
+    where
+        F: FnMut(AgentEvent) -> Fut,
+        Fut: Future<Output = ()>,
+    {
+        let window = aries_compact::ContextWindow::for_model(self.config.model());
+        let compact_threshold = window.auto_compact_threshold();
+
+        if usage.total_tokens > compact_threshold {
+            let text = format!(
+                "\n实际 tokens {} 已达阈值 {compact_threshold}，触发压缩...\n",
+                usage.total_tokens,
+            );
+            callback(AgentEvent::text(true, self.mode.name(), text)).await;
+            self.compact().await;
+        }
     }
 }
 

@@ -1,5 +1,5 @@
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use aries_filesystem::jsonl;
 use rig_core::completion::Message;
@@ -22,9 +22,7 @@ impl ChatHistory {
         let history = Self::load(&file_path).await.unwrap_or_default();
 
         let (sender, receiver) = unbounded_channel();
-        tokio::spawn(
-            refresh_history(receiver, file_path.to_path_buf()).instrument(Span::current()),
-        );
+        tokio::spawn(refresh_history(receiver, file_path).instrument(Span::current()));
 
         Self { history, sender }
     }
@@ -32,7 +30,7 @@ impl ChatHistory {
     pub fn extend(&mut self, messages: impl IntoIterator<Item = Message>) {
         self.history.extend(messages);
         if let Err(err) = self.sender.send(self.history.clone()) {
-            error!("failed to send chat history for persistence: {err}");
+            error!(err = %err, "failed to send chat history for persistence");
         }
     }
 
@@ -41,8 +39,14 @@ impl ChatHistory {
     }
 }
 
-async fn refresh_history(mut rx: UnboundedReceiver<Vec<Message>>, file_path: PathBuf) {
+async fn refresh_history(mut rx: UnboundedReceiver<Vec<Message>>, file_path: impl AsRef<Path>) {
+    let file_path = file_path.as_ref();
+
     while let Some(messages) = rx.recv().await {
+        if let Some(parent) = file_path.parent() {
+            _ = tokio::fs::create_dir_all(parent).await;
+        }
+
         if let Err(err) = jsonl::write(&file_path, messages).await {
             error!("failed to write chat history to {}: {err}", file_path.display());
         }

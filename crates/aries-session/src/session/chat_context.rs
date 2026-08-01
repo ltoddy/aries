@@ -3,11 +3,13 @@ use std::path::{Path, PathBuf};
 
 use aries_filesystem::jsonl;
 use rig_agent::completion::Message;
-use tracing::error;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
+use tracing::{Instrument, Span, error};
 
 #[derive(Debug, Clone)]
 pub struct ChatContext {
     history: Vec<Message>,
+    sender: UnboundedSender<Vec<Message>>,
     file_path: PathBuf,
 }
 
@@ -20,13 +22,16 @@ impl ChatContext {
 
         let history = Self::load(&file_path).await.unwrap_or_default();
 
-        Self { history, file_path }
+        let (sender, receiver) = unbounded_channel();
+        tokio::spawn(refresh_context(receiver, file_path.clone()).instrument(Span::current()));
+
+        Self { history, sender, file_path: file_path.to_path_buf() }
     }
 
-    pub async fn extend(&mut self, messages: impl IntoIterator<Item = Message>) {
+    pub fn extend(&mut self, messages: impl IntoIterator<Item = Message>) {
         self.history.extend(messages);
-        if let Err(err) = jsonl::write(&self.file_path, &self.history).await {
-            error!("failed to write context history to {}: {err}", self.file_path.display());
+        if let Err(err) = self.sender.send(self.history.clone()) {
+            error!(err = %err, "failed to send context history for persistence")
         }
     }
 
@@ -48,5 +53,19 @@ impl ChatContext {
     #[inline]
     async fn load(file_path: impl AsRef<Path>) -> io::Result<Vec<Message>> {
         jsonl::read(file_path).await
+    }
+}
+
+async fn refresh_context(mut rx: UnboundedReceiver<Vec<Message>>, file_path: impl AsRef<Path>) {
+    let file_path = file_path.as_ref();
+
+    while let Some(messages) = rx.recv().await {
+        if let Some(parent) = file_path.parent() {
+            _ = tokio::fs::create_dir_all(parent).await;
+        }
+
+        if let Err(err) = jsonl::write(file_path, messages).await {
+            error!("failed to write context history to {}: {err}", file_path.display());
+        }
     }
 }

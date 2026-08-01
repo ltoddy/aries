@@ -10,7 +10,7 @@ use rig_core::message::{
 
 const TOOL_RESULT_PLACEHOLDER: &str = "[Old tool result content cleared]";
 const TOOL_CALL_PLACEHOLDER: &str = "[Old tool call content cleared — file can be re-read]";
-const KEEP_RECENT: usize = 5;
+const KEEP_RECENT: usize = 8;
 
 pub fn micro_compact(messages: &mut [Message]) {
     let tools = build_tools(messages);
