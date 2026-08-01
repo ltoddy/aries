@@ -65,9 +65,9 @@ where
     C: AgentClientExt + Clone + Send + Sync + 'static,
 {
     const NAME: &'static str = NAME;
-    type Error = StreamingError;
     type Args = AgentArgs;
     type Output = AgentOutput;
+    type Error = StreamingError;
 
     fn description(&self) -> String {
         let mut description = vec![DESCRIPTION_HEAD.to_owned()];

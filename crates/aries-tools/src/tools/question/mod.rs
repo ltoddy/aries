@@ -29,9 +29,9 @@ impl AskUserQuestionTool {
 
 impl Tool for AskUserQuestionTool {
     const NAME: &'static str = NAME;
-    type Error = AskUserQuestionError;
     type Args = AskUserQuestionArgs;
     type Output = AskUserQuestionOutput;
+    type Error = AskUserQuestionError;
 
     fn description(&self) -> String {
         include_str!("description.md").to_owned()

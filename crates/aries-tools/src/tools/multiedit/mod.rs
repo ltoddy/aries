@@ -31,9 +31,9 @@ impl MultiEditTool {
 
 impl Tool for MultiEditTool {
     const NAME: &'static str = NAME;
-    type Error = MultiEditError;
     type Args = MultiEditArgs;
     type Output = MultiEditOutput;
+    type Error = MultiEditError;
 
     fn description(&self) -> String {
         include_str!("description.md").to_owned()

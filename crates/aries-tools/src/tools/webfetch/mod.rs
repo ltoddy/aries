@@ -27,9 +27,9 @@ impl WebFetchTool {
 
 impl Tool for WebFetchTool {
     const NAME: &'static str = NAME;
-    type Error = WebFetchError;
     type Args = WebFetchArgs;
     type Output = WebFetchOutput;
+    type Error = WebFetchError;
 
     fn description(&self) -> String {
         include_str!("description.md").to_owned()

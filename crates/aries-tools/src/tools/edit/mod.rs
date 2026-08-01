@@ -32,9 +32,9 @@ impl EditTool {
 
 impl Tool for EditTool {
     const NAME: &'static str = NAME;
-    type Error = EditError;
     type Args = EditArgs;
     type Output = EditOutput;
+    type Error = EditError;
 
     fn description(&self) -> String {
         include_str!("description.md").to_owned()

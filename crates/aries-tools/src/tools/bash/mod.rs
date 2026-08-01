@@ -50,9 +50,9 @@ impl BashTool {
 
 impl Tool for BashTool {
     const NAME: &'static str = NAME;
-    type Error = BashError;
     type Args = BashArgs;
     type Output = BashOutput;
+    type Error = BashError;
 
     fn description(&self) -> String {
         include_str!("description.md").to_owned()

@@ -45,7 +45,7 @@ use self::chat_context::ChatContext;
 use self::chat_history::ChatHistory;
 use self::config::SessionConfig;
 use self::hook::SessionPromptHook;
-use crate::{AriesAgent, AriesClient};
+use crate::{AriesAgent, AriesProvider};
 
 #[derive(Clone)]
 pub struct Session {
@@ -54,7 +54,7 @@ pub struct Session {
     setting: Setting,
     config: ModelConfig,
     cwd: PathBuf,
-    client: AriesClient,
+    client: AriesProvider,
     agent: AriesAgent,
     mode: Mode,
 
@@ -179,7 +179,7 @@ impl Session {
         let session_repo = SessionRepository::new(db.clone());
 
         let mode = Mode::default();
-        let client = AriesClient::new(&config)?;
+        let client = AriesProvider::new(&config)?;
         let (agent, receiver) = client
             .agent(
                 mode,
@@ -233,7 +233,7 @@ impl Session {
             .find(|m| m.alias() == alias)
             .ok_or_else(|| SettingError::not_found(&alias))?;
 
-        self.client = AriesClient::new(config)?;
+        self.client = AriesProvider::new(config)?;
         // let memory = Self::load_memory(&self.memory_store).await;
         // let (agent, agent_events) = self
         //     .client
@@ -258,7 +258,8 @@ impl Session {
     }
 
     pub async fn set_mode(&mut self, mode: Mode) -> anyhow::Result<()> {
-        self.agent.set_mode(mode);
+        // TODO 需要重新 build
+        // self.agent.set_mode(mode);
         self.mode = mode;
         Ok(())
     }
@@ -435,22 +436,22 @@ impl Session {
         }
 
         let outcome = match self.client.clone() {
-            AriesClient::Anthropic(client) => {
+            AriesProvider::Anthropic(client) => {
                 let mut compact_agent =
                     CompactAgent::new(client, self.config.model(), &self.transcripts_dir);
                 compact_agent.compact(self.chat_context.history()).await
             },
-            AriesClient::Azure(client) => {
+            AriesProvider::Azure(client) => {
                 let mut compact_agent =
                     CompactAgent::new(client, self.config.model(), &self.transcripts_dir);
                 compact_agent.compact(self.chat_context.history()).await
             },
-            AriesClient::Deepseek(client) => {
+            AriesProvider::Deepseek(client) => {
                 let mut compact_agent =
                     CompactAgent::new(client, self.config.model(), &self.transcripts_dir);
                 compact_agent.compact(self.chat_context.history()).await
             },
-            AriesClient::OpenAI(client) => {
+            AriesProvider::OpenAI(client) => {
                 let mut compact_agent =
                     CompactAgent::new(client, self.config.model(), &self.transcripts_dir);
                 compact_agent.compact(self.chat_context.history()).await
@@ -530,8 +531,8 @@ impl Session {
         self.id.clone()
     }
 
-    pub fn system_prompt(&self) -> String {
-        self.agent.system_prompt()
+    pub fn system_prompt(&self) -> &str {
+        self.agent.preamble()
     }
 
     pub fn mode(&self) -> Mode {

@@ -67,9 +67,9 @@ struct McpCodeResponse {
 
 impl Tool for CodeSearchTool {
     const NAME: &'static str = NAME;
-    type Error = CodeSearchError;
     type Args = CodeSearchArgs;
     type Output = CodeSearchOutput;
+    type Error = CodeSearchError;
 
     fn description(&self) -> String {
         include_str!("description.md").to_owned()

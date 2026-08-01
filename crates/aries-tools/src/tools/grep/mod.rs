@@ -35,9 +35,9 @@ impl GrepTool {
 
 impl Tool for GrepTool {
     const NAME: &'static str = NAME;
-    type Error = GrepError;
     type Args = GrepArgs;
     type Output = GrepOutput;
+    type Error = GrepError;
 
     fn description(&self) -> String {
         include_str!("description.md").to_owned()

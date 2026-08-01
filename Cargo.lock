@@ -249,6 +249,7 @@ dependencies = [
  "aries-preamble",
  "aries-tools",
  "futures",
+ "itertools 0.15.0",
  "rig-agent",
  "thiserror 2.0.19",
  "tokio",

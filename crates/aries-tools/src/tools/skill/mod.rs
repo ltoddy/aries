@@ -37,9 +37,9 @@ impl SkillTool {
 
 impl Tool for SkillTool {
     const NAME: &'static str = NAME;
-    type Error = SkillError;
     type Args = SkillArgs;
     type Output = SkillOutput;
+    type Error = SkillError;
 
     fn description(&self) -> String {
         include_str!("description.md").to_owned()

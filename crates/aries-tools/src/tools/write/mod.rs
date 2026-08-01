@@ -32,9 +32,9 @@ impl WriteTool {
 
 impl Tool for WriteTool {
     const NAME: &'static str = NAME;
-    type Error = WriteError;
     type Args = WriteArgs;
     type Output = WriteOutput;
+    type Error = WriteError;
 
     fn description(&self) -> String {
         include_str!("description.md").to_owned()

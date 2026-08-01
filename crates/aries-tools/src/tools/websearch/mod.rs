@@ -27,9 +27,9 @@ impl WebSearchTool {
 
 impl Tool for WebSearchTool {
     const NAME: &'static str = NAME;
-    type Error = WebSearchError;
     type Args = WebSearchArgs;
     type Output = WebSearchOutput;
+    type Error = WebSearchError;
 
     fn description(&self) -> String {
         include_str!("description.md").to_owned()

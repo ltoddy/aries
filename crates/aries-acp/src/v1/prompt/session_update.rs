@@ -52,11 +52,11 @@ impl SessionUpdates {
             MultiTurnStreamItem::ToolExecutionCommitted { .. } => {
                 // TODO
                 Self(Vec::new())
-            }
+            },
             MultiTurnStreamItem::ModelTurnRetried { .. } => {
                 // TODO
                 Self(Vec::new())
-            }
+            },
             _ => Self(Vec::new()),
         }
     }

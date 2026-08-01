@@ -1,5 +1,4 @@
 use aries_event::AgentEvent;
-use aries_mode::Mode;
 use futures::StreamExt;
 use rig_agent::agent::{Agent, AgentHook, MultiTurnStreamItem, PromptResponse};
 use rig_agent::completion::{CompletionModel, Message};
@@ -17,8 +16,7 @@ where
 {
     inner: Agent<M>,
     name: String,
-    bare_preamble: String,
-    sections: Vec<String>,
+    preamble: String,
     sender: Option<UnboundedSender<AgentEvent>>,
 }
 
@@ -29,15 +27,13 @@ where
     pub fn new(
         inner: Agent<M>,
         name: impl Into<String>,
-        bare_preamble: impl Into<String>,
-        sections: &[String],
+        preamble: impl Into<String>,
         sender: Option<UnboundedSender<AgentEvent>>,
     ) -> Self {
         let name = name.into();
-        let bare_preamble = bare_preamble.into();
-        let sections = sections.to_vec();
+        let bare_preamble = preamble.into();
 
-        Self { inner, name, bare_preamble, sections, sender }
+        Self { inner, name, preamble: bare_preamble, sender }
     }
 
     pub async fn prompt<I, T, P>(
@@ -74,24 +70,7 @@ where
         Ok(final_res)
     }
 
-    pub fn set_mode(&mut self, mode: Mode) {
-        let bare_preamble = mode.bare_preamble();
-
-        let mut preamble = String::new();
-        preamble.push_str(bare_preamble);
-        preamble.push('\n');
-        for section in &self.sections {
-            preamble.push('\n');
-            preamble.push_str(section);
-        }
-
-        self.bare_preamble = bare_preamble.to_owned();
-        // self.inner.preamble = Some(preamble);
-    }
-
-    pub fn system_prompt(&self) -> String {
-        // let preamble = self.inner.preamble.clone();
-        // preamble.unwrap_or_default()
-        String::new()
+    pub fn preamble(&self) -> &str {
+        &self.preamble
     }
 }

@@ -1,5 +1,4 @@
-use rig_agent::agent::MultiTurnStreamItem;
-use rig_core::message::Text;
+use rig_agent::agent::{MultiTurnStreamItem, Text};
 use rig_core::streaming::StreamedAssistantContent;
 
 #[derive(Debug, Clone)]

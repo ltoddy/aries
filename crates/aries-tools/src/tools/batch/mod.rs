@@ -42,9 +42,9 @@ impl BatchTool {
 
 impl Tool for BatchTool {
     const NAME: &'static str = NAME;
-    type Error = BatchError;
     type Args = BatchArgs;
     type Output = BatchOutput;
+    type Error = BatchError;
 
     fn description(&self) -> String {
         include_str!("description.md").to_owned()

@@ -31,9 +31,9 @@ impl UpdatePlanTool {
 
 impl Tool for UpdatePlanTool {
     const NAME: &'static str = NAME;
-    type Error = UpdatePlanError;
     type Args = UpdatePlanArgs;
     type Output = UpdatePlanOutput;
+    type Error = UpdatePlanError;
 
     fn description(&self) -> String {
         include_str!("description.md").to_owned()

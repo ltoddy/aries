@@ -19,6 +19,7 @@ use reqwest_retry::policies::ExponentialBackoff;
 use rig_agent::agent::{AgentHook, PromptResponse};
 use rig_agent::tool::server::ToolServerHandle;
 use rig_core::completion::Message;
+use rig_core::http_client;
 use rig_core::providers::{anthropic, azure, deepseek, openai};
 use rig_core::wasm_compat::WasmCompatSend;
 use tokio::sync::mpsc::UnboundedReceiver;
@@ -28,15 +29,15 @@ pub use crate::registry::SessionRegistry;
 pub use crate::session::Session;
 
 #[derive(Clone)]
-pub enum AriesClient {
+pub enum AriesProvider {
     Anthropic(anthropic::Client<ClientWithMiddleware>),
     Azure(azure::Client<ClientWithMiddleware>),
     Deepseek(deepseek::Client<ClientWithMiddleware>),
     OpenAI(openai::CompletionsClient<ClientWithMiddleware>),
 }
 
-impl AriesClient {
-    pub fn new(config: &ModelConfig) -> anyhow::Result<Self> {
+impl AriesProvider {
+    pub fn new(config: &ModelConfig) -> http_client::Result<Self> {
         let http_client = reqwest::Client::builder()
             .build()
             .expect("Failed to build http client for llm provider");
@@ -45,40 +46,40 @@ impl AriesClient {
             ExponentialBackoff::builder().base(1).build_with_max_retries(5),
             RetryStrategy::new(),
         );
-        let http_client = reqwest_middleware::ClientBuilder::new(http_client).with(retry).build();
+        let httpclient = reqwest_middleware::ClientBuilder::new(http_client).with(retry).build();
 
         match config {
             ModelConfig::Anthropic(c) => {
                 let client = anthropic::Client::builder()
                     .api_key(&c.api_key)
                     .base_url(&c.base_url)
-                    .http_client(http_client)
+                    .http_client(httpclient)
                     .build()?;
-                Ok(AriesClient::Anthropic(client))
+                Ok(AriesProvider::Anthropic(client))
             },
             ModelConfig::Azure(c) => {
                 let client = azure::Client::builder()
                     .api_key(&c.api_key)
                     .azure_endpoint(c.azure_endpoint.clone())
                     .api_version(&c.api_version)
-                    .http_client(http_client)
+                    .http_client(httpclient)
                     .build()?;
-                Ok(AriesClient::Azure(client))
+                Ok(AriesProvider::Azure(client))
             },
             ModelConfig::Deepseek(c) => {
                 let client = deepseek::Client::builder()
                     .api_key(&c.api_key)
-                    .http_client(http_client)
+                    .http_client(httpclient)
                     .build()?;
-                Ok(AriesClient::Deepseek(client))
+                Ok(AriesProvider::Deepseek(client))
             },
             ModelConfig::OpenAI(c) => {
                 let client = openai::CompletionsClient::builder()
                     .base_url(&c.base_url)
                     .api_key(&c.api_key)
-                    .http_client(http_client)
+                    .http_client(httpclient)
                     .build()?;
-                Ok(AriesClient::OpenAI(client))
+                Ok(AriesProvider::OpenAI(client))
             },
         }
     }
@@ -97,7 +98,7 @@ impl AriesClient {
         let cwd = cwd.as_ref().to_path_buf();
 
         match self {
-            AriesClient::Anthropic(c) => {
+            AriesProvider::Anthropic(c) => {
                 let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx)
                     .with_lsp_client(lsp_client)
                     .with_extensions(extensions)
@@ -105,7 +106,7 @@ impl AriesClient {
                     .await;
                 Ok((AriesAgent::Anthropic(agent), receiver))
             },
-            AriesClient::Azure(c) => {
+            AriesProvider::Azure(c) => {
                 let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx)
                     .with_lsp_client(lsp_client)
                     .with_extensions(extensions)
@@ -113,7 +114,7 @@ impl AriesClient {
                     .await;
                 Ok((AriesAgent::Azure(agent), receiver))
             },
-            AriesClient::Deepseek(c) => {
+            AriesProvider::Deepseek(c) => {
                 let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx)
                     .with_lsp_client(lsp_client)
                     .with_extensions(extensions)
@@ -121,7 +122,7 @@ impl AriesClient {
                     .await;
                 Ok((AriesAgent::Deepseek(agent), receiver))
             },
-            AriesClient::OpenAI(c) => {
+            AriesProvider::OpenAI(c) => {
                 let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx)
                     .with_lsp_client(lsp_client)
                     .with_extensions(extensions)
@@ -142,19 +143,19 @@ impl AriesClient {
         let model = model.into();
 
         let memories = match self {
-            AriesClient::Anthropic(c) => {
+            AriesProvider::Anthropic(c) => {
                 let extractor = MemoryExtractor::new(c.clone(), model);
                 extractor.extract(user, assistant).await
             },
-            AriesClient::Azure(c) => {
+            AriesProvider::Azure(c) => {
                 let extractor = MemoryExtractor::new(c.clone(), model);
                 extractor.extract(user, assistant).await
             },
-            AriesClient::Deepseek(c) => {
+            AriesProvider::Deepseek(c) => {
                 let extractor = MemoryExtractor::new(c.clone(), model);
                 extractor.extract(user, assistant).await
             },
-            AriesClient::OpenAI(c) => {
+            AriesProvider::OpenAI(c) => {
                 let extractor = MemoryExtractor::new(c.clone(), model);
                 extractor.extract(user, assistant).await
             },
@@ -203,21 +204,12 @@ impl AriesAgent {
         }
     }
 
-    pub fn set_mode(&mut self, mode: Mode) {
+    pub fn preamble(&self) -> &str {
         match self {
-            AriesAgent::Anthropic(a) => a.set_mode(mode),
-            AriesAgent::Azure(a) => a.set_mode(mode),
-            AriesAgent::Deepseek(a) => a.set_mode(mode),
-            AriesAgent::OpenAI(a) => a.set_mode(mode),
-        }
-    }
-
-    pub fn system_prompt(&self) -> String {
-        match self {
-            AriesAgent::Anthropic(a) => a.system_prompt(),
-            AriesAgent::Azure(a) => a.system_prompt(),
-            AriesAgent::Deepseek(a) => a.system_prompt(),
-            AriesAgent::OpenAI(a) => a.system_prompt(),
+            AriesAgent::Anthropic(a) => a.preamble(),
+            AriesAgent::Azure(a) => a.preamble(),
+            AriesAgent::Deepseek(a) => a.preamble(),
+            AriesAgent::OpenAI(a) => a.preamble(),
         }
     }
 }

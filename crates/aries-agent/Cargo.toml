@@ -12,6 +12,7 @@ aries-mode = { path = "../aries-mode" }
 aries-preamble = { path = "../aries-preamble" }
 aries-tools = { path = "../aries-tools" }
 futures.workspace = true
+itertools.workspace = true
 rig-agent.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["fs", "process"] }

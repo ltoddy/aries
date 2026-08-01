@@ -51,9 +51,9 @@ impl LspTool {
 
 impl Tool for LspTool {
     const NAME: &'static str = NAME;
-    type Error = LspError;
     type Args = LspArgs;
     type Output = LspOutput;
+    type Error = LspError;
 
     fn description(&self) -> String {
         include_str!("description.md").to_owned()

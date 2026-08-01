@@ -37,9 +37,9 @@ impl ReadTool {
 
 impl Tool for ReadTool {
     const NAME: &'static str = NAME;
-    type Error = ReadError;
     type Args = ReadArgs;
     type Output = ReadOutput;
+    type Error = ReadError;
 
     fn description(&self) -> String {
         include_str!("description.md").to_owned()

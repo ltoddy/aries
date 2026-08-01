@@ -31,9 +31,9 @@ impl LsTool {
 
 impl Tool for LsTool {
     const NAME: &'static str = NAME;
-    type Error = LsError;
     type Args = LsArgs;
     type Output = LsOutput;
+    type Error = LsError;
 
     fn description(&self) -> String {
         include_str!("description.md").to_owned()

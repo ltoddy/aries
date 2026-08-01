@@ -33,9 +33,9 @@ impl GlobTool {
 
 impl Tool for GlobTool {
     const NAME: &'static str = NAME;
-    type Error = GlobError;
     type Args = GlobArgs;
     type Output = GlobOutput;
+    type Error = GlobError;
 
     fn description(&self) -> String {
         include_str!("description.md").to_owned()
