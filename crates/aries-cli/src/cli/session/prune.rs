@@ -17,7 +17,7 @@ pub struct PruneSessionsArgs {
 pub async fn execute(args: PruneSessionsArgs, gctx: GlobalContext) -> anyhow::Result<()> {
     let db = aries_persistence::connect(&gctx.root_dir)
         .await
-        .with_context(|| format!("Failed to connect local storage: {}", gctx.root_dir.display()))
+        .with_context(|| format!("failed to connect local storage: {}", gctx.root_dir.display()))
         .expect("Run `aries init -h` for initialization");
     let mut session_repo = aries_persistence::SessionRepository::new(db);
 
@@ -38,7 +38,7 @@ pub async fn execute(args: PruneSessionsArgs, gctx: GlobalContext) -> anyhow::Re
         sessions.into_iter().map(|s| (s.session_id, s.root_dir)).collect::<(Vec<_>, Vec<_>)>();
 
     session_repo.delete_by_session_id_in(session_ids.clone()).await.with_context(|| {
-        format!("Failed to delete sessions from local storage: {:?}", session_ids)
+        format!("failed to delete sessions from local storage: {:?}", session_ids)
     })?;
 
     stream::iter(session_dirs)

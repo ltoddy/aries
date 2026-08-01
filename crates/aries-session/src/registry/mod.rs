@@ -34,11 +34,14 @@ impl SessionRegistry {
         &mut self,
         cwd: Option<PathBuf>,
     ) -> anyhow::Result<Vec<aries_persistence::Session>> {
-        let sessions = match cwd {
+        let sessions = match &cwd {
             Some(cwd) => self.session_repo.find_by_cwd(cwd.display().to_string()).await,
             None => self.session_repo.find().await,
         }
-        .with_context(|| "Failed to find session info")?;
+        .with_context(|| match &cwd {
+            Some(cwd) => format!("failed to find session info for cwd {}", cwd.display()),
+            None => "failed to find session info".to_string(),
+        })?;
 
         let sessions = sessions
             .into_iter()
@@ -72,7 +75,7 @@ impl SessionRegistry {
             self.session_repo
                 .delete_by_session_id(&session_id)
                 .await
-                .with_context(|| format!("Failed to delete session {session_id} from database"))?;
+                .with_context(|| format!("failed to delete session {session_id} from database"))?;
             let _ = tokio::fs::remove_dir_all(&session.root_dir).await;
         }
 
@@ -81,11 +84,11 @@ impl SessionRegistry {
 
     pub async fn try_session(
         &mut self,
-        project_dir: impl Into<String>,
+        cwd: impl AsRef<Path>,
         session_id: impl Into<String>,
         args: SessionArgs,
     ) -> anyhow::Result<Session> {
-        let project_dir = project_dir.into();
+        let cwd = cwd.as_ref();
         let session_id = session_id.into();
         if let Some(session) = self.active_sessions.get(&session_id) {
             return Ok(session.to_owned());
@@ -94,7 +97,7 @@ impl SessionRegistry {
         let mcp_config = McpDefinition::empty();
         match self.session_repo.find_last_by_session_id(&session_id).await {
             Ok(_) => self.load_session(session_id, mcp_config).await,
-            Err(_) => self.new_session(project_dir, mcp_config, args).await,
+            Err(_) => self.new_session(cwd, mcp_config, args).await,
         }
     }
 
@@ -130,7 +133,7 @@ impl SessionRegistry {
         )
         .instrument(info_span!("session_init", session_id = %session_id))
         .await
-        .with_context(|| format!("Failed to create session {}", session_id))?;
+        .with_context(|| format!("failed to create session {}", session_id))?;
 
         self.active_sessions.insert(session.id(), session.clone());
         self.session_repo
@@ -141,7 +144,9 @@ impl SessionRegistry {
                 session.transcript_path().display().to_string(),
             )
             .await
-            .with_context(|| "Failed to create session info in local storage")?;
+            .with_context(|| {
+                format!("failed to create session info in local storage for session {session_id}")
+            })?;
 
         Ok(session)
     }
@@ -157,7 +162,7 @@ impl SessionRegistry {
             .session_repo
             .find_last_by_session_id(&session_id)
             .await
-            .with_context(|| format!("Failed to load session {session_id} from database"))?;
+            .with_context(|| format!("failed to load session {session_id} from database"))?;
 
         let model_config = self.setting.active_model()?;
 
@@ -172,7 +177,7 @@ impl SessionRegistry {
         )
         .instrument(info_span!("session_init", session_id = %session_id))
         .await
-        .with_context(|| format!("Failed to load session: {}", session_id))?;
+        .with_context(|| format!("failed to load session {session_id}"))?;
 
         self.active_sessions.insert(session.id(), session.clone());
 

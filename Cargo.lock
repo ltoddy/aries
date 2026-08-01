@@ -457,7 +457,6 @@ dependencies = [
  "futures",
  "http",
  "nanoid",
- "parking_lot",
  "reqwest",
  "reqwest-middleware",
  "reqwest-retry",

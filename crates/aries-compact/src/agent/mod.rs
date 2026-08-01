@@ -93,7 +93,7 @@ where
         #[rustfmt::skip]
         tokio::fs::create_dir_all(&self.transcript_path)
             .await
-            .with_context(|| format!("Failed to create transcript directory `{}`", self.transcript_path.display()))?;
+            .with_context(|| format!("failed to create transcript directory `{}`", self.transcript_path.display()))?;
 
         let now = SystemTime::now();
         let ts = now.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
@@ -101,7 +101,7 @@ where
 
         jsonl::write(&file_path, messages)
             .await
-            .with_context(|| format!("Failed to write transcript file {}", file_path.display()))?;
+            .with_context(|| format!("failed to write transcript file {}", file_path.display()))?;
 
         Ok(file_path)
     }

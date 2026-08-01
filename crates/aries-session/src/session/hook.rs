@@ -8,7 +8,6 @@ use aries_extension::hook::input::{
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
 use aries_persistence::ToolCallRepository;
-use parking_lot::Mutex;
 use rig_agent::agent::hook::CompletionCall;
 use rig_agent::agent::{
     AgentHook, CompletionCallAction, HookContext, InvalidToolCallAction, InvalidToolCallContext,
@@ -19,6 +18,7 @@ use rig_agent::agent::{
 use rig_core::message::Message;
 use serde_json::Value;
 use toasty::Db;
+use tokio::sync::Mutex;
 
 use crate::session::instruction::SharedInstructionContext;
 
@@ -82,10 +82,9 @@ impl AgentHook for SessionPromptHook {
 
         let mut patched = event.history.to_vec();
         for instruction in instructions {
-            let reminder = Message::user(format!(
-                "<system-reminder>\n{}\n</system-reminder>",
-                instruction.render()
-            ));
+            let reminder = Message::user(
+                ["<system-reminder>", &instruction.render(), "</system-reminder>"].join("\n"),
+            );
             patched.push(reminder);
         }
         CompletionCallAction::Patch(RequestPatch::new().history(patched))
@@ -116,7 +115,8 @@ impl AgentHook for SessionPromptHook {
     }
 
     async fn on_tool_call(&self, _ctx: &HookContext, event: ToolCall<'_>) -> ToolCallAction {
-        let call_at = time::Instant::now();
+        let mut last_tool_call_at = self.last_tool_call_at.lock().await;
+        *last_tool_call_at = Some(time::Instant::now());
 
         let tool_input: Value = serde_json::from_str(event.args)
             .unwrap_or_else(|_| Value::String(event.args.to_owned()));
@@ -157,16 +157,8 @@ impl AgentHook for SessionPromptHook {
         .agent_type(&self.agent_type);
 
         match self.executor.fire_pre_tool_use(input).await {
-            HookDecision::Continue => {
-                let mut last_tool_call_at = self.last_tool_call_at.lock();
-                *last_tool_call_at = Some(call_at);
-                ToolCallAction::run()
-            },
-            HookDecision::Terminate { reason } => {
-                let mut last_tool_call_at = self.last_tool_call_at.lock();
-                *last_tool_call_at = None;
-                ToolCallAction::Stop(reason)
-            },
+            HookDecision::Continue => ToolCallAction::run(),
+            HookDecision::Terminate { reason } => ToolCallAction::Stop(reason),
         }
     }
 
@@ -178,6 +170,7 @@ impl AgentHook for SessionPromptHook {
         let duration_ms = self
             .last_tool_call_at
             .lock()
+            .await
             .take()
             .map(|started_at| started_at.elapsed().as_millis() as u64);
 
@@ -275,8 +268,7 @@ impl AgentHook for SessionPromptHook {
         ObservationAction::continue_run()
     }
 
-    fn observes(&self, kind: StepEventKind) -> bool {
-        let _ = kind;
+    fn observes(&self, _kind: StepEventKind) -> bool {
         true
     }
 }

@@ -9,6 +9,7 @@ use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use anyhow::Context;
 use aries_compact::{
     self, AutoCompactBreaker, CompactAgent, CompactOutcome, Decision, TokenEstimator,
 };
@@ -29,7 +30,7 @@ use aries_persistence::SessionRepository;
 use futures::pin_mut;
 use rig_agent::agent::PromptResponse;
 use rig_agent::tool::rmcp::McpClientHandler;
-use rig_agent::tool::server::ToolServer;
+use rig_agent::tool::server::{ToolServer, ToolServerHandle};
 use rig_core::completion::Message;
 use rig_core::message::UserContent;
 use rmcp::RoleClient;
@@ -45,17 +46,18 @@ use self::chat_context::ChatContext;
 use self::chat_history::ChatHistory;
 use self::config::SessionConfig;
 use self::hook::SessionPromptHook;
-use crate::{AriesAgent, AriesProvider};
+use crate::{AriesAgentProvider, AriesClientProvider};
 
 #[derive(Clone)]
 pub struct Session {
     id: String,
 
+    gctx: GlobalContext,
     setting: Setting,
     config: ModelConfig,
     cwd: PathBuf,
-    client: AriesProvider,
-    agent: AriesAgent,
+    client: AriesClientProvider,
+    agent: AriesAgentProvider,
     mode: Mode,
 
     lsp_client: Option<SharedLspClient>,
@@ -68,6 +70,7 @@ pub struct Session {
     session_dir: PathBuf,
     transcripts_dir: PathBuf,
 
+    tool_server_handle: ToolServerHandle,
     cancel_token: CancellationToken,
     receiver: Arc<Mutex<UnboundedReceiver<AgentEvent>>>,
 
@@ -179,16 +182,16 @@ impl Session {
         let session_repo = SessionRepository::new(db.clone());
 
         let mode = Mode::default();
-        let client = AriesProvider::new(&config)?;
+        let client = AriesClientProvider::new(&config)?;
         let (agent, receiver) = client
             .agent(
                 mode,
                 config.clone(),
                 cwd,
-                gctx,
+                gctx.clone(),
                 lsp_client.clone(),
                 extensions.clone(),
-                tool_server_handle,
+                tool_server_handle.clone(),
             )
             .await?;
 
@@ -199,6 +202,7 @@ impl Session {
 
         Ok(Self {
             id,
+            gctx,
             setting,
             config,
             cwd: cwd.to_path_buf(),
@@ -212,6 +216,7 @@ impl Session {
             session_repo,
             session_dir: session_dir.to_path_buf(),
             transcripts_dir,
+            tool_server_handle,
             cancel_token: CancellationToken::new(),
             receiver: Arc::new(Mutex::new(receiver)),
             compact_breaker: AutoCompactBreaker::new(),
@@ -233,33 +238,45 @@ impl Session {
             .find(|m| m.alias() == alias)
             .ok_or_else(|| SettingError::not_found(&alias))?;
 
-        self.client = AriesProvider::new(config)?;
-        // let memory = Self::load_memory(&self.memory_store).await;
-        // let (agent, agent_events) = self
-        //     .client
-        //     .agent(
-        //         self.mode,
-        //         self.config.clone(),
-        //         self.cwd.clone(),
-        //         self.lsp_client.clone(),
-        //         memory,
-        //         self.extensions.clone(),
-        //         self.mcp_tools.to_vec(),
-        //     )
-        //     .await?;
+        self.client = AriesClientProvider::new(config)?;
+        let (agent, receiver) = self
+            .client
+            .agent(
+                self.mode,
+                config.clone(),
+                self.cwd.clone(),
+                self.gctx.clone(),
+                self.lsp_client.clone(),
+                self.extensions.clone(),
+                self.tool_server_handle.clone(),
+            )
+            .await
+            .with_context(|| format!("failed to create agent for model {alias}"))?;
 
-        // TODO: Agent 自己实现
-
-        // self.agent = agent;
-        // self.receiver = Arc::new(Mutex::new(agent_events));
+        self.agent = agent;
+        self.receiver = Arc::new(Mutex::new(receiver));
         self.config = config.to_owned();
         self.setting.active = alias;
         Ok(())
     }
 
     pub async fn set_mode(&mut self, mode: Mode) -> anyhow::Result<()> {
-        // TODO 需要重新 build
-        // self.agent.set_mode(mode);
+        let (agent, receiver) = self
+            .client
+            .agent(
+                mode,
+                self.config.clone(),
+                self.cwd.clone(),
+                self.gctx.clone(),
+                self.lsp_client.clone(),
+                self.extensions.clone(),
+                self.tool_server_handle.clone(),
+            )
+            .await
+            .with_context(|| format!("failed to create agent for mode {mode}"))?;
+
+        self.agent = agent;
+        self.receiver = Arc::new(Mutex::new(receiver));
         self.mode = mode;
         Ok(())
     }
@@ -436,22 +453,22 @@ impl Session {
         }
 
         let outcome = match self.client.clone() {
-            AriesProvider::Anthropic(client) => {
+            AriesClientProvider::Anthropic(client) => {
                 let mut compact_agent =
                     CompactAgent::new(client, self.config.model(), &self.transcripts_dir);
                 compact_agent.compact(self.chat_context.history()).await
             },
-            AriesProvider::Azure(client) => {
+            AriesClientProvider::Azure(client) => {
                 let mut compact_agent =
                     CompactAgent::new(client, self.config.model(), &self.transcripts_dir);
                 compact_agent.compact(self.chat_context.history()).await
             },
-            AriesProvider::Deepseek(client) => {
+            AriesClientProvider::Deepseek(client) => {
                 let mut compact_agent =
                     CompactAgent::new(client, self.config.model(), &self.transcripts_dir);
                 compact_agent.compact(self.chat_context.history()).await
             },
-            AriesProvider::OpenAI(client) => {
+            AriesClientProvider::OpenAI(client) => {
                 let mut compact_agent =
                     CompactAgent::new(client, self.config.model(), &self.transcripts_dir);
                 compact_agent.compact(self.chat_context.history()).await

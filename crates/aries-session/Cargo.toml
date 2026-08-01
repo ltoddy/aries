@@ -21,7 +21,6 @@ aries-tools = { path = "../aries-tools" }
 futures.workspace = true
 http.workspace = true
 nanoid.workspace = true
-parking_lot.workspace = true
 reqwest.workspace = true
 reqwest-middleware.workspace = true
 reqwest-retry.workspace = true
