@@ -27,11 +27,13 @@ use aries_lspclient::{LspServerInfo, SharedLspClient, warm_up};
 use aries_memory::MemoryStore;
 use aries_mode::Mode;
 use aries_persistence::SessionRepository;
+use aries_tools::{edit, write};
 use rig_agent::agent::PromptResponse;
 use rig_agent::tool::rmcp::McpClientHandler;
 use rig_agent::tool::server::{ToolServer, ToolServerHandle};
+use rig_core::OneOrMany;
 use rig_core::completion::{Message, Usage};
-use rig_core::message::UserContent;
+use rig_core::message::{AssistantContent, UserContent};
 use rmcp::RoleClient;
 use rmcp::service::RunningService;
 use toasty::Db;
@@ -68,7 +70,7 @@ pub struct Session {
     session_repo: SessionRepository,
 
     session_dir: PathBuf,
-    transcripts_dir: PathBuf,
+    transcript_path: PathBuf,
 
     tool_server_handle: ToolServerHandle,
     cancel_token: CancellationToken,
@@ -147,87 +149,6 @@ impl Session {
         .await
     }
 
-    #[allow(clippy::too_many_arguments)]
-    async fn build(
-        id: impl Into<String>,
-        cwd: impl AsRef<Path>,
-        gctx: GlobalContext,
-        config: ModelConfig,
-        setting: Setting,
-        db: Db,
-        external_mcp_config: McpDefinition,
-        source: SessionStartSource,
-        args: SessionArgs,
-    ) -> anyhow::Result<Self> {
-        let id = id.into();
-        let cwd = cwd.as_ref();
-        let session_dir = gctx.root_dir.join(format!("session-{id}"));
-        let transcripts_dir = session_dir.join("transcripts");
-
-        aries_logger::register(&id, &session_dir);
-
-        let lsp_client = Self::warm_up_lsp(cwd).await;
-
-        let mut extensions =
-            if args.bare { AgentExtensions::empty() } else { AgentExtensions::new(cwd).await };
-        extensions.mcps.push(external_mcp_config);
-        let tool_server_handle = ToolServer::new().run();
-        let mcp_services = mcp::connect(&extensions.mcps, tool_server_handle.clone()).await;
-
-        let mem_store = MemoryStore::new(&gctx.memory_dir).await;
-
-        let chat_history = ChatHistory::new(&session_dir).await;
-        let chat_context = ChatContext::new(&session_dir).await;
-
-        let session_repo = SessionRepository::new(db.clone());
-
-        let mode = Mode::default();
-        let client = AriesClientProvider::new(&config)?;
-        let (agent, receiver) = client
-            .agent(
-                mode,
-                config.clone(),
-                cwd,
-                gctx.clone(),
-                lsp_client.clone(),
-                extensions.clone(),
-                tool_server_handle.clone(),
-            )
-            .await?;
-
-        let hooks_executor = Arc::new(HooksExecutor::new(extensions.hooks.clone()));
-
-        let input = SessionStartHookInput::new(&id, cwd, source, config.model(), mode);
-        hooks_executor.fire_session_start(input).await;
-
-        Ok(Self {
-            id,
-            gctx,
-            setting,
-            config,
-            cwd: cwd.to_path_buf(),
-            client,
-            agent,
-            mode,
-            lsp_client,
-            chat_history,
-            chat_context,
-            db,
-            session_repo,
-            session_dir: session_dir.to_path_buf(),
-            transcripts_dir,
-            tool_server_handle,
-            cancel_token: CancellationToken::new(),
-            receiver: Arc::new(Mutex::new(receiver)),
-            compact_breaker: AutoCompactBreaker::new(),
-            hooks_executor,
-            memory_store: mem_store,
-            mcp_clients: Arc::new(mcp_services),
-            extensions,
-            last_assistant_message: None,
-        })
-    }
-
     pub async fn set_model(&mut self, alias: impl Into<String>) -> anyhow::Result<()> {
         let alias = alias.into();
 
@@ -299,14 +220,20 @@ impl Session {
         self.fire_user_prompt_submit(&title).await?;
         self.pre_compact(&prompt, callback.clone()).await;
 
-        let prompt_res = {
-            let history = self.chat_context.history().to_vec();
+        let context = self.recall_context(&title).await;
+        let mut history = self.chat_context.history().to_vec();
+        if let Some(reminder) = context {
+            history.push(Message::user(
+                ["<system-reminder>", &reminder, "</system-reminder>"].join("\n"),
+            ));
+        }
+        let final_res = {
             let hook = self.session_hook();
             let future = self.agent.prompt(prompt, history, hook);
             pin!(future);
 
             let mut guard = self.receiver.lock().await;
-            let mut prompt_res = Ok(PromptResponse::empty());
+            let mut final_res = Ok(PromptResponse::empty());
             loop {
                 tokio::select! {
                     biased;
@@ -317,7 +244,7 @@ impl Session {
                         }
                     }
                     res = &mut future => {
-                        prompt_res = res;
+                        final_res = res;
                         break;
                     }
                 }
@@ -327,7 +254,7 @@ impl Session {
             }
             drop(guard);
 
-            match prompt_res {
+            match final_res {
                 Ok(res) => res,
                 Err(err) => {
                     self.fire_stop_failure(err.to_string()).await;
@@ -336,25 +263,40 @@ impl Session {
             }
         };
 
-        self.last_assistant_message = Some(prompt_res.output().to_owned());
-        if let Some(messages) = prompt_res.messages() {
+        self.last_assistant_message = Some(final_res.output().to_owned());
+        if let Some(messages) = final_res.messages() {
             self.append_messages(messages);
         }
-        self.fire_stop(prompt_res.output()).await;
-        self.sift(title, prompt_res.output());
-        self.post_compact(prompt_res.usage(), callback).await;
+        self.fire_stop(final_res.output()).await;
+        self.sift(final_res.messages(), title, final_res.output());
+        self.post_compact(final_res.usage(), callback).await;
 
         Ok(())
     }
 
-    pub fn sift(&self, query: impl Into<String>, reply: impl Into<String>) {
+    pub fn sift(
+        &self,
+        messages: Option<&[Message]>,
+        query: impl Into<String>,
+        reply: impl Into<String>,
+    ) {
+        if messages
+            .map(|messages| agent_wrote_memory(messages, self.memory_store.dir()))
+            .unwrap_or(false)
+        {
+            info!("本轮主模型已直接写入记忆，跳过后台记忆代理");
+            return;
+        }
+
         let client = self.client.clone();
         let model = self.config.model();
         let memory_store = self.memory_store.clone();
         let query = query.into();
         let reply = reply.into();
         tokio::spawn(async move {
-            client.extract_memories(&model, query, reply, &memory_store).await;
+            let manifest = memory_store.read_manifest().await.ok().flatten();
+            let memory_agent = client.memory_agent(model, memory_store.dir()).await;
+            memory_agent.run(manifest, query, reply).await;
         });
     }
 
@@ -380,7 +322,7 @@ impl Session {
             PostCompactTrigger::Auto,
             PreCompactCustomInstructions::Auto,
         )
-        .transcript_path(&self.transcripts_dir);
+        .transcript_path(&self.transcript_path);
         if let HookDecision::Terminate { .. } = self.hooks_executor.fire_pre_compact(input).await {
             return false;
         }
@@ -388,22 +330,22 @@ impl Session {
         let outcome = match self.client.clone() {
             AriesClientProvider::Anthropic(client) => {
                 let mut compact_agent =
-                    CompactAgent::new(client, self.config.model(), &self.transcripts_dir);
+                    CompactAgent::new(client, self.config.model(), &self.transcript_path);
                 compact_agent.compact(self.chat_context.history()).await
             },
             AriesClientProvider::Azure(client) => {
                 let mut compact_agent =
-                    CompactAgent::new(client, self.config.model(), &self.transcripts_dir);
+                    CompactAgent::new(client, self.config.model(), &self.transcript_path);
                 compact_agent.compact(self.chat_context.history()).await
             },
             AriesClientProvider::Deepseek(client) => {
                 let mut compact_agent =
-                    CompactAgent::new(client, self.config.model(), &self.transcripts_dir);
+                    CompactAgent::new(client, self.config.model(), &self.transcript_path);
                 compact_agent.compact(self.chat_context.history()).await
             },
             AriesClientProvider::OpenAI(client) => {
                 let mut compact_agent =
-                    CompactAgent::new(client, self.config.model(), &self.transcripts_dir);
+                    CompactAgent::new(client, self.config.model(), &self.transcript_path);
                 compact_agent.compact(self.chat_context.history()).await
             },
         };
@@ -431,7 +373,7 @@ impl Session {
                     PostCompactTrigger::Auto,
                     compact_summary,
                 )
-                .transcript_path(&self.transcripts_dir);
+                .transcript_path(&self.transcript_path);
                 self.hooks_executor.fire_post_compact(input).await;
                 true
             },
@@ -456,25 +398,6 @@ impl Session {
                 false
             },
         }
-    }
-
-    async fn update_title(&mut self, prompt: &Message) -> String {
-        let title = message_to_simple_text(prompt);
-        let _ = self.session_repo.update_title_by_session_id(&self.id, &title).await;
-        title
-    }
-
-    async fn warm_up_lsp(dir: impl AsRef<Path>) -> Option<SharedLspClient> {
-        let dir = dir.as_ref();
-
-        if let Some(info) = LspServerInfo::detect(dir)
-            && info.installed()
-            && let Ok(lsp) = warm_up(info, dir).await
-        {
-            return Some(lsp);
-        }
-
-        None
     }
 
     pub fn id(&self) -> String {
@@ -510,14 +433,115 @@ impl Session {
     }
 
     pub fn transcript_path(&self) -> &Path {
-        &self.transcripts_dir
+        &self.transcript_path
     }
 
     pub async fn close(&self) {
         let input = SessionEndHookInput::new(&self.id, &self.cwd, SessionEndReason::Logout)
-            .transcript_path(&self.transcripts_dir);
+            .transcript_path(&self.transcript_path);
 
         self.hooks_executor.fire_session_end(input).await;
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn build(
+        id: impl Into<String>,
+        cwd: impl AsRef<Path>,
+        gctx: GlobalContext,
+        config: ModelConfig,
+        setting: Setting,
+        db: Db,
+        external_mcp_config: McpDefinition,
+        source: SessionStartSource,
+        args: SessionArgs,
+    ) -> anyhow::Result<Self> {
+        let id = id.into();
+        let cwd = cwd.as_ref();
+        let session_dir = gctx.root_dir.join(format!("session-{id}"));
+        let transcript_path = session_dir.join("transcripts");
+
+        aries_logger::register(&id, &session_dir);
+
+        let lsp_client = Self::warm_up_lsp(cwd).await;
+
+        let mut extensions =
+            if args.bare { AgentExtensions::empty() } else { AgentExtensions::new(cwd).await };
+        extensions.mcps.push(external_mcp_config);
+        let tool_server_handle = ToolServer::new().run();
+        let mcp_clients = mcp::connect(&extensions.mcps, tool_server_handle.clone()).await;
+
+        let memory_store =
+            MemoryStore::new(gctx.memory_root_dir.join(aries_filesystem::path_to_slug(cwd))).await;
+
+        let chat_history = ChatHistory::new(&session_dir).await;
+        let chat_context = ChatContext::new(&session_dir).await;
+
+        let session_repo = SessionRepository::new(db.clone());
+
+        let mode = Mode::default();
+        let client = AriesClientProvider::new(&config)?;
+        let (agent, receiver) = client
+            .agent(
+                mode,
+                config.clone(),
+                cwd,
+                gctx.clone(),
+                lsp_client.clone(),
+                extensions.clone(),
+                tool_server_handle.clone(),
+            )
+            .await?;
+
+        let hooks_executor = Arc::new(HooksExecutor::new(extensions.hooks.clone()));
+
+        let input = SessionStartHookInput::new(&id, cwd, source, config.model(), mode);
+        hooks_executor.fire_session_start(input).await;
+
+        Ok(Self {
+            id,
+            gctx,
+            setting,
+            config,
+            cwd: cwd.to_path_buf(),
+            client,
+            agent,
+            mode,
+            lsp_client,
+            chat_history,
+            chat_context,
+            db,
+            session_repo,
+            session_dir: session_dir.to_path_buf(),
+            transcript_path,
+            tool_server_handle,
+            cancel_token: CancellationToken::new(),
+            receiver: Arc::new(Mutex::new(receiver)),
+            compact_breaker: AutoCompactBreaker::new(),
+            hooks_executor,
+            memory_store,
+            mcp_clients: Arc::new(mcp_clients),
+            extensions,
+            last_assistant_message: None,
+        })
+    }
+
+    async fn update_title(&mut self, prompt: &Message) -> String {
+        let title = message_to_simple_text(prompt);
+        let _ = self.session_repo.update_title_by_session_id(&self.id, &title).await;
+        title
+    }
+
+    async fn warm_up_lsp(dir: impl AsRef<Path>) -> Option<SharedLspClient> {
+        let dir = dir.as_ref();
+
+        if let Some(info) = LspServerInfo::detect(dir)
+            && info.installed()
+            && let Ok(lsp) = warm_up(info, dir).await
+        {
+            return Some(lsp);
+        }
+
+        None
     }
 
     fn session_hook(&self) -> SessionPromptHook {
@@ -525,11 +549,32 @@ impl Session {
             self.hooks_executor.clone(),
             &self.id,
             &self.cwd,
-            &self.transcripts_dir,
+            &self.transcript_path,
             self.mode.id(),
             self.mode.name(),
             self.db.clone(),
         )
+    }
+
+    async fn recall_context(&self, query: impl Into<String>) -> Option<String> {
+        let memories = self.memory_store.scan().await;
+        let retriever = self.client.memory_retriever(self.config.model());
+        let retrieved = retriever.retrieve(query, &memories).await;
+
+        let mut blocks = Vec::<String>::with_capacity(retrieved.len());
+        for file_name in retrieved {
+            if let Some(body) = self.memory_store.read_memory(&file_name).await {
+                blocks.push(format!("## {file_name}\n\n{body}"));
+            }
+        }
+
+        if blocks.is_empty() {
+            return None;
+        }
+        Some(format!(
+            "以下是与当前对话相关的历史记忆（自动召回，用户不可见）：\n\n{}",
+            blocks.join("\n\n")
+        ))
     }
 
     async fn fire_user_prompt_submit(
@@ -537,7 +582,7 @@ impl Session {
         prompt: impl Into<String>,
     ) -> aries_agent::AriesResult<()> {
         let input = UserPromptSubmitHookInput::new(&self.id, &self.cwd, prompt)
-            .transcript_path(&self.transcripts_dir);
+            .transcript_path(&self.transcript_path);
         if let HookDecision::Terminate { reason } =
             self.hooks_executor.fire_user_prompt_submit(input).await
         {
@@ -556,7 +601,7 @@ impl Session {
     async fn fire_stop_failure(&self, error: impl Into<String>) {
         let error = error.into();
         let input = StopFailureHookInput::new(&self.id, &self.cwd, &error)
-            .transcript_path(&self.transcripts_dir)
+            .transcript_path(&self.transcript_path)
             .error_details(&error);
 
         let input = match &self.last_assistant_message {
@@ -585,12 +630,12 @@ impl Session {
 
         let window = aries_compact::ContextWindow::for_model(self.config.model());
         let compact_threshold = window.auto_compact_threshold();
-        let estimate_tokens =
+        let estimated_tokens =
             self.chat_context.history().estimate_tokens().saturating_add(prompt.estimate_tokens());
 
-        if estimate_tokens >= compact_threshold {
+        if estimated_tokens >= compact_threshold {
             let text = format!(
-                "\n预估 tokens {estimate_tokens} 已达阈值 {compact_threshold}（上下文窗口 {}），提前触发压缩...\n",
+                "\n预估 tokens {estimated_tokens} 已达阈值 {compact_threshold}（上下文窗口 {}），提前触发压缩...\n",
                 window.total
             );
             callback(AgentEvent::text(true, self.mode.name(), text)).await;
@@ -625,4 +670,23 @@ fn message_to_simple_text(message: &Message) -> String {
         },
         _ => String::new(),
     }
+}
+
+fn agent_wrote_memory(messages: &[Message], memory_dir: impl AsRef<Path>) -> bool {
+    let memory_dir = memory_dir.as_ref();
+
+    messages
+        .iter()
+        .filter_map(|m| match m {
+            Message::Assistant { content, .. } => Some(content),
+            _ => None,
+        })
+        .flat_map(OneOrMany::iter)
+        .filter_map(|c| match c {
+            AssistantContent::ToolCall(tc) => Some(tc),
+            _ => None,
+        })
+        .filter(|tc| matches!(tc.function.name.as_str(), write::NAME | edit::NAME))
+        .filter_map(|tc| tc.function.arguments.get("file_path").and_then(|v| v.as_str()))
+        .any(|file_path| PathBuf::from(file_path).starts_with(memory_dir))
 }

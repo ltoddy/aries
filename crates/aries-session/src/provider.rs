@@ -5,9 +5,7 @@ use aries_event::AgentEvent;
 use aries_extension::AgentExtensions;
 use aries_init::{GlobalContext, ModelConfig};
 use aries_lspclient::SharedLspClient;
-use aries_memory::{
-    ExtractedMemory, ManifestEntry, MemoryExtractor, MemoryFrontmatter, MemoryStore,
-};
+use aries_memory::{Memory, MemoryAgent, MemoryRetriever};
 use aries_mode::Mode;
 use reqwest_middleware::ClientWithMiddleware;
 use reqwest_retry::RetryTransientMiddleware;
@@ -127,42 +125,41 @@ impl AriesClientProvider {
         }
     }
 
-    pub async fn extract_memories(
+    pub async fn memory_agent(
         &self,
         model: impl Into<String>,
-        user: impl Into<String>,
-        assistant: impl Into<String>,
-        store: &MemoryStore,
-    ) {
-        let model = model.into();
-
-        let memories = match self {
+        mem_dir: impl AsRef<Path>,
+    ) -> MemoryAgentProvider {
+        match self {
             AriesClientProvider::Anthropic(c) => {
-                let extractor = MemoryExtractor::new(c.clone(), model);
-                extractor.extract(user, assistant).await
+                MemoryAgentProvider::Anthropic(MemoryAgent::new(c.clone(), model, mem_dir).await)
             },
             AriesClientProvider::Azure(c) => {
-                let extractor = MemoryExtractor::new(c.clone(), model);
-                extractor.extract(user, assistant).await
+                MemoryAgentProvider::Azure(MemoryAgent::new(c.clone(), model, mem_dir).await)
             },
             AriesClientProvider::Deepseek(c) => {
-                let extractor = MemoryExtractor::new(c.clone(), model);
-                extractor.extract(user, assistant).await
+                MemoryAgentProvider::Deepseek(MemoryAgent::new(c.clone(), model, mem_dir).await)
             },
             AriesClientProvider::OpenAI(c) => {
-                let extractor = MemoryExtractor::new(c.clone(), model);
-                extractor.extract(user, assistant).await
+                MemoryAgentProvider::OpenAI(MemoryAgent::new(c.clone(), model, mem_dir).await)
             },
-        };
+        }
+    }
 
-        for mem in memories {
-            let ExtractedMemory { name, description, memory_type, body } = mem;
-
-            let frontmatter = MemoryFrontmatter::new(&name, &description, memory_type);
-            if store.write_memory(frontmatter, body).await.is_ok() {
-                let entry = ManifestEntry::new(format!("{name}.md"), description.clone());
-                let _ = store.append_to_manifest(entry).await;
-            }
+    pub fn memory_retriever(&self, model: impl Into<String>) -> MemoryRetrieverProvider {
+        match self {
+            AriesClientProvider::Anthropic(c) => {
+                MemoryRetrieverProvider::Anthropic(MemoryRetriever::new(c.clone(), model))
+            },
+            AriesClientProvider::Azure(c) => {
+                MemoryRetrieverProvider::Azure(MemoryRetriever::new(c.clone(), model))
+            },
+            AriesClientProvider::Deepseek(c) => {
+                MemoryRetrieverProvider::Deepseek(MemoryRetriever::new(c.clone(), model))
+            },
+            AriesClientProvider::OpenAI(c) => {
+                MemoryRetrieverProvider::OpenAI(MemoryRetriever::new(c.clone(), model))
+            },
         }
     }
 }
@@ -203,6 +200,48 @@ impl AriesAgentProvider {
             AriesAgentProvider::Azure(a) => a.preamble(),
             AriesAgentProvider::Deepseek(a) => a.preamble(),
             AriesAgentProvider::OpenAI(a) => a.preamble(),
+        }
+    }
+}
+
+pub enum MemoryAgentProvider {
+    Anthropic(MemoryAgent<anthropic::completion::CompletionModel<ClientWithMiddleware>>),
+    Azure(MemoryAgent<azure::CompletionModel<ClientWithMiddleware>>),
+    Deepseek(MemoryAgent<deepseek::CompletionModel<ClientWithMiddleware>>),
+    OpenAI(MemoryAgent<openai::CompletionModel<ClientWithMiddleware>>),
+}
+
+impl MemoryAgentProvider {
+    #[inline]
+    pub async fn run(
+        &self,
+        manifest: Option<String>,
+        user: impl Into<String>,
+        assistant: impl Into<String>,
+    ) {
+        match self {
+            MemoryAgentProvider::Anthropic(a) => a.run(manifest, user, assistant).await,
+            MemoryAgentProvider::Azure(a) => a.run(manifest, user, assistant).await,
+            MemoryAgentProvider::Deepseek(a) => a.run(manifest, user, assistant).await,
+            MemoryAgentProvider::OpenAI(a) => a.run(manifest, user, assistant).await,
+        }
+    }
+}
+
+pub enum MemoryRetrieverProvider {
+    Anthropic(MemoryRetriever<anthropic::completion::CompletionModel<ClientWithMiddleware>>),
+    Azure(MemoryRetriever<azure::CompletionModel<ClientWithMiddleware>>),
+    Deepseek(MemoryRetriever<deepseek::CompletionModel<ClientWithMiddleware>>),
+    OpenAI(MemoryRetriever<openai::CompletionModel<ClientWithMiddleware>>),
+}
+
+impl MemoryRetrieverProvider {
+    pub async fn retrieve(&self, query: impl Into<String>, memories: &[Memory]) -> Vec<String> {
+        match self {
+            MemoryRetrieverProvider::Anthropic(a) => a.retrieve(query, memories).await,
+            MemoryRetrieverProvider::Azure(a) => a.retrieve(query, memories).await,
+            MemoryRetrieverProvider::Deepseek(a) => a.retrieve(query, memories).await,
+            MemoryRetrieverProvider::OpenAI(a) => a.retrieve(query, memories).await,
         }
     }
 }

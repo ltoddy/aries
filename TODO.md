@@ -26,6 +26,7 @@
 - [ ] 优化长期记忆系统
   - [x] 历史与上下文持久化异步化：extend 改为 channel + 后台 task 写文件，不再阻塞 prompt 流程
   - [x] 记忆提取后台化：prompt 后 spawn 后台 task 提取记忆（复用 sift）
+  - [x] 长期记忆重构：extractor 拆分为 MemoryRetriever（召回相关记忆）与 MemoryAgent（后台提取记忆写盘），selector 命名统一收敛为 retriever（Memory / as_retriever_line / retrieve / RetrievedMemories）
 - [x] 上下文压缩：prompt 前按预估 token 预判压缩，prompt 后按实际 token 复核压缩（pre_compact / post_compact），micro_compact 保留更多最近消息
 - [x] 代码优化：prompt 流程提取 helper（fire_stop / append_messages / session_hook 等），agent.prompt 改 &self，callback 改 Fn + Clone
 - [ ] 优化 mcp 启动 (超时，连接速度，连接异常)

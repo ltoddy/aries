@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 aries-filesystem = { path = "../aries-filesystem" }
+aries-tools = { path = "../aries-tools" }
 itertools.workspace = true
 rig-agent.workspace = true
 rig-core.workspace = true

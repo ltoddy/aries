@@ -16,3 +16,13 @@ pub async fn path_to_uri(path: impl AsRef<Path>) -> String {
         .map(|u| u.to_string())
         .unwrap_or_else(|_| format!("file://{}", path.display()))
 }
+
+pub fn path_to_slug(path: impl AsRef<Path>) -> String {
+    let path = path.as_ref();
+    let path = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+
+    path.to_string_lossy()
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '-' })
+        .collect::<String>()
+}

@@ -1,5 +1,7 @@
-mod extractor;
+mod agent;
+mod retriever;
 mod store;
 
-pub use self::extractor::{ExtractedMemory, MemoryExtractor};
-pub use self::store::{ManifestEntry, MemoryFrontmatter, MemoryStore, MemoryType};
+pub use self::agent::MemoryAgent;
+pub use self::retriever::MemoryRetriever;
+pub use self::store::{Memory, MemoryFrontmatter, MemoryStore, MemoryType};

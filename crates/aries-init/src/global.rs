@@ -4,7 +4,7 @@ use std::path::PathBuf;
 pub struct GlobalContext {
     pub home_dir: PathBuf,
     pub root_dir: PathBuf,
-    pub memory_dir: PathBuf,
+    pub memory_root_dir: PathBuf,
     pub user: String,
 }
 
@@ -15,10 +15,10 @@ impl GlobalContext {
         let root_dir = home_dir.join(".local").join("share").join("aries");
         tokio::fs::create_dir_all(&root_dir).await.expect("failed to create Aries root directory");
 
-        let memory_dir = root_dir.join("memory");
+        let memory_root_dir = root_dir.join("projects");
 
         let user = whoami::realname().unwrap_or_default();
 
-        Self { home_dir, root_dir, memory_dir, user }
+        Self { home_dir, root_dir, memory_root_dir, user }
     }
 }

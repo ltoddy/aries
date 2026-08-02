@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 use std::fmt::{Display, Formatter};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -6,9 +9,6 @@ use aries_filesystem::document::FrontmatterDocument;
 use itertools::Itertools;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use tokio::fs::OpenOptions;
-use tokio::io::AsyncWriteExt;
-use tracing::info;
 
 #[derive(Clone)]
 pub struct MemoryStore {
@@ -19,23 +19,20 @@ impl MemoryStore {
     const MANIFEST_FILENAME: &str = "MEMORY.md";
 
     pub async fn new(dir: impl AsRef<Path>) -> Self {
-        let dir = dir.as_ref().to_path_buf();
+        let dir = dir.as_ref();
+        _ = tokio::fs::create_dir_all(dir).await;
 
-        Self { dir }
+        Self { dir: dir.to_path_buf() }
     }
 
-    pub async fn write_memory(
-        &self,
-        frontmatter: MemoryFrontmatter,
-        body: impl Into<String>,
-    ) -> Result<(), aries_filesystem::document::DocumentError> {
-        _ = tokio::fs::create_dir_all(&self.dir).await;
-        let filename = to_filename(&frontmatter.name);
-        let file_path = self.dir.join(&filename);
+    pub async fn read_memory(&self, file_name: impl Into<String>) -> Option<String> {
+        let file_name = file_name.into();
+        let file_path = self.dir.join(file_name);
 
-        let document = FrontmatterDocument::new(&file_path, frontmatter, body);
-        info!(file_path = %file_path.display(), "writing memory");
-        document.write().await
+        FrontmatterDocument::<MemoryFrontmatter>::read(&file_path)
+            .await
+            .ok()
+            .map(|document| document.body.trim().to_owned())
     }
 
     pub async fn read_manifest(&self) -> io::Result<Option<String>> {
@@ -43,22 +40,36 @@ impl MemoryStore {
 
         match tokio::fs::read_to_string(&file_path).await.map(|content| content.trim().to_owned()) {
             Ok(content) if content.is_empty() => Ok(None),
-            Ok(content) => Ok(Some(content.lines().filter(|l| l.trim().is_empty()).join("\n"))),
+            Ok(content) => Ok(Some(content.lines().filter(|l| !l.trim().is_empty()).join("\n"))),
             Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(None),
             Err(err) => Err(err),
         }
     }
 
-    pub async fn append_to_manifest(&self, entry: ManifestEntry) -> io::Result<()> {
-        let file_path = self.dir.join(Self::MANIFEST_FILENAME);
+    pub async fn scan(&self) -> Vec<Memory> {
+        let Ok(mut entries) = tokio::fs::read_dir(&self.dir).await else { return vec![] };
 
-        let line = format!("{}\n", entry.format());
+        let mut memories = vec![];
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            let path = entry.path();
 
-        let mut file = OpenOptions::new().append(true).create(true).open(&file_path).await?;
-        file.write_all(line.as_bytes()).await?;
+            let Some(file_name) = path.file_name() else {
+                continue;
+            };
+            let file_name = file_name.to_string_lossy().into_owned();
+            if file_name == Self::MANIFEST_FILENAME {
+                continue;
+            }
+            if !file_name.ends_with(".md") {
+                continue;
+            }
 
-        info!(file_path = %file_path.display(), entry = %entry.filename, "appending to manifest");
-        Ok(())
+            if let Ok(doc) = FrontmatterDocument::<MemoryFrontmatter>::read(&path).await {
+                memories.push(Memory::new(path, file_name, doc.frontmatter, doc.body))
+            }
+        }
+
+        memories
     }
 
     pub fn dir(&self) -> &Path {
@@ -67,32 +78,33 @@ impl MemoryStore {
 }
 
 #[derive(Debug, Clone)]
-pub struct ManifestEntry {
-    pub filename: String,
-    pub description: String,
+pub struct Memory {
+    pub location: PathBuf,
+    pub file_name: String,
+    pub frontmatter: MemoryFrontmatter,
+    pub body: String,
 }
 
-impl ManifestEntry {
-    pub fn new(filename: impl Into<String>, description: impl Into<String>) -> Self {
-        let filename = filename.into();
-        let description = description.into();
+impl Memory {
+    pub fn new(
+        location: impl AsRef<Path>,
+        file_name: impl Into<String>,
+        frontmatter: MemoryFrontmatter,
+        body: impl Into<String>,
+    ) -> Self {
+        let location = location.as_ref();
+        let file_name = file_name.into();
+        let body = body.into();
 
-        Self { filename, description }
+        Self { location: location.to_path_buf(), file_name, frontmatter, body }
     }
 
-    pub fn format(&self) -> String {
-        format!("- [{}]({}) — {}\n", self.filename, self.filename, self.description)
+    pub fn as_retriever_line(&self) -> String {
+        format!(
+            "- [{}] ({}) — {}",
+            self.file_name, self.frontmatter.memory_type, self.frontmatter.description
+        )
     }
-}
-
-fn to_filename(name: &str) -> String {
-    let slug = name
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { '_' })
-        .collect::<String>();
-
-    let trimmed = slug.trim_matches('_').replace("__", "_");
-    format!("{}.md", trimmed)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -101,19 +113,6 @@ pub struct MemoryFrontmatter {
     pub description: String,
     #[serde(rename = "type")]
     pub memory_type: MemoryType,
-}
-
-impl MemoryFrontmatter {
-    pub fn new(
-        name: impl Into<String>,
-        description: impl Into<String>,
-        memory_type: MemoryType,
-    ) -> Self {
-        let name = name.into();
-        let description = description.into();
-
-        Self { name, description, memory_type }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
