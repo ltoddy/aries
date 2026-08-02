@@ -7,6 +7,7 @@ use aries_init::{GlobalContext, ModelConfig};
 use aries_lspclient::SharedLspClient;
 use aries_memory::{Memory, MemoryAgent, MemoryRetriever};
 use aries_mode::Mode;
+use http::{HeaderMap, header};
 use reqwest_middleware::ClientWithMiddleware;
 use reqwest_retry::RetryTransientMiddleware;
 use reqwest_retry::policies::ExponentialBackoff;
@@ -29,7 +30,11 @@ pub enum AriesClientProvider {
 
 impl AriesClientProvider {
     pub fn new(config: &ModelConfig) -> http_client::Result<Self> {
+        let mut default_headers = HeaderMap::new();
+        default_headers.insert("HTTP-Referer", header::HeaderValue::from_static("")); // TODO
+        default_headers.insert("X-Title", header::HeaderValue::from_static("Aries"));
         let http_client = reqwest::Client::builder()
+            .default_headers(default_headers)
             .build()
             .expect("Failed to build http client for llm provider");
 
