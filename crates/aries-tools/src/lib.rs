@@ -17,7 +17,6 @@ pub const ALL_TOOL_NAMES: &[&str] = &[
     edit::NAME,
     glob::NAME,
     grep::NAME,
-    ls::NAME,
     lsp::NAME,
     multiedit::NAME,
     question::NAME,
@@ -50,7 +49,6 @@ pub fn tool_names_from_mode(mode: Mode) -> Vec<&'static str> {
         read::NAME,
         glob::NAME,
         grep::NAME,
-        ls::NAME,
         codesearch::NAME,
         webfetch::NAME,
         websearch::NAME,
@@ -105,9 +103,6 @@ pub fn create_tools_from_tool_names(
             },
             grep::NAME => {
                 tool_set.add_tool(grep::GrepTool::new(cwd));
-            },
-            ls::NAME => {
-                tool_set.add_tool(ls::LsTool::new(cwd));
             },
             lsp::NAME => {
                 if let Some(lsp_client) = lsp_client.clone() {

@@ -9,7 +9,6 @@ use aries_tools::codesearch::CodeSearchArgs;
 use aries_tools::edit::EditArgs;
 use aries_tools::glob::GlobArgs;
 use aries_tools::grep::GrepArgs;
-use aries_tools::ls::LsArgs;
 use aries_tools::lsp::LspArgs;
 use aries_tools::multiedit::MultiEditArgs;
 use aries_tools::question::AskUserQuestionArgs;
@@ -20,7 +19,7 @@ use aries_tools::webfetch::WebFetchArgs;
 use aries_tools::websearch::WebSearchArgs;
 use aries_tools::write::WriteArgs;
 use aries_tools::{
-    agent, bash, batch, codesearch, edit, glob, grep, ls, lsp, multiedit, question, read, skill,
+    agent, bash, batch, codesearch, edit, glob, grep, lsp, multiedit, question, read, skill,
     update_plan, webfetch, websearch, write,
 };
 use colored::Colorize;
@@ -87,7 +86,6 @@ pub fn format_tool_call_args(tool_name: &str, args: &str) -> (String, Option<Str
         edit::NAME => EditArgs::render_args(args),
         glob::NAME => GlobArgs::render_args(args),
         grep::NAME => GrepArgs::render_args(args),
-        ls::NAME => LsArgs::render_args(args),
         lsp::NAME => LspArgs::render_args(args),
         multiedit::NAME => MultiEditArgs::render_args(args),
         question::NAME => AskUserQuestionArgs::render_args(args),

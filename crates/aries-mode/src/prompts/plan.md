@@ -11,7 +11,6 @@
 - Bash：执行只读命令以获取信息
 - Read：读取文件内容
 - Glob/Grep：搜索文件和代码
-- Ls：列出目录内容
 - CodeSearch：进行语义化代码搜索
 - AskUserQuestion：向用户提问确认
 

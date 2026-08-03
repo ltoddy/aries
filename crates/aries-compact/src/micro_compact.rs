@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use aries_tools::{
-    bash, batch, codesearch, edit, glob, grep, ls, lsp, multiedit, read, webfetch, websearch, write,
+    bash, batch, codesearch, edit, glob, grep, lsp, multiedit, read, webfetch, websearch, write,
 };
 use rig_core::OneOrMany;
 use rig_core::message::{
@@ -101,14 +101,13 @@ const COMPACTABLE_TOOL_CALL_TOOL_NAMES: &[&str; 3] = &[edit::NAME, multiedit::NA
 
 /// - 只清空"信息密集、可重新获取"的工具结果（Read/Bash/Grep/Glob/Edit/Write/Web*…）。
 /// - 保留对会话状态有控制语义的工具（Agent/UpdatePlan/Question/Skill）。
-const COMPACTABLE_TOOL_RESULT_TOOL_NAMES: &[&str; 13] = &[
+const COMPACTABLE_TOOL_RESULT_TOOL_NAMES: &[&str; 12] = &[
     bash::NAME,
     batch::NAME,
     codesearch::NAME,
     edit::NAME,
     glob::NAME,
     grep::NAME,
-    ls::NAME,
     lsp::NAME,
     multiedit::NAME,
     read::NAME,

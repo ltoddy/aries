@@ -15,7 +15,7 @@
 - 每次调用最多取前 25 个，多余项会被忽略。
 - 全部 call 并行启动，不保证顺序；单个失败不会影响其他 call。
 - 每个 call 返回 `{ "success": true, "result": ... }` 或 `{ "success": false, "error": ... }`。
-- 支持作为子工具的列表：`Bash`、`Read`、`Write`、`Glob`、`Grep`、`Ls`、`Edit`、`MultiEdit`、`AskUserQuestion`、`WebFetch`、`WebSearch`、`CodeSearch`。
+- 支持作为子工具的列表：`Bash`、`Read`、`Write`、`Glob`、`Grep`、`Edit`、`MultiEdit`、`AskUserQuestion`、`WebFetch`、`WebSearch`、`CodeSearch`。
 - 嵌套 `Batch` 与 `Agent` 在 batch 中调用都会被拒绝（返回 `success: false` 与对应错误消息）。
 
 适合的场景：

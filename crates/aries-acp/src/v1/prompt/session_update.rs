@@ -8,7 +8,7 @@ use agent_client_protocol::schema::v1::{
 use aries_event::AgentEvent;
 use aries_tools::tools::format_tool_output;
 use aries_tools::{
-    agent, bash, batch, codesearch, edit, glob, grep, ls, lsp, multiedit, question, read, skill,
+    agent, bash, batch, codesearch, edit, glob, grep, lsp, multiedit, question, read, skill,
     update_plan, webfetch, websearch, write,
 };
 use itertools::Itertools;
@@ -206,9 +206,6 @@ fn parse_tool_call(t: ToolCall) -> (String, Vec<ToolCallContent>) {
         grep::NAME => serde_json::from_value::<grep::GrepArgs>(arguments)
             .map(|args| (args.title(), vec![]))
             .unwrap_or_else(|_| (default_title, vec![])),
-        ls::NAME => serde_json::from_value::<ls::LsArgs>(arguments)
-            .map(|args| (args.title(), vec![]))
-            .unwrap_or_else(|_| (default_title, vec![])),
         lsp::NAME => serde_json::from_value::<lsp::LspArgs>(arguments)
             .map(|args| (args.title(), vec![]))
             .unwrap_or_else(|_| (default_title, vec![])),
@@ -270,7 +267,7 @@ fn parse_tool_call(t: ToolCall) -> (String, Vec<ToolCallContent>) {
 fn tool_kind(tool_name: &Option<String>) -> ToolKind {
     match tool_name {
         Some(tool_name) => match tool_name.as_str() {
-            glob::NAME | ls::NAME | read::NAME => ToolKind::Read,
+            glob::NAME | read::NAME => ToolKind::Read,
             edit::NAME | multiedit::NAME | write::NAME => ToolKind::Edit,
             grep::NAME | codesearch::NAME | lsp::NAME => ToolKind::Search,
             bash::NAME | batch::NAME => ToolKind::Execute,
@@ -299,10 +296,6 @@ fn locations(t: ToolCall) -> Option<Vec<ToolCallLocation>> {
         multiedit::NAME => serde_json::from_value::<multiedit::MultiEditArgs>(arguments)
             .map(|args| vec![ToolCallLocation::new(args.location())])
             .ok(),
-        ls::NAME => serde_json::from_value::<ls::LsArgs>(arguments)
-            .ok()
-            .and_then(|args| args.path)
-            .map(|path| vec![ToolCallLocation::new(path)]),
         glob::NAME => serde_json::from_value::<glob::GlobArgs>(arguments)
             .ok()
             .and_then(|args| args.base_dir)

@@ -6,7 +6,7 @@ pub enum ReadError {
     Io(#[from] std::io::Error),
 
     #[error(
-        "Path is a directory, not a file: {0}. To list a directory, use the Ls or Glob tool instead."
+        "Path is a directory, not a file: {0}. To list a directory, use the Glob tool instead."
     )]
     IsADirectory(PathBuf),
 }

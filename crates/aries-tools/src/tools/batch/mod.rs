@@ -17,7 +17,6 @@ use crate::context::ToolContext;
 use crate::edit::{EditArgs, EditTool};
 use crate::glob::{GlobArgs, GlobTool};
 use crate::grep::{GrepArgs, GrepTool};
-use crate::ls::{LsArgs, LsTool};
 use crate::multiedit::{MultiEditArgs, MultiEditTool};
 use crate::question::{AskUserQuestionArgs, AskUserQuestionTool};
 use crate::read::{ReadArgs, ReadTool};
@@ -25,7 +24,7 @@ use crate::webfetch::{WebFetchArgs, WebFetchTool};
 use crate::websearch::{WebSearchArgs, WebSearchTool};
 use crate::write::{WriteArgs, WriteTool};
 use crate::{
-    agent, bash, codesearch, edit, glob, grep, ls, multiedit, question, read, webfetch, websearch,
+    agent, bash, codesearch, edit, glob, grep, multiedit, question, read, webfetch, websearch,
     write,
 };
 
@@ -163,13 +162,6 @@ async fn dispatch(
         grep::NAME => {
             let args: GrepArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
             Tool::call(&GrepTool::new(cwd), context, args)
-                .await
-                .map(|res| serde_json::to_value(res).unwrap())
-                .map_err(|e| e.to_string())
-        },
-        ls::NAME => {
-            let args: LsArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
-            Tool::call(&LsTool::new(cwd), context, args)
                 .await
                 .map(|res| serde_json::to_value(res).unwrap())
                 .map_err(|e| e.to_string())

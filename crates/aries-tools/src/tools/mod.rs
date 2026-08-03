@@ -6,7 +6,6 @@ mod diff;
 pub mod edit;
 pub mod glob;
 pub mod grep;
-pub mod ls;
 pub mod lsp;
 pub mod multiedit;
 pub mod question;
@@ -24,7 +23,6 @@ use self::codesearch::CodeSearchOutput;
 use self::edit::EditOutput;
 use self::glob::GlobOutput;
 use self::grep::GrepOutput;
-use self::ls::LsOutput;
 use self::lsp::LspOutput;
 use self::multiedit::MultiEditOutput;
 use self::question::AskUserQuestionOutput;
@@ -44,7 +42,6 @@ pub fn format_tool_output(tool_name: &str, raw_json: serde_json::Value) -> Strin
         edit::NAME => EditOutput::render_output(raw_json),
         glob::NAME => GlobOutput::render_output(raw_json),
         grep::NAME => GrepOutput::render_output(raw_json),
-        ls::NAME => LsOutput::render_output(raw_json),
         lsp::NAME => LspOutput::render_output(raw_json),
         multiedit::NAME => MultiEditOutput::render_output(raw_json),
         question::NAME => AskUserQuestionOutput::render_output(raw_json),
