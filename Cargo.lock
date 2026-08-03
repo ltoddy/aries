@@ -277,6 +277,7 @@ dependencies = [
  "futures",
  "itertools 0.15.0",
  "jiff",
+ "mimalloc",
  "nanoid",
  "prettytable-rs",
  "rig-agent",

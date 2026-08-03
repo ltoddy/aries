@@ -7,6 +7,7 @@ mod welcome;
 
 use aries_init::GlobalContext;
 use clap::Parser;
+use mimalloc::MiMalloc;
 
 use crate::cli::agent::{self, AgentCommand};
 use crate::cli::mcp::{self, McpCommand};
@@ -14,6 +15,9 @@ use crate::cli::model::{self, ModelCommand};
 use crate::cli::session::{self, SessionCommand};
 use crate::cli::skill::{self, SkillCommand};
 use crate::cli::stats::StatsCommand;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

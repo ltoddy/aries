@@ -27,6 +27,7 @@ ferris-says.workspace = true
 futures.workspace = true
 itertools.workspace = true
 jiff.workspace = true
+mimalloc.workspace = true
 nanoid.workspace = true
 prettytable.workspace = true
 rig-agent.workspace = true
