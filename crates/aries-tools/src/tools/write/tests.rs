@@ -52,7 +52,7 @@ async fn test_write_creates_parent_dirs() {
 }
 
 #[tokio::test]
-async fn test_write_overwrites_existing_file() {
+async fn test_write_rejects_non_empty_existing_file() {
     let tmp = TempDir::new().unwrap();
 
     let file_path = tmp.path().join("data.txt");
@@ -70,14 +70,10 @@ async fn test_write_overwrites_existing_file() {
                 content: "line1\nCHANGED\nline3\n".to_string(),
             },
         )
-        .await
-        .unwrap();
+        .await;
 
-    assert_eq!(result.kind, WriteKind::Update);
-    assert_eq!(result.original_content.as_deref(), Some("line1\nline2\nline3\n"));
-    assert!(!result.structured_patch.is_empty());
-    assert_eq!((result.additions, result.deletions), (1, 1));
-    assert_eq!(fs::read_to_string(&file_path).unwrap(), "line1\nCHANGED\nline3\n");
+    assert!(matches!(result, Err(WriteError::FileNotEmpty(path)) if path == file_path));
+    assert_eq!(fs::read_to_string(&file_path).unwrap(), "line1\nline2\nline3\n");
 }
 
 #[tokio::test]

@@ -72,6 +72,12 @@ impl Tool for WriteTool {
             fs::create_dir_all(parent).await?;
         }
 
+        if let Ok(metadata) = fs::metadata(&file_path).await
+            && metadata.len() > 0
+        {
+            return Err(WriteError::file_not_empty(&file_path));
+        }
+
         let original_content = fs::read_to_string(&file_path).await.ok();
         if let Some(ref original_content) = original_content {
             let _ = self.ctx.file_checkpoint.push(&file_path, original_content).await;
