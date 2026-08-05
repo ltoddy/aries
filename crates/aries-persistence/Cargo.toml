@@ -6,4 +6,4 @@ edition = "2024"
 [dependencies]
 jiff.workspace = true
 toasty = { workspace = true, features = ["jiff", "sqlite"] }
-toasty-driver-sqlite = "0.9"
+toasty-driver-sqlite.workspace = true
