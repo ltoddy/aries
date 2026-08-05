@@ -4,7 +4,7 @@ use rig_agent::extractor::Extractor;
 use rig_core::completion::CompletionModel;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use tracing::warn;
+use tracing::info;
 
 use crate::Memory;
 
@@ -44,7 +44,7 @@ impl<M: CompletionModel> MemoryRetriever<M> {
         let retrieved = match self.inner.extract(&prompt).await {
             Ok(res) => res.file_names,
             Err(err) => {
-                warn!("failed to retrieve relevant memories: {err}");
+                info!("failed to retrieve relevant memories: {err}");
                 return vec![];
             },
         };

@@ -7,7 +7,7 @@ use itertools::Itertools;
 use rig_agent::client::AgentClientExt;
 use rig_agent::completion::{CompletionModel, Prompt};
 use rig_agent::tool::server::ToolServer;
-use tracing::warn;
+use tracing::info;
 
 pub const PREAMBLE: &str = include_str!("preamble.md");
 
@@ -82,7 +82,7 @@ where
         .join("\n");
 
         if let Err(err) = self.inner.prompt(prompt).await {
-            warn!(err = %err, "memory-agent failed, memories not updated this turn");
+            info!(err = %err, "memory-agent failed, memories not updated this turn");
         }
     }
 }
