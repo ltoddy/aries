@@ -11,10 +11,10 @@ pub use tool_call::{ToolCall, ToolCallRepository};
 
 pub async fn connect(dir: impl AsRef<Path>) -> toasty::Result<toasty::Db> {
     let file_path = dir.as_ref().join("aries.db");
-    let url = format!("sqlite://{}", file_path.display());
+    let driver = toasty_driver_sqlite::Sqlite::open(&file_path);
     let db = toasty::Db::builder()
         .models(toasty::models!(Session, ToolCall, TokenAudit))
-        .connect(&url)
+        .build(driver)
         .await?;
 
     Ok(db)
