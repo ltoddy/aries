@@ -7,6 +7,7 @@
 //! `pwsh` / `bash` or an absolute path.
 
 use std::path::{Path, PathBuf};
+
 use tokio::process::Command;
 
 /// Identifies the family of shell we are driving so callers can branch on
@@ -127,10 +128,8 @@ fn parse_override(raw: &str) -> ShellSpec {
 }
 
 fn classify_by_path(path: &Path) -> ShellSpec {
-    let file = path
-        .file_name()
-        .map(|f| f.to_string_lossy().to_ascii_lowercase())
-        .unwrap_or_default();
+    let file =
+        path.file_name().map(|f| f.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
     let basename = file
         .strip_suffix(".exe")
         .or_else(|| file.strip_suffix(".EXE"))
@@ -153,7 +152,7 @@ fn classify_by_path(path: &Path) -> ShellSpec {
             // best-effort choice; callers that need precise semantics should
             // set ARIES_SHELL to one of the recognized names.
             ShellSpec::bash(program)
-        }
+        },
     }
 }
 

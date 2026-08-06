@@ -8,7 +8,6 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
 
-use crate::shell::{ShellKind, ShellSpec, detect_shell};
 use rig_agent::tool::{Tool, ToolContext};
 use serde_json::Value;
 use tree_sitter::{Language, Node, Parser};
@@ -16,6 +15,7 @@ use tree_sitter::{Language, Node, Parser};
 pub use self::args::BashArgs;
 pub use self::error::BashError;
 pub use self::output::BashOutput;
+use crate::shell::{ShellKind, ShellSpec, detect_shell};
 
 pub const NAME: &str = "Bash";
 
@@ -111,10 +111,7 @@ impl Tool for BashTool {
         let timeout = Duration::from_millis(timeout);
 
         let mut command = self.shell.build_command(&arg, &self.cwd);
-        command
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .kill_on_drop(true);
+        command.stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true);
 
         let output = match tokio::time::timeout(timeout, command.output()).await {
             Ok(result) => result.map_err(BashError::Io)?,

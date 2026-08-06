@@ -72,7 +72,8 @@ mod unix {
     async fn test_bash_timeout() {
         let mut context = ToolContext::new();
         let tool = BashTool::new(std::env::temp_dir());
-        let args = BashArgs { command: "sleep 5".to_owned(), timeout: Some(100), description: None };
+        let args =
+            BashArgs { command: "sleep 5".to_owned(), timeout: Some(100), description: None };
         let result = tool.call(&mut context, args).await;
 
         assert!(matches!(result, Err(BashError::Timeout(100))));
@@ -95,7 +96,10 @@ mod unix {
     #[test]
     fn test_rewrite_single_command() {
         let tool = BashTool::new(std::env::temp_dir());
-        assert_eq!(tool.attempt_rewrite_last_command("echo hello").unwrap(), "aries exec echo hello");
+        assert_eq!(
+            tool.attempt_rewrite_last_command("echo hello").unwrap(),
+            "aries exec echo hello"
+        );
     }
 
     #[test]
@@ -184,8 +188,7 @@ mod windows {
     async fn test_pwsh_writes_to_stdout() {
         let mut context = ToolContext::new();
         let tool = BashTool::new(std::env::temp_dir());
-        let result =
-            tool.call(&mut context, bash_args("Write-Output 'hello'")).await.unwrap();
+        let result = tool.call(&mut context, bash_args("Write-Output 'hello'")).await.unwrap();
 
         assert_eq!(result.stdout.trim(), "hello");
         assert_eq!(result.exit_code, 0);
@@ -221,8 +224,7 @@ mod windows {
         let tool = BashTool::new(std::env::temp_dir());
         // Write-Error emits to the error stream and produces a non-zero
         // `$LASTEXITCODE` semantics; at minimum stderr should be non-empty.
-        let result =
-            tool.call(&mut context, bash_args("Write-Error 'boom'")).await.unwrap();
+        let result = tool.call(&mut context, bash_args("Write-Error 'boom'")).await.unwrap();
 
         assert!(
             !result.stderr.is_empty() || !result.stdout.is_empty(),
@@ -236,8 +238,7 @@ mod windows {
     async fn test_pwsh_nonexistent_command_is_nonzero() {
         let mut context = ToolContext::new();
         let tool = BashTool::new(std::env::temp_dir());
-        let result =
-            tool.call(&mut context, bash_args("nonexistent_cmd_12345")).await.unwrap();
+        let result = tool.call(&mut context, bash_args("nonexistent_cmd_12345")).await.unwrap();
 
         assert_ne!(result.exit_code, 0);
     }
