@@ -1,4 +1,5 @@
 pub mod context;
+pub mod shell;
 pub mod tools;
 
 use std::path::Path;

@@ -1,7 +1,8 @@
+use std::path::PathBuf;
 use std::process::Stdio;
 
+use aries_tools::shell::detect_shell;
 use colored::Colorize;
-use tokio::process::Command;
 
 pub async fn execute(command: &str) {
     let command = command.trim();
@@ -10,10 +11,10 @@ pub async fn execute(command: &str) {
         return;
     }
 
-    let shell = std::env::var("SHELL").unwrap_or(String::from("bash"));
-    match Command::new(shell)
-        .arg("-c")
-        .arg(command)
+    let shell = detect_shell();
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let mut cmd = shell.build_command(command, &cwd);
+    match cmd
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())

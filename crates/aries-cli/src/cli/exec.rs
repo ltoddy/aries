@@ -1,7 +1,8 @@
+use std::path::PathBuf;
 use std::process::Stdio;
 
+use aries_tools::shell::detect_shell;
 use clap::Parser;
-use tokio::process::Command;
 
 #[derive(Parser, Debug, Clone)]
 #[command(about = "Execute a shell command")]
@@ -25,10 +26,10 @@ pub async fn execute(args: ExecArgs) -> anyhow::Result<()> {
         std::process::exit(output.exit_code);
     }
 
-    let shell = std::env::var("SHELL").unwrap_or(String::from("bash"));
-    let status = Command::new(shell)
-        .arg("-c")
-        .arg(args.command.join(" "))
+    let shell = detect_shell();
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let mut cmd = shell.build_command(&args.command.join(" "), &cwd);
+    let status = cmd
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())

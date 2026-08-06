@@ -8,9 +8,9 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
 
+use crate::shell::{ShellKind, ShellSpec, detect_shell};
 use rig_agent::tool::{Tool, ToolContext};
 use serde_json::Value;
-use tokio::process::Command;
 use tree_sitter::{Language, Node, Parser};
 
 pub use self::args::BashArgs;
@@ -22,6 +22,7 @@ pub const NAME: &str = "Bash";
 pub struct BashTool {
     cwd: PathBuf,
     language: Language,
+    shell: ShellSpec,
 }
 
 impl BashTool {
@@ -31,8 +32,9 @@ impl BashTool {
     pub fn new(cwd: impl AsRef<Path>) -> Self {
         let cwd = cwd.as_ref().to_path_buf();
         let language = tree_sitter_bash::LANGUAGE.into();
+        let shell = detect_shell();
 
-        Self { cwd, language }
+        Self { cwd, language, shell }
     }
 
     fn attempt_rewrite_last_command(&self, cmd: &str) -> Option<String> {
@@ -55,7 +57,12 @@ impl Tool for BashTool {
     type Error = BashError;
 
     fn description(&self) -> String {
-        include_str!("description.md").to_owned()
+        let text = if self.shell.kind == ShellKind::Bash {
+            include_str!("description.md")
+        } else {
+            include_str!("description_windows.md")
+        };
+        text.to_owned()
     }
 
     fn parameters(&self) -> Value {
@@ -88,7 +95,13 @@ impl Tool for BashTool {
         _context: &mut ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
-        let arg = self.attempt_rewrite_last_command(&args.command).unwrap_or(args.command);
+        // The tree-sitter-bash rewrite optimization is bash-specific. On
+        // PowerShell / cmd we pass the command through verbatim.
+        let arg = if self.shell.kind == ShellKind::Bash {
+            self.attempt_rewrite_last_command(&args.command).unwrap_or(args.command)
+        } else {
+            args.command
+        };
 
         let timeout = args
             .timeout
@@ -97,12 +110,8 @@ impl Tool for BashTool {
             .min(Self::MAX_TIMEOUT_MS);
         let timeout = Duration::from_millis(timeout);
 
-        let shell = std::env::var("SHELL").unwrap_or_else(|_| "bash".to_owned());
-        let mut command = Command::new(shell);
+        let mut command = self.shell.build_command(&arg, &self.cwd);
         command
-            .arg("-c")
-            .arg(arg)
-            .current_dir(&self.cwd)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
