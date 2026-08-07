@@ -23,7 +23,10 @@ impl SkillsLoader {
             home_dir.join(".agents").join("skills"),
             home_dir.join(".agents").join("plugins").join("skills"),
             cwd.join(".agents").join("skills"),
-        ];
+        ]
+        .into_iter()
+        .unique()
+        .collect_vec();
 
         Self { roots }
     }

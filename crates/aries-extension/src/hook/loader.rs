@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use aries_filesystem::walk::walk_dirs;
 use futures::stream::{self, StreamExt};
+use itertools::Itertools;
 
 use crate::hook::preset::HooksPreset;
 
@@ -20,7 +21,10 @@ impl HooksLoader {
             home_dir.join(".agents").join("hooks"),
             home_dir.join(".agents").join("plugins").join("hooks"),
             cwd.join(".agents").join("hooks"),
-        ];
+        ]
+        .into_iter()
+        .unique()
+        .collect_vec();
 
         Self { roots }
     }

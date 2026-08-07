@@ -1,3 +1,5 @@
+use rig_agent::tool::rmcp::McpClientError;
+
 #[derive(Debug, thiserror::Error)]
 pub enum McpParseError {
     #[error("failed to read mcp.json: {0}")]
@@ -18,10 +20,24 @@ impl McpParseError {
 
 #[derive(Debug, thiserror::Error)]
 pub enum McpConnectError {
-    #[error("failed to spawn MCP process: {0}")]
-    Spawn(#[from] std::io::Error),
-    #[error("MCP connection error: {0}")]
-    Connection(String),
-    #[error("failed to fetch MCP tool list: {0}")]
-    Service(#[from] rmcp::ServiceError),
+    #[error("failed to start MCP stdio server process: {0}")]
+    Spawn(std::io::Error),
+    #[error("MCP connection timed out after {0:?}")]
+    Timeout(std::time::Duration),
+    #[error("MCP client error: {0}")]
+    Client(#[from] McpClientError),
+}
+
+impl McpConnectError {
+    pub fn spawn(err: std::io::Error) -> Self {
+        Self::Spawn(err)
+    }
+
+    pub fn timeout(t: std::time::Duration) -> Self {
+        Self::Timeout(t)
+    }
+
+    pub fn client(err: McpClientError) -> Self {
+        Self::Client(err)
+    }
 }

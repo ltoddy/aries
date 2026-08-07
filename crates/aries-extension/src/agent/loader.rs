@@ -20,7 +20,10 @@ impl AgentsLoader {
             home_dir.join(".agents").join("agents"),
             home_dir.join(".agents").join("plugins").join("agents"),
             cwd.join(".agents").join("agents"),
-        ];
+        ]
+        .into_iter()
+        .unique()
+        .collect_vec();
 
         Self { roots }
     }
