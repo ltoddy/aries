@@ -42,10 +42,18 @@ pub fn print_agent_event(event: AgentEvent, tool_names: &mut HashMap<String, Str
                 tool_names.insert(internal_call_id, tool_call.function.name.clone());
 
                 let args = tool_call.function.arguments.to_string();
-                let (call_str, rest) = format_tool_call_args(&tool_call.function.name, &args);
-                println!("\n{} {}", "•".cyan(), call_str);
+                let (first, rest) = format_tool_call_args(&tool_call.function.name, &args);
+                println!("\n{} {}", "•".cyan(), first);
                 if let Some(rest) = rest {
-                    println!("{}", rest);
+                    for line in rest.lines() {
+                        if let Some(content) = line.strip_prefix("- ") {
+                            println!("- {}", content.red());
+                        } else if let Some(content) = line.strip_prefix("+ ") {
+                            println!("+ {}", content.green());
+                        } else {
+                            println!("{line}");
+                        }
+                    }
                 }
             },
             _ => {},
