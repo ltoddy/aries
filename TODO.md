@@ -30,6 +30,9 @@
 - [x] 上下文压缩：prompt 前按预估 token 预判压缩，prompt 后按实际 token 复核压缩（pre_compact / post_compact），micro_compact 保留更多最近消息
 - [x] 代码优化：prompt 流程提取 helper（fire_stop / append_messages / session_hook 等），agent.prompt 改 &self，callback 改 Fn + Clone
 - [x] 优化 mcp 启动 (超时，连接速度，连接异常)
+- [x] slash command
+- [x] 可视化数据库保存的数据（`aries stats tool` / `aries stats bash`：工具调用次数、bash 命令使用频率）
+- [ ] 优化执行 slash commad 的代码
 - [ ] 支持 worktree
 - [ ] 支持 Workflow
 - [ ] agent (参考 https://github.com/vercel/eve 对 agent 的目录结构设计来支持)
@@ -37,8 +40,6 @@
 - [ ] 支持设置模型 effort
 - [ ] 支持 design.md
 - [ ] 支持 cron
-- [x] 可视化数据库保存的数据（`aries stats tool` / `aries stats bash`：工具调用次数、bash 命令使用频率）
-- [ ] command
 - [ ] 通过 rsync 实现本机的 sandbox
 - [ ] 支持 Browser Use
 - [ ] 支持 Computer Use

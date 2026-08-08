@@ -55,7 +55,7 @@ where
             match chunk {
                 Ok(item) => {
                     if let Some(ref sender) = self.sender {
-                        let event = AgentEvent::from_stream(true, self.name.clone(), item.clone());
+                        let event = AgentEvent::stream_item(item.clone());
                         let _ = sender.send(event);
                     }
 
@@ -72,5 +72,9 @@ where
 
     pub fn preamble(&self) -> &str {
         &self.preamble
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 }

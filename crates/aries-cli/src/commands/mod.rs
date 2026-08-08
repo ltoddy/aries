@@ -20,13 +20,14 @@ pub enum Command {
     Exit,
     /// Run a shell command
     Shell {
-        #[arg(trailing_var_arg = true)]
+        #[arg(trailing_var_arg = true, help = "The command and its arguments")]
         command: Vec<String>,
     },
     /// Clear chat context
     ClearContext,
     /// Force compact conversation context
     Compact,
+    /// Show the current system prompt
     SystemPrompt,
 }
 

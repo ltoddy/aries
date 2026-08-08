@@ -2,31 +2,20 @@ use rig_agent::agent::{MultiTurnStreamItem, Text};
 use rig_core::streaming::StreamedAssistantContent;
 
 #[derive(Debug, Clone)]
-pub struct AgentEvent {
-    pub main: bool,   // 是否是 main agent
-    pub name: String, // agent name
-    pub stream_item: MultiTurnStreamItem<()>,
+pub enum AgentEvent {
+    Notification(String),
+    StreamItem(MultiTurnStreamItem<()>),
 }
 
 impl AgentEvent {
-    pub fn text(main: bool, name: impl Into<String>, text: impl Into<String>) -> Self {
-        let name = name.into();
+    pub fn notification(text: impl Into<String>) -> Self {
         let text = text.into();
-        let stream_item =
-            MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::text(&text));
-        // TODO: 这里使用 assistant 类型不是非常合适,但是又没有提供 user 类型
-
-        Self { main, name, stream_item }
+        Self::Notification(text)
     }
 
-    pub fn from_stream<R>(
-        main: bool,
-        name: impl Into<String>,
-        stream_item: MultiTurnStreamItem<R>,
-    ) -> Self {
-        let name = name.into();
+    pub fn stream_item<R>(stream_item: MultiTurnStreamItem<R>) -> Self {
         let stream_item = earse(stream_item);
-        Self { main, name, stream_item }
+        Self::StreamItem(stream_item)
     }
 }
 

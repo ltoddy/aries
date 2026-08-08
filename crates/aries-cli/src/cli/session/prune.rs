@@ -12,6 +12,8 @@ pub struct PruneSessionsArgs {
     session_ids: Option<Vec<String>>,
     #[arg(long, default_value_t = false, help = "Delete all sessions")]
     all: bool,
+    #[arg(long, default_value_t = false, help = "Delete all empty sessions")]
+    empty: bool,
 }
 
 pub async fn execute(args: PruneSessionsArgs, gctx: GlobalContext) -> anyhow::Result<()> {
@@ -21,12 +23,16 @@ pub async fn execute(args: PruneSessionsArgs, gctx: GlobalContext) -> anyhow::Re
         .expect("Run `aries init -h` for initialization");
     let mut session_repo = aries_persistence::SessionRepository::new(db);
 
-    let PruneSessionsArgs { session_ids, all } = args;
+    let PruneSessionsArgs { session_ids, all, empty } = args;
 
-    let sessions = match (session_ids, all) {
-        (_, true) => session_repo.find().await?,
-        (Some(session_ids), false) => session_repo.find_by_session_id_in(session_ids).await?,
-        (None, false) => vec![],
+    let sessions = if all {
+        session_repo.find().await?
+    } else if empty {
+        session_repo.find_by_null_title().await?
+    } else if let Some(session_ids) = session_ids {
+        session_repo.find_by_session_id_in(session_ids).await?
+    } else {
+        vec![]
     };
 
     if sessions.is_empty() {

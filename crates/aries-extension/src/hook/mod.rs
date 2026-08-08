@@ -1,9 +1,10 @@
-/// see more: https://code.claude.com/docs/zh-CN/hooks
 pub mod executor;
 pub mod input;
 pub mod loader;
 pub mod preset;
+#[cfg(test)]
+mod tests;
 
-pub use crate::hook::executor::{HookDecision, HooksExecutor};
-pub use crate::hook::loader::HooksLoader;
-pub use crate::hook::preset::HooksPreset;
+pub use self::executor::{HookDecision, HooksExecutor};
+pub use self::loader::HooksLoader;
+pub use self::preset::HooksPreset;

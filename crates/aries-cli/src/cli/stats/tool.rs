@@ -8,6 +8,7 @@ use jiff::{Span, Timestamp, Zoned};
 use prettytable::{Cell, Row, Table, row};
 
 #[derive(Parser, Debug, Clone)]
+#[command(about = "Show tool call statistics")]
 pub struct ToolArgs {}
 
 pub async fn execute(gctx: GlobalContext, _: ToolArgs) -> anyhow::Result<()> {

@@ -2,17 +2,19 @@ use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
 use agent_client_protocol::schema::v1::{
-    CloseSessionRequest, CloseSessionResponse, DeleteSessionRequest, DeleteSessionResponse,
+    AvailableCommand, AvailableCommandInput, AvailableCommandsUpdate, CloseSessionRequest,
+    CloseSessionResponse, ContentBlock, ContentChunk, DeleteSessionRequest, DeleteSessionResponse,
     ListSessionsRequest, ListSessionsResponse, LoadSessionRequest, LoadSessionResponse,
     NewSessionRequest, NewSessionResponse, ResumeSessionRequest, ResumeSessionResponse,
     SessionConfigId, SessionConfigOption, SessionConfigOptionCategory, SessionConfigSelectOption,
-    SessionConfigSelectOptions, SessionInfo, SetSessionConfigOptionRequest,
-    SetSessionConfigOptionResponse,
+    SessionConfigSelectOptions, SessionInfo, SessionNotification, SessionUpdate,
+    SetSessionConfigOptionRequest, SetSessionConfigOptionResponse, UnstructuredCommandInput,
 };
 use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
 use aries_init::Setting;
 use aries_mode::Mode;
 use aries_session::session::SessionArgs;
+use itertools::Itertools;
 use tracing::{info, instrument};
 
 use super::SharedRegistry;
@@ -21,7 +23,7 @@ use crate::v1::mcp::McpServers;
 pub async fn new_session(
     req: NewSessionRequest,
     responder: Responder<NewSessionResponse>,
-    _: ConnectionTo<Client>,
+    cx: ConnectionTo<Client>,
     registry: SharedRegistry,
     args: SessionArgs,
 ) -> Result<(), Error> {
@@ -38,6 +40,32 @@ pub async fn new_session(
         },
     };
 
+    let setting = session.setting();
+    let greeting = if setting.nickname.is_empty() {
+        format!("Welcome! [session id: {}]", session.id())
+    } else {
+        format!("Welcome, {}! [session id: {}]", setting.nickname, session.id())
+    };
+
+    let _ = cx.send_notification(SessionNotification::new(
+        session.id(),
+        SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::from(greeting))),
+    ));
+
+    let slash_commands = session.list_slash_commands();
+    let available_commands = slash_commands
+        .into_iter()
+        .map(|c| {
+            AvailableCommand::new(c.name, c.description).input(c.argument_hint.map(|hint| {
+                AvailableCommandInput::Unstructured(UnstructuredCommandInput::new(hint))
+            }))
+        })
+        .collect_vec();
+    let _ = cx.send_notification(SessionNotification::new(
+        session.id(),
+        SessionUpdate::AvailableCommandsUpdate(AvailableCommandsUpdate::new(available_commands)),
+    ));
+
     let config_options = config_options(session.setting(), session.mode());
     let resp = NewSessionResponse::new(session.id()).config_options(config_options);
     responder.respond(resp)
@@ -47,7 +75,7 @@ pub async fn new_session(
 pub async fn load_session(
     req: LoadSessionRequest,
     responder: Responder<LoadSessionResponse>,
-    _: ConnectionTo<Client>,
+    cx: ConnectionTo<Client>,
     registry: SharedRegistry,
 ) -> Result<(), Error> {
     info!("Received list sessions request {req:?}");
@@ -61,6 +89,32 @@ pub async fn load_session(
         Ok(session) => session,
         Err(err) => return responder.respond_with_internal_error(err.to_string()),
     };
+
+    let setting = session.setting();
+    let greeting = if setting.nickname.is_empty() {
+        format!("Welcome back! [session id: {}]", session.id())
+    } else {
+        format!("Welcome back, {}! [session id: {}]", setting.nickname, session.id())
+    };
+
+    let _ = cx.send_notification(SessionNotification::new(
+        session.id(),
+        SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::from(greeting))),
+    ));
+
+    let slash_commands = session.list_slash_commands();
+    let available_commands = slash_commands
+        .into_iter()
+        .map(|c| {
+            AvailableCommand::new(c.name, c.description).input(c.argument_hint.map(|hint| {
+                AvailableCommandInput::Unstructured(UnstructuredCommandInput::new(hint))
+            }))
+        })
+        .collect_vec();
+    let _ = cx.send_notification(SessionNotification::new(
+        session.id(),
+        SessionUpdate::AvailableCommandsUpdate(AvailableCommandsUpdate::new(available_commands)),
+    ));
 
     let config_options = config_options(session.setting(), session.mode());
     let resp = LoadSessionResponse::new().config_options(config_options);
@@ -131,7 +185,11 @@ pub async fn delete_session(
     responder.respond(resp)
 }
 
-#[instrument(name = "acp.set_session_config_option", skip_all, fields(session_id = %req.session_id))]
+#[instrument(
+    name = "acp.set_session_config_option",
+    skip_all,
+    fields(session_id = %req.session_id)
+)]
 pub async fn set_session_config_option(
     req: SetSessionConfigOptionRequest,
     responder: Responder<SetSessionConfigOptionResponse>,
@@ -273,8 +331,8 @@ fn mode_option(current: Mode) -> SessionConfigOption {
         current.id(),
         SessionConfigSelectOptions::Ungrouped(options),
     )
-    .description("Agent mode determines how Aries processes your requests — Build (coding), Plan (no edits), General (multi-step), Explore (codebase search).")
-    .category(SessionConfigOptionCategory::Mode)
+        .description("Agent mode determines how Aries processes your requests — Build (coding), Plan (no edits), General (multi-step), Explore (codebase search).")
+        .category(SessionConfigOptionCategory::Mode)
 }
 
 fn model_option(setting: &Setting) -> SessionConfigOption {
@@ -293,6 +351,6 @@ fn model_option(setting: &Setting) -> SessionConfigOption {
         setting.active.clone(),
         SessionConfigSelectOptions::Ungrouped(options),
     )
-    .description("The language model that powers this session. Switch models to change providers, capabilities, or context window size.")
-    .category(SessionConfigOptionCategory::Model)
+        .description("The language model that powers this session. Switch models to change providers, capabilities, or context window size.")
+        .category(SessionConfigOptionCategory::Model)
 }

@@ -1,6 +1,8 @@
 mod definition;
 mod error;
 mod loader;
+#[cfg(test)]
+mod tests;
 mod tool;
 
 use std::collections::HashMap;

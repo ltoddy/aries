@@ -19,6 +19,7 @@ aries-persistence = { path = "../aries-persistence" }
 aries-preamble = { path = "../aries-preamble" }
 aries-tools = { path = "../aries-tools" }
 http.workspace = true
+itertools.workspace = true
 nanoid.workspace = true
 reqwest.workspace = true
 reqwest-middleware.workspace = true

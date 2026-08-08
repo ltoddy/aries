@@ -159,7 +159,7 @@ where
         let mut final_res = PromptResponse::empty();
         while let Some(chunk) = stream.next().await {
             let chunk = chunk?;
-            let event = AgentEvent::from_stream(false, &name, chunk.clone());
+            let event = AgentEvent::stream_item(chunk.clone());
             let _ = self.sender.send(event);
 
             if let MultiTurnStreamItem::FinalResponse(res) = chunk {

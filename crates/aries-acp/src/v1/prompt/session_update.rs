@@ -23,41 +23,50 @@ pub struct SessionUpdates(Vec<SessionUpdate>);
 
 impl SessionUpdates {
     pub fn new(event: AgentEvent, tool_calls: &Mutex<HashMap<String, ToolCall>>) -> Self {
-        match event.stream_item {
-            MultiTurnStreamItem::StreamAssistantItem(v) => {
-                Self(Self::from_stream_assistant_content(v, tool_calls))
+        match event {
+            AgentEvent::Notification(text) => Self(vec![SessionUpdate::AgentMessageChunk(
+                ContentChunk::new(ContentBlock::from(text)),
+            )]),
+            AgentEvent::StreamItem(stream_item) => {
+                match stream_item {
+                    MultiTurnStreamItem::StreamAssistantItem(v) => {
+                        Self(Self::from_stream_assistant_content(v, tool_calls))
+                    },
+                    MultiTurnStreamItem::StreamUserItem(v) => {
+                        Self(Self::from_stream_user_content(v, tool_calls))
+                    },
+                    MultiTurnStreamItem::CompletionCall(_) => {
+                        // TODO
+                        Self(Vec::new())
+                    },
+                    MultiTurnStreamItem::FinalResponse(res) => {
+                        let usage = res.usage();
+                        let text = format!(
+                            "\n\nUsage: input tokens = {} (cached = {}), output tokens = {}, total tokens = {}, reasoning tokens = {}",
+                            usage.input_tokens,
+                            usage.cached_input_tokens,
+                            usage.output_tokens,
+                            usage.total_tokens,
+                            usage.reasoning_tokens,
+                        );
+                        Self(vec![
+                            SessionUpdate::AgentMessageChunk(ContentChunk::new(
+                                ContentBlock::from(text),
+                            )),
+                            SessionUpdate::UsageUpdate(UsageUpdate::new(usage.total_tokens, 0)),
+                        ])
+                    },
+                    MultiTurnStreamItem::ToolExecutionCommitted { .. } => {
+                        // TODO
+                        Self(Vec::new())
+                    },
+                    MultiTurnStreamItem::ModelTurnRetried { .. } => {
+                        // TODO
+                        Self(Vec::new())
+                    },
+                    _ => Self(Vec::new()),
+                }
             },
-            MultiTurnStreamItem::StreamUserItem(v) => {
-                Self(Self::from_stream_user_content(v, tool_calls))
-            },
-            MultiTurnStreamItem::CompletionCall(_) => {
-                // TODO
-                Self(Vec::new())
-            },
-            MultiTurnStreamItem::FinalResponse(res) => {
-                let usage = res.usage();
-                let text = format!(
-                    "\n\nUsage: input tokens = {} (cached = {}), output tokens = {}, total tokens = {}, reasoning tokens = {}",
-                    usage.input_tokens,
-                    usage.cached_input_tokens,
-                    usage.output_tokens,
-                    usage.total_tokens,
-                    usage.reasoning_tokens,
-                );
-                Self(vec![
-                    SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::from(text))),
-                    SessionUpdate::UsageUpdate(UsageUpdate::new(usage.total_tokens, 0)),
-                ])
-            },
-            MultiTurnStreamItem::ToolExecutionCommitted { .. } => {
-                // TODO
-                Self(Vec::new())
-            },
-            MultiTurnStreamItem::ModelTurnRetried { .. } => {
-                // TODO
-                Self(Vec::new())
-            },
-            _ => Self(Vec::new()),
         }
     }
 

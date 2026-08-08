@@ -1,5 +1,6 @@
 pub mod acp;
 pub mod agent;
+pub mod command;
 pub mod exec;
 pub mod mcp;
 pub mod model;
@@ -14,6 +15,7 @@ use prompt::PromptArgs;
 
 use crate::cli::acp::AcpArgs;
 use crate::cli::agent::AgentCommand;
+use crate::cli::command::CommandCommand;
 use crate::cli::exec::ExecArgs;
 use crate::cli::mcp::McpCommand;
 use crate::cli::model::ModelCommand;
@@ -39,6 +41,11 @@ pub enum Subcommands {
     Agent {
         #[command(subcommand)]
         command: AgentCommand,
+    },
+    #[command(about = "Manage slash commands")]
+    Command {
+        #[command(subcommand)]
+        command: CommandCommand,
     },
     #[command(about = "Diagnose and fix common issues")]
     Doctor,

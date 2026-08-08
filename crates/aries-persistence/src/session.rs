@@ -94,6 +94,10 @@ impl SessionRepository {
         Session::filter(Session::fields().updated_at().lt(updated_at)).exec(&mut self.db).await
     }
 
+    pub async fn find_by_null_title(&mut self) -> toasty::Result<Vec<Session>> {
+        Session::filter(Session::fields().title().is_none()).exec(&mut self.db).await
+    }
+
     pub async fn update_title_by_session_id(
         &mut self,
         session_id: impl IntoExpr<String>,

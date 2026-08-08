@@ -30,54 +30,56 @@ use rig_core::streaming::{StreamedAssistantContent, StreamedUserContent};
 use crate::text;
 
 pub fn print_agent_event(event: AgentEvent, tool_names: &mut HashMap<String, String>) {
-    match event.stream_item {
-        MultiTurnStreamItem::StreamAssistantItem(content) => match content {
-            StreamedAssistantContent::Text(text) => {
-                if !text.text.is_empty() {
-                    print!("{}", text.text);
-                    let _ = std::io::stdout().flush();
-                }
-            },
-            StreamedAssistantContent::ToolCall { tool_call, internal_call_id } => {
-                tool_names.insert(internal_call_id, tool_call.function.name.clone());
+    match event {
+        AgentEvent::Notification(_) => {},
+        AgentEvent::StreamItem(stream_item) => match stream_item {
+            MultiTurnStreamItem::StreamAssistantItem(content) => match content {
+                StreamedAssistantContent::Text(text) => {
+                    if !text.text.is_empty() {
+                        print!("{}", text.text);
+                        let _ = std::io::stdout().flush();
+                    }
+                },
+                StreamedAssistantContent::ToolCall { tool_call, internal_call_id } => {
+                    tool_names.insert(internal_call_id, tool_call.function.name.clone());
 
-                let args = tool_call.function.arguments.to_string();
-                let (first, rest) = format_tool_call_args(&tool_call.function.name, &args);
-                println!("\n{} {}", "•".cyan(), first);
-                if let Some(rest) = rest {
-                    for line in rest.lines() {
-                        if let Some(content) = line.strip_prefix("- ") {
-                            println!("- {}", content.red());
-                        } else if let Some(content) = line.strip_prefix("+ ") {
-                            println!("+ {}", content.green());
-                        } else {
-                            println!("{line}");
+                    let args = tool_call.function.arguments.to_string();
+                    let (first, rest) = format_tool_call_args(&tool_call.function.name, &args);
+                    println!("\n{} {}", "•".cyan(), first);
+                    if let Some(rest) = rest {
+                        for line in rest.lines() {
+                            if let Some(content) = line.strip_prefix("- ") {
+                                println!("- {}", content.red());
+                            } else if let Some(content) = line.strip_prefix("+ ") {
+                                println!("+ {}", content.green());
+                            } else {
+                                println!("{line}");
+                            }
                         }
                     }
-                }
+                },
+                _ => {},
             },
+            MultiTurnStreamItem::StreamUserItem(StreamedUserContent::ToolResult {
+                tool_result,
+                internal_call_id,
+            }) => {
+                let tool_name = tool_names.remove(&internal_call_id).unwrap_or_default();
+                let result = match tool_result.content.first() {
+                    ToolResultContent::Json { value } => Some(value),
+                    _ => None,
+                };
+                let formatted = format_tool_result_output(&tool_name, result);
+                println!("{formatted}");
+            },
+            MultiTurnStreamItem::FinalResponse(res) => {
+                display_token_usage(&res.usage());
+            },
+            MultiTurnStreamItem::CompletionCall(_) => {},
+            MultiTurnStreamItem::ToolExecutionCommitted { .. } => {},
+            MultiTurnStreamItem::ModelTurnRetried { .. } => {},
             _ => {},
         },
-        MultiTurnStreamItem::StreamUserItem(StreamedUserContent::ToolResult {
-            tool_result,
-            internal_call_id,
-        }) => {
-            let tool_name = tool_names.remove(&internal_call_id).unwrap_or_default();
-            let result = match tool_result.content.first() {
-                ToolResultContent::Json { value } => Some(value),
-                _ => None,
-            };
-            let formatted = format_tool_result_output(&tool_name, result);
-            println!("{formatted}");
-        },
-        MultiTurnStreamItem::FinalResponse(res) if event.main => {
-            display_token_usage(&res.usage());
-        },
-        MultiTurnStreamItem::CompletionCall(_) => {},
-        MultiTurnStreamItem::FinalResponse(_) => {},
-        MultiTurnStreamItem::ToolExecutionCommitted { .. } => {},
-        MultiTurnStreamItem::ModelTurnRetried { .. } => {},
-        _ => {},
     }
 }
 

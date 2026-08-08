@@ -10,6 +10,7 @@ use jiff::{Span, Timestamp, Zoned};
 use prettytable::{Cell, Row, Table, row};
 
 #[derive(Parser, Debug, Clone)]
+#[command(about = "Show bash command usage statistics")]
 pub struct BashArgs {}
 
 pub async fn execute(gctx: GlobalContext, _: BashArgs) -> anyhow::Result<()> {

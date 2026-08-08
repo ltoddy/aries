@@ -28,6 +28,7 @@ use aries_memory::MemoryStore;
 use aries_mode::Mode;
 use aries_persistence::SessionRepository;
 use aries_tools::{edit, write};
+use itertools::Itertools;
 use rig_agent::agent::PromptResponse;
 use rig_agent::tool::rmcp::McpClientHandler;
 use rig_agent::tool::server::{ToolServer, ToolServerHandle};
@@ -216,6 +217,14 @@ impl Session {
         self.cancel_token = CancellationToken::new();
         self.last_assistant_message = None;
         let title = self.update_title(&prompt).await;
+
+        if let Message::User { ref content } = prompt
+            && let UserContent::Text(text) = content.first()
+            && let Some(command) = text.text.trim().strip_prefix("/")
+            && self.try_execute_slash_command(command, callback.clone()).await
+        {
+            return Ok(());
+        }
 
         self.fire_user_prompt_submit(&title).await?;
         self.pre_compact(&prompt, callback.clone()).await;
@@ -443,6 +452,43 @@ impl Session {
         self.hooks_executor.fire_session_end(input).await;
     }
 
+    pub fn list_slash_commands(&self) -> Vec<aries_extension::command::Frontmatter> {
+        self.extensions.commands.iter().map(|c| c.frontmatter.clone()).collect_vec()
+    }
+
+    async fn try_execute_slash_command<F, Fut>(
+        &mut self,
+        command: impl Into<String>,
+        callback: F,
+    ) -> bool
+    where
+        F: Fn(AgentEvent) -> Fut + Clone,
+        Fut: Future<Output = ()>,
+    {
+        let command = command.into();
+        let command = command.trim();
+
+        let (command, args) = if let Some((first, rest)) = command.split_once(' ') {
+            (first, rest)
+        } else {
+            (command, "")
+        };
+
+        if let Some(slash_command) =
+            self.extensions.commands.iter().find(|c| c.frontmatter.name == command)
+        {
+            let prompt = slash_command.expand_arguments(args);
+            let _ = self.agent.prompt::<[_; 0], Message, _>(&prompt, [], ()).await;
+
+            let mut guard = self.receiver.lock().await;
+            while let Ok(event) = guard.try_recv() {
+                callback.clone()(event).await;
+            }
+            return true;
+        }
+        false
+    }
+
     #[allow(clippy::too_many_arguments)]
     async fn build(
         id: impl Into<String>,
@@ -638,7 +684,7 @@ impl Session {
                 "\n预估 tokens {estimated_tokens} 已达阈值 {compact_threshold}（上下文窗口 {}），提前触发压缩...\n",
                 window.total
             );
-            callback(AgentEvent::text(true, self.mode.name(), text)).await;
+            callback(AgentEvent::notification(text)).await;
             self.compact().await;
         }
     }
@@ -656,7 +702,7 @@ impl Session {
                 "\n实际 tokens {} 已达阈值 {compact_threshold}，触发压缩...\n",
                 usage.total_tokens,
             );
-            callback(AgentEvent::text(true, self.mode.name(), text)).await;
+            callback(AgentEvent::notification(text)).await;
             self.compact().await;
         }
     }

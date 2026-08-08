@@ -10,6 +10,7 @@ use clap::Parser;
 use mimalloc::MiMalloc;
 
 use crate::cli::agent::{self, AgentCommand};
+use crate::cli::command::{self, CommandCommand};
 use crate::cli::mcp::{self, McpCommand};
 use crate::cli::model::{self, ModelCommand};
 use crate::cli::session::{self, SessionCommand};
@@ -30,6 +31,9 @@ async fn main() -> anyhow::Result<()> {
         Some(cli::Subcommands::Acp(args)) => cli::acp::execute(args, gctx).await,
         Some(cli::Subcommands::Agent { command }) => match command {
             AgentCommand::List(args) => agent::list::execute(args, gctx).await,
+        },
+        Some(cli::Subcommands::Command { command }) => match command {
+            CommandCommand::List(args) => command::list::execute(args, gctx).await,
         },
         Some(cli::Subcommands::Doctor) => {
             todo!()
