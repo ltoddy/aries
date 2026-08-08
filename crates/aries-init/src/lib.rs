@@ -16,6 +16,15 @@ pub async fn init(root_dir: impl AsRef<Path>) {
         .await
         .expect("Unable to connect to local aries database");
     let _ = aries_persistence::migrate(&mut db).await;
+}
+
+pub async fn gc(root_dir: impl AsRef<Path>) {
+    let root_dir = root_dir.as_ref();
+
+    let mut db = aries_persistence::connect(root_dir)
+        .await
+        .expect("Unable to connect to local aries database");
+    let _ = aries_persistence::migrate(&mut db).await;
 
     let lock_file_path = root_dir.join("aries-db.lock");
     match aries_filesystem::lock::try_lock(lock_file_path).await {

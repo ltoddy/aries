@@ -2,6 +2,7 @@ pub mod acp;
 pub mod agent;
 pub mod command;
 pub mod exec;
+pub mod gc;
 pub mod mcp;
 pub mod model;
 pub mod prompt;
@@ -51,6 +52,8 @@ pub enum Subcommands {
     Doctor,
     #[command(about = "Execute a shell command")]
     Exec(ExecArgs),
+    #[command(about = "Garbage collect stale database records")]
+    Gc,
     #[command(about = "Run git hook integrations")]
     Hook {},
     #[command(about = "Manage MCP (Model Context Protocol) servers")]

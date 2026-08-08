@@ -39,6 +39,7 @@ async fn main() -> anyhow::Result<()> {
             todo!()
         },
         Some(cli::Subcommands::Exec(args)) => cli::exec::execute(args).await,
+        Some(cli::Subcommands::Gc) => cli::gc::execute(gctx).await,
         Some(cli::Subcommands::Hook { .. }) => {
             todo!()
         },
