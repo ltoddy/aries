@@ -8,7 +8,7 @@ use thiserror::Error;
 use tracing::info;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct HooksPreset {
+pub struct HooksDefinition {
     pub description: Option<String>,
     pub hooks: HooksSettings,
 }
@@ -21,7 +21,7 @@ pub enum ParseHooksFileError {
     Json(#[from] serde_json::Error),
 }
 
-impl HooksPreset {
+impl HooksDefinition {
     pub async fn parse(file_path: impl AsRef<Path>) -> Result<Self, ParseHooksFileError> {
         let file_path = file_path.as_ref();
         info!("Parsing hooks file: {}", file_path.display());

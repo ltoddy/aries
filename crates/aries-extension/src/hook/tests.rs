@@ -7,12 +7,12 @@ use std::path::Path;
 use tempfile::TempDir;
 
 use super::*;
-use crate::hook::executor::execute_bash_command_hook;
-use crate::hook::input::PreToolUseHookInput;
-use crate::hook::preset::{
+use crate::hook::definition::{
     BashCommandHook, HookCommand, HookEvent, HookMatcher, HookMatcherError, HooksSettings,
     ParseHooksFileError, ShellType,
 };
+use crate::hook::executor::execute_bash_command_hook;
+use crate::hook::input::PreToolUseHookInput;
 
 /// 在 `root/.agents/hooks/` 下写入一个 hooks.json，事件名为 key。
 fn write_hooks_json(root: &Path, event: &str) {
@@ -128,7 +128,7 @@ async fn parses_hooks_preset() {
     )
     .unwrap();
 
-    let preset = HooksPreset::parse(&file).await.unwrap();
+    let preset = HooksDefinition::parse(&file).await.unwrap();
     assert_eq!(preset.description.as_deref(), Some("demo"));
     assert_eq!(preset.hooks.0.len(), 1);
     assert!(preset.hooks.0.contains_key(&HookEvent::PreToolUse));
@@ -136,7 +136,7 @@ async fn parses_hooks_preset() {
 
 #[tokio::test]
 async fn parse_reports_missing_file() {
-    let err = HooksPreset::parse("/nonexistent/hooks.json").await.unwrap_err();
+    let err = HooksDefinition::parse("/nonexistent/hooks.json").await.unwrap_err();
     assert!(matches!(err, ParseHooksFileError::Io(_)));
 }
 
@@ -178,7 +178,7 @@ async fn executor_continues_when_no_hooks_registered() {
 
 #[tokio::test]
 async fn executor_blocks_pre_tool_use_when_hook_exits_two() {
-    let preset = HooksPreset {
+    let preset = HooksDefinition {
         description: None,
         hooks: HooksSettings(HashMap::from([(
             HookEvent::PreToolUse,
@@ -199,7 +199,7 @@ async fn executor_blocks_pre_tool_use_when_hook_exits_two() {
 
 #[tokio::test]
 async fn executor_skips_hook_when_matcher_does_not_match() {
-    let preset = HooksPreset {
+    let preset = HooksDefinition {
         description: None,
         hooks: HooksSettings(HashMap::from([(
             HookEvent::PreToolUse,

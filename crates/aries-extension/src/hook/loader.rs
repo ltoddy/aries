@@ -4,7 +4,7 @@ use aries_filesystem::walk::walk_dirs;
 use futures::stream::{self, StreamExt};
 use itertools::Itertools;
 
-use crate::hook::preset::HooksPreset;
+use crate::hook::definition::HooksDefinition;
 
 pub struct HooksLoader {
     roots: Vec<PathBuf>,
@@ -29,7 +29,7 @@ impl HooksLoader {
         Self { roots }
     }
 
-    pub async fn load(&self) -> Vec<HooksPreset> {
+    pub async fn load(&self) -> Vec<HooksDefinition> {
         let Ok(entries) = walk_dirs(&self.roots, true, false) else { return vec![] };
 
         let file_paths = entries
@@ -38,7 +38,7 @@ impl HooksLoader {
             .collect::<Vec<_>>();
 
         stream::iter(file_paths)
-            .filter_map(|file_path| async move { HooksPreset::parse(file_path).await.ok() })
+            .filter_map(|file_path| async move { HooksDefinition::parse(file_path).await.ok() })
             .collect()
             .await
     }

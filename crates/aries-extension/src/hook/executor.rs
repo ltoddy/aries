@@ -11,13 +11,15 @@ use tokio::process::Command;
 use tokio::time::error::Elapsed;
 use tracing::{info, warn};
 
+use crate::hook::definition::{
+    BashCommandHook, HookCommand, HookEvent, HookMatcher, HooksDefinition,
+};
 use crate::hook::input::{
     HookInput, PostCompactHookInput, PostToolUseFailureHookInput, PostToolUseHookInput,
     PreCompactHookInput, PreToolUseHookInput, SessionEndHookInput, SessionStartHookInput,
     StopFailureHookInput, StopHookInput, SubagentStartHookInput, SubagentStopHookInput,
     UserPromptSubmitHookInput,
 };
-use crate::hook::preset::{BashCommandHook, HookCommand, HookEvent, HookMatcher, HooksPreset};
 
 const DEFAULT_HOOK_TIMEOUT_SECS: f64 = 60.0;
 
@@ -32,7 +34,7 @@ pub struct HooksExecutor {
 }
 
 impl HooksExecutor {
-    pub fn new(presets: Vec<HooksPreset>) -> Self {
+    pub fn new(presets: Vec<HooksDefinition>) -> Self {
         let mut hooks = HashMap::<HookEvent, Vec<HookMatcher>>::new();
 
         for preset in presets {

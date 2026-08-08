@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use crate::agent::{AgentDefinition, AgentsLoader};
 use crate::command::{CommandDefinition, CommandsLoader};
-use crate::hook::{HooksLoader, HooksPreset};
+use crate::hook::{HooksDefinition, HooksLoader};
 use crate::mcp::{McpDefinition, McpsLoader};
 use crate::skill::{SkillDefinition, SkillsLoader};
 
@@ -16,7 +16,7 @@ use crate::skill::{SkillDefinition, SkillsLoader};
 pub struct AgentExtensions {
     pub agents: Vec<AgentDefinition>,
     pub commands: Vec<CommandDefinition>,
-    pub hooks: Vec<HooksPreset>,
+    pub hooks: Vec<HooksDefinition>,
     pub mcps: Vec<McpDefinition>,
     pub skills: Vec<SkillDefinition>,
 }
