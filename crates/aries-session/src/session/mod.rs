@@ -259,7 +259,7 @@ impl Session {
                 }
             }
             while let Ok(event) = guard.try_recv() {
-                callback.clone()(event).await;
+                callback(event).await;
             }
             drop(guard);
 
@@ -478,12 +478,28 @@ impl Session {
             self.extensions.commands.iter().find(|c| c.frontmatter.name == command)
         {
             let prompt = slash_command.expand_arguments(args);
-            let _ = self.agent.prompt::<[_; 0], Message, _>(&prompt, [], ()).await;
-
             let mut guard = self.receiver.lock().await;
-            while let Ok(event) = guard.try_recv() {
-                callback.clone()(event).await;
+            let future = self.agent.prompt::<[_; 0], Message, _>(&prompt, [], ());
+            pin!(future);
+
+            loop {
+                tokio::select! {
+                    biased;
+                    _ = self.cancel_token.cancelled() => break,
+                    event = guard.recv() => {
+                        if let Some(event) = event {
+                            callback(event).await
+                        }
+                    }
+                    _ = &mut future => {
+                        break;
+                    }
+                }
             }
+            while let Ok(event) = guard.try_recv() {
+                callback(event).await;
+            }
+            drop(guard);
             return true;
         }
         false
