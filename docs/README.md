@@ -2,3 +2,4 @@
 
 - [从错误中恢复](error-recovery.md)
 - [长期记忆系统](memory.md)
+- [WebFetch Tool](web-tool.md)

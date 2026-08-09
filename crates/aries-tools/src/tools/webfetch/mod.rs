@@ -1,6 +1,10 @@
 mod args;
 mod error;
 mod output;
+#[cfg(test)]
+mod tests;
+
+use std::env;
 
 use rig_agent::tool::{Tool, ToolContext};
 use serde_json::Value;
@@ -10,6 +14,8 @@ pub use self::error::WebFetchError;
 pub use self::output::WebFetchOutput;
 
 pub const NAME: &str = "WebFetch";
+
+const DEFAULT_FIRECRAWL_API_URL: &str = "https://api.firecrawl.dev";
 
 pub struct WebFetchTool;
 
@@ -21,7 +27,7 @@ impl Default for WebFetchTool {
 
 impl WebFetchTool {
     pub fn new() -> Self {
-        Self {}
+        Self
     }
 }
 
@@ -38,15 +44,11 @@ impl Tool for WebFetchTool {
     fn parameters(&self) -> Value {
         serde_json::json!({
             "type": "object",
+            "additionalProperties": false,
             "properties": {
                 "url": {
                     "type": "string",
                     "description": "The URL to fetch content from"
-                },
-                "format": {
-                    "type": "string",
-                    "description": "The format to return the content in (markdown, text, or html)",
-                    "enum": ["markdown", "text", "html"]
                 }
             },
             "required": ["url"]
@@ -58,24 +60,20 @@ impl Tool for WebFetchTool {
         _context: &mut ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
-        let url = if args.url.starts_with("http://") {
-            args.url.replace("http://", "https://")
-        } else {
-            args.url.clone()
+        let api_url =
+            env::var("FIRECRAWL_API_URL").unwrap_or_else(|_| DEFAULT_FIRECRAWL_API_URL.to_owned());
+        let api_key = env::var("FIRECRAWL_API_KEY").ok();
+
+        let client = firecrawl::Client::new_selfhosted(api_url, api_key)
+            .map_err(WebFetchError::missing_api_key)?;
+
+        let options = firecrawl::ScrapeOptions {
+            origin: Some("aries".to_owned()),
+            formats: Some(vec![firecrawl::Format::Markdown]),
+            ..Default::default()
         };
-
-        let response =
-            reqwest::get(&url).await.map_err(|e| WebFetchError::FetchError(e.to_string()))?;
-
-        let content =
-            response.text().await.map_err(|e| WebFetchError::FetchError(e.to_string()))?;
-
-        let mut truncated = content;
-        if truncated.len() > 10000 {
-            truncated.truncate(10000);
-            truncated.push_str("\n... (content truncated due to length)");
-        }
-
-        Ok(WebFetchOutput { content: truncated })
+        let document = client.scrape(args.url, options).await.map_err(WebFetchError::firecrawl)?;
+        let output = WebFetchOutput::new(document.markdown.unwrap_or_default());
+        Ok(output)
     }
 }

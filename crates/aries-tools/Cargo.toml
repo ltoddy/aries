@@ -11,6 +11,7 @@ aries-lspclient = { path = "../aries-lspclient" }
 aries-mode = { path = "../aries-mode" }
 aries-preamble = { path = "../aries-preamble" }
 dialoguer.workspace = true
+firecrawl.workspace = true
 futures.workspace = true
 globset.workspace = true
 ignore.workspace = true
@@ -29,4 +30,4 @@ tree-sitter-bash.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
-tokio = { workspace = true, features = ["macros", "rt-multi-thread", "fs", "process"] }
+tokio = { workspace = true, features = ["fs", "macros", "net", "process", "rt-multi-thread"] }

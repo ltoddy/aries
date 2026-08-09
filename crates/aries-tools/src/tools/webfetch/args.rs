@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WebFetchArgs {
     pub url: String,
-    pub format: Option<String>,
 }
 
 impl WebFetchArgs {
