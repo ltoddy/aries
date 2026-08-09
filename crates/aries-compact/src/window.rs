@@ -8,6 +8,12 @@ pub struct ContextWindow {
 
 const CONTEXT_WINDOW: u64 = 1_000_000;
 
+impl Default for ContextWindow {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ContextWindow {
     pub fn new() -> Self {
         Self { total: CONTEXT_WINDOW }

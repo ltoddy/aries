@@ -1,3 +1,4 @@
+pub mod commands;
 pub mod middleware;
 pub mod provider;
 pub mod registry;

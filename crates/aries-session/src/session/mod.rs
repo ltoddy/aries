@@ -49,6 +49,7 @@ use self::chat_context::ChatContext;
 use self::chat_history::ChatHistory;
 use self::config::SessionConfig;
 use self::hook::SessionPromptHook;
+use crate::commands::CommandsExecutor;
 use crate::{AriesAgentProvider, AriesClientProvider};
 
 #[derive(Clone)]
@@ -220,8 +221,8 @@ impl Session {
 
         if let Message::User { ref content } = prompt
             && let UserContent::Text(text) = content.first()
-            && let Some(command) = text.text.trim().strip_prefix("/")
-            && self.try_execute_slash_command(command, callback.clone()).await
+            && let Some(input) = text.text.trim().strip_prefix("/")
+            && self.try_execute_slash_command(input, callback.clone()).await
         {
             return Ok(());
         }
@@ -460,50 +461,21 @@ impl Session {
 
     async fn try_execute_slash_command<F, Fut>(
         &mut self,
-        command: impl Into<String>,
+        input: impl AsRef<str>,
         callback: F,
     ) -> bool
     where
         F: Fn(AgentEvent) -> Fut + Clone,
         Fut: Future<Output = ()>,
     {
-        let command = command.into();
-        let command = command.trim();
-
-        let (command, args) = if let Some((first, rest)) = command.split_once(' ') {
-            (first, rest)
-        } else {
-            (command, "")
-        };
-
-        if let Some(slash_command) =
-            self.extensions.commands.iter().find(|c| c.frontmatter.name == command)
-        {
-            let prompt = slash_command.expand_arguments(args);
+        let executor = CommandsExecutor::new(&self.agent, &self.extensions.commands, &self.id);
+        if executor.execute(input).await {
             let mut guard = self.receiver.lock().await;
-            let future = self.agent.prompt::<[_; 0], Message, _>(&prompt, [], ());
-            pin!(future);
-
-            loop {
-                tokio::select! {
-                    biased;
-                    _ = self.cancel_token.cancelled() => break,
-                    event = guard.recv() => {
-                        if let Some(event) = event {
-                            callback(event).await
-                        }
-                    }
-                    _ = &mut future => {
-                        break;
-                    }
-                }
-            }
             while let Ok(event) = guard.try_recv() {
                 callback(event).await;
             }
-            drop(guard);
             return true;
-        }
+        };
         false
     }
 

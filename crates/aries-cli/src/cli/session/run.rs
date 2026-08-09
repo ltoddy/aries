@@ -33,7 +33,7 @@ pub async fn execute(gctx: GlobalContext, bare: bool) -> anyhow::Result<()> {
     let session_id = session.id();
     let _session_span = info_span!("session", session_id = %session_id).entered();
 
-    let mut reader = input::InputReader::new(session.session_dir())?;
+    let mut reader = input::InputReader::new(&gctx.root_dir)?;
     welcome::welcome(
         model_config.provider().to_string(),
         model_config.model(),
@@ -46,13 +46,9 @@ pub async fn execute(gctx: GlobalContext, bare: bool) -> anyhow::Result<()> {
         let readline = reader.readline(format!("{} › ", gctx.user).as_str());
         match readline {
             Ok(line) => {
+                reader.save_history();
                 let input = line.trim();
                 if input.is_empty() {
-                    continue;
-                }
-
-                if input.starts_with('/') {
-                    commands::execute(input, &mut session).await;
                     continue;
                 }
 

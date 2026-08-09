@@ -31,7 +31,7 @@ use crate::text;
 
 pub fn print_agent_event(event: AgentEvent, tool_names: &mut HashMap<String, String>) {
     match event {
-        AgentEvent::Notification(_) => {},
+        AgentEvent::Notification(text) => println!("{}", text),
         AgentEvent::StreamItem(stream_item) => match stream_item {
             MultiTurnStreamItem::StreamAssistantItem(content) => match content {
                 StreamedAssistantContent::Text(text) => {

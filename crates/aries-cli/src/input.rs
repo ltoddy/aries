@@ -12,8 +12,8 @@ pub struct InputReader {
 }
 
 impl InputReader {
-    pub fn new(dir: impl AsRef<Path>) -> anyhow::Result<Self> {
-        let file_path = dir.as_ref().join("history.txt");
+    pub fn new(root_dir: impl AsRef<Path>) -> anyhow::Result<Self> {
+        let file_path = root_dir.as_ref().join("history.txt");
 
         let config = Config::builder().auto_add_history(true).build();
         let mut rl = Editor::with_config(config)?;
@@ -21,6 +21,10 @@ impl InputReader {
         let _ = rl.load_history(&file_path);
 
         Ok(Self { editor: rl, file_path })
+    }
+
+    pub fn save_history(&mut self) {
+        let _ = self.editor.save_history(&self.file_path);
     }
 }
 

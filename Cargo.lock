@@ -297,9 +297,9 @@ name = "aries-compact"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aries-agent",
  "aries-filesystem",
  "aries-tools",
+ "futures",
  "regex-lite",
  "rig-agent",
  "rig-core",

@@ -112,6 +112,6 @@ where
 
         let inner = builder.build();
 
-        (AriesAgent::new(inner, name, preamble, Some(self.sender)), self.receiver)
+        (AriesAgent::new(inner, name, preamble, self.sender), self.receiver)
     }
 }

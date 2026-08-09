@@ -2,12 +2,17 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Context;
-use aries_agent::AriesAgent;
 use aries_filesystem::jsonl;
+use futures::StreamExt;
 use regex_lite::Regex;
+use rig_agent::Agent;
+use rig_agent::agent::{MultiTurnStreamItem, PromptResponse, StreamingError};
 use rig_agent::client::AgentClientExt;
 use rig_agent::completion::{self, Message};
+use rig_agent::streaming::StreamingPrompt;
+use rig_core::completion::CompletionError;
 use rig_core::message::{self, AssistantContent, ReasoningContent, UserContent};
+use tokio::pin;
 use tracing::info;
 
 const PREAMBLE: &str = include_str!("preamble.md");
@@ -31,7 +36,7 @@ pub struct CompactAgent<M>
 where
     M: completion::CompletionModel,
 {
-    inner: AriesAgent<M>,
+    inner: Agent<M>,
     transcript_path: PathBuf,
 }
 
@@ -55,7 +60,7 @@ where
             .default_max_turns(Self::COMPACTION_MAX_TURNS)
             .build();
 
-        Self { inner: AriesAgent::new(agent, NAME, PREAMBLE, None), transcript_path }
+        Self { inner: agent, transcript_path }
     }
 
     pub async fn compact(&mut self, messages: &[Message]) -> CompactOutcome {
@@ -67,17 +72,36 @@ where
         };
 
         let compressed_prompt = compress(messages);
-        let final_res =
-            match self.inner.prompt::<[_; 0], Message, _>(compressed_prompt, [], ()).await {
-                Ok(r) => r,
-                Err(e) => {
-                    return if e.is_context_exceeded() {
-                        CompactOutcome::PromptTooLong
-                    } else {
-                        CompactOutcome::Transient(e.to_string())
-                    };
+        let stream = self.inner.stream_prompt(compressed_prompt).await;
+        pin!(stream);
+
+        let mut final_res = PromptResponse::empty();
+        while let Some(chunk) = stream.next().await {
+            match chunk {
+                Ok(chunk) => {
+                    if let MultiTurnStreamItem::FinalResponse(res) = chunk {
+                        final_res = res;
+                    }
                 },
-            };
+                Err(err) => {
+                    if let StreamingError::Completion(CompletionError::ProviderError(ref err)) = err
+                    {
+                        const PATTERNS: [&str; 6] = [
+                            "prompt_too_long",
+                            "context_length_exceeded",
+                            "maximum context length",
+                            "context length exceeded",
+                            "too many tokens",
+                            "input is too long",
+                        ];
+                        if PATTERNS.iter().any(|p| err.contains(p)) {
+                            return CompactOutcome::PromptTooLong;
+                        }
+                    }
+                    return CompactOutcome::Transient(err.to_string());
+                },
+            }
+        }
 
         let summary = final_res.output().trim();
         if summary.is_empty() {

@@ -13,6 +13,7 @@ use agent_client_protocol::schema::v1::{
 use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
 use aries_init::Setting;
 use aries_mode::Mode;
+use aries_session::commands::BUILTIN_COMMANDS;
 use aries_session::session::SessionArgs;
 use itertools::Itertools;
 use tracing::{info, instrument};
@@ -52,8 +53,16 @@ pub async fn new_session(
         SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::from(greeting))),
     ));
 
-    let slash_commands = session.list_slash_commands();
-    let available_commands = slash_commands
+    let builtin_commands = BUILTIN_COMMANDS
+        .iter()
+        .map(|(name, desc, hint)| {
+            AvailableCommand::new(name.to_string(), desc.to_string()).input(hint.map(|hint| {
+                AvailableCommandInput::Unstructured(UnstructuredCommandInput::new(hint))
+            }))
+        })
+        .collect_vec();
+    let slash_commands = session
+        .list_slash_commands()
         .into_iter()
         .map(|c| {
             AvailableCommand::new(c.name, c.description).input(c.argument_hint.map(|hint| {
@@ -61,6 +70,7 @@ pub async fn new_session(
             }))
         })
         .collect_vec();
+    let available_commands = builtin_commands.into_iter().chain(slash_commands).collect_vec();
     let _ = cx.send_notification(SessionNotification::new(
         session.id(),
         SessionUpdate::AvailableCommandsUpdate(AvailableCommandsUpdate::new(available_commands)),
@@ -102,8 +112,16 @@ pub async fn load_session(
         SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::from(greeting))),
     ));
 
-    let slash_commands = session.list_slash_commands();
-    let available_commands = slash_commands
+    let builtin_commands = BUILTIN_COMMANDS
+        .iter()
+        .map(|(name, desc, hint)| {
+            AvailableCommand::new(name.to_string(), desc.to_string()).input(hint.map(|hint| {
+                AvailableCommandInput::Unstructured(UnstructuredCommandInput::new(hint))
+            }))
+        })
+        .collect_vec();
+    let slash_commands = session
+        .list_slash_commands()
         .into_iter()
         .map(|c| {
             AvailableCommand::new(c.name, c.description).input(c.argument_hint.map(|hint| {
@@ -111,6 +129,7 @@ pub async fn load_session(
             }))
         })
         .collect_vec();
+    let available_commands = builtin_commands.into_iter().chain(slash_commands).collect_vec();
     let _ = cx.send_notification(SessionNotification::new(
         session.id(),
         SessionUpdate::AvailableCommandsUpdate(AvailableCommandsUpdate::new(available_commands)),

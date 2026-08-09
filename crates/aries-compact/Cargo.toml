@@ -5,9 +5,9 @@ edition = "2024"
 
 [dependencies]
 anyhow.workspace = true
-aries-agent = { path = "../aries-agent" }
 aries-filesystem = { path = "../aries-filesystem" }
 aries-tools = { path = "../aries-tools" }
+futures.workspace = true
 regex-lite.workspace = true
 rig-agent.workspace = true
 rig-core.workspace = true

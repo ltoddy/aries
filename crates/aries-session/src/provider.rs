@@ -198,6 +198,15 @@ impl AriesAgentProvider {
         }
     }
 
+    pub fn send_notification(&self, text: impl Into<String>) {
+        match self {
+            AriesAgentProvider::Anthropic(a) => a.send_notification(text),
+            AriesAgentProvider::Azure(a) => a.send_notification(text),
+            AriesAgentProvider::Deepseek(a) => a.send_notification(text),
+            AriesAgentProvider::OpenAI(a) => a.send_notification(text),
+        }
+    }
+
     #[inline]
     pub fn preamble(&self) -> &str {
         match self {

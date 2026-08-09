@@ -1,11 +1,11 @@
+use aries_session::commands::BUILTIN_COMMANDS;
 use dialoguer::Select;
 use dialoguer::theme::ColorfulTheme;
+use itertools::Itertools;
 use rustyline::completion::{Completer, Pair};
 use rustyline::hint::HistoryHinter;
 use rustyline::{Context, Result};
 use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
-
-use super::Command;
 
 #[derive(Helper, Highlighter, Hinter, Validator)]
 pub struct CommandCompleter {
@@ -34,16 +34,16 @@ impl Completer for CommandCompleter {
 }
 
 pub fn show(prefix: &str) -> Option<String> {
-    let commands = Command::all();
-    let filtered: Vec<(String, String)> =
-        commands.into_iter().filter(|(cmd, _)| cmd.starts_with(prefix)).collect();
-
+    let filtered = BUILTIN_COMMANDS
+        .iter()
+        .filter(|(cmd, _, _)| format!("/{cmd}").starts_with(prefix))
+        .map(|(cmd, desc, _)| (cmd, desc))
+        .collect_vec();
     if filtered.is_empty() {
         return None;
     }
 
-    let items: Vec<String> = filtered.iter().map(|(cmd, desc)| format!("{cmd}  {desc}")).collect();
-
+    let items = filtered.iter().map(|(cmd, desc)| format!("/{cmd} - {desc}")).collect_vec();
     let selection = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Select a command")
         .default(0)
@@ -52,5 +52,5 @@ pub fn show(prefix: &str) -> Option<String> {
         .ok()
         .flatten()?;
 
-    Some(filtered[selection].0.clone())
+    Some(format!("/{}", filtered[selection].0))
 }

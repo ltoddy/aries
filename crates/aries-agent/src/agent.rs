@@ -17,7 +17,7 @@ where
     inner: Agent<M>,
     name: String,
     preamble: String,
-    sender: Option<UnboundedSender<AgentEvent>>,
+    sender: UnboundedSender<AgentEvent>,
 }
 
 impl<M> AriesAgent<M>
@@ -28,7 +28,7 @@ where
         inner: Agent<M>,
         name: impl Into<String>,
         preamble: impl Into<String>,
-        sender: Option<UnboundedSender<AgentEvent>>,
+        sender: UnboundedSender<AgentEvent>,
     ) -> Self {
         let name = name.into();
         let bare_preamble = preamble.into();
@@ -54,10 +54,8 @@ where
         while let Some(chunk) = stream.next().await {
             match chunk {
                 Ok(item) => {
-                    if let Some(ref sender) = self.sender {
-                        let event = AgentEvent::stream_item(item.clone());
-                        let _ = sender.send(event);
-                    }
+                    let event = AgentEvent::stream_item(item.clone());
+                    let _ = self.sender.send(event);
 
                     if let MultiTurnStreamItem::FinalResponse(res) = item {
                         final_res = res;
@@ -76,5 +74,11 @@ where
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    // 这样子设计不太好, 对外暴露了 Agent 内部的通信方式
+    pub fn send_notification(&self, text: impl Into<String>) {
+        let event = AgentEvent::notification(text);
+        let _ = self.sender.send(event);
     }
 }

@@ -15,7 +15,7 @@ impl TavilyClient {
 
         let http_client = reqwest::ClientBuilder::new()
             .user_agent("Aries")
-            .timeout(Duration::from_mins(1))
+            .timeout(Duration::from_secs(30))
             .build()
             .expect("failed to build Tavily HTTP client");
 
