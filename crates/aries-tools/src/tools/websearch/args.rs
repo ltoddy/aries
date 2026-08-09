@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 pub struct WebSearchArgs {
     pub query: String,
     pub num: Option<i32>,
+    pub allowed_domains: Option<Vec<String>>,
+    pub blocked_domains: Option<Vec<String>>,
 }
 
 impl WebSearchArgs {

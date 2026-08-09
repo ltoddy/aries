@@ -1,5 +1,19 @@
+use super::tavily::TavilyError;
+
 #[derive(thiserror::Error, Debug)]
 pub enum WebSearchError {
+    #[error("WebSearchTool is not configured: environment variable TAVILY_API_KEY is not set")]
+    NotConfigured,
     #[error("Failed to perform web search: {0}")]
-    SearchError(String),
+    SearchError(#[from] TavilyError),
+}
+
+impl WebSearchError {
+    pub fn not_configured() -> Self {
+        Self::NotConfigured
+    }
+
+    pub fn search_error(err: TavilyError) -> Self {
+        Self::SearchError(err)
+    }
 }

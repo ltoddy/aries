@@ -278,7 +278,9 @@ impl Session {
         }
         self.fire_stop(final_res.output()).await;
         self.sift(final_res.messages(), title, final_res.output());
-        self.post_compact(final_res.usage(), callback).await;
+        if let Some(complection) = final_res.completion_calls.last() {
+            self.post_compact(complection.usage, callback).await;
+        }
 
         Ok(())
     }
@@ -363,7 +365,7 @@ impl Session {
             CompactOutcome::Success((compressed, compact_summary)) => {
                 self.chat_context.overwrite(compressed).await;
 
-                let window = aries_compact::ContextWindow::for_model(self.config.model());
+                let window = aries_compact::ContextWindow::new();
                 let post_tokens = self.chat_context.history().estimate_tokens();
                 let threshold = window.auto_compact_threshold();
                 if post_tokens >= threshold {
@@ -690,7 +692,7 @@ impl Session {
     {
         aries_compact::micro_compact(self.chat_context.history_mut());
 
-        let window = aries_compact::ContextWindow::for_model(self.config.model());
+        let window = aries_compact::ContextWindow::new();
         let compact_threshold = window.auto_compact_threshold();
         let estimated_tokens =
             self.chat_context.history().estimate_tokens().saturating_add(prompt.estimate_tokens());
@@ -710,7 +712,7 @@ impl Session {
         F: FnMut(AgentEvent) -> Fut,
         Fut: Future<Output = ()>,
     {
-        let window = aries_compact::ContextWindow::for_model(self.config.model());
+        let window = aries_compact::ContextWindow::new();
         let compact_threshold = window.auto_compact_threshold();
 
         if usage.total_tokens > compact_threshold {

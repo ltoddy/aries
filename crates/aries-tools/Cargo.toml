@@ -21,11 +21,11 @@ reqwest.workspace = true
 rig-agent.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-tree-sitter-bash.workspace = true
-tree-sitter.workspace = true
 similar.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["fs", "process"] }
+tree-sitter.workspace = true
+tree-sitter-bash.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

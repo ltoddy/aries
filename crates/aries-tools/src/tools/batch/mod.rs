@@ -198,7 +198,7 @@ async fn dispatch(
         },
         websearch::NAME => {
             let args: WebSearchArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
-            Tool::call(&WebSearchTool, context, args)
+            Tool::call(&WebSearchTool::new(), context, args)
                 .await
                 .map(|res| serde_json::to_value(res).unwrap())
                 .map_err(|e| e.to_string())

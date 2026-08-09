@@ -38,6 +38,10 @@
 
 > 详见 [docs/acp.md](docs/acp.md)
 
+## 支持 WebSearch Tool
+
+> 详见 [docs/websearch-tool.md](docs/websearch-tool.md)
+
 ## Aries Island（macOS 菜单栏助手）
 
 > 详见 [docs/mac-island.md](docs/mac-island.md)
