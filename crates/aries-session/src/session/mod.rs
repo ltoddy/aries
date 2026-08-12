@@ -22,7 +22,7 @@ use aries_extension::hook::input::{
 use aries_extension::hook::{HookDecision, HooksExecutor};
 use aries_extension::mcp::McpDefinition;
 use aries_extension::{AgentExtensions, mcp};
-use aries_init::{GlobalContext, ModelConfig, Setting, SettingError};
+use aries_init::{GlobalContext, ModelConfig, Setting, SettingLoader};
 use aries_lspclient::{LspServerInfo, SharedLspClient, warm_up};
 use aries_memory::MemoryStore;
 use aries_mode::Mode;
@@ -51,6 +51,7 @@ use self::config::SessionConfig;
 use self::hook::SessionPromptHook;
 use crate::commands::CommandsExecutor;
 use crate::{AriesAgentProvider, AriesClientProvider};
+use crate::provider::CompactAgentProvider;
 
 #[derive(Clone)]
 pub struct Session {
@@ -154,14 +155,9 @@ impl Session {
     pub async fn set_model(&mut self, alias: impl Into<String>) -> anyhow::Result<()> {
         let alias = alias.into();
 
-        let config = self
-            .setting
-            .models
-            .iter()
-            .find(|m| m.alias() == alias)
-            .ok_or_else(|| SettingError::not_found(&alias))?;
+        let config = self.setting.activate(&alias)?;
 
-        self.client = AriesClientProvider::new(config)?;
+        self.client = AriesClientProvider::new(&config)?;
         let (agent, receiver) = self
             .client
             .agent(
@@ -179,7 +175,10 @@ impl Session {
         self.agent = agent;
         self.receiver = Arc::new(Mutex::new(receiver));
         self.config = config.to_owned();
-        self.setting.active = alias;
+
+        let loader = SettingLoader::new(&self.gctx.root_dir);
+        let _ = loader.save(&self.setting).await;
+
         Ok(())
     }
 
@@ -339,28 +338,8 @@ impl Session {
             return false;
         }
 
-        let outcome = match self.client.clone() {
-            AriesClientProvider::Anthropic(client) => {
-                let mut compact_agent =
-                    CompactAgent::new(client, self.config.model(), &self.transcript_path);
-                compact_agent.compact(self.chat_context.history()).await
-            },
-            AriesClientProvider::Azure(client) => {
-                let mut compact_agent =
-                    CompactAgent::new(client, self.config.model(), &self.transcript_path);
-                compact_agent.compact(self.chat_context.history()).await
-            },
-            AriesClientProvider::Deepseek(client) => {
-                let mut compact_agent =
-                    CompactAgent::new(client, self.config.model(), &self.transcript_path);
-                compact_agent.compact(self.chat_context.history()).await
-            },
-            AriesClientProvider::OpenAI(client) => {
-                let mut compact_agent =
-                    CompactAgent::new(client, self.config.model(), &self.transcript_path);
-                compact_agent.compact(self.chat_context.history()).await
-            },
-        };
+        let mut compact_agent = self.client.compact_agent(self.config.model(), &self.transcript_path);
+        let outcome = compact_agent.compact(self.chat_context.history()).await;
 
         match outcome {
             CompactOutcome::Success((compressed, compact_summary)) => {

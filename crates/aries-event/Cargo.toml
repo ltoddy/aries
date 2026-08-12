@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 rig-agent.workspace = true
 rig-core.workspace = true
+tokio.workspace = true

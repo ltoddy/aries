@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use aries_agent::{AgentBuilder, AriesAgent, AriesResult};
+use aries_compact::{CompactAgent, CompactOutcome};
 use aries_event::AgentEvent;
 use aries_extension::AgentExtensions;
 use aries_init::{GlobalContext, ModelConfig};
@@ -130,6 +131,27 @@ impl AriesClientProvider {
         }
     }
 
+    pub fn compact_agent(
+        &self,
+        model: impl Into<String>,
+        transcript_path: impl AsRef<Path>,
+    ) -> CompactAgentProvider {
+        match self {
+            AriesClientProvider::Anthropic(c) => CompactAgentProvider::Anthropic(
+                CompactAgent::new(c.clone(), model, transcript_path),
+            ),
+            AriesClientProvider::Azure(c) => {
+                CompactAgentProvider::Azure(CompactAgent::new(c.clone(), model, transcript_path))
+            },
+            AriesClientProvider::Deepseek(c) => {
+                CompactAgentProvider::Deepseek(CompactAgent::new(c.clone(), model, transcript_path))
+            },
+            AriesClientProvider::OpenAI(c) => {
+                CompactAgentProvider::OpenAI(CompactAgent::new(c.clone(), model, transcript_path))
+            },
+        }
+    }
+
     pub async fn memory_agent(
         &self,
         model: impl Into<String>,
@@ -214,6 +236,24 @@ impl AriesAgentProvider {
             AriesAgentProvider::Azure(a) => a.preamble(),
             AriesAgentProvider::Deepseek(a) => a.preamble(),
             AriesAgentProvider::OpenAI(a) => a.preamble(),
+        }
+    }
+}
+
+pub enum CompactAgentProvider {
+    Anthropic(CompactAgent<anthropic::completion::CompletionModel<ClientWithMiddleware>>),
+    Azure(CompactAgent<azure::CompletionModel<ClientWithMiddleware>>),
+    Deepseek(CompactAgent<deepseek::CompletionModel<ClientWithMiddleware>>),
+    OpenAI(CompactAgent<openai::CompletionModel<ClientWithMiddleware>>),
+}
+
+impl CompactAgentProvider {
+    pub async fn compact(&mut self, messages: &[Message]) -> CompactOutcome {
+        match self {
+            CompactAgentProvider::Anthropic(a) => a.compact(messages).await,
+            CompactAgentProvider::Azure(a) => a.compact(messages).await,
+            CompactAgentProvider::Deepseek(a) => a.compact(messages).await,
+            CompactAgentProvider::OpenAI(a) => a.compact(messages).await,
         }
     }
 }

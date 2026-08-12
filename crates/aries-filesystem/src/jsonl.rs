@@ -6,13 +6,12 @@ use serde::de::DeserializeOwned;
 use serde_json::Deserializer;
 use tracing::warn;
 
-pub async fn write<S: Serialize>(
+pub async fn write<'a, S: Serialize + 'a>(
     path: impl AsRef<Path>,
-    elements: impl AsRef<[S]>,
+    elements: impl IntoIterator<Item = &'a S>,
 ) -> io::Result<()> {
     let lines: Vec<String> = elements
-        .as_ref()
-        .iter()
+        .into_iter()
         .enumerate()
         .map(|(i, ele)| {
             serde_json::to_string(ele).map_err(|e| {

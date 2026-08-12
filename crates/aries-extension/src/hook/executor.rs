@@ -47,7 +47,13 @@ impl HooksExecutor {
 
     pub async fn fire_post_compact(&self, input: PostCompactHookInput) {
         let hook_event_name = input.hook_event_name();
-        let input = serde_json::to_string(&input).unwrap();
+        let input = match serde_json::to_string(&input) {
+            Ok(input) => input,
+            Err(err) => {
+                warn!(event = hook_event_name, %err, "failed to serialize hook input");
+                return;
+            },
+        };
         info!(event = hook_event_name, input = %input, "received hook event");
 
         let Some(matchers) = self.hooks.get(&HookEvent::PostCompact) else { return };
@@ -69,7 +75,13 @@ impl HooksExecutor {
     {
         let hook_event_name = input.hook_event_name();
         let tool_name = input.tool_name.as_str();
-        let input = serde_json::to_string(&input).unwrap();
+        let input = match serde_json::to_string(&input) {
+            Ok(input) => input,
+            Err(err) => {
+                warn!(event = hook_event_name, %err, "failed to serialize hook input");
+                return;
+            },
+        };
         info!(event = hook_event_name, input = %input, "received hook event");
 
         let Some(matchers) = self.hooks.get(&HookEvent::PostToolUseFailure) else { return };
@@ -98,7 +110,13 @@ impl HooksExecutor {
     {
         let hook_event_name = input.hook_event_name();
         let tool_name = input.tool_name.as_str();
-        let input = serde_json::to_string(&input).unwrap();
+        let input = match serde_json::to_string(&input) {
+            Ok(input) => input,
+            Err(err) => {
+                warn!(event = hook_event_name, %err, "failed to serialize hook input");
+                return;
+            },
+        };
         info!(event = hook_event_name, input = %input, "received hook event");
 
         let Some(matchers) = self.hooks.get(&HookEvent::PostToolUse) else { return };
@@ -120,7 +138,13 @@ impl HooksExecutor {
 
     pub async fn fire_pre_compact(&self, input: PreCompactHookInput) -> HookDecision {
         let hook_event_name = input.hook_event_name();
-        let input = serde_json::to_string(&input).unwrap();
+        let input = match serde_json::to_string(&input) {
+            Ok(input) => input,
+            Err(err) => {
+                warn!(event = hook_event_name, %err, "failed to serialize hook input");
+                return HookDecision::Continue;
+            },
+        };
         info!(event = hook_event_name, input = %input, "received hook event");
 
         let Some(matchers) = self.hooks.get(&HookEvent::PreCompact) else {
@@ -148,7 +172,13 @@ impl HooksExecutor {
     {
         let hook_event_name = input.hook_event_name();
         let tool_name = input.tool_name.clone();
-        let input = serde_json::to_string(&input).unwrap();
+        let input = match serde_json::to_string(&input) {
+            Ok(input) => input,
+            Err(err) => {
+                warn!(event = hook_event_name, %err, "failed to serialize hook input");
+                return HookDecision::Continue;
+            },
+        };
         info!(event = hook_event_name, input = %input, "received hook event");
         let Some(matchers) = self.hooks.get(&HookEvent::PreToolUse) else {
             return HookDecision::Continue;
@@ -174,7 +204,13 @@ impl HooksExecutor {
 
     pub async fn fire_session_end(&self, input: SessionEndHookInput) {
         let hook_event_name = input.hook_event_name();
-        let input = serde_json::to_string(&input).unwrap();
+        let input = match serde_json::to_string(&input) {
+            Ok(input) => input,
+            Err(err) => {
+                warn!(event = hook_event_name, %err, "failed to serialize hook input");
+                return;
+            },
+        };
         info!(event = hook_event_name, input = %input, "received hook event");
 
         let Some(matchers) = self.hooks.get(&HookEvent::SessionEnd) else { return };
@@ -190,7 +226,13 @@ impl HooksExecutor {
 
     pub async fn fire_session_start(&self, input: SessionStartHookInput) {
         let hook_event_name = input.hook_event_name();
-        let input = serde_json::to_string(&input).unwrap();
+        let input = match serde_json::to_string(&input) {
+            Ok(input) => input,
+            Err(err) => {
+                warn!(event = hook_event_name, %err, "failed to serialize hook input");
+                return;
+            },
+        };
         info!(event = hook_event_name, input = %input, "received hook event");
 
         let Some(matchers) = self.hooks.get(&HookEvent::SessionStart) else { return };
@@ -206,7 +248,13 @@ impl HooksExecutor {
 
     pub async fn fire_stop_failure(&self, input: StopFailureHookInput) {
         let hook_event_name = input.hook_event_name();
-        let input = serde_json::to_string(&input).unwrap();
+        let input = match serde_json::to_string(&input) {
+            Ok(input) => input,
+            Err(err) => {
+                warn!(event = hook_event_name, %err, "failed to serialize hook input");
+                return;
+            },
+        };
         info!(event = hook_event_name, input = %input, "received hook event");
 
         let Some(matchers) = self.hooks.get(&HookEvent::StopFailure) else { return };
@@ -223,7 +271,13 @@ impl HooksExecutor {
     /// 在文档中对于 stop hook 是可以被阻止的: `Prevents Claude from stopping, continues the conversation`. 没太理解, 先记录个 todo
     pub async fn fire_stop(&self, input: StopHookInput) -> HookDecision {
         let hook_event_name = input.hook_event_name();
-        let input = serde_json::to_string(&input).unwrap();
+        let input = match serde_json::to_string(&input) {
+            Ok(input) => input,
+            Err(err) => {
+                warn!(event = hook_event_name, %err, "failed to serialize hook input");
+                return HookDecision::Continue;
+            },
+        };
         info!(event = hook_event_name, input = %input, "received hook event");
 
         let Some(matchers) = self.hooks.get(&HookEvent::Stop) else {
@@ -244,7 +298,13 @@ impl HooksExecutor {
 
     pub async fn fire_subagent_start(&self, input: SubagentStartHookInput) {
         let hook_event_name = input.hook_event_name();
-        let input = serde_json::to_string(&input).unwrap();
+        let input = match serde_json::to_string(&input) {
+            Ok(input) => input,
+            Err(err) => {
+                warn!(event = hook_event_name, %err, "failed to serialize hook input");
+                return;
+            },
+        };
         info!(event = hook_event_name, input = %input, "received hook event");
 
         let Some(matchers) = self.hooks.get(&HookEvent::SubagentStart) else { return };
@@ -261,7 +321,13 @@ impl HooksExecutor {
     /// 在文档中对于 subagent stop hook 是可以被阻止的: `Prevents the subagent from stopping` 没太理解, 先记录一个 todo
     pub async fn fire_subagent_stop(&self, input: SubagentStopHookInput) -> HookDecision {
         let hook_event_name = input.hook_event_name();
-        let input = serde_json::to_string(&input).unwrap();
+        let input = match serde_json::to_string(&input) {
+            Ok(input) => input,
+            Err(err) => {
+                warn!(event = hook_event_name, %err, "failed to serialize hook input");
+                return HookDecision::Continue;
+            },
+        };
         info!(event = hook_event_name, input = %input, "received hook event");
 
         let Some(matchers) = self.hooks.get(&HookEvent::SubagentStop) else {
@@ -282,7 +348,13 @@ impl HooksExecutor {
 
     pub async fn fire_user_prompt_submit(&self, input: UserPromptSubmitHookInput) -> HookDecision {
         let hook_event_name = input.hook_event_name();
-        let input = serde_json::to_string(&input).unwrap();
+        let input = match serde_json::to_string(&input) {
+            Ok(input) => input,
+            Err(err) => {
+                warn!(event = hook_event_name, %err, "failed to serialize hook input");
+                return HookDecision::Continue;
+            },
+        };
         info!(event = hook_event_name, input = %input, "received hook event");
 
         let Some(matchers) = self.hooks.get(&HookEvent::UserPromptSubmit) else {

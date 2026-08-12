@@ -121,14 +121,18 @@ impl Setting {
             .ok_or_else(|| SettingError::not_found(self.active.clone()))
     }
 
-    pub fn activate(&mut self, alias: impl Into<String>) -> Result<(), SettingError> {
+    pub fn activate(&mut self, alias: impl Into<String>) -> Result<ModelConfig, SettingError> {
         let alias = alias.into();
-        if !self.models.iter().any(|m| m.alias() == alias) {
-            return Err(SettingError::not_found(alias));
-        }
+
+        let activated = self
+            .models
+            .iter()
+            .find(|m| m.alias().eq(&alias))
+            .cloned()
+            .ok_or(SettingError::not_found(&alias))?;
 
         self.active = alias;
-        Ok(())
+        Ok(activated)
     }
 
     #[inline]

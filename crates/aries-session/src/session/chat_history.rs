@@ -47,7 +47,7 @@ async fn refresh_history(mut rx: UnboundedReceiver<Vec<Message>>, file_path: imp
             _ = tokio::fs::create_dir_all(parent).await;
         }
 
-        if let Err(err) = jsonl::write(&file_path, messages).await {
+        if let Err(err) = jsonl::write(&file_path, &messages).await {
             error!("failed to write chat history to {}: {err}", file_path.display());
         }
     }

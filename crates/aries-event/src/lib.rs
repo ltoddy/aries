@@ -1,5 +1,6 @@
 use rig_agent::agent::{MultiTurnStreamItem, Text};
 use rig_core::streaming::StreamedAssistantContent;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 #[derive(Debug, Clone)]
 pub enum AgentEvent {
@@ -58,5 +59,30 @@ pub fn earse<R>(stream_item: MultiTurnStreamItem<R>) -> MultiTurnStreamItem<()> 
         _ => MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Text(Text::new(
             String::new(),
         ))), // unreachable
+    }
+}
+
+// TODO 发送与接收消息未来统一使用此结构体
+#[derive(Debug)]
+pub struct Notifier<T: Clone> {
+    sender: UnboundedSender<T>,
+    receiver: UnboundedReceiver<T>,
+}
+
+impl<T: Clone> Notifier<T> {
+    pub fn new() -> Self {
+        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel::<T>();
+
+        Self { sender, receiver }
+    }
+
+    pub fn send(&self, event: T) {
+        let _ = self.sender.send(event);
+    }
+}
+
+impl<T: Clone> Default for Notifier<T> {
+    fn default() -> Self {
+        Self::new()
     }
 }
