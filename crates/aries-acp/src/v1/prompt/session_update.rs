@@ -42,19 +42,25 @@ impl SessionUpdates {
                     MultiTurnStreamItem::FinalResponse(res) => {
                         let usage = res.usage();
                         let text = format!(
-                            "\n\nUsage: input tokens = {} (cached = {}), output tokens = {}, total tokens = {}, reasoning tokens = {}",
+                            "\n\nThis turn token usage: input tokens = {} (cached = {}), output tokens = {}, total tokens = {}, reasoning tokens = {}",
                             usage.input_tokens,
                             usage.cached_input_tokens,
                             usage.output_tokens,
                             usage.total_tokens,
                             usage.reasoning_tokens,
                         );
-                        Self(vec![
-                            SessionUpdate::AgentMessageChunk(ContentChunk::new(
-                                ContentBlock::from(text),
-                            )),
-                            SessionUpdate::UsageUpdate(UsageUpdate::new(usage.total_tokens, 0)),
-                        ])
+                        if let Some(completion) = res.completion_calls.last() {
+                            return Self(vec![
+                                SessionUpdate::AgentMessageChunk(ContentChunk::new(
+                                    ContentBlock::from(text),
+                                )),
+                                SessionUpdate::UsageUpdate(UsageUpdate::new(
+                                    completion.usage.total_tokens,
+                                    0,
+                                )),
+                            ]);
+                        }
+                        Self(Vec::new())
                     },
                     MultiTurnStreamItem::ToolExecutionCommitted { .. } => {
                         // TODO

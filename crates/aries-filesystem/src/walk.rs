@@ -1,14 +1,14 @@
-use std::collections::VecDeque;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use ignore::WalkBuilder;
+use ignore::{DirEntry, Error, WalkBuilder, WalkState};
+use parking_lot::Mutex;
 
 /// Walk a directory.
 ///
 /// - If `recursive == false`: returns direct children (files + dirs).
-/// - If `recursive == true`: returns all descendants (files + dirs) in
-///   breadth-first order.
+/// - If `recursive == true`: returns all descendants (files + dirs).
+/// - `hidden`: if `true`, hidden entries (dotfiles) are ignored.
 pub fn walk_dir(root: impl AsRef<Path>, recursive: bool, hidden: bool) -> io::Result<Vec<PathBuf>> {
     let root = root.as_ref();
 
@@ -19,41 +19,46 @@ pub fn walk_dir(root: impl AsRef<Path>, recursive: bool, hidden: bool) -> io::Re
         ));
     }
 
-    walk_dirs(&[root], recursive, hidden)
+    walk_dirs([root], recursive, hidden)
 }
 
 pub fn walk_dirs(
-    roots: &[impl AsRef<Path>],
+    roots: impl IntoIterator<Item = impl AsRef<Path>>,
     recursive: bool,
     hidden: bool,
 ) -> io::Result<Vec<PathBuf>> {
-    let mut queue: VecDeque<&Path> = roots.iter().map(|r| r.as_ref()).collect();
-    let mut results = Vec::new();
+    let mut entries = Vec::new();
 
-    while let Some(dir) = queue.pop_front() {
-        if !dir.is_dir() {
+    for root in roots {
+        let root = root.as_ref();
+        if !root.is_dir() {
             continue;
         }
 
-        let mut builder = WalkBuilder::new(dir);
+        let mut builder = WalkBuilder::new(root);
         builder.hidden(hidden).ignore(true);
         if !recursive {
             builder.max_depth(Some(1));
         }
 
-        for result in builder.build() {
-            let entry = match result {
-                Ok(entry) => entry,
-                Err(_) => continue,
-            };
+        let visited = Mutex::new(Vec::new());
+        builder.build_parallel().run(|| {
+            Box::new(|result: Result<DirEntry, Error>| {
+                let entry = match result {
+                    Ok(entry) => entry,
+                    Err(_) => return WalkState::Continue,
+                };
 
-            let path = entry.path();
-            if path == dir {
-                continue;
-            }
-            results.push(path.to_path_buf());
-        }
+                let path = entry.path();
+                if path == root {
+                    return WalkState::Continue;
+                }
+                visited.lock().push(path.to_path_buf());
+                WalkState::Continue
+            })
+        });
+        entries.append(&mut visited.into_inner());
     }
 
-    Ok(results)
+    Ok(entries)
 }

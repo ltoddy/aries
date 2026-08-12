@@ -30,11 +30,6 @@
    - 优先创建新 commit，而不是 amend 已有 commit
    - 执行破坏性操作前（如 git reset --hard、git push --force、git checkout --），先考虑是否有更安全的替代方案能达到相同目的。只有当破坏性操作确实是最佳方案时才使用
    - 除非用户明确要求，不要跳过 hooks（--no-verify）或绕过签名（--no-gpg-sign、-c commit.gpgsign=false）。如果 hook 失败，应调查并修复根本问题
- - 避免不必要的 `sleep` 命令：
-   - 可以立即执行的命令之间不要 sleep —— 直接运行
-   - 不要在 sleep 循环里重试失败命令 —— 诊断根本原因
-   - 如果必须轮询外部进程，用检查命令（如 `gh run view`）而不是先 sleep
-   - 如果必须 sleep，保持时长很短（1-5 秒），避免阻塞用户
 
 # 使用 git 提交改动
 
