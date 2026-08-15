@@ -273,7 +273,7 @@ impl Session {
 
         self.last_assistant_message = Some(final_res.output().to_owned());
         if let Some(messages) = final_res.messages() {
-            self.append_messages(messages);
+            self.append_messages(messages).await;
         }
         self.fire_stop(final_res.output()).await;
         self.sift(final_res.messages(), title, final_res.output());
@@ -415,8 +415,12 @@ impl Session {
         let memory_store =
             MemoryStore::new(gctx.memory_root_dir.join(aries_filesystem::path_to_slug(cwd))).await;
 
-        let chat_history = ChatHistory::new(&session_dir).await;
-        let chat_context = ChatContext::new(&session_dir).await;
+        let chat_history = ChatHistory::new(&session_dir)
+            .await
+            .with_context(|| format!("failed to initialize chat history for session {id}"))?;
+        let chat_context = ChatContext::new(&session_dir)
+            .await
+            .with_context(|| format!("failed to initialize chat context for session {id}"))?;
 
         let session_repo = SessionRepository::new(db.clone());
 
@@ -565,13 +569,13 @@ impl Session {
         self.hooks_executor.fire_stop_failure(input).await;
     }
 
-    fn append_messages(&mut self, messages: &[Message]) {
+    async fn append_messages(&mut self, messages: &[Message]) {
         if messages.is_empty() {
             return;
         }
 
-        self.chat_history.extend(messages.iter().cloned());
-        self.chat_context.extend(messages.iter().cloned());
+        self.chat_history.append(messages).await;
+        self.chat_context.append(messages).await;
     }
 
     async fn pre_compact<F, Fut>(&mut self, prompt: &Message, mut callback: F)

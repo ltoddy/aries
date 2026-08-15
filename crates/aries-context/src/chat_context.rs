@@ -1,13 +1,13 @@
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use aries_filesystem::jsonl;
+use aries_filesystem::jsonl::JsonlAppender;
 use itertools::Itertools;
 use parking_lot::RwLock;
 use rig_agent::completion::Message;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
-use tracing::{Instrument, Span, error};
+use tracing::error;
 
 #[derive(Clone)]
 pub struct ChatContext {
@@ -16,32 +16,27 @@ pub struct ChatContext {
 
 struct Inner {
     history: RwLock<Vec<Message>>,
-    sender: UnboundedSender<Vec<Message>>,
-    file_path: PathBuf,
+    file: JsonlAppender,
 }
 
 impl ChatContext {
     const FILENAME: &'static str = "chat-context.jsonl";
 
-    pub async fn new(root_dir: impl AsRef<Path>) -> Self {
+    pub async fn new(root_dir: impl AsRef<Path>) -> std::io::Result<Self> {
         let root_dir = root_dir.as_ref();
         let file_path = root_dir.join(Self::FILENAME);
+        _ = tokio::fs::create_dir_all(root_dir).await;
 
         let history = Self::load(&file_path).await.unwrap_or_default();
+        let file = JsonlAppender::open(&file_path).await?;
 
-        let (sender, receiver) = unbounded_channel();
-        tokio::spawn(refresh_context(receiver, file_path.clone()).instrument(Span::current()));
-
-        let inner = Inner { history: RwLock::new(history), sender, file_path };
-        Self { inner: Arc::new(inner) }
+        let inner = Inner { history: RwLock::new(history), file };
+        Ok(Self { inner: Arc::new(inner) })
     }
 
-    pub fn extend(&self, messages: impl IntoIterator<Item = Message>) {
-        self.inner.history.write().extend(messages);
-
-        let snapshot = self.inner.history.read().clone();
-        if let Err(err) = self.inner.sender.send(snapshot) {
-            error!(err = %err, "failed to send context history for persistence")
+    pub async fn append(&self, messages: impl IntoIterator<Item = &Message>) {
+        if let Err(err) = self.inner.file.append(messages).await {
+            error!(path = %self.inner.file.file_path().display(), err = %err, "failed to append chat context");
         }
     }
 
@@ -49,8 +44,8 @@ impl ChatContext {
         *self.inner.history.write() = messages.into_iter().collect_vec();
 
         let snapshot = self.inner.history.read().clone();
-        if let Err(err) = jsonl::write(&self.inner.file_path, &snapshot).await {
-            error!("failed to write context history to {}: {err}", self.inner.file_path.display());
+        if let Err(err) = self.inner.file.overwrite(&snapshot).await {
+            error!(path = %self.inner.file.file_path().display(), err = %err, "failed to overwrite chat context");
         }
     }
 
@@ -65,19 +60,5 @@ impl ChatContext {
     #[inline]
     async fn load(file_path: impl AsRef<Path>) -> io::Result<Vec<Message>> {
         jsonl::read(file_path).await
-    }
-}
-
-async fn refresh_context(mut rx: UnboundedReceiver<Vec<Message>>, file_path: impl AsRef<Path>) {
-    let file_path = file_path.as_ref();
-
-    while let Some(messages) = rx.recv().await {
-        if let Some(parent) = file_path.parent() {
-            _ = tokio::fs::create_dir_all(parent).await;
-        }
-
-        if let Err(err) = jsonl::write(file_path, &messages).await {
-            error!("failed to write context history to {}: {err}", file_path.display());
-        }
     }
 }
