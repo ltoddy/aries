@@ -17,7 +17,7 @@ use aries_extension::hook::{HookDecision, HooksExecutor};
 
 pub use self::agent::{CompactAgent, CompactOutcome, compact_summary};
 pub use self::breaker::{AutoCompactBreaker, Decision};
-pub use self::micro_compact::micro_compact;
+pub use self::micro_compact::{KEEP_RECENT, micro_compact};
 pub use self::provider::CompactAgentProvider;
 pub use self::tokens::TokenEstimator;
 pub use self::window::ContextWindow;

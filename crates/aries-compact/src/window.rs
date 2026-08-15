@@ -23,4 +23,8 @@ impl ContextWindow {
         // max window context * 0.6
         self.total / 10 * 6
     }
+
+    pub fn near_overflow_threshold(&self) -> u64 {
+        self.total / 10 * 8
+    }
 }

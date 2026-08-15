@@ -588,7 +588,7 @@ impl Session {
     {
         {
             let mut write = self.chat_context.history_mut().await;
-            aries_compact::micro_compact(&mut write);
+            aries_compact::micro_compact(&mut write, aries_compact::KEEP_RECENT);
         }
 
         let window = aries_compact::ContextWindow::new();

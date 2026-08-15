@@ -1,8 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use aries_tools::{
-    bash, batch, codesearch, edit, glob, grep, lsp, multiedit, read, webfetch, websearch, write,
-};
+use aries_tools::{agent, edit, multiedit, question, skill, update_plan, write};
 use rig_core::OneOrMany;
 use rig_core::message::{
     AssistantContent, Message, ToolCall, ToolResult, ToolResultContent, UserContent,
@@ -10,9 +8,9 @@ use rig_core::message::{
 
 const TOOL_RESULT_PLACEHOLDER: &str = "[Old tool result content cleared]";
 const TOOL_CALL_PLACEHOLDER: &str = "[Old tool call content cleared — file can be re-read]";
-const KEEP_RECENT: usize = 8;
+pub const KEEP_RECENT: usize = 8;
 
-pub fn micro_compact(messages: &mut [Message]) {
+pub fn micro_compact(messages: &mut [Message], keep_recent: usize) {
     let tools = build_tools(messages);
 
     let compactable = messages
@@ -24,7 +22,7 @@ pub fn micro_compact(messages: &mut [Message]) {
         .map(|tr| tr.id.clone())
         .collect::<Vec<_>>();
 
-    let clears = compactable.into_iter().rev().skip(KEEP_RECENT).collect::<HashSet<_>>();
+    let clears = compactable.into_iter().rev().skip(keep_recent).collect::<HashSet<_>>();
 
     for message in messages.iter_mut() {
         if let Message::User { content } = message {
@@ -52,7 +50,7 @@ pub fn micro_compact(messages: &mut [Message]) {
         .map(|tc| tc.id.clone())
         .collect::<Vec<_>>();
 
-    let clears: HashSet<_> = compactable.into_iter().rev().skip(KEEP_RECENT).collect();
+    let clears: HashSet<_> = compactable.into_iter().rev().skip(keep_recent).collect();
 
     for message in messages.iter_mut() {
         if let Message::Assistant { content, .. } = message {
@@ -99,26 +97,11 @@ fn build_tools(messages: &[Message]) -> HashMap<String, String> {
 
 const COMPACTABLE_TOOL_CALL_TOOL_NAMES: &[&str; 3] = &[edit::NAME, multiedit::NAME, write::NAME];
 
-/// - 只清空"信息密集、可重新获取"的工具结果（Read/Bash/Grep/Glob/Edit/Write/Web*…）。
-/// - 保留对会话状态有控制语义的工具（Agent/UpdatePlan/Question/Skill）。
-const COMPACTABLE_TOOL_RESULT_TOOL_NAMES: &[&str; 12] = &[
-    bash::NAME,
-    batch::NAME,
-    codesearch::NAME,
-    edit::NAME,
-    glob::NAME,
-    grep::NAME,
-    lsp::NAME,
-    multiedit::NAME,
-    read::NAME,
-    webfetch::NAME,
-    websearch::NAME,
-    write::NAME,
-];
+/// 保留对会话状态有控制语义的工具（Agent/UpdatePlan/Question/Skill），
+const KEEP_TOOL_RESULT_TOOL_NAMES: &[&str; 4] =
+    &[agent::NAME, question::NAME, skill::NAME, update_plan::NAME];
 
 #[inline]
 fn is_compactable_tool_result(tr: &ToolResult, tools: &HashMap<String, String>) -> bool {
-    tools
-        .get(&tr.id)
-        .is_some_and(|name| COMPACTABLE_TOOL_RESULT_TOOL_NAMES.contains(&name.as_str()))
+    tools.get(&tr.id).is_some_and(|name| !KEEP_TOOL_RESULT_TOOL_NAMES.contains(&name.as_str()))
 }

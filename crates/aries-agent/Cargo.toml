@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 aries-event = { path = "../aries-event" }
 aries-extension = { path = "../aries-extension" }
-aries-init = { version = "0.1.0", path = "../aries-init" }
+aries-init = { path = "../aries-init" }
 aries-lspclient = { path = "../aries-lspclient" }
 aries-mode = { path = "../aries-mode" }
 aries-preamble = { path = "../aries-preamble" }

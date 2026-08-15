@@ -9,9 +9,13 @@
 
 ### 上下文超长
 
-即使被压缩过之后依旧超长
+agent loop 内每轮工具调用/结果都会写入上下文, 一次任务连续访问大量文件、执行大量命令时上下文会突发性增长, 可能在有限轮数内超出模型窗口.
 
-从 history 中获取最后 n turn 的会话内容，然后调用 LLM 进行 compact 摘要压缩.
+通过 rig 的 `AgentHook::on_completion_call` 做发送端过滤: 每轮 completion 前用 `TokenEstimator` 估算 history + prompt 的 token 数, 达到窗口的 80% (`ContextWindow::near_overflow_threshold`) 时, 将最老的工具调用/结果替换为占位符 (`micro_compact`, 保留最近 30 条), 再发送给模型. 只影响本轮发送, rig 内部消息与 transcript 完整保留, 零 LLM 调用, 不打断 agent 流程.
+
+待做:
+- 全量压缩 (`PromptTooLong`) 失败后的降级策略
+- 模型侧 `context_length_exceeded` 报错的兜底 (`AriesError::is_context_exceeded` 补调用点)
 
 ### 模型提供商故障
 

@@ -2,7 +2,7 @@
 
 - [ ] 从错误中恢复
   - 输出被截断 (Anthropic 的接口可以设置 max_tokens)
-  - 上下文超长
+  - [x] 上下文超长 (agent loop 内发送端过滤, 详见 docs/error-recovery.md)
 - [ ] acp 协议 v2 支持 (https://agentclientprotocol.com/protocol/v2/overview 等什么时候不再是 draft 了, 立马跟进实现)
 - [ ] 优化执行 slash commad 的代码
 - [ ] 完善 + 优化执行 hook 的代码

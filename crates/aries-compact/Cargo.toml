@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 anyhow.workspace = true
 aries-context = { path = "../aries-context" }
-aries-event = { version = "0.1.0", path = "../aries-event" }
+aries-event = { path = "../aries-event" }
 aries-extension = { path = "../aries-extension" }
 aries-filesystem = { path = "../aries-filesystem" }
 aries-tools = { path = "../aries-tools" }

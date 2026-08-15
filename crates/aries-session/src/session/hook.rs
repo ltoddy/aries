@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time;
 
+use aries_compact::{ContextWindow, TokenEstimator, micro_compact};
 use aries_extension::hook::input::{
     PostToolUseFailureHookInput, PostToolUseHookInput, PreToolUseHookInput, SubagentStartHookInput,
     SubagentStopHookInput,
@@ -22,6 +23,8 @@ use tokio::sync::Mutex;
 
 use crate::session::instruction::SharedInstructionContext;
 
+const KEEP_RECENT: usize = 30;
+
 #[derive(Clone)]
 pub struct SessionPromptHook {
     executor: Arc<HooksExecutor>,
@@ -34,6 +37,7 @@ pub struct SessionPromptHook {
 
     tool_call_repo: ToolCallRepository,
     instruction_ctx: SharedInstructionContext,
+    window: ContextWindow,
 }
 
 impl SessionPromptHook {
@@ -54,6 +58,7 @@ impl SessionPromptHook {
 
         let tool_call_repo = ToolCallRepository::new(db);
         let instruction_ctx = SharedInstructionContext::new(cwd);
+        let window = ContextWindow::new();
 
         Self {
             executor,
@@ -65,6 +70,7 @@ impl SessionPromptHook {
             last_tool_call_at: Default::default(),
             tool_call_repo,
             instruction_ctx,
+            window,
         }
     }
 }
@@ -76,11 +82,18 @@ impl AgentHook for SessionPromptHook {
         event: CompletionCall<'_>,
     ) -> CompletionCallAction {
         let instructions = self.instruction_ctx.drain().await;
-        if instructions.is_empty() {
+
+        let near_overflow = (event.history.estimate_tokens() + event.prompt.estimate_tokens())
+            >= self.window.near_overflow_threshold();
+
+        if instructions.is_empty() && !near_overflow {
             return CompletionCallAction::continue_run();
         }
 
         let mut patched = event.history.to_vec();
+        if near_overflow {
+            micro_compact(&mut patched, KEEP_RECENT);
+        }
         for instruction in instructions {
             let reminder = Message::user(
                 ["<system-reminder>", &instruction.render(), "</system-reminder>"].join("\n"),
