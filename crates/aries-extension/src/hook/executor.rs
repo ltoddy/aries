@@ -29,6 +29,7 @@ pub enum HookDecision {
     Terminate { reason: String },
 }
 
+#[derive(Debug)]
 pub struct HooksExecutor {
     hooks: HashMap<HookEvent, Vec<HookMatcher>>,
 }

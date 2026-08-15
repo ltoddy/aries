@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EditOperation {
     pub old_text: String,
     pub new_text: String,
@@ -10,7 +10,7 @@ pub struct EditOperation {
     pub replace_all: bool,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MultiEditArgs {
     pub file_path: PathBuf,
     pub edits: Vec<EditOperation>,

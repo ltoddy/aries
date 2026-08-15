@@ -20,14 +20,14 @@ use crate::schema::{
     Location, SymbolInformation,
 };
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum DocumentSymbolItem {
     Flat(SymbolInformation),
     Hierarchical(DocumentSymbol),
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum LspResult {
     Definition(Vec<Location>),
     References(Vec<Location>),

@@ -8,8 +8,8 @@ use tempfile::TempDir;
 
 use super::*;
 use crate::hook::definition::{
-    BashCommandHook, HookCommand, HookEvent, HookMatcher, HookMatcherError, HooksSettings,
-    ParseHooksFileError, ShellType,
+    BashCommandHook, HookCommand, HookEvent, HookMatcher, HookMatcherError, HooksFileParseError,
+    HooksSettings, ShellType,
 };
 use crate::hook::executor::execute_bash_command_hook;
 use crate::hook::input::PreToolUseHookInput;
@@ -137,7 +137,7 @@ async fn parses_hooks_preset() {
 #[tokio::test]
 async fn parse_reports_missing_file() {
     let err = HooksDefinition::parse("/nonexistent/hooks.json").await.unwrap_err();
-    assert!(matches!(err, ParseHooksFileError::Io(_)));
+    assert!(matches!(err, HooksFileParseError::Io(_)));
 }
 
 #[tokio::test]

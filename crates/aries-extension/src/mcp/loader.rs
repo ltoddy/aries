@@ -7,6 +7,7 @@ use itertools::Itertools;
 
 use crate::mcp::definition::McpDefinition;
 
+#[derive(Debug)]
 pub struct McpsLoader {
     roots: Vec<PathBuf>,
 }

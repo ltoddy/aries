@@ -1,8 +1,8 @@
 #[derive(thiserror::Error, Debug)]
 pub enum LspError {
-    #[error("LSP operation failed: {0}")]
+    #[error("lsp operation failed: {0}")]
     OperationFailed(String),
-    #[error("Invalid input: {0}")]
+    #[error("invalid input: {0}")]
     InvalidInput(String),
     #[error("{0}")]
     Io(#[from] std::io::Error),

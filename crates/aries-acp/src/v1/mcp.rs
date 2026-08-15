@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use agent_client_protocol::schema::v1::{McpServer, McpServerHttp, McpServerSse, McpServerStdio};
 use aries_extension::mcp::{McpDefinition, McpServerConfig};
 
+#[derive(Debug, Clone)]
 pub struct McpServers(pub Vec<McpServer>);
 
 impl From<McpServers> for McpDefinition {

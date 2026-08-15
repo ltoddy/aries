@@ -19,6 +19,7 @@ use rig_core::streaming::{StreamedAssistantContent, StreamedUserContent};
 
 use super::plan::PlanEntry;
 
+#[derive(Debug, Clone)]
 pub struct SessionUpdates(Vec<SessionUpdate>);
 
 impl SessionUpdates {

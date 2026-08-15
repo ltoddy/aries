@@ -7,6 +7,7 @@ use itertools::Itertools;
 
 use crate::agent::AgentDefinition;
 
+#[derive(Debug)]
 pub struct AgentsLoader {
     roots: Vec<PathBuf>,
 }

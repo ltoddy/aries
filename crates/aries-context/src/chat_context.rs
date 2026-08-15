@@ -8,11 +8,12 @@ use rig_agent::completion::Message;
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tracing::error;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ChatContext {
     inner: Arc<Inner>,
 }
 
+#[derive(Debug)]
 struct Inner {
     history: RwLock<Vec<Message>>,
     file: JsonlAppender,

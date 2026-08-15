@@ -14,15 +14,15 @@ pub struct HooksDefinition {
 }
 
 #[derive(Debug, Error)]
-pub enum ParseHooksFileError {
-    #[error("Failed to read hooks file: {0}")]
+pub enum HooksFileParseError {
+    #[error("failed to read hooks file: {0}")]
     Io(#[from] io::Error),
-    #[error("Failed to parse hooks file: {0}")]
+    #[error("failed to parse hooks file: {0}")]
     Json(#[from] serde_json::Error),
 }
 
 impl HooksDefinition {
-    pub async fn parse(file_path: impl AsRef<Path>) -> Result<Self, ParseHooksFileError> {
+    pub async fn parse(file_path: impl AsRef<Path>) -> Result<Self, HooksFileParseError> {
         let file_path = file_path.as_ref();
         info!("Parsing hooks file: {}", file_path.display());
 
@@ -286,7 +286,7 @@ pub struct HookMatcher {
 
 #[derive(Debug, Error)]
 pub enum HookMatcherError {
-    #[error("Invalid hook matcher regex {pattern:?}: {source}")]
+    #[error("invalid hook matcher regex {pattern:?}: {source}")]
     InvalidRegex {
         pattern: String,
         #[source]

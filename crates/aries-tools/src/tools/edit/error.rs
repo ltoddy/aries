@@ -4,10 +4,10 @@ use crate::context::GuardWriteError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum EditError {
-    #[error("Failed to edit file: {0}")]
+    #[error("failed to edit file: {0}")]
     Io(#[from] std::io::Error),
 
-    #[error("File does not exist: {0}. Use Write tool to create new files.")]
+    #[error("file does not exist: {0}. use the write tool to create new files")]
     FileNotFound(PathBuf),
 
     #[error("old_text and new_text cannot be identical")]
@@ -17,7 +17,7 @@ pub enum EditError {
     OldTextNotFound,
 
     #[error(
-        "Found {count} matches for old_text, but replace_all is false. Provide more surrounding lines in old_text to identify a unique match, or set replace_all to true."
+        "found {count} matches for old_text, but replace_all is false. provide more surrounding lines in old_text to identify a unique match, or set replace_all to true"
     )]
     MultipleMatches { count: usize },
 

@@ -5,19 +5,19 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Location {
     pub uri: String,
     pub range: Range,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Range {
     pub start: Position,
     pub end: Position,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Position {
     pub line: u32,
     pub character: u32,
@@ -88,7 +88,7 @@ impl Display for SymbolKind {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SymbolInformation {
     pub name: String,
@@ -97,7 +97,7 @@ pub struct SymbolInformation {
     pub container_name: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DocumentSymbol {
     pub name: String,
@@ -108,13 +108,13 @@ pub struct DocumentSymbol {
     pub children: Option<Vec<DocumentSymbol>>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Hover {
     pub contents: Value,
     pub range: Option<Range>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CallHierarchyItem {
     pub detail: String,
@@ -125,14 +125,14 @@ pub struct CallHierarchyItem {
     pub uri: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CallHierarchyIncomingCall {
     pub from: CallHierarchyItem,
     pub from_ranges: Vec<Range>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CallHierarchyOutgoingCall {
     pub to: CallHierarchyItem,

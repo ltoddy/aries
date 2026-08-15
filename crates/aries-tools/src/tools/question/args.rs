@@ -1,12 +1,12 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AskUserQuestionOption {
     pub label: String,
     pub description: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AskUserQuestionArgs {
     pub question: String,
     pub options: Option<Vec<AskUserQuestionOption>>,

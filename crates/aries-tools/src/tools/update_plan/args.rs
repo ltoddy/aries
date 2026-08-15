@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::update_plan::{PlanEntry, PlanEntryPriority, PlanEntryStatus};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct UpdatePlanArgs {
     pub items: Vec<PlanEntry>,
 }

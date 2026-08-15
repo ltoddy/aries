@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AgentOutput {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub task_id: Option<String>,

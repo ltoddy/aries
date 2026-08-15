@@ -1,8 +1,8 @@
 #[derive(thiserror::Error, Debug)]
 pub enum GlobError {
-    #[error("Globset error: {0}")]
+    #[error("globset error: {0}")]
     GlobsetError(#[from] globset::Error),
-    #[error("Walk error: {0}")]
+    #[error("walk error: {0}")]
     Walk(String),
 }
 

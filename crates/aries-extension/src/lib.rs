@@ -12,7 +12,7 @@ use crate::hook::{HooksDefinition, HooksLoader};
 use crate::mcp::{McpDefinition, McpsLoader};
 use crate::skill::{SkillDefinition, SkillsLoader};
 
-#[derive(Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct AgentExtensions {
     pub agents: Vec<AgentDefinition>,
     pub commands: Vec<CommandDefinition>,

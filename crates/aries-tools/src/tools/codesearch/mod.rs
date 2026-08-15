@@ -26,20 +26,20 @@ impl CodeSearchTool {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct McpCodeRequestArgs {
     query: String,
     #[serde(rename = "tokensNum")]
     tokens_num: i32,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct McpCodeRequestParams {
     name: String,
     arguments: McpCodeRequestArgs,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct McpCodeRequest {
     jsonrpc: String,
     id: i32,
@@ -47,19 +47,19 @@ struct McpCodeRequest {
     params: McpCodeRequestParams,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct McpCodeResponseContent {
     #[serde(rename = "type")]
     content_type: String,
     text: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct McpCodeResponseResult {
     content: Vec<McpCodeResponseContent>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct McpCodeResponse {
     jsonrpc: String,
     result: Option<McpCodeResponseResult>,

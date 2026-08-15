@@ -1,7 +1,7 @@
 use aries_lspclient::{DocumentSymbolItem, LspResult};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LspOutput {
     pub result: LspResult,
 }

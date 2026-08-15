@@ -6,6 +6,7 @@ use itertools::Itertools;
 
 use crate::hook::definition::HooksDefinition;
 
+#[derive(Debug)]
 pub struct HooksLoader {
     roots: Vec<PathBuf>,
 }

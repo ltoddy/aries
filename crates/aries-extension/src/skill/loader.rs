@@ -8,6 +8,7 @@ use itertools::Itertools;
 
 use crate::skill::SkillDefinition;
 
+#[derive(Debug)]
 pub struct SkillsLoader {
     roots: Vec<PathBuf>,
 }

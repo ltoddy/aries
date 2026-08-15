@@ -1,6 +1,7 @@
 use http::status::StatusCode;
 use reqwest_retry::{Retryable, RetryableStrategy};
 
+#[derive(Debug)]
 pub struct RetryStrategy;
 
 impl Default for RetryStrategy {

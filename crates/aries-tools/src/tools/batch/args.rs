@@ -3,13 +3,13 @@ use serde_json::Value;
 
 pub const NAME: &str = "Batch";
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct BatchCall {
     pub tool: String,
     pub parameters: Value,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct BatchArgs {
     pub calls: Vec<BatchCall>,
 }

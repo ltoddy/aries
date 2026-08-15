@@ -2,7 +2,7 @@ use crate::context::GuardWriteError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum MultiEditError {
-    #[error("Failed to edit file: {0}")]
+    #[error("failed to edit file: {0}")]
     Io(#[from] std::io::Error),
 
     #[error("old_text and new_text cannot be identical")]

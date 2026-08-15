@@ -2,11 +2,11 @@ use std::path::Path;
 
 #[derive(Debug, thiserror::Error)]
 pub enum WriteError {
-    #[error("Failed to write file: {0}")]
+    #[error("failed to write file: {0}")]
     Io(#[from] std::io::Error),
 
     #[error(
-        "The file {0} already exists and is not empty. Use the Edit or MultiEdit tool to modify it instead."
+        "the file {0} already exists and is not empty. use the edit or multiedit tool to modify it instead."
     )]
     FileNotEmpty(std::path::PathBuf),
 }

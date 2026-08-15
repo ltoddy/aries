@@ -14,6 +14,7 @@ pub fn section(cwd: impl AsRef<Path>) -> String {
 
 pub const FILENAME: &str = "AGENTS.md";
 
+#[derive(Debug)]
 pub struct AgentsmdReader {
     root: PathBuf,
 }

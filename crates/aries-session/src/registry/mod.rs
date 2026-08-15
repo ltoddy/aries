@@ -101,7 +101,7 @@ impl SessionRegistry {
         }
     }
 
-    pub fn get_session(&self, session_id: impl Into<String>) -> Option<Session> {
+    pub fn session(&self, session_id: impl Into<String>) -> Option<Session> {
         let session = self.active_sessions.get(&session_id.into())?;
 
         Some(session.to_owned())

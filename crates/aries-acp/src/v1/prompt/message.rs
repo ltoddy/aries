@@ -5,6 +5,7 @@ use rig_core::OneOrMany;
 use rig_core::completion::Message;
 use rig_core::message::{Document, DocumentMediaType, DocumentSourceKind, UserContent};
 
+#[derive(Debug, Clone)]
 pub struct UserMessage(Message);
 
 impl From<Vec<ContentBlock>> for UserMessage {

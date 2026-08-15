@@ -10,7 +10,7 @@ use itertools::Itertools;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct MemoryStore {
     dir: PathBuf,
 }
@@ -99,7 +99,7 @@ impl Memory {
         Self { location: location.to_path_buf(), file_name, frontmatter, body }
     }
 
-    pub fn as_retriever_line(&self) -> String {
+    pub fn to_retriever_line(&self) -> String {
         format!(
             "- [{}] ({}) — {}",
             self.file_name, self.frontmatter.memory_type, self.frontmatter.description

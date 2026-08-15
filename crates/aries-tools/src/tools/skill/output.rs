@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SkillOutput {
     pub title: String,
     pub output: String,
@@ -16,7 +16,7 @@ impl SkillOutput {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SkillMetadata {
     pub name: String,
     pub dir: PathBuf,

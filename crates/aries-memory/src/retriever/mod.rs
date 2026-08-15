@@ -37,7 +37,7 @@ impl<M: CompletionModel> MemoryRetriever<M> {
         }
 
         let query = query.into();
-        let manifest = memories.iter().map(Memory::as_retriever_line).join("\n");
+        let manifest = memories.iter().map(Memory::to_retriever_line).join("\n");
         let prompt = ["<memories>", &manifest, "</memories>", "\n", "<query>", &query, "</query>"]
             .join("\n");
 

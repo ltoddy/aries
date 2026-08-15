@@ -1,6 +1,7 @@
 use agent_client_protocol::schema::v1 as schema;
 use aries_tools::update_plan::{self, PlanEntryPriority, PlanEntryStatus};
 
+#[derive(Debug, Clone)]
 pub struct PlanEntry(update_plan::PlanEntry);
 
 impl PlanEntry {

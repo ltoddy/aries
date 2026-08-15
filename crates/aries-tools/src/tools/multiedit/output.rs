@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::tools::diff;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MultiEditOutput {
     #[serde(rename = "type")]
     pub kind: WriteKind,

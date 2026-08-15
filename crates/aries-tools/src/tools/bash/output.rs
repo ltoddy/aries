@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 const MAX_OUTPUT_CHARS: usize = 30_000;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct BashOutput {
     pub stdout: String,
     pub stderr: String,

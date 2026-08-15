@@ -16,7 +16,7 @@ pub async fn cancel(
 
     let session = {
         let registry = registry.lock().await;
-        match registry.get_session(&session_id) {
+        match registry.session(&session_id) {
             Some(session) => session,
             None => return Err(Error::resource_not_found(Some(session_id))),
         }

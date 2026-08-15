@@ -3,7 +3,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct TavilyClient {
     api_key: String,
     http_client: reqwest::Client,
@@ -82,10 +82,10 @@ pub struct TavilySearchResult {
 
 #[derive(Debug, Error)]
 pub enum TavilyError {
-    #[error("Tavily request failed: {0}")]
+    #[error("tavily request failed: {0}")]
     Request(#[from] reqwest::Error),
 
-    #[error("Tavily returned {0}: {1}")]
+    #[error("tavily returned {0}: {1}")]
     Status(reqwest::StatusCode, String),
 }
 

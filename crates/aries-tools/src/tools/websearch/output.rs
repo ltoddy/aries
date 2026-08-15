@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SearchResult {
     pub title: String,
     pub url: String,
@@ -20,7 +20,7 @@ impl SearchResult {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct WebSearchOutput {
     pub query: String,
     pub results: Vec<SearchResult>,

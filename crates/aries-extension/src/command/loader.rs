@@ -7,6 +7,7 @@ use itertools::Itertools;
 
 use crate::command::definition::CommandDefinition;
 
+#[derive(Debug)]
 pub struct CommandsLoader {
     roots: Vec<PathBuf>,
 }

@@ -223,7 +223,7 @@ pub async fn set_session_config_option(
 
     let mut session = {
         let registry = registry.lock().await;
-        match registry.get_session(&session_id) {
+        match registry.session(&session_id) {
             Some(session) => session,
             None => {
                 return responder.respond_with_error(Error::resource_not_found(Some(session_id)));

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GlobOutput {
     pub files: Vec<PathBuf>,
     #[serde(default)]

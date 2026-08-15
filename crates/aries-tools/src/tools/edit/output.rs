@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::tools::diff;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EditOutput {
     pub file_path: PathBuf,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

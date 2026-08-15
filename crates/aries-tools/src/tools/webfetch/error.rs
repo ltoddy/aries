@@ -1,9 +1,9 @@
 #[derive(thiserror::Error, Debug)]
 pub enum WebFetchError {
-    #[error("Missing `FIRECRAWL_API_URL` or `FIRECRAWL_API_KEY` environment variable: {0}")]
+    #[error("missing `FIRECRAWL_API_URL` or `FIRECRAWL_API_KEY` environment variable: {0}")]
     MissingApiKey(firecrawl::FirecrawlError),
 
-    #[error("Firecrawl API error: {0}")]
+    #[error("firecrawl api error: {0}")]
     Firecrawl(firecrawl::FirecrawlError),
 }
 

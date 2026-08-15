@@ -33,7 +33,7 @@ impl Display for LspOperation {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LspArgs {
     pub operation: LspOperation,
     pub file_path: Option<PathBuf>,
