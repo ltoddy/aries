@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::tools::diff;
-use crate::write::WriteKind;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MultiEditOutput {
@@ -62,4 +61,11 @@ impl MultiEditOutput {
             WriteKind::Update => format!("The file {} has been updated successfully.", path),
         })
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum WriteKind {
+    Create,
+    Update,
 }

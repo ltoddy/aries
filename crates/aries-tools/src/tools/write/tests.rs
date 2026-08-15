@@ -24,11 +24,8 @@ async fn test_write_new_file() {
         .await
         .unwrap();
 
-    assert_eq!(result.kind, WriteKind::Create);
     assert_eq!(result.file_path, file_path);
-    assert!(result.original_content.is_none());
-    assert!(result.structured_patch.is_empty());
-    assert_eq!((result.additions, result.deletions), (1, 0));
+    assert_eq!(result.additions, 1);
     assert_eq!(fs::read_to_string(&file_path).unwrap(), "Hello, world!");
 }
 
@@ -39,15 +36,13 @@ async fn test_write_creates_parent_dirs() {
     let file_path = tmp.path().join("a/b/c/output.txt");
     let mut context = rig_agent::tool::ToolContext::new();
     let tool = WriteTool::new(tmp.path(), ToolContext::new(None));
-    let result = tool
-        .call(
-            &mut context,
-            WriteArgs { file_path: file_path.clone(), content: "nested content".to_string() },
-        )
-        .await
-        .unwrap();
+    tool.call(
+        &mut context,
+        WriteArgs { file_path: file_path.clone(), content: "nested content".to_string() },
+    )
+    .await
+    .unwrap();
 
-    assert_eq!(result.kind, WriteKind::Create);
     assert_eq!(fs::read_to_string(&file_path).unwrap(), "nested content");
 }
 
@@ -83,12 +78,10 @@ async fn test_write_empty_content() {
     let file_path = tmp.path().join("empty.txt");
     let mut context = rig_agent::tool::ToolContext::new();
     let tool = WriteTool::new(tmp.path(), ToolContext::new(None));
-    let result = tool
-        .call(&mut context, WriteArgs { file_path: file_path.clone(), content: String::new() })
+    tool.call(&mut context, WriteArgs { file_path: file_path.clone(), content: String::new() })
         .await
         .unwrap();
 
-    assert_eq!(result.kind, WriteKind::Create);
     assert_eq!(fs::read_to_string(&file_path).unwrap(), "");
 }
 
@@ -106,7 +99,6 @@ async fn test_write_resolves_relative_path_against_cwd() {
         .await
         .unwrap();
 
-    assert_eq!(result.kind, WriteKind::Create);
     assert_eq!(result.file_path, tmp.path().join("sub/rel.txt"));
     assert_eq!(fs::read_to_string(tmp.path().join("sub/rel.txt")).unwrap(), "relative");
 }
@@ -121,32 +113,14 @@ fn test_write_args_location_and_title() {
 }
 
 #[test]
-fn test_render_output_create_and_update() {
+fn test_render_output_create() {
     let create = serde_json::to_value(&WriteOutput {
-        kind: WriteKind::Create,
         file_path: PathBuf::from("/tmp/new.txt"),
-        structured_patch: Vec::new(),
-        original_content: None,
         additions: 1,
-        deletions: 0,
     })
     .unwrap();
     assert_eq!(
         WriteOutput::render_output(create).unwrap(),
         "File created successfully at: /tmp/new.txt"
-    );
-
-    let update = serde_json::to_value(&WriteOutput {
-        kind: WriteKind::Update,
-        file_path: PathBuf::from("/tmp/old.txt"),
-        structured_patch: Vec::new(),
-        original_content: Some("old".to_string()),
-        additions: 0,
-        deletions: 0,
-    })
-    .unwrap();
-    assert_eq!(
-        WriteOutput::render_output(update).unwrap(),
-        "The file /tmp/old.txt has been updated successfully."
     );
 }

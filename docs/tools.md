@@ -18,7 +18,7 @@ aries 内置 16 个工具，按模式分配。
 
 | 工具          | 说明                                                      |
 |---------------|-----------------------------------------------------------|
-| `write`       | 写入 / 创建文件，输出结构化 diff                          |
+| `write`       | 创建新文件或覆盖空文件，输出新增行数                    |
 | `edit`        | 精确字符串替换编辑文件                                    |
 | `multiedit`   | 对同一文件依次执行多次查找替换                            |
 | `batch`       | 并发执行多个独立工具调用                                  |
@@ -62,7 +62,7 @@ aries 对工具实现做了一系列优化：
 - `Hunk`：`old_start` / `old_lines` / `new_start` / `new_lines`，以及带 `+` / `-` 前缀的行内容。
 - `additions` / `deletions`：新增 / 删除行数。
 
-`write` 的输出还区分 `WriteKind::Create` / `WriteKind::Update`，并附带 `original_content` 与 `structured_patch`。
+`write` 只创建新文件或覆盖空文件，输出附带 `additions`（新增行数）；`edit` / `multiedit` 输出 `WriteKind::Update`，附带 `original_content` 与 `structured_patch`。
 
 ### Read 流式读取
 

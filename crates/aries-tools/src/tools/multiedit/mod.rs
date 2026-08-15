@@ -12,7 +12,7 @@ use tokio::fs;
 
 pub use self::args::{EditOperation, MultiEditArgs};
 pub use self::error::MultiEditError;
-pub use self::output::MultiEditOutput;
+pub use self::output::{MultiEditOutput, WriteKind};
 use crate::tools::diff;
 
 pub const NAME: &str = "MultiEdit";

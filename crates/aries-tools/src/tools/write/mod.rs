@@ -12,9 +12,7 @@ use tokio::fs;
 
 pub use self::args::WriteArgs;
 pub use self::error::WriteError;
-pub use self::output::{WriteKind, WriteOutput};
-use crate::tools::diff;
-
+pub use self::output::WriteOutput;
 pub const NAME: &str = "Write";
 
 pub struct WriteTool {
@@ -78,32 +76,11 @@ impl Tool for WriteTool {
             return Err(WriteError::file_not_empty(&file_path));
         }
 
-        let original_content = fs::read_to_string(&file_path).await.ok();
-        if let Some(ref original_content) = original_content {
-            let _ = self.ctx.file_checkpoint.push(&file_path, original_content).await;
-        }
-
         fs::write(&file_path, &args.content).await?;
         self.ctx.on_file_written(&file_path, &args.content).await;
 
-        match original_content {
-            Some(original_content) => {
-                let (hunks, additions, deletions) = diff::diff(&original_content, &args.content);
-
-                let output = WriteOutput::for_update(
-                    file_path,
-                    original_content,
-                    hunks,
-                    additions,
-                    deletions,
-                );
-                Ok(output)
-            },
-            None => {
-                let additions = args.content.lines().count();
-                let output = WriteOutput::for_create(file_path, additions);
-                Ok(output)
-            },
-        }
+        let additions = args.content.lines().count();
+        let output = WriteOutput::new(file_path, additions);
+        Ok(output)
     }
 }
