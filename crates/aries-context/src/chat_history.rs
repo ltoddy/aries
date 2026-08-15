@@ -29,7 +29,7 @@ impl ChatHistory {
     pub async fn append(&self, messages: impl IntoIterator<Item = &Message>) {
         if let Err(err) = self.file.append(messages).await {
             error!(path = %self.file.file_path().display(), err = %err, "failed to append chat history");
-            return
+            return;
         }
         let _ = self.file.flush().await;
     }
