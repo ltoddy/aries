@@ -319,8 +319,6 @@ name = "aries-context"
 version = "0.1.0"
 dependencies = [
  "aries-filesystem",
- "itertools 0.15.0",
- "parking_lot",
  "rig-agent",
  "tokio",
  "tracing",

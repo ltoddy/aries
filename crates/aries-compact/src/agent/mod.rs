@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Context;
+use aries_event::Notifier;
 use aries_filesystem::jsonl;
 use futures::StreamExt;
 use regex_lite::Regex;
@@ -13,7 +14,6 @@ use rig_agent::streaming::StreamingPrompt;
 use rig_core::completion::CompletionError;
 use rig_core::message::{self, AssistantContent, ReasoningContent, UserContent};
 use tokio::pin;
-use tracing::info;
 
 const PREAMBLE: &str = include_str!("preamble.md");
 const NAME: &str = "Archivist";
@@ -38,6 +38,7 @@ where
 {
     inner: Agent<M>,
     transcript_path: PathBuf,
+    notifier: Notifier,
 }
 
 impl<M> CompactAgent<M>
@@ -46,7 +47,12 @@ where
 {
     const COMPACTION_MAX_TURNS: usize = 1; // 强制单论,避免陷入循环
 
-    pub fn new<C>(c: C, model: impl Into<String>, transcript_path: impl AsRef<Path>) -> Self
+    pub fn new<C>(
+        c: C,
+        model: impl Into<String>,
+        transcript_path: impl AsRef<Path>,
+        notifier: Notifier,
+    ) -> Self
     where
         C: AgentClientExt<CompletionModel = M> + 'static,
     {
@@ -60,12 +66,10 @@ where
             .default_max_turns(Self::COMPACTION_MAX_TURNS)
             .build();
 
-        Self { inner: agent, transcript_path }
+        Self { inner: agent, transcript_path, notifier }
     }
 
     pub async fn compact(&mut self, messages: &[Message]) -> CompactOutcome {
-        info!("Compacting {} messages", messages.len());
-
         let file_path = match self.save_transcript(messages).await {
             Ok(p) => p,
             Err(e) => return CompactOutcome::Transient(format!("save transcript failed: {e}")),
@@ -79,6 +83,7 @@ where
         while let Some(chunk) = stream.next().await {
             match chunk {
                 Ok(chunk) => {
+                    self.notifier.send_stream_item(chunk.clone());
                     if let MultiTurnStreamItem::FinalResponse(res) = chunk {
                         final_res = res;
                     }

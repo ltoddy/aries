@@ -5,8 +5,6 @@ edition = "2024"
 
 [dependencies]
 aries-filesystem = { path = "../aries-filesystem" }
-itertools.workspace = true
-parking_lot.workspace = true
 rig-agent.workspace = true
 tokio = { workspace = true, features = ["sync"] }
 tracing.workspace = true

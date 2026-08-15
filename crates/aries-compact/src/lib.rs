@@ -90,7 +90,7 @@ impl ContextCompactor {
         }
 
         let outcome = {
-            let read = self.chat_context.history().clone();
+            let read = self.chat_context.history().await.clone();
             self.agent.compact(&read).await
         };
 

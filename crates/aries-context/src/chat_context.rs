@@ -4,9 +4,8 @@ use std::sync::Arc;
 
 use aries_filesystem::jsonl;
 use aries_filesystem::jsonl::JsonlAppender;
-use itertools::Itertools;
-use parking_lot::RwLock;
 use rig_agent::completion::Message;
+use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tracing::error;
 
 #[derive(Clone)]
@@ -35,26 +34,33 @@ impl ChatContext {
     }
 
     pub async fn append(&self, messages: impl IntoIterator<Item = &Message>) {
-        if let Err(err) = self.inner.file.append(messages).await {
-            error!(path = %self.inner.file.file_path().display(), err = %err, "failed to append chat context");
+        let messages = messages.into_iter().cloned().collect::<Vec<_>>();
+
+        self.inner.history.write().await.extend(messages.clone());
+
+        if let Err(err) = self.inner.file.append(&messages).await {
+            error!(path = %self.inner.file.file_path().display(), err = %err, "failed to persist chat context");
         }
+        let _ = self.inner.file.flush().await;
     }
 
     pub async fn overwrite(&self, messages: impl IntoIterator<Item = Message>) {
-        *self.inner.history.write() = messages.into_iter().collect_vec();
+        let messages = messages.into_iter().collect::<Vec<_>>();
 
-        let snapshot = self.inner.history.read().clone();
-        if let Err(err) = self.inner.file.overwrite(&snapshot).await {
-            error!(path = %self.inner.file.file_path().display(), err = %err, "failed to overwrite chat context");
+        *self.inner.history.write().await = messages.clone();
+
+        if let Err(err) = self.inner.file.overwrite(&messages).await {
+            error!(path = %self.inner.file.file_path().display(), err = %err, "failed to persist chat context");
         }
+        let _ = self.inner.file.flush().await;
     }
 
-    pub fn history(&self) -> parking_lot::RwLockReadGuard<'_, Vec<Message>> {
-        self.inner.history.read()
+    pub async fn history(&self) -> RwLockReadGuard<'_, Vec<Message>> {
+        self.inner.history.read().await
     }
 
-    pub fn history_mut(&self) -> parking_lot::RwLockWriteGuard<'_, Vec<Message>> {
-        self.inner.history.write()
+    pub async fn history_mut(&self) -> RwLockWriteGuard<'_, Vec<Message>> {
+        self.inner.history.write().await
     }
 
     #[inline]

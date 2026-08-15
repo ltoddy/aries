@@ -75,6 +75,7 @@ impl JsonlAppender {
         &self,
         elements: impl IntoIterator<Item = &'a S>,
     ) -> io::Result<()> {
+        let mut guard = self.file.lock().await;
         for (i, element) in elements.into_iter().enumerate() {
             let line = serde_json::to_string(element).map_err(|err| {
                 io::Error::new(
@@ -82,7 +83,6 @@ impl JsonlAppender {
                     format!("failed to serialize element {i} as JSON: {err}"),
                 )
             })?;
-            let mut guard = self.file.lock().await;
             guard.write_all(format!("{line}\n").as_bytes()).await?;
         }
         Ok(())
@@ -92,9 +92,17 @@ impl JsonlAppender {
         &self,
         elements: impl IntoIterator<Item = &'a S>,
     ) -> io::Result<()> {
-        let guard = self.file.lock().await;
+        let mut guard = self.file.lock().await;
         guard.set_len(0).await?;
-        self.append(elements).await?;
+        for (i, element) in elements.into_iter().enumerate() {
+            let line = serde_json::to_string(element).map_err(|err| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("failed to serialize element {i} as JSON: {err}"),
+                )
+            })?;
+            guard.write_all(format!("{line}\n").as_bytes()).await?;
+        }
         Ok(())
     }
 

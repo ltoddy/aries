@@ -172,8 +172,11 @@ impl Session {
 
         self.agent = agent;
         self.config = config.to_owned();
-        self.compactor
-            .set_agent(self.client.compact_agent(self.config.model(), &self.transcript_path));
+        self.compactor.set_agent(self.client.compact_agent(
+            self.config.model(),
+            &self.transcript_path,
+            Notifier::clone(&self.notifier),
+        ));
 
         let loader = SettingLoader::new(&self.gctx.root_dir);
         let _ = loader.save(&self.setting).await;
@@ -229,7 +232,7 @@ impl Session {
         self.pre_compact(&prompt, callback.clone()).await;
 
         let context = self.recall_context(&title).await;
-        let mut history = self.chat_context.history().to_vec();
+        let mut history = self.chat_context.history().await.to_vec();
         if let Some(reminder) = context {
             history.push(Message::user(
                 ["<system-reminder>", &reminder, "</system-reminder>"].join("\n"),
@@ -444,7 +447,7 @@ impl Session {
             &id,
             cwd,
             &transcript_path,
-            client.compact_agent(config.model(), &transcript_path),
+            client.compact_agent(config.model(), &transcript_path, Notifier::clone(&notifier)),
             chat_context.clone(),
             hooks_executor.clone(),
             Notifier::clone(&notifier),
@@ -584,7 +587,7 @@ impl Session {
         Fut: Future<Output = ()>,
     {
         {
-            let mut write = self.chat_context.history_mut();
+            let mut write = self.chat_context.history_mut().await;
             aries_compact::micro_compact(&mut write);
         }
 
@@ -592,7 +595,7 @@ impl Session {
         let compact_threshold = window.auto_compact_threshold();
 
         let estimated_tokens = {
-            let read = self.chat_context.history();
+            let read = self.chat_context.history().await;
             read.estimate_tokens().saturating_add(prompt.estimate_tokens())
         };
 

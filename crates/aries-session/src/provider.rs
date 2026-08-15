@@ -133,20 +133,30 @@ impl AriesClientProvider {
         &self,
         model: impl Into<String>,
         transcript_path: impl AsRef<Path>,
+        notifier: Notifier,
     ) -> CompactAgentProvider {
         match self {
             AriesClientProvider::Anthropic(c) => CompactAgentProvider::Anthropic(
-                CompactAgent::new(c.clone(), model, transcript_path),
+                CompactAgent::new(c.clone(), model, transcript_path, notifier),
             ),
-            AriesClientProvider::Azure(c) => {
-                CompactAgentProvider::Azure(CompactAgent::new(c.clone(), model, transcript_path))
-            },
-            AriesClientProvider::Deepseek(c) => {
-                CompactAgentProvider::Deepseek(CompactAgent::new(c.clone(), model, transcript_path))
-            },
-            AriesClientProvider::OpenAI(c) => {
-                CompactAgentProvider::OpenAI(CompactAgent::new(c.clone(), model, transcript_path))
-            },
+            AriesClientProvider::Azure(c) => CompactAgentProvider::Azure(CompactAgent::new(
+                c.clone(),
+                model,
+                transcript_path,
+                notifier,
+            )),
+            AriesClientProvider::Deepseek(c) => CompactAgentProvider::Deepseek(CompactAgent::new(
+                c.clone(),
+                model,
+                transcript_path,
+                notifier,
+            )),
+            AriesClientProvider::OpenAI(c) => CompactAgentProvider::OpenAI(CompactAgent::new(
+                c.clone(),
+                model,
+                transcript_path,
+                notifier,
+            )),
         }
     }
 
