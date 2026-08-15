@@ -1,10 +1,12 @@
 mod builtin;
 mod slash;
 
+use aries_event::Notifier;
 use aries_extension::command::CommandDefinition;
 
 pub use self::builtin::BUILTIN_COMMANDS;
 use crate::AriesAgentProvider;
+use crate::compactor::ContextCompactor;
 
 pub struct CommandsExecutor<'a> {
     slash_commands_executor: slash::SlashCommandsExecutor<'a>,
@@ -16,14 +18,17 @@ impl<'a> CommandsExecutor<'a> {
         agent: &'a AriesAgentProvider,
         commands: &'a [CommandDefinition],
         session_id: &'a str,
+        compactor: ContextCompactor,
+        notifier: Notifier,
     ) -> Self {
         let slash_commands_executor = slash::SlashCommandsExecutor::new(agent, commands);
-        let builtin_commands_executor = builtin::BuiltinCommandsExecutor::new(agent, session_id);
+        let builtin_commands_executor =
+            builtin::BuiltinCommandsExecutor::new(agent, session_id, compactor, notifier);
 
         Self { slash_commands_executor, builtin_commands_executor }
     }
 
-    pub async fn execute(&self, input: impl AsRef<str>) -> bool {
+    pub async fn execute(&mut self, input: impl AsRef<str>) -> bool {
         let input = input.as_ref();
         let input = input.trim();
 

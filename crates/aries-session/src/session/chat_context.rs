@@ -1,14 +1,20 @@
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use aries_filesystem::jsonl;
+use itertools::Itertools;
 use rig_agent::completion::Message;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 use tracing::{Instrument, Span, error};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ChatContext {
-    history: Vec<Message>,
+    inner: Arc<Inner>,
+}
+
+struct Inner {
+    history: parking_lot::RwLock<Vec<Message>>,
     sender: UnboundedSender<Vec<Message>>,
     file_path: PathBuf,
 }
@@ -25,29 +31,34 @@ impl ChatContext {
         let (sender, receiver) = unbounded_channel();
         tokio::spawn(refresh_context(receiver, file_path.clone()).instrument(Span::current()));
 
-        Self { history, sender, file_path: file_path.to_path_buf() }
+        let inner = Inner { history: parking_lot::RwLock::new(history), sender, file_path };
+        Self { inner: Arc::new(inner) }
     }
 
-    pub fn extend(&mut self, messages: impl IntoIterator<Item = Message>) {
-        self.history.extend(messages);
-        if let Err(err) = self.sender.send(self.history.clone()) {
+    pub fn extend(&self, messages: impl IntoIterator<Item = Message>) {
+        self.inner.history.write().extend(messages);
+
+        let snapshot = self.inner.history.read().clone();
+        if let Err(err) = self.inner.sender.send(snapshot) {
             error!(err = %err, "failed to send context history for persistence")
         }
     }
 
-    pub async fn overwrite(&mut self, messages: impl IntoIterator<Item = Message>) {
-        self.history = messages.into_iter().collect();
-        if let Err(err) = jsonl::write(&self.file_path, &self.history).await {
-            error!("failed to write context history to {}: {err}", self.file_path.display());
+    pub async fn overwrite(&self, messages: impl IntoIterator<Item = Message>) {
+        *self.inner.history.write() = messages.into_iter().collect_vec();
+
+        let snapshot = self.inner.history.read().clone();
+        if let Err(err) = jsonl::write(&self.inner.file_path, &snapshot).await {
+            error!("failed to write context history to {}: {err}", self.inner.file_path.display());
         }
     }
 
-    pub fn history(&self) -> &[Message] {
-        &self.history
+    pub fn history(&self) -> parking_lot::RwLockReadGuard<'_, Vec<Message>> {
+        self.inner.history.read()
     }
 
-    pub fn history_mut(&mut self) -> &mut [Message] {
-        &mut self.history
+    pub fn history_mut(&self) -> parking_lot::RwLockWriteGuard<'_, Vec<Message>> {
+        self.inner.history.write()
     }
 
     #[inline]

@@ -35,6 +35,16 @@ impl TokenEstimator for &[Message] {
     }
 }
 
+impl TokenEstimator for Vec<Message> {
+    fn estimate_tokens(&self) -> u64 {
+        self.iter()
+            .map(|m| m.estimate_tokens())
+            .sum::<u64>()
+            .saturating_mul(CONSERVATIVE_NUM)
+            .div_ceil(CONSERVATIVE_DEN)
+    }
+}
+
 impl TokenEstimator for Message {
     fn estimate_tokens(&self) -> u64 {
         match self {

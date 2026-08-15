@@ -3,7 +3,7 @@ mod output;
 
 use std::path::{Path, PathBuf};
 
-use aries_event::AgentEvent;
+use aries_event::Notifier;
 use aries_extension::agent::AgentDefinition;
 use aries_mode::Mode;
 use futures::StreamExt;
@@ -13,7 +13,6 @@ use rig_agent::streaming::StreamingPrompt;
 use rig_agent::tool::server::ToolServer;
 use rig_agent::tool::{Tool, ToolContext};
 use serde_json::Value;
-use tokio::sync::mpsc::UnboundedSender;
 
 pub use self::args::AgentArgs;
 pub use self::output::AgentOutput;
@@ -32,7 +31,7 @@ where
     client: C,
     model: String,
     cwd: PathBuf,
-    sender: UnboundedSender<AgentEvent>,
+    notifier: Notifier,
     custom_agents: Vec<AgentDefinition>,
 }
 
@@ -44,13 +43,13 @@ where
         client: C,
         model: impl Into<String>,
         cwd: impl AsRef<Path>,
-        sender: UnboundedSender<AgentEvent>,
+        notifier: Notifier,
         custom_agents: Vec<AgentDefinition>,
     ) -> Self {
         let model = model.into();
         let cwd = cwd.as_ref().to_path_buf();
 
-        Self { client, model, cwd, sender, custom_agents }
+        Self { client, model, cwd, notifier, custom_agents }
     }
 
     fn find_agent(&self, mode: impl Into<String>) -> Option<&AgentDefinition> {
@@ -159,8 +158,7 @@ where
         let mut final_res = PromptResponse::empty();
         while let Some(chunk) = stream.next().await {
             let chunk = chunk?;
-            let event = AgentEvent::stream_item(chunk.clone());
-            let _ = self.sender.send(event);
+            self.notifier.send_stream_item(chunk.clone());
 
             if let MultiTurnStreamItem::FinalResponse(res) = chunk {
                 final_res = res;

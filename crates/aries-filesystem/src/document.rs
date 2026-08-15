@@ -22,7 +22,7 @@ where
     F: Serialize + DeserializeOwned,
 {
     pub fn new(location: impl AsRef<Path>, frontmatter: F, body: impl Into<String>) -> Self {
-        let location = location.as_ref().to_path_buf();
+        let location = location.as_ref().to_owned();
         let body = body.into();
 
         Self { location, frontmatter, body }
@@ -30,7 +30,7 @@ where
 
     pub async fn read(file_path: impl AsRef<Path>) -> Result<Self, DocumentError> {
         let file_path = file_path.as_ref();
-        let location = file_path.to_path_buf();
+        let location = file_path.to_owned();
         let content = tokio::fs::read_to_string(file_path)
             .await
             .map_err(|err| DocumentError::io(&location, err))?;

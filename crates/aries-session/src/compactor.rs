@@ -1,0 +1,134 @@
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use aries_compact::{AutoCompactBreaker, CompactOutcome, Decision, TokenEstimator};
+use aries_event::Notifier;
+use aries_extension::hook::input::{
+    PostCompactHookInput, PostCompactTrigger, PreCompactCustomInstructions, PreCompactHookInput,
+};
+use aries_extension::hook::{HookDecision, HooksExecutor};
+
+use crate::provider::CompactAgentProvider;
+use crate::session::ChatContext;
+
+#[derive(Clone)]
+pub struct ContextCompactor {
+    id: String,
+    cwd: PathBuf,
+    agent: CompactAgentProvider,
+    transcript_path: PathBuf,
+    breaker: AutoCompactBreaker,
+    chat_context: ChatContext,
+    hooks_executor: Arc<HooksExecutor>,
+    notifier: Notifier,
+}
+
+impl ContextCompactor {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        id: impl Into<String>,
+        cwd: impl AsRef<Path>,
+        transcript_path: impl AsRef<Path>,
+        agent: CompactAgentProvider,
+        breaker: AutoCompactBreaker,
+        chat_context: ChatContext,
+        hooks_executor: Arc<HooksExecutor>,
+        notifier: Notifier,
+    ) -> Self {
+        let id = id.into();
+        let cwd = cwd.as_ref();
+        let transcript_path = transcript_path.as_ref();
+
+        Self {
+            agent,
+            transcript_path: transcript_path.to_owned(),
+            breaker,
+            chat_context,
+            hooks_executor,
+            id,
+            cwd: cwd.to_owned(),
+            notifier,
+        }
+    }
+
+    pub fn set_agent(&mut self, agent: CompactAgentProvider) {
+        self.agent = agent;
+    }
+
+    pub async fn compact(&mut self) {
+        match self.breaker.decide() {
+            Decision::Allow { half_open } => {
+                if half_open {
+                    self.notifier.notify("冷却结束，尝试恢复压缩...");
+                }
+            },
+            Decision::Skip { wait, consecutive_failures } => {
+                self.notifier.notify(format!("压缩处于冷却期（已连续失败 {consecutive_failures} 次），约 {wait:?} 后重试，本次跳过。"));
+                return;
+            },
+        }
+
+        let input = PreCompactHookInput::new(
+            &self.id,
+            &self.cwd,
+            PostCompactTrigger::Auto,
+            PreCompactCustomInstructions::Auto,
+        )
+        .transcript_path(&self.transcript_path);
+        if let HookDecision::Terminate { .. } = self.hooks_executor.fire_pre_compact(input).await {
+            return;
+        }
+
+        let outcome = {
+            let read = self.chat_context.history().clone();
+            self.agent.compact(&read).await
+        };
+
+        match outcome {
+            CompactOutcome::Success((compressed, summary)) => {
+                self.chat_context.overwrite(compressed).await;
+
+                let window = aries_compact::ContextWindow::new();
+                let post_tokens = {
+                    let read = self.chat_context.history();
+                    read.estimate_tokens()
+                };
+                let threshold = window.auto_compact_threshold();
+                if post_tokens >= threshold {
+                    self.notifier.notify(format!(
+                        "压缩后 tokens {post_tokens} 仍高于阈值 {threshold}，本次压缩无效。",
+                    ));
+                    self.breaker.on_failure();
+                    return;
+                }
+                self.breaker.on_success();
+
+                let input = PostCompactHookInput::new(
+                    &self.id,
+                    &self.cwd,
+                    PostCompactTrigger::Auto,
+                    summary,
+                )
+                .transcript_path(&self.transcript_path);
+                self.hooks_executor.fire_post_compact(input).await;
+            },
+            CompactOutcome::PromptTooLong => {
+                self.notifier.notify("上下文过长，压缩请求被拒，进入冷却以避免反复重试。");
+                self.breaker.trip();
+            },
+            CompactOutcome::Transient(err) => {
+                self.notifier.notify(format!("压缩遇到临时错误（不计入失败）：{err}"));
+            },
+            CompactOutcome::Empty => {
+                self.breaker.on_failure();
+                let failures = self.breaker.consecutive_failures();
+                if failures >= AutoCompactBreaker::MAX_CONSECUTIVE_AUTOCOMPACT_FAILURES {
+                    self.notifier.notify(format!(
+                        "连续 {failures} 次压缩失败，进入 {} 分钟冷却。",
+                        AutoCompactBreaker::AUTOCOMPACT_FAILURE_COOLDOWN.as_secs() / 60,
+                    ));
+                }
+            },
+        }
+    }
+}

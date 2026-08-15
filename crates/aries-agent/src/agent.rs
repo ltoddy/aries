@@ -1,9 +1,8 @@
-use aries_event::AgentEvent;
+use aries_event::Notifier;
 use futures::StreamExt;
 use rig_agent::agent::{Agent, AgentHook, MultiTurnStreamItem, PromptResponse};
 use rig_agent::completion::{CompletionModel, Message};
 use rig_agent::streaming::StreamingPrompt;
-use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{AriesError, AriesResult};
 
@@ -17,7 +16,7 @@ where
     inner: Agent<M>,
     name: String,
     preamble: String,
-    sender: UnboundedSender<AgentEvent>,
+    notifier: Notifier,
 }
 
 impl<M> AriesAgent<M>
@@ -28,12 +27,12 @@ where
         inner: Agent<M>,
         name: impl Into<String>,
         preamble: impl Into<String>,
-        sender: UnboundedSender<AgentEvent>,
+        notifier: Notifier,
     ) -> Self {
         let name = name.into();
         let bare_preamble = preamble.into();
 
-        Self { inner, name, preamble: bare_preamble, sender }
+        Self { inner, name, preamble: bare_preamble, notifier }
     }
 
     pub async fn prompt<I, T, P>(
@@ -54,8 +53,7 @@ where
         while let Some(chunk) = stream.next().await {
             match chunk {
                 Ok(item) => {
-                    let event = AgentEvent::stream_item(item.clone());
-                    let _ = self.sender.send(event);
+                    self.notifier.send_stream_item(item.clone());
 
                     if let MultiTurnStreamItem::FinalResponse(res) = item {
                         final_res = res;
@@ -74,11 +72,5 @@ where
 
     pub fn name(&self) -> &str {
         &self.name
-    }
-
-    // 这样子设计不太好, 对外暴露了 Agent 内部的通信方式
-    pub fn send_notification(&self, text: impl Into<String>) {
-        let event = AgentEvent::notification(text);
-        let _ = self.sender.send(event);
     }
 }

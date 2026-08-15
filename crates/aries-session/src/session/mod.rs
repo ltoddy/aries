@@ -10,12 +10,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::Context;
-use aries_compact::{
-    self, AutoCompactBreaker, CompactAgent, CompactOutcome, Decision, TokenEstimator,
-};
-use aries_event::AgentEvent;
+use aries_compact::{self, AutoCompactBreaker, TokenEstimator};
+use aries_event::{AgentEvent, Notifier};
 use aries_extension::hook::input::{
-    PostCompactHookInput, PostCompactTrigger, PreCompactCustomInstructions, PreCompactHookInput,
     SessionEndHookInput, SessionEndReason, SessionStartHookInput, SessionStartSource,
     StopFailureHookInput, StopHookInput, UserPromptSubmitHookInput,
 };
@@ -45,13 +42,13 @@ use tokio_util::sync::CancellationToken;
 use tracing::info;
 
 pub use self::args::SessionArgs;
-use self::chat_context::ChatContext;
+pub use self::chat_context::ChatContext;
 use self::chat_history::ChatHistory;
 use self::config::SessionConfig;
 use self::hook::SessionPromptHook;
 use crate::commands::CommandsExecutor;
+use crate::compactor::ContextCompactor;
 use crate::{AriesAgentProvider, AriesClientProvider};
-use crate::provider::CompactAgentProvider;
 
 #[derive(Clone)]
 pub struct Session {
@@ -78,11 +75,14 @@ pub struct Session {
     tool_server_handle: ToolServerHandle,
     cancel_token: CancellationToken,
     receiver: Arc<Mutex<UnboundedReceiver<AgentEvent>>>,
+    notifier: Notifier,
 
-    compact_breaker: AutoCompactBreaker,
+    compactor: ContextCompactor,
     hooks_executor: Arc<HooksExecutor>,
     memory_store: MemoryStore,
 
+    // 为了避免连接因为 drop 而释放
+    #[allow(dead_code)]
     mcp_clients: Arc<Vec<RunningService<RoleClient, McpClientHandler>>>,
     extensions: AgentExtensions,
 
@@ -158,7 +158,7 @@ impl Session {
         let config = self.setting.activate(&alias)?;
 
         self.client = AriesClientProvider::new(&config)?;
-        let (agent, receiver) = self
+        let agent = self
             .client
             .agent(
                 self.mode,
@@ -168,13 +168,15 @@ impl Session {
                 self.lsp_client.clone(),
                 self.extensions.clone(),
                 self.tool_server_handle.clone(),
+                Notifier::clone(&self.notifier),
             )
             .await
             .with_context(|| format!("failed to create agent for model {alias}"))?;
 
         self.agent = agent;
-        self.receiver = Arc::new(Mutex::new(receiver));
         self.config = config.to_owned();
+        self.compactor
+            .set_agent(self.client.compact_agent(self.config.model(), &self.transcript_path));
 
         let loader = SettingLoader::new(&self.gctx.root_dir);
         let _ = loader.save(&self.setting).await;
@@ -183,7 +185,7 @@ impl Session {
     }
 
     pub async fn set_mode(&mut self, mode: Mode) -> anyhow::Result<()> {
-        let (agent, receiver) = self
+        let agent = self
             .client
             .agent(
                 mode,
@@ -193,12 +195,12 @@ impl Session {
                 self.lsp_client.clone(),
                 self.extensions.clone(),
                 self.tool_server_handle.clone(),
+                Notifier::clone(&self.notifier),
             )
             .await
             .with_context(|| format!("failed to create agent for mode {mode}"))?;
 
         self.agent = agent;
-        self.receiver = Arc::new(Mutex::new(receiver));
         self.mode = mode;
         Ok(())
     }
@@ -311,86 +313,6 @@ impl Session {
         });
     }
 
-    #[tracing::instrument(name = "compact", skip_all, fields(session_id = %self.id))]
-    pub async fn compact(&mut self) -> bool {
-        match self.compact_breaker.decide() {
-            Decision::Skip { wait, consecutive_failures } => {
-                info!(
-                    "\n⏳ 压缩处于冷却期（已连续失败 {consecutive_failures} 次），约 {wait:?} 后重试，本次跳过。",
-                );
-                return false;
-            },
-            Decision::Allow { half_open } => {
-                if half_open {
-                    info!("\n🔁 冷却结束，尝试恢复压缩...");
-                }
-            },
-        }
-
-        let input = PreCompactHookInput::new(
-            &self.id,
-            &self.cwd,
-            PostCompactTrigger::Auto,
-            PreCompactCustomInstructions::Auto,
-        )
-        .transcript_path(&self.transcript_path);
-        if let HookDecision::Terminate { .. } = self.hooks_executor.fire_pre_compact(input).await {
-            return false;
-        }
-
-        let mut compact_agent = self.client.compact_agent(self.config.model(), &self.transcript_path);
-        let outcome = compact_agent.compact(self.chat_context.history()).await;
-
-        match outcome {
-            CompactOutcome::Success((compressed, compact_summary)) => {
-                self.chat_context.overwrite(compressed).await;
-
-                let window = aries_compact::ContextWindow::new();
-                let post_tokens = self.chat_context.history().estimate_tokens();
-                let threshold = window.auto_compact_threshold();
-                if post_tokens >= threshold {
-                    info!(
-                        "\n⚠️  压缩后 tokens {post_tokens} 仍高于阈值 {threshold}，本次压缩无效。",
-                    );
-                    self.compact_breaker.on_failure();
-                    return false;
-                }
-
-                self.compact_breaker.on_success();
-
-                let input = PostCompactHookInput::new(
-                    &self.id,
-                    &self.cwd,
-                    PostCompactTrigger::Auto,
-                    compact_summary,
-                )
-                .transcript_path(&self.transcript_path);
-                self.hooks_executor.fire_post_compact(input).await;
-                true
-            },
-            CompactOutcome::Transient(err) => {
-                info!("\n🌐 压缩遇到临时错误（不计入失败）：{}", err);
-                false
-            },
-            CompactOutcome::PromptTooLong => {
-                info!("\n🛑 上下文过长，压缩请求被拒，进入冷却以避免反复重试。");
-                self.compact_breaker.trip();
-                false
-            },
-            CompactOutcome::Empty => {
-                self.compact_breaker.on_failure();
-                let failures = self.compact_breaker.consecutive_failures();
-                if failures >= AutoCompactBreaker::MAX_CONSECUTIVE_AUTOCOMPACT_FAILURES {
-                    info!(
-                        "\n⛔ 连续 {failures} 次压缩失败，进入 {} 分钟冷却。",
-                        AutoCompactBreaker::AUTOCOMPACT_FAILURE_COOLDOWN.as_secs() / 60,
-                    );
-                }
-                false
-            },
-        }
-    }
-
     pub fn id(&self) -> String {
         self.id.clone()
     }
@@ -447,7 +369,13 @@ impl Session {
         F: Fn(AgentEvent) -> Fut + Clone,
         Fut: Future<Output = ()>,
     {
-        let executor = CommandsExecutor::new(&self.agent, &self.extensions.commands, &self.id);
+        let mut executor = CommandsExecutor::new(
+            &self.agent,
+            &self.extensions.commands,
+            &self.id,
+            ContextCompactor::clone(&self.compactor),
+            Notifier::clone(&self.notifier),
+        );
         if executor.execute(input).await {
             let mut guard = self.receiver.lock().await;
             while let Ok(event) = guard.try_recv() {
@@ -477,6 +405,8 @@ impl Session {
 
         aries_logger::register(&id, &session_dir);
 
+        let (notifier, receiver) = Notifier::channel();
+
         let lsp_client = Self::warm_up_lsp(cwd).await;
 
         let mut extensions =
@@ -495,7 +425,7 @@ impl Session {
 
         let mode = Mode::default();
         let client = AriesClientProvider::new(&config)?;
-        let (agent, receiver) = client
+        let agent = client
             .agent(
                 mode,
                 config.clone(),
@@ -504,10 +434,21 @@ impl Session {
                 lsp_client.clone(),
                 extensions.clone(),
                 tool_server_handle.clone(),
+                Notifier::clone(&notifier),
             )
             .await?;
 
         let hooks_executor = Arc::new(HooksExecutor::new(extensions.hooks.clone()));
+        let compactor = ContextCompactor::new(
+            &id,
+            cwd,
+            &transcript_path,
+            client.compact_agent(config.model(), &transcript_path),
+            AutoCompactBreaker::new(),
+            chat_context.clone(),
+            hooks_executor.clone(),
+            Notifier::clone(&notifier),
+        );
 
         let input = SessionStartHookInput::new(&id, cwd, source, config.model(), mode);
         hooks_executor.fire_session_start(input).await;
@@ -517,7 +458,7 @@ impl Session {
             gctx,
             setting,
             config,
-            cwd: cwd.to_path_buf(),
+            cwd: cwd.to_owned(),
             client,
             agent,
             mode,
@@ -526,17 +467,18 @@ impl Session {
             chat_context,
             db,
             session_repo,
-            session_dir: session_dir.to_path_buf(),
+            session_dir: session_dir.to_owned(),
             transcript_path,
             tool_server_handle,
             cancel_token: CancellationToken::new(),
+            notifier,
             receiver: Arc::new(Mutex::new(receiver)),
-            compact_breaker: AutoCompactBreaker::new(),
             hooks_executor,
             memory_store,
             mcp_clients: Arc::new(mcp_clients),
             extensions,
             last_assistant_message: None,
+            compactor,
         })
     }
 
@@ -641,12 +583,18 @@ impl Session {
         F: FnMut(AgentEvent) -> Fut,
         Fut: Future<Output = ()>,
     {
-        aries_compact::micro_compact(self.chat_context.history_mut());
+        {
+            let mut write = self.chat_context.history_mut();
+            aries_compact::micro_compact(&mut write);
+        }
 
         let window = aries_compact::ContextWindow::new();
         let compact_threshold = window.auto_compact_threshold();
-        let estimated_tokens =
-            self.chat_context.history().estimate_tokens().saturating_add(prompt.estimate_tokens());
+
+        let estimated_tokens = {
+            let read = self.chat_context.history();
+            read.estimate_tokens().saturating_add(prompt.estimate_tokens())
+        };
 
         if estimated_tokens >= compact_threshold {
             let text = format!(
@@ -654,7 +602,7 @@ impl Session {
                 window.total
             );
             callback(AgentEvent::notification(text)).await;
-            self.compact().await;
+            self.compactor.compact().await;
         }
     }
 
@@ -672,7 +620,7 @@ impl Session {
                 usage.total_tokens,
             );
             callback(AgentEvent::notification(text)).await;
-            self.compact().await;
+            self.compactor.compact().await;
         }
     }
 }

@@ -1,6 +1,31 @@
 use rig_agent::agent::{MultiTurnStreamItem, Text};
 use rig_core::streaming::StreamedAssistantContent;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
+
+#[derive(Debug, Clone)]
+pub struct Notifier {
+    sender: UnboundedSender<AgentEvent>,
+}
+
+impl Notifier {
+    pub fn channel() -> (Self, UnboundedReceiver<AgentEvent>) {
+        let (sender, receiver) = unbounded_channel::<AgentEvent>();
+
+        (Self { sender }, receiver)
+    }
+
+    //  fire and forget
+
+    pub fn notify(&self, text: impl Into<String>) {
+        let event = AgentEvent::notification(text);
+        let _ = self.sender.send(event);
+    }
+
+    pub fn send_stream_item<R>(&self, stream_item: MultiTurnStreamItem<R>) {
+        let event = AgentEvent::stream_item(stream_item);
+        let _ = self.sender.send(event);
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum AgentEvent {
@@ -59,30 +84,5 @@ pub fn earse<R>(stream_item: MultiTurnStreamItem<R>) -> MultiTurnStreamItem<()> 
         _ => MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Text(Text::new(
             String::new(),
         ))), // unreachable
-    }
-}
-
-// TODO 发送与接收消息未来统一使用此结构体
-#[derive(Debug)]
-pub struct Notifier<T: Clone> {
-    sender: UnboundedSender<T>,
-    receiver: UnboundedReceiver<T>,
-}
-
-impl<T: Clone> Notifier<T> {
-    pub fn new() -> Self {
-        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel::<T>();
-
-        Self { sender, receiver }
-    }
-
-    pub fn send(&self, event: T) {
-        let _ = self.sender.send(event);
-    }
-}
-
-impl<T: Clone> Default for Notifier<T> {
-    fn default() -> Self {
-        Self::new()
     }
 }

@@ -1,4 +1,5 @@
 pub mod commands;
+pub mod compactor;
 pub mod middleware;
 pub mod provider;
 pub mod registry;

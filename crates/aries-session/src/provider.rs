@@ -2,7 +2,7 @@ use std::path::Path;
 
 use aries_agent::{AgentBuilder, AriesAgent, AriesResult};
 use aries_compact::{CompactAgent, CompactOutcome};
-use aries_event::AgentEvent;
+use aries_event::Notifier;
 use aries_extension::AgentExtensions;
 use aries_init::{GlobalContext, ModelConfig};
 use aries_lspclient::SharedLspClient;
@@ -17,7 +17,6 @@ use rig_agent::tool::server::ToolServerHandle;
 use rig_core::completion::Message;
 use rig_core::http_client;
 use rig_core::providers::{anthropic, azure, deepseek, openai};
-use tokio::sync::mpsc::UnboundedReceiver;
 
 use crate::middleware::RetryStrategy;
 
@@ -91,42 +90,43 @@ impl AriesClientProvider {
         lsp_client: Option<SharedLspClient>,
         extensions: AgentExtensions,
         tool_server_handle: ToolServerHandle,
-    ) -> anyhow::Result<(AriesAgentProvider, UnboundedReceiver<AgentEvent>)> {
+        notifier: Notifier,
+    ) -> anyhow::Result<AriesAgentProvider> {
         let model = config.model();
-        let cwd = cwd.as_ref().to_path_buf();
+        let cwd = cwd.as_ref().to_owned();
 
         match self {
             AriesClientProvider::Anthropic(c) => {
-                let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx)
+                let agent = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx, notifier)
                     .with_lsp_client(lsp_client)
                     .with_extensions(extensions)
                     .build(tool_server_handle)
                     .await;
-                Ok((AriesAgentProvider::Anthropic(agent), receiver))
+                Ok(AriesAgentProvider::Anthropic(agent))
             },
             AriesClientProvider::Azure(c) => {
-                let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx)
+                let agent = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx, notifier)
                     .with_lsp_client(lsp_client)
                     .with_extensions(extensions)
                     .build(tool_server_handle)
                     .await;
-                Ok((AriesAgentProvider::Azure(agent), receiver))
+                Ok(AriesAgentProvider::Azure(agent))
             },
             AriesClientProvider::Deepseek(c) => {
-                let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx)
+                let agent = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx, notifier)
                     .with_lsp_client(lsp_client)
                     .with_extensions(extensions)
                     .build(tool_server_handle)
                     .await;
-                Ok((AriesAgentProvider::Deepseek(agent), receiver))
+                Ok(AriesAgentProvider::Deepseek(agent))
             },
             AriesClientProvider::OpenAI(c) => {
-                let (agent, receiver) = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx)
+                let agent = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx, notifier)
                     .with_lsp_client(lsp_client)
                     .with_extensions(extensions)
                     .build(tool_server_handle)
                     .await;
-                Ok((AriesAgentProvider::OpenAI(agent), receiver))
+                Ok(AriesAgentProvider::OpenAI(agent))
             },
         }
     }
@@ -220,15 +220,6 @@ impl AriesAgentProvider {
         }
     }
 
-    pub fn send_notification(&self, text: impl Into<String>) {
-        match self {
-            AriesAgentProvider::Anthropic(a) => a.send_notification(text),
-            AriesAgentProvider::Azure(a) => a.send_notification(text),
-            AriesAgentProvider::Deepseek(a) => a.send_notification(text),
-            AriesAgentProvider::OpenAI(a) => a.send_notification(text),
-        }
-    }
-
     #[inline]
     pub fn preamble(&self) -> &str {
         match self {
@@ -240,6 +231,7 @@ impl AriesAgentProvider {
     }
 }
 
+#[derive(Clone)]
 pub enum CompactAgentProvider {
     Anthropic(CompactAgent<anthropic::completion::CompletionModel<ClientWithMiddleware>>),
     Azure(CompactAgent<azure::CompletionModel<ClientWithMiddleware>>),

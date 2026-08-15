@@ -48,7 +48,7 @@ impl SessionPromptHook {
     ) -> Self {
         let session_id = session_id.into();
         let cwd = cwd.as_ref();
-        let transcript_path = transcript_path.as_ref().to_path_buf();
+        let transcript_path = transcript_path.as_ref().to_owned();
         let agent_id = agent_id.into();
         let agent_type = agent_type.into();
 
@@ -58,7 +58,7 @@ impl SessionPromptHook {
         Self {
             executor,
             session_id,
-            cwd: cwd.to_path_buf(),
+            cwd: cwd.to_owned(),
             transcript_path,
             agent_id,
             agent_type,

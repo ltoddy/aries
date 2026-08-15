@@ -1,7 +1,7 @@
 use std::iter;
 use std::path::{Path, PathBuf};
 
-use aries_event::AgentEvent;
+use aries_event::Notifier;
 use aries_extension::AgentExtensions;
 use aries_init::GlobalContext;
 use aries_lspclient::SharedLspClient;
@@ -10,7 +10,6 @@ use aries_tools::agent;
 use itertools::Itertools;
 use rig_agent::client::AgentClientExt;
 use rig_agent::tool::server::ToolServerHandle;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::agent::{AGENT_LOOP_MAX_TURNS, AriesAgent};
 
@@ -27,8 +26,7 @@ where
 
     extensions: AgentExtensions,
 
-    sender: UnboundedSender<AgentEvent>,
-    receiver: UnboundedReceiver<AgentEvent>,
+    notifier: Notifier,
 }
 
 impl<C> AgentBuilder<C>
@@ -41,10 +39,10 @@ where
         mode: Mode,
         cwd: impl AsRef<Path>,
         gctx: GlobalContext,
+        notifier: Notifier,
     ) -> Self {
         let cwd = cwd.as_ref().to_path_buf();
         let model = model.into();
-        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
 
         Self {
             client,
@@ -54,8 +52,7 @@ where
             gctx,
             lsp_client: None,
             extensions: AgentExtensions::empty(),
-            sender,
-            receiver,
+            notifier,
         }
     }
 
@@ -72,7 +69,7 @@ where
     pub async fn build(
         self,
         tool_server_handle: ToolServerHandle,
-    ) -> (AriesAgent<C::CompletionModel>, UnboundedReceiver<AgentEvent>) {
+    ) -> AriesAgent<C::CompletionModel> {
         let mode = self.mode;
         let name = mode.name();
 
@@ -87,7 +84,7 @@ where
                 self.client.clone(),
                 &self.model,
                 &self.cwd,
-                self.sender.clone(),
+                self.notifier.clone(),
                 self.extensions.agents.clone(),
             ));
         }
@@ -112,6 +109,6 @@ where
 
         let inner = builder.build();
 
-        (AriesAgent::new(inner, name, preamble, self.sender), self.receiver)
+        AriesAgent::new(inner, name, preamble, self.notifier)
     }
 }

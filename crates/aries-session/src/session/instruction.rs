@@ -54,6 +54,6 @@ impl InstructionContext {
     pub fn new(root_dir: impl AsRef<Path>) -> Self {
         let root_dir = root_dir.as_ref();
 
-        Self { root_dir: root_dir.to_path_buf(), instructions: vec![], que: VecDeque::new() }
+        Self { root_dir: root_dir.to_owned(), instructions: vec![], que: VecDeque::new() }
     }
 }
