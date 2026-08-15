@@ -2,9 +2,11 @@ use std::io;
 use std::path::Path;
 
 use aries_filesystem::jsonl;
-use rig_core::completion::Message;
+use rig_agent::completion::Message;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 use tracing::{Instrument, Span, error};
+
+// TODO: file open 设置为 append 模式
 
 #[derive(Debug, Clone)]
 pub struct ChatHistory {

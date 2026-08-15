@@ -1,20 +1,18 @@
 use std::path::Path;
 
-use aries_agent::{AgentBuilder, AriesAgent, AriesResult};
-use aries_compact::{CompactAgent, CompactOutcome};
+use aries_agent::{AgentBuilder, AriesAgentProvider};
+use aries_compact::{CompactAgent, CompactAgentProvider};
 use aries_event::Notifier;
 use aries_extension::AgentExtensions;
 use aries_init::{GlobalContext, ModelConfig};
 use aries_lspclient::SharedLspClient;
-use aries_memory::{Memory, MemoryAgent, MemoryRetriever};
+use aries_memory::{MemoryAgent, MemoryAgentProvider, MemoryRetriever, MemoryRetrieverProvider};
 use aries_mode::Mode;
 use http::{HeaderMap, header};
 use reqwest_middleware::ClientWithMiddleware;
 use reqwest_retry::RetryTransientMiddleware;
 use reqwest_retry::policies::ExponentialBackoff;
-use rig_agent::agent::{AgentHook, PromptResponse};
 use rig_agent::tool::server::ToolServerHandle;
-use rig_core::completion::Message;
 use rig_core::http_client;
 use rig_core::providers::{anthropic, azure, deepseek, openai};
 
@@ -187,107 +185,6 @@ impl AriesClientProvider {
             AriesClientProvider::OpenAI(c) => {
                 MemoryRetrieverProvider::OpenAI(MemoryRetriever::new(c.clone(), model))
             },
-        }
-    }
-}
-
-#[derive(Clone)]
-pub enum AriesAgentProvider {
-    Anthropic(AriesAgent<anthropic::completion::CompletionModel<ClientWithMiddleware>>),
-    Azure(AriesAgent<azure::CompletionModel<ClientWithMiddleware>>),
-    Deepseek(AriesAgent<deepseek::CompletionModel<ClientWithMiddleware>>),
-    OpenAI(AriesAgent<openai::CompletionModel<ClientWithMiddleware>>),
-}
-
-impl AriesAgentProvider {
-    #[inline]
-    pub async fn prompt<I, T, P>(
-        &self,
-        prompt: impl Into<Message> + Send,
-        history: I,
-        hook: P,
-    ) -> AriesResult<PromptResponse>
-    where
-        I: IntoIterator<Item = T>,
-        T: Into<Message>,
-        P: AgentHook + 'static,
-    {
-        match self {
-            AriesAgentProvider::Anthropic(a) => a.prompt(prompt, history, hook).await,
-            AriesAgentProvider::Azure(a) => a.prompt(prompt, history, hook).await,
-            AriesAgentProvider::Deepseek(a) => a.prompt(prompt, history, hook).await,
-            AriesAgentProvider::OpenAI(a) => a.prompt(prompt, history, hook).await,
-        }
-    }
-
-    #[inline]
-    pub fn preamble(&self) -> &str {
-        match self {
-            AriesAgentProvider::Anthropic(a) => a.preamble(),
-            AriesAgentProvider::Azure(a) => a.preamble(),
-            AriesAgentProvider::Deepseek(a) => a.preamble(),
-            AriesAgentProvider::OpenAI(a) => a.preamble(),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub enum CompactAgentProvider {
-    Anthropic(CompactAgent<anthropic::completion::CompletionModel<ClientWithMiddleware>>),
-    Azure(CompactAgent<azure::CompletionModel<ClientWithMiddleware>>),
-    Deepseek(CompactAgent<deepseek::CompletionModel<ClientWithMiddleware>>),
-    OpenAI(CompactAgent<openai::CompletionModel<ClientWithMiddleware>>),
-}
-
-impl CompactAgentProvider {
-    pub async fn compact(&mut self, messages: &[Message]) -> CompactOutcome {
-        match self {
-            CompactAgentProvider::Anthropic(a) => a.compact(messages).await,
-            CompactAgentProvider::Azure(a) => a.compact(messages).await,
-            CompactAgentProvider::Deepseek(a) => a.compact(messages).await,
-            CompactAgentProvider::OpenAI(a) => a.compact(messages).await,
-        }
-    }
-}
-
-pub enum MemoryAgentProvider {
-    Anthropic(MemoryAgent<anthropic::completion::CompletionModel<ClientWithMiddleware>>),
-    Azure(MemoryAgent<azure::CompletionModel<ClientWithMiddleware>>),
-    Deepseek(MemoryAgent<deepseek::CompletionModel<ClientWithMiddleware>>),
-    OpenAI(MemoryAgent<openai::CompletionModel<ClientWithMiddleware>>),
-}
-
-impl MemoryAgentProvider {
-    #[inline]
-    pub async fn run(
-        &self,
-        manifest: Option<String>,
-        user: impl Into<String>,
-        assistant: impl Into<String>,
-    ) {
-        match self {
-            MemoryAgentProvider::Anthropic(a) => a.run(manifest, user, assistant).await,
-            MemoryAgentProvider::Azure(a) => a.run(manifest, user, assistant).await,
-            MemoryAgentProvider::Deepseek(a) => a.run(manifest, user, assistant).await,
-            MemoryAgentProvider::OpenAI(a) => a.run(manifest, user, assistant).await,
-        }
-    }
-}
-
-pub enum MemoryRetrieverProvider {
-    Anthropic(MemoryRetriever<anthropic::completion::CompletionModel<ClientWithMiddleware>>),
-    Azure(MemoryRetriever<azure::CompletionModel<ClientWithMiddleware>>),
-    Deepseek(MemoryRetriever<deepseek::CompletionModel<ClientWithMiddleware>>),
-    OpenAI(MemoryRetriever<openai::CompletionModel<ClientWithMiddleware>>),
-}
-
-impl MemoryRetrieverProvider {
-    pub async fn retrieve(&self, query: impl Into<String>, memories: &[Memory]) -> Vec<String> {
-        match self {
-            MemoryRetrieverProvider::Anthropic(a) => a.retrieve(query, memories).await,
-            MemoryRetrieverProvider::Azure(a) => a.retrieve(query, memories).await,
-            MemoryRetrieverProvider::Deepseek(a) => a.retrieve(query, memories).await,
-            MemoryRetrieverProvider::OpenAI(a) => a.retrieve(query, memories).await,
         }
     }
 }

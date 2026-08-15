@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use aries_filesystem::jsonl;
 use itertools::Itertools;
+use parking_lot::RwLock;
 use rig_agent::completion::Message;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 use tracing::{Instrument, Span, error};
@@ -14,7 +15,7 @@ pub struct ChatContext {
 }
 
 struct Inner {
-    history: parking_lot::RwLock<Vec<Message>>,
+    history: RwLock<Vec<Message>>,
     sender: UnboundedSender<Vec<Message>>,
     file_path: PathBuf,
 }
@@ -31,7 +32,7 @@ impl ChatContext {
         let (sender, receiver) = unbounded_channel();
         tokio::spawn(refresh_context(receiver, file_path.clone()).instrument(Span::current()));
 
-        let inner = Inner { history: parking_lot::RwLock::new(history), sender, file_path };
+        let inner = Inner { history: RwLock::new(history), sender, file_path };
         Self { inner: Arc::new(inner) }
     }
 

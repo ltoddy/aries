@@ -5,13 +5,17 @@ edition = "2024"
 
 [dependencies]
 anyhow.workspace = true
+aries-context = { path = "../aries-context" }
+aries-event = { version = "0.1.0", path = "../aries-event" }
+aries-extension = { path = "../aries-extension" }
 aries-filesystem = { path = "../aries-filesystem" }
 aries-tools = { path = "../aries-tools" }
 futures.workspace = true
 parking_lot.workspace = true
 regex-lite.workspace = true
+reqwest-middleware.workspace = true
 rig-agent.workspace = true
-rig-core.workspace = true
+rig-core = { workspace = true, features = ["reqwest-middleware"] }
 serde_json.workspace = true
 tokio = { workspace = true, features = ["fs"] }
 tracing.workspace = true

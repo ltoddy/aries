@@ -33,16 +33,17 @@
 - [x] slash command
 - [x] 可视化数据库保存的数据（`aries stats tool` / `aries stats bash`：工具调用次数、bash 命令使用频率）
 - [ ] 优化执行 slash commad 的代码
+- [ ] 优化执行 hook 的代码
+- [ ] batch tool 支持 agent 同时在 acp 中体现 multi-agent
 - [ ] 支持 worktree
 - [ ] 支持 Workflow
 - [ ] agent (参考 https://github.com/vercel/eve 对 agent 的目录结构设计来支持)
 - [ ] token 使用优化
+- [ ] 缓存命中率优化
 - [ ] 支持设置模型 effort
 - [ ] 支持 design.md
 - [ ] 支持 cron
 - [ ] 通过 rsync 实现本机的 sandbox
-- [ ] 支持 Browser Use
-- [ ] 支持 Computer Use
 - [ ] 支持自我进化 (想要达到的目标, 从单体进化逐步走向群体进化,单体进化: 一个 Agent 变聪明了, 另一个 Agent 不知道, 希望逐步走向进化成果可以像基因一样跨个体共享, 群体遗传!)
   - hermes agent 实现自进化有两种方式:
     1. 动态 Skill 生成, 每次完成一轮对话,后台会启动一个审查 Agent (这段对话有什么值得记忆的经验? 这个任务模式值值得抽象成 skill ? 整个执行过程有什么可改进的,如果值得就把经验结构化成一个 skill 包)，如果连续跑了十论都没有生成新的 skill 系统会提示: 你是不是改把最近学到的经验整理一下. 同时在未来遇到新的边界 case 以生成的 skill 也会再次更新.

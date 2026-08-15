@@ -7,6 +7,7 @@ edition = "2024"
 anyhow.workspace = true
 aries-agent = { path = "../aries-agent" }
 aries-compact = { path = "../aries-compact" }
+aries-context = { version = "0.1.0", path = "../aries-context" }
 aries-event = { path = "../aries-event" }
 aries-extension = { path = "../aries-extension" }
 aries-filesystem = { path = "../aries-filesystem" }

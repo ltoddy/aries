@@ -1,12 +1,12 @@
 mod builtin;
 mod slash;
 
+use aries_agent::AriesAgentProvider;
+use aries_compact::ContextCompactor;
 use aries_event::Notifier;
 use aries_extension::command::CommandDefinition;
 
 pub use self::builtin::BUILTIN_COMMANDS;
-use crate::AriesAgentProvider;
-use crate::compactor::ContextCompactor;
 
 pub struct CommandsExecutor<'a> {
     slash_commands_executor: slash::SlashCommandsExecutor<'a>,

@@ -1,6 +1,4 @@
 mod args;
-mod chat_context;
-mod chat_history;
 mod config;
 mod hook;
 mod instruction;
@@ -10,7 +8,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::Context;
-use aries_compact::{self, AutoCompactBreaker, TokenEstimator};
+use aries_agent::AriesAgentProvider;
+use aries_compact::{self, ContextCompactor, TokenEstimator};
+use aries_context::{ChatContext, ChatHistory};
 use aries_event::{AgentEvent, Notifier};
 use aries_extension::hook::input::{
     SessionEndHookInput, SessionEndReason, SessionStartHookInput, SessionStartSource,
@@ -42,13 +42,10 @@ use tokio_util::sync::CancellationToken;
 use tracing::info;
 
 pub use self::args::SessionArgs;
-pub use self::chat_context::ChatContext;
-use self::chat_history::ChatHistory;
 use self::config::SessionConfig;
 use self::hook::SessionPromptHook;
+use crate::AriesClientProvider;
 use crate::commands::CommandsExecutor;
-use crate::compactor::ContextCompactor;
-use crate::{AriesAgentProvider, AriesClientProvider};
 
 #[derive(Clone)]
 pub struct Session {
@@ -444,7 +441,6 @@ impl Session {
             cwd,
             &transcript_path,
             client.compact_agent(config.model(), &transcript_path),
-            AutoCompactBreaker::new(),
             chat_context.clone(),
             hooks_executor.clone(),
             Notifier::clone(&notifier),

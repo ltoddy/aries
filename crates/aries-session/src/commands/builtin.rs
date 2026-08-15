@@ -1,10 +1,9 @@
 use std::process::Stdio;
 
+use aries_agent::AriesAgentProvider;
+use aries_compact::ContextCompactor;
 use aries_event::Notifier;
 use tokio::process::Command;
-
-use crate::AriesAgentProvider;
-use crate::compactor::ContextCompactor;
 
 const EXIT: &str = "exit";
 const SHELL: &str = "shell";

@@ -1,11 +1,13 @@
-pub mod agent;
-pub mod builder;
+mod agent;
+mod builder;
+mod provider;
 
 use rig_agent::agent::StreamingError;
 use rig_agent::completion::CompletionError;
 
-pub use crate::agent::{AGENT_LOOP_MAX_TURNS, AriesAgent};
-pub use crate::builder::AgentBuilder;
+pub use self::agent::{AGENT_LOOP_MAX_TURNS, AriesAgent};
+pub use self::builder::AgentBuilder;
+pub use self::provider::AriesAgentProvider;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AriesError {
