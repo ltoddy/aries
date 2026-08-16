@@ -481,6 +481,7 @@ dependencies = [
  "aries-tools",
  "http",
  "itertools 0.15.0",
+ "jiff",
  "nanoid",
  "reqwest 0.13.4",
  "reqwest-middleware",

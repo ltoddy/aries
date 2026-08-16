@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use agent_client_protocol::schema::v1::{
-    Content, ContentBlock, ContentChunk, Diff, Plan, SessionUpdate, ToolCall as AcpToolCall,
-    ToolCallContent, ToolCallId, ToolCallLocation, ToolCallStatus, ToolCallUpdate,
-    ToolCallUpdateFields, ToolKind, UsageUpdate,
+    Content, ContentBlock, ContentChunk, Diff, Plan, SessionInfoUpdate, SessionUpdate,
+    ToolCall as AcpToolCall, ToolCallContent, ToolCallId, ToolCallLocation, ToolCallStatus,
+    ToolCallUpdate, ToolCallUpdateFields, ToolKind, UsageUpdate,
 };
 use aries_event::AgentEvent;
 use aries_tools::tools::format_tool_output;
@@ -28,7 +28,6 @@ impl SessionUpdates {
             AgentEvent::Notification(text) => Self(vec![SessionUpdate::AgentMessageChunk(
                 ContentChunk::new(ContentBlock::from(text)),
             )]),
-            AgentEvent::AwaitingUserInput { .. } => Self(Vec::new()),
             AgentEvent::StreamItem(stream_item) => {
                 match stream_item {
                     MultiTurnStreamItem::StreamAssistantItem(v) => {
@@ -75,6 +74,12 @@ impl SessionUpdates {
                     },
                     _ => Self(Vec::new()),
                 }
+            },
+            AgentEvent::AwaitingUserInput { .. } => Self(Vec::new()),
+            AgentEvent::SessionInfoUpdate { title, updated_at } => {
+                Self(vec![SessionUpdate::SessionInfoUpdate(
+                    SessionInfoUpdate::new().title(title).updated_at(updated_at),
+                )])
             },
         }
     }

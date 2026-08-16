@@ -30,6 +30,15 @@ impl Notifier {
         let event = AgentEvent::awaiting_user_input(args);
         let _ = self.sender.send(event);
     }
+
+    pub fn send_session_info_update(
+        &self,
+        title: impl Into<String>,
+        updated_at: impl Into<String>,
+    ) {
+        let event = AgentEvent::session_info_update(title, updated_at);
+        let _ = self.sender.send(event);
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -37,6 +46,7 @@ pub enum AgentEvent {
     Notification(String),
     StreamItem(MultiTurnStreamItem<()>),
     AwaitingUserInput { args: serde_json::Value },
+    SessionInfoUpdate { title: String, updated_at: String },
 }
 
 impl AgentEvent {
@@ -52,6 +62,12 @@ impl AgentEvent {
 
     pub fn awaiting_user_input(args: serde_json::Value) -> Self {
         Self::AwaitingUserInput { args }
+    }
+
+    pub fn session_info_update(title: impl Into<String>, updated_at: impl Into<String>) -> Self {
+        let title = title.into();
+        let updated_at = updated_at.into();
+        Self::SessionInfoUpdate { title, updated_at }
     }
 }
 

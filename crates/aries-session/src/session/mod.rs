@@ -27,6 +27,7 @@ use aries_mode::Mode;
 use aries_persistence::SessionRepository;
 use aries_tools::{edit, write};
 use itertools::Itertools;
+use jiff::Zoned;
 use rig_agent::agent::PromptResponse;
 use rig_agent::tool::rmcp::McpClientHandler;
 use rig_agent::tool::server::{ToolServer, ToolServerHandle};
@@ -220,7 +221,6 @@ impl Session {
         let prompt: Message = prompt.into();
         self.cancel_token = CancellationToken::new();
         self.last_assistant_message = None;
-        let title = self.update_title(&prompt).await;
 
         if let Message::User { ref content } = prompt
             && let UserContent::Text(text) = content.first()
@@ -229,6 +229,10 @@ impl Session {
         {
             return Ok(());
         }
+
+        let title = self.update_title(&prompt).await;
+        let now = Zoned::now();
+        self.notifier.send_session_info_update(&title, now.to_string());
 
         self.fire_user_prompt_submit(&title).await?;
         self.pre_compact(&prompt, callback.clone()).await;
