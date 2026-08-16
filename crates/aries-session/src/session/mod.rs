@@ -2,6 +2,7 @@ mod args;
 mod config;
 mod hook;
 mod instruction;
+mod question;
 
 use std::future::Future;
 use std::path::{Path, PathBuf};
@@ -44,6 +45,7 @@ use tracing::info;
 pub use self::args::SessionArgs;
 use self::config::SessionConfig;
 use self::hook::SessionPromptHook;
+pub use self::question::resume_input;
 use crate::AriesClientProvider;
 use crate::commands::CommandsExecutor;
 
@@ -268,6 +270,9 @@ impl Session {
             match final_res {
                 Ok(res) => res,
                 Err(err) => {
+                    if err.is_awaiting_user_input() {
+                        return Ok(());
+                    }
                     self.fire_stop_failure(err.to_string()).await;
                     return Err(err);
                 },
@@ -513,6 +518,7 @@ impl Session {
             self.mode.id(),
             self.mode.name(),
             self.db.clone(),
+            Notifier::clone(&self.notifier),
         )
     }
 

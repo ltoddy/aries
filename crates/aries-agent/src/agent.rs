@@ -6,7 +6,9 @@ use rig_agent::streaming::StreamingPrompt;
 
 use crate::{AriesError, AriesResult};
 
-pub const AGENT_LOOP_MAX_TURNS: usize = 200;
+// 随着上下文管理的优化,长程任务逐渐变得可能,所以不断提高 turns 的上限
+// 提高 turns 的上限可能是一个错误,也许对于长程任务,使用 handoff 的方式更好.
+pub const AGENT_LOOP_MAX_TURNS: usize = 512;
 
 #[derive(Clone)]
 pub struct AriesAgent<M>

@@ -1,3 +1,4 @@
+pub mod elicitation;
 pub mod message;
 pub mod plan;
 pub mod session_update;
@@ -9,10 +10,13 @@ use agent_client_protocol::schema::v1::{
 };
 use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
 use aries_event::AgentEvent;
+use aries_tools::question::AskUserQuestionArgs;
 use parking_lot::Mutex;
+use rig_core::completion::Message;
 use rig_core::message::ToolCall;
-use tracing::{info, instrument};
+use tracing::{info, instrument, warn};
 
+use self::elicitation::Elicitation;
 use self::message::UserMessage;
 use self::session_update::SessionUpdates;
 use super::SharedRegistry;
@@ -37,21 +41,44 @@ pub async fn prompt(
         }
     };
 
-    let prompt = UserMessage::from(req.prompt);
-    let tool_names = Mutex::new(HashMap::<String, ToolCall>::new());
+    let user_message = UserMessage::from(req.prompt);
+    let prompt = user_message.into();
 
-    let callback = async |event: AgentEvent| {
-        SessionUpdates::new(event, &tool_names).into_iter().for_each(|u| {
-            let _ = cx.send_notification(SessionNotification::new(session_id.clone(), u));
-        });
+    let tool_names = Mutex::new(HashMap::<String, ToolCall>::new());
+    let pending = Mutex::new(None::<AskUserQuestionArgs>);
+
+    let callback = async |event: AgentEvent| match event {
+        AgentEvent::AwaitingUserInput { args } => {
+            match serde_json::from_value::<AskUserQuestionArgs>(args.clone()) {
+                Ok(question) => *pending.lock() = Some(question),
+                Err(err) => warn!("failed to parse AskUserQuestion args: {err}"),
+            }
+        },
+        _ => {
+            SessionUpdates::new(event, &tool_names).into_iter().for_each(|u| {
+                let _ = cx.send_notification(SessionNotification::new(session_id.clone(), u));
+            });
+        },
     };
 
-    match session.prompt(prompt, callback).await {
-        Ok(_) => {
-            let mut registry = registry.lock().await;
-            registry.putback_session(session);
-            responder.respond(PromptResponse::new(StopReason::EndTurn))
-        },
-        Err(err) => responder.respond_with_internal_error(err.to_string()),
+    let mut prompt = prompt;
+    loop {
+        match session.prompt(prompt, callback).await {
+            Ok(_) => {
+                let question = pending.lock().take();
+                match question {
+                    Some(question) => {
+                        let answer = Elicitation::new(cx.clone(), &session_id).ask(&question).await;
+                        prompt = Message::user(answer.to_input(&question));
+                    },
+                    None => break,
+                }
+            },
+            Err(err) => return responder.respond_with_internal_error(err.to_string()),
+        }
     }
+
+    let mut registry = registry.lock().await;
+    registry.putback_session(session);
+    responder.respond(PromptResponse::new(StopReason::EndTurn))
 }

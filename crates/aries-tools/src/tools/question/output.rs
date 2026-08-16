@@ -6,8 +6,13 @@ pub struct AskUserQuestionOutput {
 }
 
 impl AskUserQuestionOutput {
-    pub fn render_output(raw: serde_json::Value) -> Result<String, serde_json::Error> {
-        let output: Self = serde_json::from_value(raw)?;
-        Ok(output.answers.join("\n"))
+    pub fn new() -> Self {
+        Self { answers: Vec::new() }
+    }
+}
+
+impl Default for AskUserQuestionOutput {
+    fn default() -> Self {
+        Self::new()
     }
 }

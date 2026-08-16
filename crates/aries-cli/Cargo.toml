@@ -23,6 +23,7 @@ aries-tools = { path = "../aries-tools" }
 clap = { workspace = true, features = ["derive"] }
 colored.workspace = true
 dialoguer.workspace = true
+parking_lot.workspace = true
 ferris-says.workspace = true
 futures.workspace = true
 itertools.workspace = true

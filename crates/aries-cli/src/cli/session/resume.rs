@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use aries_extension::mcp::McpDefinition;
@@ -10,8 +8,7 @@ use colored::Colorize;
 use rustyline::error::ReadlineError;
 use tracing::info_span;
 
-use super::display_elapsed;
-use crate::display::print_agent_event;
+use super::{display_elapsed, prompt_maybe_ask};
 use crate::{commands, input, welcome};
 
 #[derive(Clone, Debug, Parser)]
@@ -56,17 +53,8 @@ pub async fn execute(args: ResumeSessionsArgs, gctx: GlobalContext) -> anyhow::R
 
                 print!("\n{}: ", "Aries".magenta());
                 let start = Instant::now();
-                let tool_names: Arc<Mutex<HashMap<String, String>>> =
-                    Arc::new(Mutex::new(HashMap::new()));
 
-                let callback = async |event| {
-                    let tool_names = tool_names.clone();
-                    if let Ok(mut map) = tool_names.lock() {
-                        print_agent_event(event, &mut map);
-                    }
-                };
-
-                if let Err(err) = session.prompt(input, callback).await {
+                if let Err(err) = prompt_maybe_ask(&mut session, input).await {
                     eprintln!("\n{}: {}", "Error".red(), err);
                     continue;
                 }

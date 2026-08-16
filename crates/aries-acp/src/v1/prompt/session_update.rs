@@ -28,6 +28,7 @@ impl SessionUpdates {
             AgentEvent::Notification(text) => Self(vec![SessionUpdate::AgentMessageChunk(
                 ContentChunk::new(ContentBlock::from(text)),
             )]),
+            AgentEvent::AwaitingUserInput { .. } => Self(Vec::new()),
             AgentEvent::StreamItem(stream_item) => {
                 match stream_item {
                     MultiTurnStreamItem::StreamAssistantItem(v) => {
@@ -43,7 +44,8 @@ impl SessionUpdates {
                     MultiTurnStreamItem::FinalResponse(res) => {
                         let usage = res.usage();
                         let text = format!(
-                            "\n\nThis turn token usage: input tokens = {} (cached = {}), output tokens = {}, total tokens = {}, reasoning tokens = {}",
+                            "\n\nComplection({}) - This turn token usage: input tokens = {} (cached = {}), output tokens = {}, total tokens = {}, reasoning tokens = {}",
+                            res.completion_calls.len(),
                             usage.input_tokens,
                             usage.cached_input_tokens,
                             usage.output_tokens,
@@ -112,6 +114,11 @@ impl SessionUpdates {
                 )))]
             },
             StreamedAssistantContent::ToolCall { tool_call, internal_call_id, .. } => {
+                if tool_call.function.name == question::NAME {
+                    // AskUserQuestion tool 是空实现,由外部驱动
+                    return Vec::new();
+                }
+
                 tool_calls.lock().insert(internal_call_id, tool_call.clone());
 
                 let (title, content) = parse_tool_call(tool_call.clone());
@@ -267,9 +274,6 @@ fn parse_tool_call(t: ToolCall) -> (String, Vec<ToolCallContent>) {
         codesearch::NAME => serde_json::from_value::<codesearch::CodeSearchArgs>(arguments)
             .map(|args| (args.title(), vec![]))
             .unwrap_or_else(|_| (default_title, vec![])),
-        question::NAME => serde_json::from_value::<question::AskUserQuestionArgs>(arguments)
-            .map(|args| (args.title(), vec![]))
-            .unwrap_or_else(|_| (default_title, vec![])),
         skill::NAME => serde_json::from_value::<skill::SkillArgs>(arguments)
             .map(|args| (args.title(), vec![]))
             .unwrap_or_else(|_| (default_title, vec![])),
@@ -288,7 +292,7 @@ fn tool_kind(tool_name: &Option<String>) -> ToolKind {
             grep::NAME | codesearch::NAME | lsp::NAME => ToolKind::Search,
             bash::NAME | batch::NAME => ToolKind::Execute,
             webfetch::NAME | websearch::NAME => ToolKind::Fetch,
-            agent::NAME | skill::NAME | question::NAME | update_plan::NAME => ToolKind::Think,
+            agent::NAME | skill::NAME | update_plan::NAME => ToolKind::Think,
             _ => ToolKind::Other,
         },
         None => Default::default(),

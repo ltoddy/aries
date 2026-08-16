@@ -10,9 +10,9 @@ aries-filesystem = { path = "../aries-filesystem" }
 aries-lspclient = { path = "../aries-lspclient" }
 aries-mode = { path = "../aries-mode" }
 aries-preamble = { path = "../aries-preamble" }
-dialoguer.workspace = true
 firecrawl.workspace = true
 futures.workspace = true
+dialoguer.workspace = true
 globset.workspace = true
 ignore.workspace = true
 itertools.workspace = true

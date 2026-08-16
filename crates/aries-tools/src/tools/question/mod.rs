@@ -1,6 +1,7 @@
 mod args;
-mod error;
 mod output;
+
+use std::convert::Infallible;
 
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input, MultiSelect, Select};
@@ -8,7 +9,6 @@ use rig_agent::tool::{Tool, ToolContext};
 use serde_json::Value;
 
 pub use self::args::{AskUserQuestionArgs, AskUserQuestionOption};
-pub use self::error::AskUserQuestionError;
 pub use self::output::AskUserQuestionOutput;
 
 pub const NAME: &str = "AskUserQuestion";
@@ -25,13 +25,73 @@ impl AskUserQuestionTool {
     pub fn new() -> Self {
         Self {}
     }
+
+    pub fn ask(&self, args: &AskUserQuestionArgs) -> Result<Vec<String>, dialoguer::Error> {
+        let theme = ColorfulTheme::default();
+        let mut answers = Vec::new();
+
+        if let Some(options) = &args.options {
+            let mut labels: Vec<String> = options
+                .iter()
+                .map(|o| {
+                    if let Some(desc) = &o.description {
+                        format!("{} - {}", o.label, desc)
+                    } else {
+                        o.label.clone()
+                    }
+                })
+                .collect();
+
+            let custom_opt = "Type your own answer...";
+            if args.custom {
+                labels.push(custom_opt.to_owned());
+            }
+
+            if args.multiple {
+                let selections = MultiSelect::with_theme(&theme)
+                    .with_prompt(&args.question)
+                    .items(&labels)
+                    .interact()?;
+
+                for &idx in &selections {
+                    if args.custom && idx == labels.len() - 1 {
+                        let custom_answer: String =
+                            Input::with_theme(&theme).with_prompt("Your answer").interact_text()?;
+                        answers.push(custom_answer);
+                    } else {
+                        answers.push(options[idx].label.clone());
+                    }
+                }
+            } else {
+                let selection = Select::with_theme(&theme)
+                    .with_prompt(&args.question)
+                    .items(&labels)
+                    .default(0)
+                    .interact()?;
+
+                if args.custom && selection == labels.len() - 1 {
+                    let custom_answer: String =
+                        Input::with_theme(&theme).with_prompt("Your answer").interact_text()?;
+                    answers.push(custom_answer);
+                } else {
+                    answers.push(options[selection].label.clone());
+                }
+            }
+        } else {
+            let answer: String =
+                Input::with_theme(&theme).with_prompt(&args.question).interact_text()?;
+            answers.push(answer);
+        }
+
+        Ok(answers)
+    }
 }
 
 impl Tool for AskUserQuestionTool {
     const NAME: &'static str = NAME;
     type Args = AskUserQuestionArgs;
     type Output = AskUserQuestionOutput;
-    type Error = AskUserQuestionError;
+    type Error = Infallible;
 
     fn description(&self) -> String {
         include_str!("description.md").to_owned()
@@ -72,72 +132,8 @@ impl Tool for AskUserQuestionTool {
     async fn call(
         &self,
         _context: &mut ToolContext,
-        args: Self::Args,
+        _args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
-        let mut answers = Vec::new();
-        let theme = ColorfulTheme::default();
-
-        if let Some(options) = args.options {
-            let mut labels: Vec<String> = options
-                .iter()
-                .map(|o| {
-                    if let Some(desc) = &o.description {
-                        format!("{} - {}", o.label, desc)
-                    } else {
-                        o.label.clone()
-                    }
-                })
-                .collect();
-
-            let custom_opt = "Type your own answer...";
-            if args.custom {
-                labels.push(custom_opt.to_owned());
-            }
-
-            if args.multiple {
-                let selections = MultiSelect::with_theme(&theme)
-                    .with_prompt(&args.question)
-                    .items(&labels)
-                    .interact()
-                    .map_err(|e| AskUserQuestionError::InteractionError(e.to_string()))?;
-
-                for &idx in &selections {
-                    if args.custom && idx == labels.len() - 1 {
-                        let custom_answer: String = Input::with_theme(&theme)
-                            .with_prompt("Your answer")
-                            .interact_text()
-                            .map_err(|e| AskUserQuestionError::InteractionError(e.to_string()))?;
-                        answers.push(custom_answer);
-                    } else {
-                        answers.push(options[idx].label.clone());
-                    }
-                }
-            } else {
-                let selection = Select::with_theme(&theme)
-                    .with_prompt(&args.question)
-                    .items(&labels)
-                    .default(0)
-                    .interact()
-                    .map_err(|e| AskUserQuestionError::InteractionError(e.to_string()))?;
-
-                if args.custom && selection == labels.len() - 1 {
-                    let custom_answer: String = Input::with_theme(&theme)
-                        .with_prompt("Your answer")
-                        .interact_text()
-                        .map_err(|e| AskUserQuestionError::InteractionError(e.to_string()))?;
-                    answers.push(custom_answer);
-                } else {
-                    answers.push(options[selection].label.clone());
-                }
-            }
-        } else {
-            let answer: String = Input::with_theme(&theme)
-                .with_prompt(&args.question)
-                .interact_text()
-                .map_err(|e| AskUserQuestionError::InteractionError(e.to_string()))?;
-            answers.push(answer);
-        }
-
-        Ok(AskUserQuestionOutput { answers })
+        Ok(AskUserQuestionOutput::new())
     }
 }

@@ -25,7 +25,6 @@ use self::glob::GlobOutput;
 use self::grep::GrepOutput;
 use self::lsp::LspOutput;
 use self::multiedit::MultiEditOutput;
-use self::question::AskUserQuestionOutput;
 use self::read::ReadOutput;
 use self::skill::SkillOutput;
 use self::update_plan::UpdatePlanOutput;
@@ -44,7 +43,6 @@ pub fn format_tool_output(tool_name: &str, raw_json: serde_json::Value) -> Strin
         grep::NAME => GrepOutput::render_output(raw_json),
         lsp::NAME => LspOutput::render_output(raw_json),
         multiedit::NAME => MultiEditOutput::render_output(raw_json),
-        question::NAME => AskUserQuestionOutput::render_output(raw_json),
         read::NAME => ReadOutput::render_output(raw_json),
         skill::NAME => SkillOutput::render_output(raw_json),
         update_plan::NAME => UpdatePlanOutput::render_output(raw_json),

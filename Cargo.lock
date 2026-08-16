@@ -280,6 +280,7 @@ dependencies = [
  "jiff",
  "mimalloc",
  "nanoid",
+ "parking_lot",
  "prettytable-rs",
  "rig-agent",
  "rig-core",
@@ -329,6 +330,7 @@ version = "0.1.0"
 dependencies = [
  "rig-agent",
  "rig-core",
+ "serde_json",
  "tokio",
 ]
 

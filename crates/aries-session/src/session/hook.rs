@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::time;
 
 use aries_compact::{ContextWindow, TokenEstimator, micro_compact};
+use aries_event::Notifier;
 use aries_extension::hook::input::{
     PostToolUseFailureHookInput, PostToolUseHookInput, PreToolUseHookInput, SubagentStartHookInput,
     SubagentStopHookInput,
@@ -38,9 +39,12 @@ pub struct SessionPromptHook {
     tool_call_repo: ToolCallRepository,
     instruction_ctx: SharedInstructionContext,
     window: ContextWindow,
+
+    notifier: Notifier,
 }
 
 impl SessionPromptHook {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         executor: Arc<HooksExecutor>,
         session_id: impl Into<String>,
@@ -49,6 +53,7 @@ impl SessionPromptHook {
         agent_id: impl Into<String>,
         agent_type: impl Into<String>,
         db: Db,
+        notifier: Notifier,
     ) -> Self {
         let session_id = session_id.into();
         let cwd = cwd.as_ref();
@@ -71,6 +76,7 @@ impl SessionPromptHook {
             tool_call_repo,
             instruction_ctx,
             window,
+            notifier,
         }
     }
 }
@@ -156,6 +162,15 @@ impl AgentHook for SessionPromptHook {
                 }
             },
             _ => {},
+        }
+
+        // AskUserQuestion is the only interactive tool today: suspend the turn
+        // before execution and forward the model-generated arguments as the
+        // question definition. Generalize into a registry if more interactive
+        // tools appear.
+        if event.tool_name == aries_tools::question::NAME {
+            self.notifier.send_awaiting_input(tool_input.clone());
+            return ToolCallAction::Stop(aries_agent::AWAITING_USER_INPUT_REASON.to_string());
         }
 
         let input = PreToolUseHookInput::new(

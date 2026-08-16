@@ -25,12 +25,18 @@ impl Notifier {
         let event = AgentEvent::stream_item(stream_item);
         let _ = self.sender.send(event);
     }
+
+    pub fn send_awaiting_input(&self, args: serde_json::Value) {
+        let event = AgentEvent::awaiting_user_input(args);
+        let _ = self.sender.send(event);
+    }
 }
 
 #[derive(Debug, Clone)]
 pub enum AgentEvent {
     Notification(String),
     StreamItem(MultiTurnStreamItem<()>),
+    AwaitingUserInput { args: serde_json::Value },
 }
 
 impl AgentEvent {
@@ -42,6 +48,10 @@ impl AgentEvent {
     pub fn stream_item<R>(stream_item: MultiTurnStreamItem<R>) -> Self {
         let stream_item = earse(stream_item);
         Self::StreamItem(stream_item)
+    }
+
+    pub fn awaiting_user_input(args: serde_json::Value) -> Self {
+        Self::AwaitingUserInput { args }
     }
 }
 

@@ -6,6 +6,12 @@ pub struct AskUserQuestionOption {
     pub description: Option<String>,
 }
 
+impl AskUserQuestionOption {
+    pub fn new(label: impl Into<String>, description: Option<impl Into<String>>) -> Self {
+        Self { label: label.into(), description: description.map(Into::into) }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AskUserQuestionArgs {
     pub question: String,
@@ -14,12 +20,6 @@ pub struct AskUserQuestionArgs {
     pub multiple: bool,
     #[serde(default = "default_custom")]
     pub custom: bool,
-}
-
-impl AskUserQuestionArgs {
-    pub fn title(&self) -> String {
-        format!("Ask user: {}", self.question)
-    }
 }
 
 impl AskUserQuestionArgs {
