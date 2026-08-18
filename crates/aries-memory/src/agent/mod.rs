@@ -4,29 +4,23 @@ mod tests;
 use std::path::Path;
 
 use itertools::Itertools;
-use rig_agent::client::AgentClientExt;
-use rig_agent::completion::{CompletionModel, Prompt};
-use rig_agent::tool::server::ToolServer;
+use rig::client::AgentClientExt;
+use rig::completion::Prompt;
+use rig::tool::server::ToolServer;
 use tracing::info;
 
 pub const PREAMBLE: &str = include_str!("preamble.md");
 
-pub struct MemoryAgent<M>
-where
-    M: CompletionModel + 'static,
-{
-    inner: rig_agent::agent::Agent<M>,
+pub struct MemoryAgent {
+    inner: rig::agent::Agent,
 }
 
-impl<M> MemoryAgent<M>
-where
-    M: CompletionModel + 'static,
-{
+impl MemoryAgent {
     const DEFAULT_MAX_TURNS: usize = 50;
 
     pub async fn new<C>(c: C, model: impl Into<String>, memory_dir: impl AsRef<Path>) -> Self
     where
-        C: AgentClientExt<CompletionModel = M> + 'static,
+        C: AgentClientExt + 'static,
     {
         let tool_names = [
             aries_tools::read::NAME,

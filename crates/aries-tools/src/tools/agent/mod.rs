@@ -7,11 +7,11 @@ use aries_event::Notifier;
 use aries_extension::agent::AgentDefinition;
 use aries_mode::Mode;
 use futures::StreamExt;
-use rig_agent::agent::{MultiTurnStreamItem, PromptResponse, StreamingError};
-use rig_agent::client::AgentClientExt;
-use rig_agent::streaming::StreamingPrompt;
-use rig_agent::tool::server::ToolServer;
-use rig_agent::tool::{Tool, ToolContext};
+use rig::agent::{MultiTurnStreamItem, PromptResponse, StreamingError};
+use rig::client::AgentClientExt;
+use rig::streaming::StreamingPrompt;
+use rig::tool::server::ToolServer;
+use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
 
 pub use self::args::AgentArgs;

@@ -23,9 +23,9 @@ use aries_tools::{
     update_plan, webfetch, websearch, write,
 };
 use colored::Colorize;
-use rig_agent::agent::MultiTurnStreamItem;
-use rig_core::message::ToolResultContent;
-use rig_core::streaming::{StreamedAssistantContent, StreamedUserContent};
+use rig::agent::MultiTurnStreamItem;
+use rig::message::ToolResultContent;
+use rig::streaming::{StreamedAssistantContent, StreamedUserContent};
 
 use crate::text;
 
@@ -65,12 +65,12 @@ pub fn print_agent_event(event: AgentEvent, tool_names: &mut HashMap<String, Str
                 internal_call_id,
             }) => {
                 let tool_name = tool_names.remove(&internal_call_id).unwrap_or_default();
-                let result = match tool_result.content.first() {
-                    ToolResultContent::Json { value } => Some(value),
-                    _ => None,
-                };
-                let formatted = format_tool_result_output(&tool_name, result);
-                println!("{formatted}");
+                for result in tool_result.content {
+                    if let ToolResultContent::Json { value } = result {
+                        let formatted = format_tool_result_output(&tool_name, value);
+                        println!("{formatted}");
+                    }
+                }
             },
             MultiTurnStreamItem::FinalResponse(res) => {
                 display_token_usage(&res.usage());
@@ -78,7 +78,6 @@ pub fn print_agent_event(event: AgentEvent, tool_names: &mut HashMap<String, Str
             MultiTurnStreamItem::CompletionCall(_) => {},
             MultiTurnStreamItem::ToolExecutionCommitted { .. } => {},
             MultiTurnStreamItem::ModelTurnRetried { .. } => {},
-            _ => {},
         },
         AgentEvent::AwaitingUserInput { .. } => {},
         AgentEvent::SessionInfoUpdate { .. } => {},
@@ -115,16 +114,14 @@ pub fn format_tool_call_args(tool_name: &str, args: &str) -> (String, Option<Str
     (format!("{} {}", tool_name.cyan(), first.yellow()), rest)
 }
 
-pub fn format_tool_result_output(tool_name: &str, result: Option<serde_json::Value>) -> String {
-    let output = result
-        .map(|value| aries_tools::tools::format_tool_output(tool_name, value))
-        .unwrap_or_default();
+pub fn format_tool_result_output(tool_name: &str, value: serde_json::Value) -> String {
+    let output = aries_tools::tools::format_tool_output(tool_name, value);
     let output = if output.is_empty() { "No output".to_string() } else { output };
 
     text::preview(output).dimmed().to_string()
 }
 
-pub fn display_token_usage(usage: &rig_core::completion::Usage) {
+pub fn display_token_usage(usage: &rig::completion::Usage) {
     println!(
         "\n\n{} total={} input={} (cached={}) output={}",
         "Token usage:".dimmed(),

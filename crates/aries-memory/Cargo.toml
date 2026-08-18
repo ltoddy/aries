@@ -8,8 +8,7 @@ aries-filesystem = { path = "../aries-filesystem" }
 aries-tools = { path = "../aries-tools" }
 itertools.workspace = true
 reqwest-middleware.workspace = true
-rig-agent.workspace = true
-rig-core.workspace = true
+rig.workspace = true
 schemars.workspace = true
 serde = { workspace = true, features = ["derive"] }
 tokio = { workspace = true, features = ["io-util"] }

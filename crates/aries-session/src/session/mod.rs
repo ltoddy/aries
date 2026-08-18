@@ -28,12 +28,11 @@ use aries_persistence::SessionRepository;
 use aries_tools::{edit, write};
 use itertools::Itertools;
 use jiff::Zoned;
-use rig_agent::agent::PromptResponse;
-use rig_agent::tool::rmcp::McpClientHandler;
-use rig_agent::tool::server::{ToolServer, ToolServerHandle};
-use rig_core::OneOrMany;
-use rig_core::completion::{Message, Usage};
-use rig_core::message::{AssistantContent, UserContent};
+use rig::agent::PromptResponse;
+use rig::completion::{Message, Usage};
+use rig::message::{AssistantContent, UserContent};
+use rig::tool::rmcp::McpClientHandler;
+use rig::tool::server::{ToolServer, ToolServerHandle};
 use rmcp::RoleClient;
 use rmcp::service::RunningService;
 use toasty::Db;
@@ -223,7 +222,7 @@ impl Session {
         self.last_assistant_message = None;
 
         if let Message::User { ref content } = prompt
-            && let UserContent::Text(text) = content.first()
+            && let Some(UserContent::Text(text)) = content.first()
             && let Some(input) = text.text.trim().strip_prefix("/")
             && self.try_execute_slash_command(input, callback.clone()).await
         {
@@ -640,10 +639,13 @@ impl Session {
 
 fn message_to_simple_text(message: &Message) -> String {
     match message {
-        Message::User { content } => match content.first() {
-            UserContent::Text(text) => text.text.clone(),
-            _ => String::new(),
-        },
+        Message::User { content } => content
+            .iter()
+            .filter_map(|chunk| match chunk {
+                UserContent::Text(t) => Some(t.text()),
+                _ => None,
+            })
+            .join(""),
         _ => String::new(),
     }
 }
@@ -657,7 +659,7 @@ fn agent_wrote_memory(messages: &[Message], memory_dir: impl AsRef<Path>) -> boo
             Message::Assistant { content, .. } => Some(content),
             _ => None,
         })
-        .flat_map(OneOrMany::iter)
+        .flatten()
         .filter_map(|c| match c {
             AssistantContent::ToolCall(tc) => Some(tc),
             _ => None,

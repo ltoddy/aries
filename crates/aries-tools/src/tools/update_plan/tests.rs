@@ -1,6 +1,6 @@
 // This file contains tests generated with AI assistance.
 
-use rig_agent::tool::{Tool, ToolContext};
+use rig::tool::{Tool, ToolContext};
 
 use super::*;
 

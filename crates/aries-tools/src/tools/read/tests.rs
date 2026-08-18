@@ -2,7 +2,7 @@
 
 use std::fs;
 
-use rig_agent::tool::Tool;
+use rig::tool::Tool;
 use tempfile::TempDir;
 
 use super::*;
@@ -14,7 +14,7 @@ async fn test_read_file() {
     let file_path = dir.path().join("test.txt");
     fs::write(&file_path, "line1\nline2\nline3").unwrap();
 
-    let mut context = rig_agent::tool::ToolContext::new();
+    let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(dir.path(), ToolContext::new(None));
     let result =
         tool.call(&mut context, ReadArgs { file_path, offset: None, limit: None }).await.unwrap();
@@ -29,7 +29,7 @@ async fn test_read_file_with_offset() {
     let file_path = dir.path().join("test.txt");
     fs::write(&file_path, "line1\nline2\nline3").unwrap();
 
-    let mut context = rig_agent::tool::ToolContext::new();
+    let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(dir.path(), ToolContext::new(None));
     let result = tool
         .call(&mut context, ReadArgs { file_path, offset: Some(2), limit: None })
@@ -46,7 +46,7 @@ async fn test_read_file_with_limit() {
     let file_path = dir.path().join("test.txt");
     fs::write(&file_path, "line1\nline2\nline3\nline4").unwrap();
 
-    let mut context = rig_agent::tool::ToolContext::new();
+    let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(dir.path(), ToolContext::new(None));
     let result = tool
         .call(&mut context, ReadArgs { file_path, offset: Some(2), limit: Some(2) })
@@ -64,7 +64,7 @@ async fn test_read_file_respects_default_line_cap() {
     let content = (1..=2500).map(|i| format!("line{i}")).collect::<Vec<_>>().join("\n");
     fs::write(&file_path, content).unwrap();
 
-    let mut context = rig_agent::tool::ToolContext::new();
+    let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(dir.path(), ToolContext::new(None));
     let result =
         tool.call(&mut context, ReadArgs { file_path, offset: None, limit: None }).await.unwrap();
@@ -81,7 +81,7 @@ async fn test_read_empty_file() {
     let file_path = dir.path().join("empty.txt");
     fs::write(&file_path, "").unwrap();
 
-    let mut context = rig_agent::tool::ToolContext::new();
+    let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(dir.path(), ToolContext::new(None));
     let result =
         tool.call(&mut context, ReadArgs { file_path, offset: None, limit: None }).await.unwrap();
@@ -93,7 +93,7 @@ async fn test_read_empty_file() {
 async fn test_read_directory_is_rejected() {
     let dir = TempDir::new().unwrap();
 
-    let mut context = rig_agent::tool::ToolContext::new();
+    let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(dir.path(), ToolContext::new(None));
     let result = tool
         .call(
@@ -107,7 +107,7 @@ async fn test_read_directory_is_rejected() {
 
 #[tokio::test]
 async fn test_read_file_not_found() {
-    let mut context = rig_agent::tool::ToolContext::new();
+    let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(".", ToolContext::new(None));
     let result = tool
         .call(

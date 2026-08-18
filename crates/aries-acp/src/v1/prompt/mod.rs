@@ -12,8 +12,8 @@ use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
 use aries_event::AgentEvent;
 use aries_tools::question::AskUserQuestionArgs;
 use parking_lot::Mutex;
-use rig_core::completion::Message;
-use rig_core::message::ToolCall;
+use rig::completion::Message;
+use rig::message::ToolCall;
 use tracing::{info, instrument, warn};
 
 use self::elicitation::Elicitation;

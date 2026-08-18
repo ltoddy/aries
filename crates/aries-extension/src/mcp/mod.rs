@@ -9,8 +9,8 @@ use std::collections::HashMap;
 
 use futures::future;
 use http::{HeaderName, HeaderValue};
-use rig_agent::tool::rmcp::McpClientHandler;
-use rig_agent::tool::server::ToolServerHandle;
+use rig::tool::rmcp::McpClientHandler;
+use rig::tool::server::ToolServerHandle;
 use rmcp::RoleClient;
 use rmcp::model::{ClientCapabilities, ClientInfo, Implementation};
 use rmcp::service::RunningService;

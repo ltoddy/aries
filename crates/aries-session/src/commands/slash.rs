@@ -1,6 +1,6 @@
 use aries_agent::AriesAgentProvider;
 use aries_extension::command::CommandDefinition;
-use rig_core::message::Message;
+use rig::message::Message;
 
 pub struct SlashCommandsExecutor<'a> {
     agent: &'a AriesAgentProvider,

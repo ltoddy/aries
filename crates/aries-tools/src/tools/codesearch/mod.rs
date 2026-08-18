@@ -2,7 +2,7 @@ mod args;
 mod error;
 mod output;
 
-use rig_agent::tool::{Tool, ToolContext};
+use rig::tool::{Tool, ToolContext};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 

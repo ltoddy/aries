@@ -12,9 +12,9 @@ use http::{HeaderMap, header};
 use reqwest_middleware::ClientWithMiddleware;
 use reqwest_retry::RetryTransientMiddleware;
 use reqwest_retry::policies::ExponentialBackoff;
-use rig_agent::tool::server::ToolServerHandle;
-use rig_core::http_client;
-use rig_core::providers::{anthropic, azure, deepseek, openai};
+use rig::http_client;
+use rig::providers::{anthropic, azure, deepseek, openai};
+use rig::tool::server::ToolServerHandle;
 
 use crate::middleware::RetryStrategy;
 

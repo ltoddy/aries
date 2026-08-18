@@ -6,7 +6,7 @@ mod tests;
 
 use std::path::{Path, PathBuf};
 
-use rig_agent::tool::{Tool, ToolContext};
+use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
 use tokio::fs;
 

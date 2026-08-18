@@ -8,8 +8,8 @@ use aries_lspclient::SharedLspClient;
 use aries_mode::Mode;
 use aries_tools::agent;
 use itertools::Itertools;
-use rig_agent::client::AgentClientExt;
-use rig_agent::tool::server::ToolServerHandle;
+use rig::client::AgentClientExt;
+use rig::tool::server::ToolServerHandle;
 
 use crate::agent::{AGENT_LOOP_MAX_TURNS, AriesAgent};
 
@@ -66,10 +66,7 @@ where
         self
     }
 
-    pub async fn build(
-        self,
-        tool_server_handle: ToolServerHandle,
-    ) -> AriesAgent<C::CompletionModel> {
+    pub async fn build(self, tool_server_handle: ToolServerHandle) -> AriesAgent {
         let mode = self.mode;
         let name = mode.name();
 

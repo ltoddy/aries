@@ -10,14 +10,14 @@ use aries_extension::hook::input::{
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
 use aries_persistence::ToolCallRepository;
-use rig_agent::agent::hook::CompletionCall;
-use rig_agent::agent::{
+use rig::agent::hook::CompletionCall;
+use rig::agent::{
     AgentHook, CompletionCallAction, HookContext, InvalidToolCallAction, InvalidToolCallContext,
     ModelTurnAction, ModelTurnFinished, ObservationAction, RequestPatch, StepEventKind,
     StreamResponseFinish, TextDelta, ToolCall, ToolCallAction, ToolCallDelta, ToolResultAction,
     ToolResultEvent,
 };
-use rig_core::message::Message;
+use rig::message::Message;
 use serde_json::Value;
 use toasty::Db;
 use tokio::sync::Mutex;
@@ -112,7 +112,7 @@ impl AgentHook for SessionPromptHook {
     async fn on_completion_response(
         &self,
         _ctx: &HookContext,
-        _event: rig_agent::agent::hook::CompletionResponse<'_>,
+        _event: rig::agent::hook::CompletionResponse<'_>,
     ) -> ObservationAction {
         ObservationAction::continue_run()
     }

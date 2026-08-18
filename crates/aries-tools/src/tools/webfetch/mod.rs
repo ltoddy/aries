@@ -6,7 +6,7 @@ mod tests;
 
 use std::env;
 
-use rig_agent::tool::{Tool, ToolContext};
+use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
 
 pub use self::args::WebFetchArgs;

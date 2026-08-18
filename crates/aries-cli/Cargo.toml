@@ -23,16 +23,15 @@ aries-tools = { path = "../aries-tools" }
 clap = { workspace = true, features = ["derive"] }
 colored.workspace = true
 dialoguer.workspace = true
-parking_lot.workspace = true
 ferris-says.workspace = true
 futures.workspace = true
 itertools.workspace = true
 jiff.workspace = true
 mimalloc.workspace = true
 nanoid.workspace = true
+parking_lot.workspace = true
 prettytable.workspace = true
-rig-agent.workspace = true
-rig-core.workspace = true
+rig.workspace = true
 rustyline.workspace = true
 rustyline-derive.workspace = true
 serde_json.workspace = true

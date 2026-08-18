@@ -8,7 +8,7 @@ use aries_extension::skill::definition::SkillDefinition;
 use aries_filesystem::path_to_uri;
 use aries_filesystem::walk::walk_dir;
 use itertools::Itertools;
-use rig_agent::tool::{Tool, ToolContext};
+use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
 
 pub use self::args::SkillArgs;

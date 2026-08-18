@@ -5,7 +5,7 @@ mod output;
 use std::path::{Path, PathBuf};
 
 use futures::future::join_all;
-use rig_agent::tool::Tool;
+use rig::tool::Tool;
 use serde_json::Value;
 
 pub use self::args::{BatchArgs, BatchCall, NAME};
@@ -77,7 +77,7 @@ impl Tool for BatchTool {
 
     async fn call(
         &self,
-        context: &mut rig_agent::tool::ToolContext,
+        context: &mut rig::tool::ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
         let mut futures = Vec::new();
@@ -128,7 +128,7 @@ async fn dispatch(
     params: Value,
     cwd: PathBuf,
     ctx: ToolContext,
-    context: &mut rig_agent::tool::ToolContext,
+    context: &mut rig::tool::ToolContext,
 ) -> Result<Value, String> {
     match tool_name.as_str() {
         bash::NAME => {

@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use aries_filesystem::jsonl;
 use aries_filesystem::jsonl::JsonlAppender;
-use rig_agent::completion::Message;
+use rig::completion::Message;
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tracing::error;
 

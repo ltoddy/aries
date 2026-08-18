@@ -1,7 +1,6 @@
 use itertools::Itertools;
-use rig_agent::client::AgentClientExt;
-use rig_agent::extractor::Extractor;
-use rig_core::completion::CompletionModel;
+use rig::client::AgentClientExt;
+use rig::extractor::Extractor;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tracing::info;
@@ -17,14 +16,14 @@ pub struct RetrievedMemories {
     pub file_names: Vec<String>,
 }
 
-pub struct MemoryRetriever<M: CompletionModel> {
-    inner: Extractor<M, RetrievedMemories>,
+pub struct MemoryRetriever {
+    inner: Extractor<RetrievedMemories>,
 }
 
-impl<M: CompletionModel> MemoryRetriever<M> {
+impl MemoryRetriever {
     pub fn new<C>(client: C, model: impl Into<String>) -> Self
     where
-        C: AgentClientExt<CompletionModel = M>,
+        C: AgentClientExt + 'static,
     {
         let inner = client.extractor::<RetrievedMemories>(model).preamble(PREAMBLE).build();
 

@@ -1,15 +1,13 @@
-use reqwest_middleware::ClientWithMiddleware;
-use rig_core::completion::Message;
-use rig_core::providers::{anthropic, azure, deepseek, openai};
+use rig::completion::Message;
 
 use crate::{CompactAgent, CompactOutcome};
 
 #[derive(Clone)]
 pub enum CompactAgentProvider {
-    Anthropic(CompactAgent<anthropic::completion::CompletionModel<ClientWithMiddleware>>),
-    Azure(CompactAgent<azure::CompletionModel<ClientWithMiddleware>>),
-    Deepseek(CompactAgent<deepseek::CompletionModel<ClientWithMiddleware>>),
-    OpenAI(CompactAgent<openai::CompletionModel<ClientWithMiddleware>>),
+    Anthropic(CompactAgent),
+    Azure(CompactAgent),
+    Deepseek(CompactAgent),
+    OpenAI(CompactAgent),
 }
 
 impl CompactAgentProvider {

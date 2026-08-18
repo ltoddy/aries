@@ -5,7 +5,7 @@ mod output;
 use std::path::{Path, PathBuf};
 
 use aries_lspclient::{LspResult, SharedLspClient};
-use rig_agent::tool::{Tool, ToolContext};
+use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
 
 pub use self::args::{LspArgs, LspOperation};

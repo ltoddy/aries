@@ -1,6 +1,6 @@
 // This file contains tests generated with AI assistance.
 
-use rig_agent::tool::Tool;
+use rig::tool::Tool;
 use tempfile::TempDir;
 use tokio::fs;
 
@@ -20,7 +20,7 @@ async fn test_edit_simple_replacement() {
     let ctx = ToolContext::new(None);
     seed_file(&ctx, &file_path, "hello world").await;
 
-    let mut context = rig_agent::tool::ToolContext::new();
+    let mut context = rig::tool::ToolContext::new();
     let tool = EditTool::new(dir.path(), ctx);
     let result = tool
         .call(
@@ -49,7 +49,7 @@ async fn test_edit_replace_all() {
     let ctx = ToolContext::new(None);
     seed_file(&ctx, &file_path, "foo foo foo").await;
 
-    let mut context = rig_agent::tool::ToolContext::new();
+    let mut context = rig::tool::ToolContext::new();
     let tool = EditTool::new(dir.path(), ctx);
     let result = tool
         .call(
@@ -71,7 +71,7 @@ async fn test_edit_replace_all() {
 #[tokio::test]
 async fn test_edit_file_not_found() {
     let dir = TempDir::new().unwrap();
-    let mut context = rig_agent::tool::ToolContext::new();
+    let mut context = rig::tool::ToolContext::new();
     let tool = EditTool::new(dir.path(), ToolContext::new(None));
     let result = tool
         .call(
@@ -95,7 +95,7 @@ async fn test_edit_old_text_not_found() {
     let ctx = ToolContext::new(None);
     seed_file(&ctx, &file_path, "hello world").await;
 
-    let mut context = rig_agent::tool::ToolContext::new();
+    let mut context = rig::tool::ToolContext::new();
     let tool = EditTool::new(dir.path(), ctx);
     let result = tool
         .call(
@@ -119,7 +119,7 @@ async fn test_edit_multiple_matches_without_replace_all() {
     let ctx = ToolContext::new(None);
     seed_file(&ctx, &file_path, "a a a").await;
 
-    let mut context = rig_agent::tool::ToolContext::new();
+    let mut context = rig::tool::ToolContext::new();
     let tool = EditTool::new(dir.path(), ctx);
     let result = tool
         .call(
@@ -143,7 +143,7 @@ async fn test_edit_rejects_unread_file() {
     // 未经 Read，直接编辑：应被读后写校验拒绝。
     fs::write(&file_path, "hello world").await.unwrap();
 
-    let mut context = rig_agent::tool::ToolContext::new();
+    let mut context = rig::tool::ToolContext::new();
     let tool = EditTool::new(dir.path(), ToolContext::new(None));
     let result = tool
         .call(
@@ -171,7 +171,7 @@ async fn test_edit_rejects_modified_since_read() {
     tokio::time::sleep(std::time::Duration::from_millis(20)).await;
     fs::write(&file_path, "hello brave world").await.unwrap();
 
-    let mut context = rig_agent::tool::ToolContext::new();
+    let mut context = rig::tool::ToolContext::new();
     let tool = EditTool::new(dir.path(), ctx);
     let result = tool
         .call(

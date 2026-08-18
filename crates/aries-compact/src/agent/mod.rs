@@ -6,13 +6,12 @@ use aries_event::Notifier;
 use aries_filesystem::jsonl;
 use futures::StreamExt;
 use regex_lite::Regex;
-use rig_agent::Agent;
-use rig_agent::agent::{MultiTurnStreamItem, PromptResponse, StreamingError};
-use rig_agent::client::AgentClientExt;
-use rig_agent::completion::{self, Message};
-use rig_agent::streaming::StreamingPrompt;
-use rig_core::completion::CompletionError;
-use rig_core::message::{self, AssistantContent, ReasoningContent, UserContent};
+use rig::Agent;
+use rig::agent::{MultiTurnStreamItem, PromptResponse, StreamingError};
+use rig::client::AgentClientExt;
+use rig::completion::{CompletionError, Message};
+use rig::message::{self, AssistantContent, ReasoningContent, UserContent};
+use rig::streaming::StreamingPrompt;
 use tokio::pin;
 
 const PREAMBLE: &str = include_str!("preamble.md");
@@ -32,19 +31,13 @@ pub enum CompactOutcome {
 }
 
 #[derive(Clone)]
-pub struct CompactAgent<M>
-where
-    M: completion::CompletionModel,
-{
-    inner: Agent<M>,
+pub struct CompactAgent {
+    inner: Agent,
     transcript_path: PathBuf,
     notifier: Notifier,
 }
 
-impl<M> CompactAgent<M>
-where
-    M: completion::CompletionModel + 'static,
-{
+impl CompactAgent {
     const COMPACTION_MAX_TURNS: usize = 1; // 强制单论,避免陷入循环
 
     pub fn new<C>(
@@ -54,7 +47,7 @@ where
         notifier: Notifier,
     ) -> Self
     where
-        C: AgentClientExt<CompletionModel = M> + 'static,
+        C: AgentClientExt + 'static,
     {
         let transcript_path = transcript_path.as_ref().to_path_buf();
 
@@ -192,7 +185,6 @@ fn compress(messages: &[Message]) -> String {
                                     ReasoningContent::Encrypted(s) => s.as_str(),
                                     ReasoningContent::Redacted { data } => data.as_str(),
                                     ReasoningContent::Summary(s) => s.as_str(),
-                                    _ => continue,
                                 };
                                 if prompt.len() > start_len {
                                     prompt.push('\n');

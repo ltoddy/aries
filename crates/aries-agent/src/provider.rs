@@ -1,16 +1,14 @@
-use reqwest_middleware::ClientWithMiddleware;
-use rig_agent::agent::{AgentHook, PromptResponse};
-use rig_agent::completion::Message;
-use rig_agent::core::providers::{anthropic, azure, deepseek, openai};
+use rig::agent::{AgentHook, PromptResponse};
+use rig::completion::Message;
 
 use crate::{AriesAgent, AriesResult};
 
 #[derive(Clone)]
 pub enum AriesAgentProvider {
-    Anthropic(AriesAgent<anthropic::completion::CompletionModel<ClientWithMiddleware>>),
-    Azure(AriesAgent<azure::CompletionModel<ClientWithMiddleware>>),
-    Deepseek(AriesAgent<deepseek::CompletionModel<ClientWithMiddleware>>),
-    OpenAI(AriesAgent<openai::CompletionModel<ClientWithMiddleware>>),
+    Anthropic(AriesAgent),
+    Azure(AriesAgent),
+    Deepseek(AriesAgent),
+    OpenAI(AriesAgent),
 }
 
 impl AriesAgentProvider {

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use agent_client_protocol::schema::v1::{
-    Content, ContentBlock, ContentChunk, Diff, Plan, SessionInfoUpdate, SessionUpdate,
+    Content, ContentBlock, ContentChunk, Diff, MessageId, Plan, SessionInfoUpdate, SessionUpdate,
     ToolCall as AcpToolCall, ToolCallContent, ToolCallId, ToolCallLocation, ToolCallStatus,
     ToolCallUpdate, ToolCallUpdateFields, ToolKind, UsageUpdate,
 };
@@ -13,9 +13,9 @@ use aries_tools::{
 };
 use itertools::Itertools;
 use parking_lot::Mutex;
-use rig_agent::agent::MultiTurnStreamItem;
-use rig_core::message::{ReasoningContent, ToolCall, ToolFunction, ToolResultContent};
-use rig_core::streaming::{StreamedAssistantContent, StreamedUserContent};
+use rig::agent::MultiTurnStreamItem;
+use rig::message::{ReasoningContent, ToolCall, ToolFunction, ToolResultContent};
+use rig::streaming::{StreamedAssistantContent, StreamedUserContent};
 
 use super::plan::PlanEntry;
 
@@ -72,7 +72,6 @@ impl SessionUpdates {
                         // TODO
                         Self(Vec::new())
                     },
-                    _ => Self(Vec::new()),
                 }
             },
             AgentEvent::AwaitingUserInput { .. } => Self(Vec::new()),
@@ -90,7 +89,7 @@ impl SessionUpdates {
     }
 
     fn from_stream_assistant_content(
-        content: StreamedAssistantContent<()>,
+        content: StreamedAssistantContent,
         tool_calls: &Mutex<HashMap<String, ToolCall>>,
     ) -> Vec<SessionUpdate> {
         match content {
@@ -99,18 +98,20 @@ impl SessionUpdates {
                     t.text(),
                 )))]
             },
-            StreamedAssistantContent::Reasoning(reasoning) => reasoning
+            StreamedAssistantContent::Reasoning { reasoning, id } => reasoning
                 .content
                 .into_iter()
-                .filter_map(|rc| match rc {
-                    ReasoningContent::Text { text, .. } => Some(text),
-                    ReasoningContent::Encrypted(s) => Some(s),
-                    ReasoningContent::Redacted { data } => Some(data),
-                    ReasoningContent::Summary(s) => Some(s),
-                    _ => None,
+                .map(|rc| match rc {
+                    ReasoningContent::Text { text, .. } => text,
+                    ReasoningContent::Encrypted(s) => s,
+                    ReasoningContent::Redacted { data } => data,
+                    ReasoningContent::Summary(s) => s,
                 })
                 .map(|text| {
-                    SessionUpdate::AgentThoughtChunk(ContentChunk::new(ContentBlock::from(text)))
+                    SessionUpdate::AgentThoughtChunk(
+                        ContentChunk::new(ContentBlock::from(text))
+                            .message_id(MessageId::new(id.clone())),
+                    )
                 })
                 .collect(),
             StreamedAssistantContent::ReasoningDelta { reasoning, .. } => {
@@ -131,7 +132,7 @@ impl SessionUpdates {
 
                 let ToolFunction { name, arguments } = tool_call.function;
 
-                let acp_tool_call = AcpToolCall::new(ToolCallId::new(tool_call.id), title)
+                let acp_tool_call = AcpToolCall::new(ToolCallId::new(tool_call.id.as_str()), title)
                     .kind(tool_kind(&Some(name.clone())))
                     .status(ToolCallStatus::InProgress)
                     .content(content)
@@ -197,7 +198,8 @@ impl SessionUpdates {
                     .raw_input(raw_input)
                     .raw_output(serde_json::Value::String(raw_output));
 
-                let tool_call_update = ToolCallUpdate::new(ToolCallId::new(tool_result.id), fields);
+                let tool_call_update =
+                    ToolCallUpdate::new(ToolCallId::new(tool_result.call.as_str()), fields);
                 let tool_call_update = SessionUpdate::ToolCallUpdate(tool_call_update);
                 vec![tool_call_update]
             },

@@ -1,16 +1,15 @@
 use agent_client_protocol::schema::v1::{ContentBlock, EmbeddedResourceResource};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
-use rig_core::OneOrMany;
-use rig_core::completion::Message;
-use rig_core::message::{Document, DocumentMediaType, DocumentSourceKind, UserContent};
+use rig::completion::Message;
+use rig::message::{Document, DocumentMediaType, DocumentSourceKind, UserContent};
 
 #[derive(Debug, Clone)]
 pub struct UserMessage(Message);
 
 impl From<Vec<ContentBlock>> for UserMessage {
     fn from(value: Vec<ContentBlock>) -> Self {
-        let contents = value
+        let content = value
             .into_iter()
             .filter_map(|block| match block {
                 ContentBlock::Text(t) => Some(UserContent::text(t.text)),
@@ -58,11 +57,7 @@ impl From<Vec<ContentBlock>> for UserMessage {
             })
             .collect::<Vec<UserContent>>();
 
-        if contents.is_empty() {
-            return UserMessage("".into());
-        }
-
-        UserMessage(Message::User { content: OneOrMany::many(contents).unwrap() })
+        UserMessage(Message::User { content })
     }
 }
 

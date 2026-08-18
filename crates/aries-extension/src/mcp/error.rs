@@ -1,4 +1,4 @@
-use rig_agent::tool::rmcp::McpClientError;
+use rig::tool::rmcp::McpClientError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum McpParseError {

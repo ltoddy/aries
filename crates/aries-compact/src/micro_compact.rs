@@ -1,25 +1,28 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use aries_tools::{agent, edit, multiedit, question, skill, update_plan, write};
-use rig_core::OneOrMany;
-use rig_core::message::{
-    AssistantContent, Message, ToolCall, ToolResult, ToolResultContent, UserContent,
-};
+use rig::message::{AssistantContent, Message, ToolCall, ToolResultContent, UserContent};
 
 const TOOL_RESULT_PLACEHOLDER: &str = "[Old tool result content cleared]";
 const TOOL_CALL_PLACEHOLDER: &str = "[Old tool call content cleared — file can be re-read]";
 pub const KEEP_RECENT: usize = 8;
 
+/// 保留对会话状态有控制语义的工具（Agent/UpdatePlan/Question/Skill），
+const KEEP_TOOL_RESULT_TOOL_NAMES: &[&str; 4] =
+    &[agent::NAME, question::NAME, skill::NAME, update_plan::NAME];
+
+const COMPACTABLE_TOOL_CALL_TOOL_NAMES: &[&str; 3] = &[edit::NAME, multiedit::NAME, write::NAME];
+
 pub fn micro_compact(messages: &mut [Message], keep_recent: usize) {
-    let tools = build_tools(messages);
+    // 清理 Tool Result
 
     let compactable = messages
         .iter()
-        .filter_map(|m| if let Message::User { content } = m { Some(content.iter()) } else { None })
+        .filter_map(|m| if let Message::User { content } = m { Some(content) } else { None })
         .flatten()
         .filter_map(|c| if let UserContent::ToolResult(tr) = c { Some(tr) } else { None })
-        .filter(|tr| is_compactable_tool_result(tr, &tools))
-        .map(|tr| tr.id.clone())
+        .filter(|tr| !KEEP_TOOL_RESULT_TOOL_NAMES.contains(&tr.name.as_str()))
+        .map(|tr| tr.call.to_owned())
         .collect::<Vec<_>>();
 
     let clears = compactable.into_iter().rev().skip(keep_recent).collect::<HashSet<_>>();
@@ -28,16 +31,19 @@ pub fn micro_compact(messages: &mut [Message], keep_recent: usize) {
         if let Message::User { content } = message {
             for item in content.iter_mut() {
                 if let UserContent::ToolResult(tr) = item
-                    && clears.contains(&tr.id)
+                    && clears.contains(tr.call.as_str())
                 {
                     *item = UserContent::tool_result(
-                        tr.id.clone(),
-                        OneOrMany::one(ToolResultContent::text(TOOL_RESULT_PLACEHOLDER.to_owned())),
+                        tr.call.as_str(),
+                        &tr.name,
+                        vec![ToolResultContent::text(TOOL_RESULT_PLACEHOLDER.to_owned())],
                     );
                 }
             }
         }
     }
+
+    // 清理 Tool Call
 
     let compactable = messages
         .iter()
@@ -55,53 +61,16 @@ pub fn micro_compact(messages: &mut [Message], keep_recent: usize) {
     for message in messages.iter_mut() {
         if let Message::Assistant { content, .. } = message {
             for item in content.iter_mut() {
-                if let AssistantContent::ToolCall(ToolCall { id, call_id, function, .. }) = item
+                if let AssistantContent::ToolCall(ToolCall { id, function, .. }) = item
                     && clears.contains(id)
                 {
-                    *item = match call_id {
-                        Some(call_id) => AssistantContent::tool_call_with_call_id(
-                            id.to_owned(),
-                            call_id.to_owned(),
-                            &function.name,
-                            serde_json::Value::String(String::from(TOOL_CALL_PLACEHOLDER)),
-                        ),
-                        None => AssistantContent::tool_call(
-                            id.to_owned(),
-                            &function.name,
-                            serde_json::Value::String(String::from(TOOL_CALL_PLACEHOLDER)),
-                        ),
-                    };
+                    *item = AssistantContent::tool_call(
+                        id.as_str(),
+                        &function.name,
+                        serde_json::Value::String(String::from(TOOL_CALL_PLACEHOLDER)),
+                    );
                 }
             }
         }
     }
-}
-
-#[inline]
-fn build_tools(messages: &[Message]) -> HashMap<String, String> {
-    messages
-        .iter()
-        .filter_map(|m| {
-            if let Message::Assistant { content, .. } = m { Some(content.iter()) } else { None }
-        })
-        .flatten()
-        .filter_map(|c| {
-            if let AssistantContent::ToolCall(ToolCall { id, function, .. }) = c {
-                Some((id.clone(), function.name.clone()))
-            } else {
-                None
-            }
-        })
-        .collect()
-}
-
-const COMPACTABLE_TOOL_CALL_TOOL_NAMES: &[&str; 3] = &[edit::NAME, multiedit::NAME, write::NAME];
-
-/// 保留对会话状态有控制语义的工具（Agent/UpdatePlan/Question/Skill），
-const KEEP_TOOL_RESULT_TOOL_NAMES: &[&str; 4] =
-    &[agent::NAME, question::NAME, skill::NAME, update_plan::NAME];
-
-#[inline]
-fn is_compactable_tool_result(tr: &ToolResult, tools: &HashMap<String, String>) -> bool {
-    tools.get(&tr.id).is_some_and(|name| !KEEP_TOOL_RESULT_TOOL_NAMES.contains(&name.as_str()))
 }

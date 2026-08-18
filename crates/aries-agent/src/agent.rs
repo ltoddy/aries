@@ -1,8 +1,8 @@
 use aries_event::Notifier;
 use futures::StreamExt;
-use rig_agent::agent::{Agent, AgentHook, MultiTurnStreamItem, PromptResponse};
-use rig_agent::completion::{CompletionModel, Message};
-use rig_agent::streaming::StreamingPrompt;
+use rig::agent::{Agent, AgentHook, MultiTurnStreamItem, PromptResponse};
+use rig::completion::Message;
+use rig::streaming::StreamingPrompt;
 
 use crate::{AriesError, AriesResult};
 
@@ -11,22 +11,16 @@ use crate::{AriesError, AriesResult};
 pub const AGENT_LOOP_MAX_TURNS: usize = 512;
 
 #[derive(Clone)]
-pub struct AriesAgent<M>
-where
-    M: CompletionModel,
-{
-    inner: Agent<M>,
+pub struct AriesAgent {
+    inner: Agent,
     name: String,
     preamble: String,
     notifier: Notifier,
 }
 
-impl<M> AriesAgent<M>
-where
-    M: CompletionModel + 'static,
-{
+impl AriesAgent {
     pub fn new(
-        inner: Agent<M>,
+        inner: Agent,
         name: impl Into<String>,
         preamble: impl Into<String>,
         notifier: Notifier,

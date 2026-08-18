@@ -6,7 +6,7 @@ use std::path::Path;
 use aries_extension::skill::SkillDefinition;
 use aries_mode::Mode;
 use itertools::Itertools;
-use rig_agent::tool::ToolSet;
+use rig::tool::ToolSet;
 pub use tools::*;
 
 pub const ALL_TOOL_NAMES: &[&str] = &[

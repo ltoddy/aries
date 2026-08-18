@@ -5,7 +5,7 @@ mod output;
 #[cfg(test)]
 mod tests;
 
-use rig_agent::tool::{Tool, ToolContext};
+use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
 
 pub use self::args::UpdatePlanArgs;

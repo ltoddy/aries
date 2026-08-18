@@ -11,7 +11,7 @@ use std::time::SystemTime;
 use globset::GlobBuilder;
 use ignore::WalkBuilder;
 use regex_lite::RegexBuilder;
-use rig_agent::tool::{Tool, ToolContext};
+use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
 use tokio::fs;
 

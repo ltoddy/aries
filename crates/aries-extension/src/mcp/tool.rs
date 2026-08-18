@@ -1,5 +1,5 @@
-// use rig_agent::tool::DynamicTool;
-// use rig_agent::tool::rmcp::McpClientHandler;
+// use rig::tool::DynamicTool;
+// use rig::tool::rmcp::McpClientHandler;
 // use rmcp::handler::server::tool::CallToolHandler;
 //
 // pub struct NamespacedMcpTool {

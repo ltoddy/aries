@@ -3,7 +3,7 @@
 use std::fs;
 
 use aries_extension::skill::definition::{Frontmatter, SkillDefinition};
-use rig_agent::tool::{Tool, ToolContext};
+use rig::tool::{Tool, ToolContext};
 use tempfile::TempDir;
 
 use super::*;

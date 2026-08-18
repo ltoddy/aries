@@ -2,8 +2,8 @@ mod agent;
 mod builder;
 mod provider;
 
-use rig_agent::agent::StreamingError;
-use rig_agent::completion::{CompletionError, PromptError};
+use rig::agent::StreamingError;
+use rig::completion::{CompletionError, PromptError};
 
 pub use self::agent::{AGENT_LOOP_MAX_TURNS, AriesAgent};
 pub use self::builder::AgentBuilder;

@@ -1,7 +1,4 @@
-use rig_core::OneOrMany;
-use rig_core::message::{
-    AssistantContent, Message, ReasoningContent, ToolResultContent, UserContent,
-};
+use rig::message::{AssistantContent, Message, ReasoningContent, ToolResultContent, UserContent};
 
 pub trait TokenEstimator {
     fn estimate_tokens(&self) -> u64;
@@ -55,7 +52,7 @@ impl TokenEstimator for Message {
     }
 }
 
-impl TokenEstimator for OneOrMany<UserContent> {
+impl TokenEstimator for Vec<UserContent> {
     fn estimate_tokens(&self) -> u64 {
         self.iter().map(|content| content.estimate_tokens()).sum::<u64>()
     }
@@ -74,7 +71,7 @@ impl TokenEstimator for UserContent {
     }
 }
 
-impl TokenEstimator for OneOrMany<AssistantContent> {
+impl TokenEstimator for Vec<AssistantContent> {
     fn estimate_tokens(&self) -> u64 {
         self.iter().map(|content| content.estimate_tokens()).sum::<u64>()
     }
@@ -96,7 +93,6 @@ impl TokenEstimator for AssistantContent {
                         ReasoningContent::Encrypted(s) => s.estimate_tokens(),
                         ReasoningContent::Redacted { data } => data.estimate_tokens(),
                         ReasoningContent::Summary(s) => s.estimate_tokens(),
-                        _ => 0,
                     };
                 }
                 sum
@@ -106,7 +102,7 @@ impl TokenEstimator for AssistantContent {
     }
 }
 
-impl TokenEstimator for OneOrMany<ToolResultContent> {
+impl TokenEstimator for Vec<ToolResultContent> {
     fn estimate_tokens(&self) -> u64 {
         self.iter().map(|content| content.estimate_tokens()).sum::<u64>()
     }

@@ -5,7 +5,7 @@ use std::convert::Infallible;
 
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input, MultiSelect, Select};
-use rig_agent::tool::{Tool, ToolContext};
+use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
 
 pub use self::args::{AskUserQuestionArgs, AskUserQuestionOption};

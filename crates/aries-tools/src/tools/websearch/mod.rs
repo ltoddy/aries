@@ -8,7 +8,7 @@ mod tests;
 use std::time::Instant;
 
 use itertools::Itertools;
-use rig_agent::tool::{Tool, ToolContext};
+use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
 
 pub use self::args::WebSearchArgs;
