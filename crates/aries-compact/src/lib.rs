@@ -4,15 +4,17 @@ mod micro_compact;
 mod tokens;
 mod window;
 
+use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use aries_context::ChatContext;
-use aries_event::Notifier;
+use aries_event::{AgentEvent, Notifier};
 use aries_extension::hook::input::{
     PostCompactHookInput, PostCompactTrigger, PreCompactCustomInstructions, PreCompactHookInput,
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
+use rig::completion::{Message, Usage};
 
 pub use self::agent::{CompactAgent, CompactOutcome, compact_summary};
 pub use self::breaker::{AutoCompactBreaker, Decision};
@@ -61,6 +63,52 @@ impl ContextCompactor {
 
     pub fn set_agent(&mut self, agent: CompactAgent) {
         self.agent = agent;
+    }
+
+    pub async fn pre_compact<F, Fut>(&mut self, prompt: &Message, mut callback: F)
+    where
+        F: FnMut(AgentEvent) -> Fut,
+        Fut: Future<Output = ()>,
+    {
+        {
+            let mut write = self.chat_context.history_mut().await;
+            micro_compact(&mut write, KEEP_RECENT);
+        }
+
+        let window = ContextWindow::new();
+        let compact_threshold = window.auto_compact_threshold();
+
+        let estimated_tokens = {
+            let read = self.chat_context.history().await;
+            read.estimate_tokens().saturating_add(prompt.estimate_tokens())
+        };
+
+        if estimated_tokens >= compact_threshold {
+            let text = format!(
+                "\n预估 tokens {estimated_tokens} 已达阈值 {compact_threshold}（上下文窗口 {}），提前触发压缩...\n",
+                window.total
+            );
+            callback(AgentEvent::notification(text)).await;
+            self.compact().await;
+        }
+    }
+
+    pub async fn post_compact<F, Fut>(&mut self, usage: Usage, mut callback: F)
+    where
+        F: FnMut(AgentEvent) -> Fut,
+        Fut: Future<Output = ()>,
+    {
+        let window = ContextWindow::new();
+        let compact_threshold = window.auto_compact_threshold();
+
+        if usage.total_tokens > compact_threshold {
+            let text = format!(
+                "\n实际 tokens {} 已达阈值 {compact_threshold}，触发压缩...\n",
+                usage.total_tokens,
+            );
+            callback(AgentEvent::notification(text)).await;
+            self.compact().await;
+        }
     }
 
     pub async fn compact(&mut self) {

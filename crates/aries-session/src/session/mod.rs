@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use aries_agent::AriesAgent;
-use aries_compact::{self, ContextCompactor, TokenEstimator};
+use aries_compact::{self, ContextCompactor};
 use aries_context::{ChatContext, ChatHistory};
 use aries_event::{AgentEvent, Notifier};
 use aries_extension::hook::input::{
@@ -29,7 +29,7 @@ use aries_tools::{edit, write};
 use itertools::Itertools;
 use jiff::Zoned;
 use rig::agent::PromptResponse;
-use rig::completion::{Message, Usage};
+use rig::completion::Message;
 use rig::message::{AssistantContent, UserContent};
 use rig::tool::rmcp::McpClientHandler;
 use rig::tool::server::{ToolServer, ToolServerHandle};
@@ -234,7 +234,7 @@ impl Session {
         self.notifier.send_session_info_update(&title, now.to_string());
 
         self.fire_user_prompt_submit(&title).await?;
-        self.pre_compact(&prompt, callback.clone()).await;
+        self.compactor.pre_compact(&prompt, callback.clone()).await;
 
         let context = self.recall_context(&title).await;
         let mut history = self.chat_context.history().await.to_vec();
@@ -289,7 +289,7 @@ impl Session {
         self.fire_stop(final_res.output()).await;
         self.sift(final_res.messages(), title, final_res.output());
         if let Some(complection) = final_res.completion_calls.last() {
-            self.post_compact(complection.usage, callback).await;
+            self.compactor.post_compact(complection.usage, callback).await;
         }
 
         Ok(())
@@ -588,52 +588,6 @@ impl Session {
 
         self.chat_history.append(messages).await;
         self.chat_context.append(messages).await;
-    }
-
-    async fn pre_compact<F, Fut>(&mut self, prompt: &Message, mut callback: F)
-    where
-        F: FnMut(AgentEvent) -> Fut,
-        Fut: Future<Output = ()>,
-    {
-        {
-            let mut write = self.chat_context.history_mut().await;
-            aries_compact::micro_compact(&mut write, aries_compact::KEEP_RECENT);
-        }
-
-        let window = aries_compact::ContextWindow::new();
-        let compact_threshold = window.auto_compact_threshold();
-
-        let estimated_tokens = {
-            let read = self.chat_context.history().await;
-            read.estimate_tokens().saturating_add(prompt.estimate_tokens())
-        };
-
-        if estimated_tokens >= compact_threshold {
-            let text = format!(
-                "\n预估 tokens {estimated_tokens} 已达阈值 {compact_threshold}（上下文窗口 {}），提前触发压缩...\n",
-                window.total
-            );
-            callback(AgentEvent::notification(text)).await;
-            self.compactor.compact().await;
-        }
-    }
-
-    async fn post_compact<F, Fut>(&mut self, usage: Usage, mut callback: F)
-    where
-        F: FnMut(AgentEvent) -> Fut,
-        Fut: Future<Output = ()>,
-    {
-        let window = aries_compact::ContextWindow::new();
-        let compact_threshold = window.auto_compact_threshold();
-
-        if usage.total_tokens > compact_threshold {
-            let text = format!(
-                "\n实际 tokens {} 已达阈值 {compact_threshold}，触发压缩...\n",
-                usage.total_tokens,
-            );
-            callback(AgentEvent::notification(text)).await;
-            self.compactor.compact().await;
-        }
     }
 }
 
