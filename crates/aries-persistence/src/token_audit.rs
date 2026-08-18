@@ -38,7 +38,11 @@ impl TokenAuditRepository {
         optimized_tokens: u64,
     ) -> toasty::Result<TokenAudit> {
         let saved_tokens = original_tokens.saturating_sub(optimized_tokens);
-        let savings_percent = (saved_tokens as f64 / original_tokens as f64) * 100.0;
+        let savings_percent = if original_tokens == 0 {
+            0.0
+        } else {
+            (saved_tokens as f64 / original_tokens as f64) * 100.0
+        };
 
         TokenAudit::create()
             .command(command)
