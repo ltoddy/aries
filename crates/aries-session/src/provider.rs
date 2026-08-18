@@ -1,12 +1,12 @@
 use std::path::Path;
 
-use aries_agent::{AgentBuilder, AriesAgentProvider};
-use aries_compact::{CompactAgent, CompactAgentProvider};
+use aries_agent::{AgentBuilder, AriesAgent};
+use aries_compact::CompactAgent;
 use aries_event::Notifier;
 use aries_extension::AgentExtensions;
 use aries_init::{GlobalContext, ModelConfig};
 use aries_lspclient::SharedLspClient;
-use aries_memory::{MemoryAgent, MemoryAgentProvider, MemoryRetriever, MemoryRetrieverProvider};
+use aries_memory::{MemoryAgent, MemoryRetriever};
 use aries_mode::Mode;
 use http::{HeaderMap, header};
 use reqwest_middleware::ClientWithMiddleware;
@@ -89,7 +89,7 @@ impl AriesClientProvider {
         extensions: AgentExtensions,
         tool_server_handle: ToolServerHandle,
         notifier: Notifier,
-    ) -> anyhow::Result<AriesAgentProvider> {
+    ) -> anyhow::Result<AriesAgent> {
         let model = config.model();
         let cwd = cwd.as_ref().to_owned();
 
@@ -100,7 +100,7 @@ impl AriesClientProvider {
                     .with_extensions(extensions)
                     .build(tool_server_handle)
                     .await;
-                Ok(AriesAgentProvider::Anthropic(agent))
+                Ok(agent)
             },
             AriesClientProvider::Azure(c) => {
                 let agent = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx, notifier)
@@ -108,7 +108,7 @@ impl AriesClientProvider {
                     .with_extensions(extensions)
                     .build(tool_server_handle)
                     .await;
-                Ok(AriesAgentProvider::Azure(agent))
+                Ok(agent)
             },
             AriesClientProvider::Deepseek(c) => {
                 let agent = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx, notifier)
@@ -116,7 +116,7 @@ impl AriesClientProvider {
                     .with_extensions(extensions)
                     .build(tool_server_handle)
                     .await;
-                Ok(AriesAgentProvider::Deepseek(agent))
+                Ok(agent)
             },
             AriesClientProvider::OpenAI(c) => {
                 let agent = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx, notifier)
@@ -124,7 +124,7 @@ impl AriesClientProvider {
                     .with_extensions(extensions)
                     .build(tool_server_handle)
                     .await;
-                Ok(AriesAgentProvider::OpenAI(agent))
+                Ok(agent)
             },
         }
     }
@@ -134,29 +134,20 @@ impl AriesClientProvider {
         model: impl Into<String>,
         transcript_path: impl AsRef<Path>,
         notifier: Notifier,
-    ) -> CompactAgentProvider {
+    ) -> CompactAgent {
         match self {
-            AriesClientProvider::Anthropic(c) => CompactAgentProvider::Anthropic(
-                CompactAgent::new(c.clone(), model, transcript_path, notifier),
-            ),
-            AriesClientProvider::Azure(c) => CompactAgentProvider::Azure(CompactAgent::new(
-                c.clone(),
-                model,
-                transcript_path,
-                notifier,
-            )),
-            AriesClientProvider::Deepseek(c) => CompactAgentProvider::Deepseek(CompactAgent::new(
-                c.clone(),
-                model,
-                transcript_path,
-                notifier,
-            )),
-            AriesClientProvider::OpenAI(c) => CompactAgentProvider::OpenAI(CompactAgent::new(
-                c.clone(),
-                model,
-                transcript_path,
-                notifier,
-            )),
+            AriesClientProvider::Anthropic(c) => {
+                CompactAgent::new(c.clone(), model, transcript_path, notifier)
+            },
+            AriesClientProvider::Azure(c) => {
+                CompactAgent::new(c.clone(), model, transcript_path, notifier)
+            },
+            AriesClientProvider::Deepseek(c) => {
+                CompactAgent::new(c.clone(), model, transcript_path, notifier)
+            },
+            AriesClientProvider::OpenAI(c) => {
+                CompactAgent::new(c.clone(), model, transcript_path, notifier)
+            },
         }
     }
 
@@ -164,37 +155,21 @@ impl AriesClientProvider {
         &self,
         model: impl Into<String>,
         mem_dir: impl AsRef<Path>,
-    ) -> MemoryAgentProvider {
+    ) -> MemoryAgent {
         match self {
-            AriesClientProvider::Anthropic(c) => {
-                MemoryAgentProvider::Anthropic(MemoryAgent::new(c.clone(), model, mem_dir).await)
-            },
-            AriesClientProvider::Azure(c) => {
-                MemoryAgentProvider::Azure(MemoryAgent::new(c.clone(), model, mem_dir).await)
-            },
-            AriesClientProvider::Deepseek(c) => {
-                MemoryAgentProvider::Deepseek(MemoryAgent::new(c.clone(), model, mem_dir).await)
-            },
-            AriesClientProvider::OpenAI(c) => {
-                MemoryAgentProvider::OpenAI(MemoryAgent::new(c.clone(), model, mem_dir).await)
-            },
+            AriesClientProvider::Anthropic(c) => MemoryAgent::new(c.clone(), model, mem_dir).await,
+            AriesClientProvider::Azure(c) => MemoryAgent::new(c.clone(), model, mem_dir).await,
+            AriesClientProvider::Deepseek(c) => MemoryAgent::new(c.clone(), model, mem_dir).await,
+            AriesClientProvider::OpenAI(c) => MemoryAgent::new(c.clone(), model, mem_dir).await,
         }
     }
 
-    pub fn memory_retriever(&self, model: impl Into<String>) -> MemoryRetrieverProvider {
+    pub fn memory_retriever(&self, model: impl Into<String>) -> MemoryRetriever {
         match self {
-            AriesClientProvider::Anthropic(c) => {
-                MemoryRetrieverProvider::Anthropic(MemoryRetriever::new(c.clone(), model))
-            },
-            AriesClientProvider::Azure(c) => {
-                MemoryRetrieverProvider::Azure(MemoryRetriever::new(c.clone(), model))
-            },
-            AriesClientProvider::Deepseek(c) => {
-                MemoryRetrieverProvider::Deepseek(MemoryRetriever::new(c.clone(), model))
-            },
-            AriesClientProvider::OpenAI(c) => {
-                MemoryRetrieverProvider::OpenAI(MemoryRetriever::new(c.clone(), model))
-            },
+            AriesClientProvider::Anthropic(c) => MemoryRetriever::new(c.clone(), model),
+            AriesClientProvider::Azure(c) => MemoryRetriever::new(c.clone(), model),
+            AriesClientProvider::Deepseek(c) => MemoryRetriever::new(c.clone(), model),
+            AriesClientProvider::OpenAI(c) => MemoryRetriever::new(c.clone(), model),
         }
     }
 }

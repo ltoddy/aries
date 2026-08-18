@@ -1,13 +1,11 @@
 mod agent;
 mod builder;
-mod provider;
 
 use rig::agent::StreamingError;
 use rig::completion::{CompletionError, PromptError};
 
 pub use self::agent::{AGENT_LOOP_MAX_TURNS, AriesAgent};
 pub use self::builder::AgentBuilder;
-pub use self::provider::AriesAgentProvider;
 
 pub const AWAITING_USER_INPUT_REASON: &str = "awaiting user input";
 

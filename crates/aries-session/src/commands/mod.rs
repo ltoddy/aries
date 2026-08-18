@@ -1,7 +1,7 @@
 mod builtin;
 mod slash;
 
-use aries_agent::AriesAgentProvider;
+use aries_agent::AriesAgent;
 use aries_compact::ContextCompactor;
 use aries_event::Notifier;
 use aries_extension::command::CommandDefinition;
@@ -15,7 +15,7 @@ pub struct CommandsExecutor<'a> {
 
 impl<'a> CommandsExecutor<'a> {
     pub fn new(
-        agent: &'a AriesAgentProvider,
+        agent: &'a AriesAgent,
         commands: &'a [CommandDefinition],
         session_id: &'a str,
         compactor: ContextCompactor,

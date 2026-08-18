@@ -1,6 +1,6 @@
 use std::process::Stdio;
 
-use aries_agent::AriesAgentProvider;
+use aries_agent::AriesAgent;
 use aries_compact::ContextCompactor;
 use aries_event::Notifier;
 use tokio::process::Command;
@@ -19,14 +19,14 @@ pub const BUILTIN_COMMANDS: &[(&str, &str, Option<&str>); 4] = &[
 
 pub struct BuiltinCommandsExecutor<'a> {
     session_id: &'a str,
-    agent: &'a AriesAgentProvider,
+    agent: &'a AriesAgent,
     compactor: ContextCompactor,
     notifier: Notifier,
 }
 
 impl<'a> BuiltinCommandsExecutor<'a> {
     pub fn new(
-        agent: &'a AriesAgentProvider,
+        agent: &'a AriesAgent,
         session_id: &'a str,
         compactor: ContextCompactor,
         notifier: Notifier,

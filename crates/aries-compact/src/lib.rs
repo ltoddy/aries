@@ -1,7 +1,6 @@
 mod agent;
 mod breaker;
 mod micro_compact;
-mod provider;
 mod tokens;
 mod window;
 
@@ -18,7 +17,6 @@ use aries_extension::hook::{HookDecision, HooksExecutor};
 pub use self::agent::{CompactAgent, CompactOutcome, compact_summary};
 pub use self::breaker::{AutoCompactBreaker, Decision};
 pub use self::micro_compact::{KEEP_RECENT, micro_compact};
-pub use self::provider::CompactAgentProvider;
 pub use self::tokens::TokenEstimator;
 pub use self::window::ContextWindow;
 
@@ -26,7 +24,7 @@ pub use self::window::ContextWindow;
 pub struct ContextCompactor {
     id: String,
     cwd: PathBuf,
-    agent: CompactAgentProvider,
+    agent: CompactAgent,
     transcript_path: PathBuf,
     breaker: AutoCompactBreaker,
     chat_context: ChatContext,
@@ -39,7 +37,7 @@ impl ContextCompactor {
         id: impl Into<String>,
         cwd: impl AsRef<Path>,
         transcript_path: impl AsRef<Path>,
-        agent: CompactAgentProvider,
+        agent: CompactAgent,
         chat_context: ChatContext,
         hooks_executor: Arc<HooksExecutor>,
         notifier: Notifier,
@@ -61,7 +59,7 @@ impl ContextCompactor {
         }
     }
 
-    pub fn set_agent(&mut self, agent: CompactAgentProvider) {
+    pub fn set_agent(&mut self, agent: CompactAgent) {
         self.agent = agent;
     }
 

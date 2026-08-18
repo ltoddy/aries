@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::Context;
-use aries_agent::AriesAgentProvider;
+use aries_agent::AriesAgent;
 use aries_compact::{self, ContextCompactor, TokenEstimator};
 use aries_context::{ChatContext, ChatHistory};
 use aries_event::{AgentEvent, Notifier};
@@ -58,7 +58,7 @@ pub struct Session {
     config: ModelConfig,
     cwd: PathBuf,
     client: AriesClientProvider,
-    agent: AriesAgentProvider,
+    agent: AriesAgent,
     mode: Mode,
 
     lsp_client: Option<SharedLspClient>,

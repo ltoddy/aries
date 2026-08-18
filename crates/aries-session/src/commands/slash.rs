@@ -1,14 +1,14 @@
-use aries_agent::AriesAgentProvider;
+use aries_agent::AriesAgent;
 use aries_extension::command::CommandDefinition;
 use rig::message::Message;
 
 pub struct SlashCommandsExecutor<'a> {
-    agent: &'a AriesAgentProvider,
+    agent: &'a AriesAgent,
     commands: &'a [CommandDefinition],
 }
 
 impl<'a> SlashCommandsExecutor<'a> {
-    pub fn new(agent: &'a AriesAgentProvider, commands: &'a [CommandDefinition]) -> Self {
+    pub fn new(agent: &'a AriesAgent, commands: &'a [CommandDefinition]) -> Self {
         Self { agent, commands }
     }
 
