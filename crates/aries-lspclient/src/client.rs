@@ -54,7 +54,7 @@ impl LspClient {
             .args(info.args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stderr(Stdio::null())
             .kill_on_drop(true)
             .spawn()?;
 
@@ -156,8 +156,17 @@ impl LspClient {
             stdin.flush().await?;
         }
 
-        let result = tokio::time::timeout(std::time::Duration::from_secs(30), rx).await??;
-        Ok(result)
+        match tokio::time::timeout(std::time::Duration::from_secs(30), rx).await {
+            Ok(Ok(value)) => Ok(value),
+            Ok(Err(recv_err)) => {
+                self.pending.lock().remove(&RequestId::Number(id));
+                Err(recv_err.into())
+            },
+            Err(elapsed) => {
+                self.pending.lock().remove(&RequestId::Number(id));
+                Err(elapsed.into())
+            },
+        }
     }
 
     pub async fn send_notification(&self, method: &str, params: Value) -> io::Result<()> {

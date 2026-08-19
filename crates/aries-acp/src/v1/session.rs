@@ -242,6 +242,7 @@ pub async fn set_session_config_option(
                     session.setting(),
                     session.mode(),
                 ));
+                registry.lock().await.putback_session(session);
                 responder.respond(resp)
             },
             SessionConfig::Model => {
@@ -252,6 +253,7 @@ pub async fn set_session_config_option(
                     session.setting(),
                     session.mode(),
                 ));
+                registry.lock().await.putback_session(session);
                 responder.respond(resp)
             },
         };
