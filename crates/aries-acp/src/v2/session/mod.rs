@@ -1,8 +1,8 @@
 use agent_client_protocol::schema::v2::{
     CloseSessionRequest, CloseSessionResponse, DeleteSessionRequest, DeleteSessionResponse,
-    ListSessionsRequest, ListSessionsResponse, NewSessionRequest, NewSessionResponse,
-    ResumeSessionRequest, ResumeSessionResponse, SetSessionConfigOptionRequest,
-    SetSessionConfigOptionResponse,
+    ForkSessionRequest, ForkSessionResponse, ListSessionsRequest, ListSessionsResponse,
+    NewSessionRequest, NewSessionResponse, ResumeSessionRequest, ResumeSessionResponse,
+    SetSessionConfigOptionRequest, SetSessionConfigOptionResponse,
 };
 use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
 use tracing::info;
@@ -58,5 +58,14 @@ pub async fn set_session_config_option(
     _cx: ConnectionTo<Client>,
 ) -> Result<(), Error> {
     info!("Received set session config option request (v2): {req:?}");
+    todo!()
+}
+
+pub async fn fork_session(
+    req: ForkSessionRequest,
+    _responder: Responder<ForkSessionResponse>,
+    _cx: ConnectionTo<Client>,
+) -> Result<(), Error> {
+    info!("Received fork session request (v2): {req:?}");
     todo!()
 }

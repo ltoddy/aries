@@ -1,5 +1,6 @@
 pub mod authenticate;
 pub mod cancel;
+pub mod connection;
 pub mod initialize;
 pub mod logout;
 pub mod mcp;
@@ -29,7 +30,10 @@ pub async fn run(
         .on_receive_request(session::close_session, on_receive_request!())
         .on_receive_request(session::resume_session, on_receive_request!())
         .on_receive_request(session::set_session_config_option, on_receive_request!())
+        .on_receive_request(session::fork_session, on_receive_request!())
         .on_receive_notification(cancel::cancel, on_receive_notification!())
+        .with_spawned(connection::on_connection_established)
+        .on_close(connection::on_connection_closed)
         .connect_to(transport)
         .await?;
 
