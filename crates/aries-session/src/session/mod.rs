@@ -72,7 +72,7 @@ pub struct Session {
     transcript_path: PathBuf,
 
     tool_server_handle: ToolServerHandle,
-    cancel_token: CancellationToken,
+    cancel_token: Arc<parking_lot::Mutex<CancellationToken>>,
     receiver: Arc<Mutex<UnboundedReceiver<AgentEvent>>>,
     notifier: Notifier,
 
@@ -218,7 +218,11 @@ impl Session {
         Fut: Future<Output = ()>,
     {
         let prompt: Message = prompt.into();
-        self.cancel_token = CancellationToken::new();
+        let cancel_token = {
+            let mut guard = self.cancel_token.lock();
+            *guard = CancellationToken::new();
+            guard.clone()
+        };
         self.last_assistant_message = None;
 
         if let Message::User { ref content } = prompt
@@ -253,7 +257,7 @@ impl Session {
             loop {
                 tokio::select! {
                     biased;
-                    _ = self.cancel_token.cancelled() => break,
+                    _ = cancel_token.cancelled() => break,
                     event = guard.recv() => {
                         if let Some(event) = event {
                             callback(event).await;
@@ -342,7 +346,7 @@ impl Session {
     }
 
     pub fn cancel(&self) {
-        self.cancel_token.cancel();
+        self.cancel_token.lock().cancel()
     }
 
     pub fn session_dir(&self) -> &Path {
@@ -481,7 +485,7 @@ impl Session {
             session_dir: session_dir.to_owned(),
             transcript_path,
             tool_server_handle,
-            cancel_token: CancellationToken::new(),
+            cancel_token: Arc::new(parking_lot::Mutex::new(CancellationToken::new())),
             notifier,
             receiver: Arc::new(Mutex::new(receiver)),
             hooks_executor,

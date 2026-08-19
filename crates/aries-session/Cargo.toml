@@ -23,6 +23,7 @@ http.workspace = true
 itertools.workspace = true
 jiff.workspace = true
 nanoid.workspace = true
+parking_lot.workspace = true
 reqwest.workspace = true
 reqwest-middleware.workspace = true
 reqwest-retry.workspace = true

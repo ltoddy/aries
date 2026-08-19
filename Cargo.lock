@@ -551,6 +551,7 @@ dependencies = [
  "itertools 0.15.0",
  "jiff",
  "nanoid",
+ "parking_lot",
  "reqwest 0.13.4",
  "reqwest-middleware",
  "reqwest-retry",
