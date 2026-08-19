@@ -24,7 +24,11 @@ use tokio::sync::Mutex;
 
 use crate::session::instruction::SharedInstructionContext;
 
-const KEEP_RECENT: usize = 30;
+const MICRO_COMPACT_KEEP_MESSAGES_AT_80_PERCENT: usize = 10;
+const MICRO_COMPACT_KEEP_MESSAGES_AT_75_PERCENT: usize = 15;
+const MICRO_COMPACT_KEEP_MESSAGES_AT_70_PERCENT: usize = 20;
+const MICRO_COMPACT_KEEP_MESSAGES_AT_65_PERCENT: usize = 25;
+const MICRO_COMPACT_KEEP_MESSAGES_AT_60_PERCENT: usize = 30;
 
 #[derive(Clone)]
 pub struct SessionPromptHook {
@@ -89,17 +93,26 @@ impl AgentHook for SessionPromptHook {
     ) -> CompletionCallAction {
         let instructions = self.instruction_ctx.drain().await;
 
-        let near_overflow = (event.history.estimate_tokens() + event.prompt.estimate_tokens())
-            >= self.window.near_overflow_threshold();
-
-        if instructions.is_empty() && !near_overflow {
+        let estimate_tokens = event.history.estimate_tokens() + event.prompt.estimate_tokens();
+        let stuffed = estimate_tokens > self.window.sixty_percent_threshold();
+        if instructions.is_empty() && !stuffed {
             return CompletionCallAction::continue_run();
         }
 
         let mut patched = event.history.to_vec();
-        if near_overflow {
-            micro_compact(&mut patched, KEEP_RECENT);
+
+        if estimate_tokens > self.window.eighty_percent_threshold() {
+            micro_compact(&mut patched, MICRO_COMPACT_KEEP_MESSAGES_AT_80_PERCENT);
+        } else if estimate_tokens > self.window.seventy_five_percent_threshold() {
+            micro_compact(&mut patched, MICRO_COMPACT_KEEP_MESSAGES_AT_75_PERCENT);
+        } else if estimate_tokens > self.window.seventy_percent_threshold() {
+            micro_compact(&mut patched, MICRO_COMPACT_KEEP_MESSAGES_AT_70_PERCENT);
+        } else if estimate_tokens > self.window.sixty_five_percent_threshold() {
+            micro_compact(&mut patched, MICRO_COMPACT_KEEP_MESSAGES_AT_65_PERCENT);
+        } else if estimate_tokens > self.window.sixty_percent_threshold() {
+            micro_compact(&mut patched, MICRO_COMPACT_KEEP_MESSAGES_AT_60_PERCENT);
         }
+
         for instruction in instructions {
             let reminder = Message::user(
                 ["<system-reminder>", &instruction.render(), "</system-reminder>"].join("\n"),

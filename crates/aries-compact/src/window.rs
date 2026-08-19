@@ -20,11 +20,26 @@ impl ContextWindow {
     }
 
     pub fn auto_compact_threshold(&self) -> u64 {
-        // max window context * 0.6
+        self.sixty_percent_threshold()
+    }
+
+    pub fn sixty_percent_threshold(&self) -> u64 {
         self.total / 10 * 6
     }
 
-    pub fn near_overflow_threshold(&self) -> u64 {
+    pub fn sixty_five_percent_threshold(&self) -> u64 {
+        self.total / 100 * 65
+    }
+
+    pub fn seventy_percent_threshold(&self) -> u64 {
+        self.total / 10 * 7
+    }
+
+    pub fn seventy_five_percent_threshold(&self) -> u64 {
+        self.total / 100 * 75
+    }
+
+    pub fn eighty_percent_threshold(&self) -> u64 {
         self.total / 10 * 8
     }
 }
