@@ -9,7 +9,9 @@ impl TokenEstimator for &str {
         if self.is_empty() {
             return 0;
         }
-        (self.chars().count() as u64).div_ceil(CHARS_PER_TOKEN).max(1)
+
+        let milli_tokens = self.chars().map(char_token_millis).sum::<u64>();
+        milli_tokens.div_ceil(1_000).max(1)
     }
 }
 
@@ -18,8 +20,38 @@ impl TokenEstimator for String {
         if self.is_empty() {
             return 0;
         }
-        (self.chars().count() as u64).div_ceil(CHARS_PER_TOKEN).max(1)
+
+        let milli_tokens = self.chars().map(char_token_millis).sum::<u64>();
+        milli_tokens.div_ceil(1_000).max(1)
     }
+}
+
+fn char_token_millis(c: char) -> u64 {
+    if c.is_ascii() {
+        ASCII_TOKEN_MILLIS_PER_CHAR
+    } else if is_cjk(c) {
+        CJK_TOKEN_MILLIS_PER_CHAR
+    } else {
+        OTHER_TOKEN_MILLIS_PER_CHAR
+    }
+}
+
+fn is_cjk(c: char) -> bool {
+    matches!(
+        u32::from(c),
+        0x2E80..=0x2FFF
+            | 0x3000..=0x303F
+            | 0x3040..=0x30FF
+            | 0x3100..=0x312F
+            | 0x3190..=0x319F
+            | 0x3400..=0x4DBF
+            | 0x4E00..=0x9FFF
+            | 0xAC00..=0xD7AF
+            | 0xF900..=0xFAFF
+            | 0xFE30..=0xFE4F
+            | 0xFF00..=0xFFEF
+            | 0x20000..=0x3134F
+    )
 }
 
 impl TokenEstimator for &[Message] {
@@ -64,9 +96,9 @@ impl TokenEstimator for UserContent {
             UserContent::Text(t) => t.text.estimate_tokens(),
             UserContent::ToolResult(tr) => tr.content.estimate_tokens(),
             UserContent::Image(_) => IMAGE_MAX_TOKEN_SIZE,
-            UserContent::Audio(_) => IMAGE_MAX_TOKEN_SIZE,
-            UserContent::Video(_) => IMAGE_MAX_TOKEN_SIZE,
-            UserContent::Document(_) => IMAGE_MAX_TOKEN_SIZE,
+            UserContent::Audio(_) => MEDIA_MAX_TOKEN_SIZE,
+            UserContent::Video(_) => MEDIA_MAX_TOKEN_SIZE,
+            UserContent::Document(_) => DOCUMENT_MAX_TOKEN_SIZE,
         }
     }
 }
@@ -119,6 +151,12 @@ impl TokenEstimator for ToolResultContent {
 }
 
 const IMAGE_MAX_TOKEN_SIZE: u64 = 2_000;
-const CHARS_PER_TOKEN: u64 = 4;
+const MEDIA_MAX_TOKEN_SIZE: u64 = 20_000;
+const DOCUMENT_MAX_TOKEN_SIZE: u64 = 10_000;
+
+const ASCII_TOKEN_MILLIS_PER_CHAR: u64 = 250;
+const CJK_TOKEN_MILLIS_PER_CHAR: u64 = 1_200;
+const OTHER_TOKEN_MILLIS_PER_CHAR: u64 = 500;
+
 const CONSERVATIVE_NUM: u64 = 4;
 const CONSERVATIVE_DEN: u64 = 3;

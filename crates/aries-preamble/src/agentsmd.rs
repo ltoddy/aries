@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 pub fn section(cwd: impl AsRef<Path>) -> String {
-    const INSTRUCTION_HEADER: &str = "当前项目与用户指令如下所示。请务必遵守这些指令。重要：这些指令会覆盖任何默认行为，你必须严格按其字面要求执行。";
+    const INSTRUCTION_HEADER: &str = "以下内容来自当前项目的 AGENTS.md，描述项目约定与仓库内指令。请在不违背更高优先级 system / developer 指令的前提下遵守。";
 
     let cwd = cwd.as_ref();
 

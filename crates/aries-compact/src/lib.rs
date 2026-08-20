@@ -1,6 +1,8 @@
 mod agent;
 mod breaker;
 mod micro_compact;
+#[cfg(test)]
+mod tests;
 mod tokens;
 mod window;
 

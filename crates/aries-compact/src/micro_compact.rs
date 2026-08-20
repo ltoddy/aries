@@ -36,7 +36,9 @@ pub fn micro_compact(messages: &mut [Message], keep_recent: usize) {
                     *item = UserContent::tool_result(
                         tr.call.as_str(),
                         &tr.name,
-                        vec![ToolResultContent::text(TOOL_RESULT_PLACEHOLDER.to_owned())],
+                        vec![ToolResultContent::json(
+                            serde_json::json!({"note": TOOL_RESULT_PLACEHOLDER}),
+                        )],
                     );
                 }
             }
@@ -67,7 +69,7 @@ pub fn micro_compact(messages: &mut [Message], keep_recent: usize) {
                     *item = AssistantContent::tool_call(
                         id.as_str(),
                         &function.name,
-                        serde_json::Value::String(String::from(TOOL_CALL_PLACEHOLDER)),
+                        serde_json::json!({"note": TOOL_CALL_PLACEHOLDER}),
                     );
                 }
             }
