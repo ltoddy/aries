@@ -7,7 +7,6 @@ edition = "2024"
 aries-filesystem = { path = "../aries-filesystem" }
 aries-tools = { path = "../aries-tools" }
 itertools.workspace = true
-reqwest-middleware.workspace = true
 rig.workspace = true
 schemars.workspace = true
 serde = { workspace = true, features = ["derive"] }

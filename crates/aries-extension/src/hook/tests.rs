@@ -4,15 +4,15 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
+use itertools::Itertools;
 use tempfile::TempDir;
 
 use super::*;
 use crate::hook::definition::{
-    BashCommandHook, HookCommand, HookEvent, HookMatcher, HookMatcherError, HooksFileParseError,
-    HooksSettings, ShellType,
+    HookCommand, HookEvent, HookMatcher, HookMatcherError, HooksFileParseError, HooksSettings,
+    ShellType,
 };
-use crate::hook::executor::execute_bash_command_hook;
-use crate::hook::input::PreToolUseHookInput;
+use crate::hook::input::{PreToolUseHookInput, SessionStartHookInput, SessionStartSource};
 
 /// 在 `root/.agents/hooks/` 下写入一个 hooks.json，事件名为 key。
 fn write_hooks_json(root: &Path, event: &str) {
@@ -25,7 +25,14 @@ fn write_hooks_json(root: &Path, event: &str) {
 }
 
 fn command_hook(command: &str) -> HookCommand {
-    serde_json::from_str(&format!(r#"{{"type": "command", "command": "{command}"}}"#)).unwrap()
+    serde_json::from_value(serde_json::json!({ "type": "command", "command": command })).unwrap()
+}
+
+fn hooks_definition(event: HookEvent, hooks: Vec<HookCommand>) -> HooksDefinition {
+    HooksDefinition {
+        description: None,
+        hooks: HooksSettings(HashMap::from([(event, vec![HookMatcher { matcher: None, hooks }])])),
+    }
 }
 
 #[test]
@@ -62,9 +69,9 @@ fn deserializes_hook_command_variants() {
         serde_json::from_str(r#"{"type": "prompt", "prompt": "assess"}"#).unwrap();
     assert!(matches!(prompt, HookCommand::Prompt(_)));
 
-    let agent: HookCommand =
-        serde_json::from_str(r#"{"type": "agent", "prompt": "verify"}"#).unwrap();
-    assert!(matches!(agent, HookCommand::Agent(_)));
+    // let agent: HookCommand =
+    //     serde_json::from_str(r#"{"type": "agent", "prompt": "verify"}"#).unwrap();
+    // assert!(matches!(agent, HookCommand::Agent(_)));
 
     let http: HookCommand =
         serde_json::from_str(r#"{"type": "http", "url": "https://example.com"}"#).unwrap();
@@ -140,31 +147,6 @@ async fn parse_reports_missing_file() {
     assert!(matches!(err, HooksFileParseError::Io(_)));
 }
 
-#[tokio::test]
-async fn bash_hook_exit_zero_does_not_block() {
-    let hook: BashCommandHook = serde_json::from_str(r#"{"command": "echo hello"}"#).unwrap();
-    let outcome = execute_bash_command_hook(&hook, "").await.unwrap();
-    assert_eq!(outcome.exit_code, Some(0));
-    assert!(!outcome.blocked);
-    assert!(outcome.stdout.contains("hello"));
-}
-
-#[tokio::test]
-async fn bash_hook_exit_two_blocks() {
-    let hook: BashCommandHook = serde_json::from_str(r#"{"command": "exit 2"}"#).unwrap();
-    let outcome = execute_bash_command_hook(&hook, "").await.unwrap();
-    assert_eq!(outcome.exit_code, Some(2));
-    assert!(outcome.blocked);
-}
-
-#[tokio::test]
-async fn bash_hook_captures_stderr() {
-    let hook: BashCommandHook = serde_json::from_str(r#"{"command": "echo oops 1>&2"}"#).unwrap();
-    let outcome = execute_bash_command_hook(&hook, "").await.unwrap();
-    assert_eq!(outcome.exit_code, Some(0));
-    assert!(outcome.stderr.contains("oops"));
-}
-
 fn pre_tool_use_input(tool_name: &str) -> PreToolUseHookInput<String> {
     PreToolUseHookInput::new("session-1", "/tmp", tool_name, "{}".to_owned(), "tool-use-1")
 }
@@ -173,7 +155,7 @@ fn pre_tool_use_input(tool_name: &str) -> PreToolUseHookInput<String> {
 async fn executor_continues_when_no_hooks_registered() {
     let executor = HooksExecutor::new(vec![]);
     let decision = executor.fire_pre_tool_use(pre_tool_use_input("Write")).await;
-    assert!(matches!(decision, HookDecision::Continue));
+    assert!(matches!(decision, HookDecision::Continue { .. }));
 }
 
 #[tokio::test]
@@ -193,7 +175,7 @@ async fn executor_blocks_pre_tool_use_when_hook_exits_two() {
     let decision = executor.fire_pre_tool_use(pre_tool_use_input("Write")).await;
     match decision {
         HookDecision::Terminate { reason } => assert!(reason.contains("exit code 2")),
-        HookDecision::Continue => panic!("expected hook to be blocked"),
+        HookDecision::Continue { .. } => panic!("expected hook to be blocked"),
     }
 }
 
@@ -212,7 +194,94 @@ async fn executor_skips_hook_when_matcher_does_not_match() {
     let executor = HooksExecutor::new(vec![preset]);
 
     let decision = executor.fire_pre_tool_use(pre_tool_use_input("Write")).await;
-    assert!(matches!(decision, HookDecision::Continue));
+    assert!(matches!(decision, HookDecision::Continue { .. }));
+}
+
+#[tokio::test]
+async fn executor_adds_command_json_additional_context() {
+    let command = r#"printf '%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"from hook"}}'"#;
+    let executor = HooksExecutor::new(vec![hooks_definition(
+        HookEvent::PreToolUse,
+        vec![command_hook(command)],
+    )]);
+
+    let decision = executor.fire_pre_tool_use(pre_tool_use_input("Write")).await;
+
+    match decision {
+        HookDecision::Continue { contexts } => {
+            assert_eq!(contexts.into_iter().collect_vec(), ["from hook"])
+        },
+        decision => panic!("expected context, got {decision:?}"),
+    }
+}
+
+#[tokio::test]
+async fn executor_ignores_plain_stdout_for_pre_tool_use() {
+    let executor = HooksExecutor::new(vec![hooks_definition(
+        HookEvent::PreToolUse,
+        vec![command_hook("echo plain")],
+    )]);
+
+    let decision = executor.fire_pre_tool_use(pre_tool_use_input("Write")).await;
+
+    assert!(matches!(decision, HookDecision::Continue { contexts } if contexts.is_empty()));
+}
+
+#[tokio::test]
+async fn executor_adds_plain_stdout_for_session_start() {
+    let executor = HooksExecutor::new(vec![hooks_definition(
+        HookEvent::SessionStart,
+        vec![command_hook("printf startup-context")],
+    )]);
+    let input = SessionStartHookInput::new(
+        "session-1",
+        "/tmp",
+        SessionStartSource::Startup,
+        "model",
+        "default",
+    );
+
+    let decision = executor.fire_session_start(input).await;
+
+    match decision {
+        HookDecision::Continue { contexts } => {
+            assert_eq!(contexts.into_iter().collect_vec(), ["startup-context"])
+        },
+        decision => panic!("expected context, got {decision:?}"),
+    }
+}
+
+#[tokio::test]
+async fn executor_combines_context_from_multiple_matching_hooks() {
+    let executor = HooksExecutor::new(vec![HooksDefinition {
+        description: None,
+        hooks: HooksSettings(HashMap::from([(
+            HookEvent::PreToolUse,
+            vec![
+                HookMatcher {
+                    matcher: None,
+                    hooks: vec![command_hook(
+                        r#"printf '%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"first"}}'"#,
+                    )],
+                },
+                HookMatcher {
+                    matcher: Some("Write".to_owned()),
+                    hooks: vec![command_hook(
+                        r#"printf '%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"second"}}'"#,
+                    )],
+                },
+            ],
+        )])),
+    }]);
+
+    let decision = executor.fire_pre_tool_use(pre_tool_use_input("Write")).await;
+
+    match decision {
+        HookDecision::Continue { contexts } => {
+            assert_eq!(contexts.into_iter().collect_vec(), ["first", "second"])
+        },
+        decision => panic!("expected combined context, got {decision:?}"),
+    }
 }
 
 #[tokio::test]

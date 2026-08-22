@@ -55,7 +55,7 @@ pub enum HookEvent {
     /// enforcing project rules before the action runs.
     PreToolUse,
 
-    /// Fires when Claude is about to request permission.
+    /// Fires when the agent is about to request permission.
     PermissionRequest,
 
     /// Fires after a permission request is denied.
@@ -73,7 +73,7 @@ pub enum HookEvent {
     /// Fires after a batch of tool calls completes.
     PostToolBatch,
 
-    /// Fires when Claude is waiting for input or permission.
+    /// Fires when the agent is waiting for input or permission.
     ///
     /// Commonly used to send a desktop or external notification so you do not
     /// need to watch the terminal.
@@ -105,8 +105,8 @@ pub enum HookEvent {
 
     /// Fires when configuration changes.
     ///
-    /// In Claude Code, `ConfigChange` can be used to track when settings or
-    /// skills files change during a session.
+    /// `ConfigChange` can be used to track when settings or skills files change
+    /// during a session.
     ConfigChange,
 
     /// Fires when the current working directory changes.
@@ -130,7 +130,7 @@ pub enum HookEvent {
     /// Fires after compaction completes.
     PostCompact,
 
-    /// Fires when Claude asks the user for additional input or clarification.
+    /// Fires when the agent asks the user for additional input or clarification.
     Elicitation,
 
     /// Fires after the user responds to an elicitation.
@@ -166,7 +166,7 @@ impl ShellType {
 pub enum HookCommand {
     Command(BashCommandHook),
     Prompt(PromptHook),
-    Agent(AgentHook),
+    // Agent(AgentHook),
     Http(HttpHook),
 }
 
@@ -215,7 +215,7 @@ pub struct PromptHook {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout: Option<f64>,
 
-    /// 模型 ID，例如 "claude-sonnet-4-6"
+    /// 模型 ID，例如 "gpt-4o"
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
 
@@ -226,27 +226,28 @@ pub struct PromptHook {
     pub once: Option<bool>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentHook {
-    /// 描述要验证什么的 Prompt
-    pub prompt: String,
-
-    #[serde(default, rename = "if", skip_serializing_if = "Option::is_none")]
-    pub if_condition: Option<String>,
-
-    /// 默认 60 秒
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub timeout: Option<f64>,
-
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub model: Option<String>,
-
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub status_message: Option<String>,
-
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub once: Option<bool>,
-}
+// 目前处于试验阶段, 先不添加
+// #[derive(Debug, Clone, Serialize, Deserialize)]
+// pub struct AgentHook {
+//     /// 描述要验证什么的 Prompt
+//     pub prompt: String,
+//
+//     #[serde(default, rename = "if", skip_serializing_if = "Option::is_none")]
+//     pub if_condition: Option<String>,
+//
+//     /// 默认 60 秒
+//     #[serde(default, skip_serializing_if = "Option::is_none")]
+//     pub timeout: Option<f64>,
+//
+//     #[serde(default, skip_serializing_if = "Option::is_none")]
+//     pub model: Option<String>,
+//
+//     #[serde(default, skip_serializing_if = "Option::is_none")]
+//     pub status_message: Option<String>,
+//
+//     #[serde(default, skip_serializing_if = "Option::is_none")]
+//     pub once: Option<bool>,
+// }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HttpHook {

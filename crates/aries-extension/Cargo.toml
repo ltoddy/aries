@@ -9,6 +9,7 @@ futures.workspace = true
 http.workspace = true
 itertools.workspace = true
 regex-lite.workspace = true
+reqwest.workspace = true
 rig = { workspace = true, features = ["rmcp"] }
 rmcp = { workspace = true, features = ["client", "transport-child-process", "transport-streamable-http-client", "transport-streamable-http-client-reqwest"] }
 serde = { workspace = true, features = ["derive"] }

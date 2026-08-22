@@ -45,7 +45,7 @@ async fn test_call_echoes_items() {
 
 #[tokio::test]
 async fn test_call_clears_when_all_completed() {
-    // 全部 completed 时应清空计划（对齐 OpenClaude allDone -> []）。
+    // 全部 completed 时应清空计划（对齐上游 allDone -> []）。
     let mut context = ToolContext::new();
     let tool = UpdatePlanTool::new();
     let args = UpdatePlanArgs {

@@ -13,7 +13,10 @@ aries-tools = { path = "../aries-tools" }
 futures.workspace = true
 parking_lot.workspace = true
 regex-lite.workspace = true
-reqwest-middleware.workspace = true
 rig = { workspace = true, features = ["reqwest-middleware"] }
 serde_json.workspace = true
 tokio = { workspace = true, features = ["fs"] }
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio = { workspace = true, features = ["fs", "macros", "rt"] }

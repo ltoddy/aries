@@ -17,12 +17,12 @@ use rig::agent::{
     StreamResponseFinish, TextDelta, ToolCall, ToolCallAction, ToolCallDelta, ToolResultAction,
     ToolResultEvent,
 };
-use rig::message::Message;
 use serde_json::Value;
 use toasty::Db;
 use tokio::sync::Mutex;
 
-use crate::session::instruction::SharedInstructionContext;
+use crate::session::instruction::InstructionContext;
+use crate::session::{system_reminder, system_reminders};
 
 const MICRO_COMPACT_KEEP_MESSAGES_AT_80_PERCENT: usize = 10;
 const MICRO_COMPACT_KEEP_MESSAGES_AT_75_PERCENT: usize = 15;
@@ -41,7 +41,7 @@ pub struct SessionPromptHook {
     last_tool_call_at: Arc<Mutex<Option<time::Instant>>>,
 
     tool_call_repo: ToolCallRepository,
-    instruction_ctx: SharedInstructionContext,
+    instruction_ctx: InstructionContext,
     window: ContextWindow,
 
     notifier: Notifier,
@@ -57,6 +57,7 @@ impl SessionPromptHook {
         agent_id: impl Into<String>,
         agent_type: impl Into<String>,
         db: Db,
+        instruction_ctx: InstructionContext,
         notifier: Notifier,
     ) -> Self {
         let session_id = session_id.into();
@@ -66,7 +67,6 @@ impl SessionPromptHook {
         let agent_type = agent_type.into();
 
         let tool_call_repo = ToolCallRepository::new(db);
-        let instruction_ctx = SharedInstructionContext::new(cwd);
         let window = ContextWindow::new();
 
         Self {
@@ -92,10 +92,11 @@ impl AgentHook for SessionPromptHook {
         event: CompletionCall<'_>,
     ) -> CompletionCallAction {
         let instructions = self.instruction_ctx.drain().await;
+        let hook_contexts = self.instruction_ctx.drain_hook_contexts().await;
 
         let estimate_tokens = event.history.estimate_tokens() + event.prompt.estimate_tokens();
         let stuffed = estimate_tokens > self.window.sixty_percent_threshold();
-        if instructions.is_empty() && !stuffed {
+        if instructions.is_empty() && hook_contexts.is_empty() && !stuffed {
             return CompletionCallAction::continue_run();
         }
 
@@ -114,11 +115,10 @@ impl AgentHook for SessionPromptHook {
         }
 
         for instruction in instructions {
-            let reminder = Message::user(
-                ["<system-reminder>", &instruction.render(), "</system-reminder>"].join("\n"),
-            );
+            let reminder = system_reminder(instruction.render());
             patched.push(reminder);
         }
+        patched.extend_from_slice(&system_reminders(hook_contexts));
         CompletionCallAction::Patch(RequestPatch::new().history(patched))
     }
 
@@ -177,10 +177,6 @@ impl AgentHook for SessionPromptHook {
             _ => {},
         }
 
-        // AskUserQuestion is the only interactive tool today: suspend the turn
-        // before execution and forward the model-generated arguments as the
-        // question definition. Generalize into a registry if more interactive
-        // tools appear.
         if event.tool_name == aries_tools::question::NAME {
             self.notifier.send_awaiting_input(tool_input.clone());
             return ToolCallAction::Stop(aries_agent::AWAITING_USER_INPUT_REASON.to_string());
@@ -198,7 +194,10 @@ impl AgentHook for SessionPromptHook {
         .agent_type(&self.agent_type);
 
         match self.executor.fire_pre_tool_use(input).await {
-            HookDecision::Continue => ToolCallAction::run(),
+            HookDecision::Continue { contexts } => {
+                self.instruction_ctx.push_hook_contexts(contexts).await;
+                ToolCallAction::run()
+            },
             HookDecision::Terminate { reason } => ToolCallAction::Stop(reason),
         }
     }
@@ -247,7 +246,11 @@ impl AgentHook for SessionPromptHook {
                 None => input,
             };
 
-            self.executor.fire_post_tool_use_failure(input).await;
+            if let HookDecision::Continue { contexts } =
+                self.executor.fire_post_tool_use_failure(input).await
+            {
+                self.instruction_ctx.push_hook_contexts(contexts).await;
+            }
             return ToolResultAction::keep();
         }
 
@@ -265,7 +268,11 @@ impl AgentHook for SessionPromptHook {
                 Some(text) => input.last_assistant_message(text),
                 None => input,
             };
-            self.executor.fire_subagent_stop(input).await;
+            if let HookDecision::Continue { contexts } =
+                self.executor.fire_subagent_stop(input).await
+            {
+                self.instruction_ctx.push_hook_contexts(contexts).await;
+            }
         }
 
         let input = PostToolUseHookInput::new(
@@ -284,7 +291,9 @@ impl AgentHook for SessionPromptHook {
             None => input,
         };
 
-        self.executor.fire_post_tool_use(input).await;
+        if let HookDecision::Continue { contexts } = self.executor.fire_post_tool_use(input).await {
+            self.instruction_ctx.push_hook_contexts(contexts).await;
+        }
 
         ToolResultAction::keep()
     }

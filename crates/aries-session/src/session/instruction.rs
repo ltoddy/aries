@@ -6,11 +6,11 @@ use aries_preamble::agentsmd::Agentsmd;
 use tokio::sync::Mutex;
 
 #[derive(Clone, Debug, Default)]
-pub struct SharedInstructionContext(Arc<Mutex<InstructionContext>>);
+pub struct InstructionContext(Arc<Mutex<InstructionState>>);
 
-impl SharedInstructionContext {
+impl InstructionContext {
     pub fn new(root_dir: impl AsRef<Path>) -> Self {
-        Self(Arc::new(Mutex::new(InstructionContext::new(root_dir))))
+        Self(Arc::new(Mutex::new(InstructionState::new(root_dir))))
     }
 
     pub async fn visit(&self, dir: impl AsRef<Path>) {
@@ -33,27 +33,44 @@ impl SharedInstructionContext {
 
         let instruction = Agentsmd::new(file_path, content, false);
         guard.instructions.push(instruction.clone());
-        guard.que.push_back(instruction);
+        guard.pending_instructions.push_back(instruction);
     }
 
     pub async fn drain(&self) -> Vec<Agentsmd> {
         let mut guard = self.0.lock().await;
 
-        guard.que.drain(..).collect()
+        guard.pending_instructions.drain(..).collect()
+    }
+
+    pub async fn push_hook_contexts(&self, contexts: impl IntoIterator<Item = String>) {
+        let mut guard = self.0.lock().await;
+        guard.hook_contexts.extend(contexts);
+    }
+
+    pub async fn drain_hook_contexts(&self) -> Vec<String> {
+        let mut guard = self.0.lock().await;
+
+        guard.hook_contexts.drain(..).collect()
     }
 }
 
 #[derive(Clone, Debug, Default)]
-struct InstructionContext {
+struct InstructionState {
     root_dir: PathBuf,
     instructions: Vec<Agentsmd>,
-    que: VecDeque<Agentsmd>,
+    pending_instructions: VecDeque<Agentsmd>,
+    hook_contexts: VecDeque<String>,
 }
 
-impl InstructionContext {
+impl InstructionState {
     pub fn new(root_dir: impl AsRef<Path>) -> Self {
         let root_dir = root_dir.as_ref();
 
-        Self { root_dir: root_dir.to_owned(), instructions: vec![], que: VecDeque::new() }
+        Self {
+            root_dir: root_dir.to_owned(),
+            instructions: vec![],
+            pending_instructions: VecDeque::new(),
+            hook_contexts: VecDeque::new(),
+        }
     }
 }

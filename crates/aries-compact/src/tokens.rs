@@ -1,4 +1,7 @@
-use rig::message::{AssistantContent, Message, ReasoningContent, ToolResultContent, UserContent};
+use rig::message::{
+    AssistantContent, Document, DocumentSourceKind, Message, ReasoningContent, ToolResultContent,
+    UserContent,
+};
 
 pub trait TokenEstimator {
     fn estimate_tokens(&self) -> u64;
@@ -98,7 +101,26 @@ impl TokenEstimator for UserContent {
             UserContent::Image(_) => IMAGE_MAX_TOKEN_SIZE,
             UserContent::Audio(_) => MEDIA_MAX_TOKEN_SIZE,
             UserContent::Video(_) => MEDIA_MAX_TOKEN_SIZE,
-            UserContent::Document(_) => DOCUMENT_MAX_TOKEN_SIZE,
+            UserContent::Document(document) => document.estimate_tokens(),
+        }
+    }
+}
+
+impl TokenEstimator for Document {
+    fn estimate_tokens(&self) -> u64 {
+        self.data.estimate_tokens()
+    }
+}
+
+impl TokenEstimator for DocumentSourceKind {
+    fn estimate_tokens(&self) -> u64 {
+        match self {
+            DocumentSourceKind::Url(source)
+            | DocumentSourceKind::Base64(source)
+            | DocumentSourceKind::FileId(source)
+            | DocumentSourceKind::String(source) => source.estimate_tokens(),
+            DocumentSourceKind::Raw(bytes) => bytes.len().div_ceil(4) as u64,
+            DocumentSourceKind::Unknown => 0,
         }
     }
 }
@@ -152,7 +174,6 @@ impl TokenEstimator for ToolResultContent {
 
 const IMAGE_MAX_TOKEN_SIZE: u64 = 2_000;
 const MEDIA_MAX_TOKEN_SIZE: u64 = 20_000;
-const DOCUMENT_MAX_TOKEN_SIZE: u64 = 10_000;
 
 const ASCII_TOKEN_MILLIS_PER_CHAR: u64 = 250;
 const CJK_TOKEN_MILLIS_PER_CHAR: u64 = 1_200;

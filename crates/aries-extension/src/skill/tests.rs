@@ -35,7 +35,7 @@ fn deserializes_kebab_case_allowed_tools() {
 name: fix-typo
 description: fix typos in the codebase
 license: MIT
-compatibility: claude
+compatibility: any
 allowed-tools:
   - Read
   - Edit
@@ -44,7 +44,7 @@ allowed-tools:
     assert_eq!(fm.name, "fix-typo");
     assert_eq!(fm.description, "fix typos in the codebase");
     assert_eq!(fm.license.as_deref(), Some("MIT"));
-    assert_eq!(fm.compatibility.as_deref(), Some("claude"));
+    assert_eq!(fm.compatibility.as_deref(), Some("any"));
     assert_eq!(fm.allowed_tools.as_deref(), Some(&["Read".to_owned(), "Edit".to_owned()][..]));
 }
 

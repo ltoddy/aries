@@ -4,6 +4,7 @@ mod hook;
 mod instruction;
 mod question;
 
+use std::collections::VecDeque;
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -45,6 +46,7 @@ use tracing::info;
 pub use self::args::SessionArgs;
 use self::config::SessionConfig;
 use self::hook::SessionPromptHook;
+use self::instruction::InstructionContext;
 pub use self::question::resume_input;
 use crate::AriesClientProvider;
 use crate::commands::CommandsExecutor;
@@ -78,6 +80,7 @@ pub struct Session {
 
     compactor: ContextCompactor,
     hooks_executor: Arc<HooksExecutor>,
+    instruction_ctx: InstructionContext,
     memory_store: MemoryStore,
 
     // 为了避免连接因为 drop 而释放
@@ -237,15 +240,14 @@ impl Session {
         let now = Zoned::now();
         self.notifier.send_session_info_update(&title, now.to_string());
 
-        self.fire_user_prompt_submit(&title).await?;
+        let hook_context = self.fire_user_prompt_submit(&title).await?;
         self.compactor.pre_compact(&prompt, callback.clone()).await;
 
         let context = self.recall_context(&title).await;
         let mut history = self.chat_context.history().await.to_vec();
+        history.extend_from_slice(&system_reminders(hook_context));
         if let Some(reminder) = context {
-            history.push(Message::user(
-                ["<system-reminder>", &reminder, "</system-reminder>"].join("\n"),
-            ));
+            history.push(system_reminder(reminder));
         }
         let final_res = {
             let hook = self.session_hook();
@@ -465,8 +467,12 @@ impl Session {
             Notifier::clone(&notifier),
         );
 
+        let instruction_ctx = InstructionContext::new(cwd);
         let input = SessionStartHookInput::new(&id, cwd, source, config.model(), mode);
-        hooks_executor.fire_session_start(input).await;
+        if let HookDecision::Continue { contexts } = hooks_executor.fire_session_start(input).await
+        {
+            chat_context.append(&system_reminders(contexts)).await;
+        }
 
         Ok(Self {
             id,
@@ -489,6 +495,7 @@ impl Session {
             notifier,
             receiver: Arc::new(Mutex::new(receiver)),
             hooks_executor,
+            instruction_ctx,
             memory_store,
             mcp_clients: Arc::new(mcp_clients),
             extensions,
@@ -525,6 +532,7 @@ impl Session {
             self.mode.id(),
             self.mode.name(),
             self.db.clone(),
+            self.instruction_ctx.clone(),
             Notifier::clone(&self.notifier),
         )
     }
@@ -553,22 +561,23 @@ impl Session {
     async fn fire_user_prompt_submit(
         &self,
         prompt: impl Into<String>,
-    ) -> aries_agent::AriesResult<()> {
+    ) -> aries_agent::AriesResult<VecDeque<String>> {
         let input = UserPromptSubmitHookInput::new(&self.id, &self.cwd, prompt)
             .transcript_path(&self.transcript_path);
-        if let HookDecision::Terminate { reason } =
-            self.hooks_executor.fire_user_prompt_submit(input).await
-        {
-            return Err(aries_agent::AriesError::hook_terminated(reason));
+        match self.hooks_executor.fire_user_prompt_submit(input).await {
+            HookDecision::Terminate { reason } => {
+                Err(aries_agent::AriesError::hook_terminated(reason))
+            },
+            HookDecision::Continue { contexts } => Ok(contexts),
         }
-
-        Ok(())
     }
 
     async fn fire_stop(&self, assistant_output: impl Into<String>) {
         let input =
             StopHookInput::new(&self.id, &self.cwd, false).last_assistant_message(assistant_output);
-        self.hooks_executor.fire_stop(input).await;
+        if let HookDecision::Continue { contexts } = self.hooks_executor.fire_stop(input).await {
+            self.chat_context.append(&system_reminders(contexts)).await;
+        }
     }
 
     async fn fire_stop_failure(&self, error: impl Into<String>) {
@@ -593,6 +602,20 @@ impl Session {
         self.chat_history.append(messages).await;
         self.chat_context.append(messages).await;
     }
+}
+
+fn system_reminders<Item: AsRef<str>>(contents: impl IntoIterator<Item = Item>) -> Vec<Message> {
+    let mut messages = Vec::new();
+    for content in contents {
+        messages.push(system_reminder(content));
+    }
+    messages
+}
+
+fn system_reminder(content: impl AsRef<str>) -> Message {
+    let content = content.as_ref();
+
+    Message::user(["<system-reminder>", content, "</system-reminder>"].join("\n"))
 }
 
 fn message_to_simple_text(message: &Message) -> String {

@@ -1,5 +1,3 @@
-use std::process::Stdio;
-
 use aries_agent::AriesAgent;
 use aries_compact::ContextCompactor;
 use aries_event::Notifier;
@@ -67,14 +65,7 @@ impl<'a> BuiltinCommandsExecutor<'a> {
         let args = args.as_ref();
         let shell = std::env::var("SHELL").unwrap_or(String::from("bash"));
 
-        let output = Command::new(shell)
-            .arg("-c")
-            .arg(args)
-            .stdin(Stdio::inherit())
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit())
-            .output()
-            .await;
+        let output = Command::new(shell).arg("-c").arg(args).output().await;
         match output {
             Ok(output) => {
                 let stdout = String::from_utf8_lossy(&output.stdout);

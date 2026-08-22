@@ -13,7 +13,9 @@ const KEEP_TOOL_RESULT_TOOL_NAMES: &[&str; 4] =
 
 const COMPACTABLE_TOOL_CALL_TOOL_NAMES: &[&str; 3] = &[edit::NAME, multiedit::NAME, write::NAME];
 
-pub fn micro_compact(messages: &mut [Message], keep_recent: usize) {
+pub fn micro_compact(messages: &mut [Message], keep_recent: usize) -> bool {
+    let mut compacted = false;
+
     // 清理 Tool Result
 
     let compactable = messages
@@ -40,6 +42,7 @@ pub fn micro_compact(messages: &mut [Message], keep_recent: usize) {
                             serde_json::json!({"note": TOOL_RESULT_PLACEHOLDER}),
                         )],
                     );
+                    compacted = true;
                 }
             }
         }
@@ -71,8 +74,11 @@ pub fn micro_compact(messages: &mut [Message], keep_recent: usize) {
                         &function.name,
                         serde_json::json!({"note": TOOL_CALL_PLACEHOLDER}),
                     );
+                    compacted = true;
                 }
             }
         }
     }
+
+    compacted
 }
