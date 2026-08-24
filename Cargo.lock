@@ -386,14 +386,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aries-cron"
-version = "0.1.0"
-
-[[package]]
-name = "aries-daemon"
-version = "0.1.0"
-
-[[package]]
 name = "aries-event"
 version = "0.1.0"
 dependencies = [
@@ -520,14 +512,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aries-sandbox"
-version = "0.1.0"
-
-[[package]]
-name = "aries-selfimprove"
-version = "0.1.0"
-
-[[package]]
 name = "aries-session"
 version = "0.1.0"
 dependencies = [
@@ -564,10 +548,6 @@ dependencies = [
  "toml",
  "tracing",
 ]
-
-[[package]]
-name = "aries-telemetry"
-version = "0.1.0"
 
 [[package]]
 name = "aries-tokenopt"
@@ -607,10 +587,6 @@ dependencies = [
  "tree-sitter",
  "tree-sitter-bash",
 ]
-
-[[package]]
-name = "aries-workflow"
-version = "0.1.0"
 
 [[package]]
 name = "aristo"

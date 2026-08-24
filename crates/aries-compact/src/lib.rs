@@ -85,7 +85,6 @@ impl ContextCompactor {
             read.estimate_tokens().saturating_add(prompt.estimate_tokens())
         };
 
-        self.notifier.notify(format!("[pre-compact] estimated tokens = {estimated_tokens} \n\n"));
         if estimated_tokens >= compact_threshold {
             let text = format!(
                 "\n预估 tokens {estimated_tokens} 已达阈值 {compact_threshold}（上下文窗口 {}），提前触发压缩...\n",

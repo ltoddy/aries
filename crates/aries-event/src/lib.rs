@@ -43,7 +43,7 @@ impl Notifier {
 #[derive(Debug, Clone)]
 pub enum AgentEvent {
     Notification(String),
-    StreamItem(MultiTurnStreamItem),
+    StreamItem(Box<MultiTurnStreamItem>),
     AwaitingUserInput { args: serde_json::Value },
     SessionInfoUpdate { title: String, updated_at: String },
 }
@@ -55,7 +55,7 @@ impl AgentEvent {
     }
 
     pub fn stream_item(stream_item: MultiTurnStreamItem) -> Self {
-        Self::StreamItem(stream_item)
+        Self::StreamItem(Box::new(stream_item))
     }
 
     pub fn awaiting_user_input(args: serde_json::Value) -> Self {

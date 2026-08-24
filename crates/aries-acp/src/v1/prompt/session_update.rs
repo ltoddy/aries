@@ -29,7 +29,7 @@ impl SessionUpdates {
                 ContentChunk::new(ContentBlock::from(text)),
             )]),
             AgentEvent::StreamItem(stream_item) => {
-                match stream_item {
+                match *stream_item {
                     MultiTurnStreamItem::StreamAssistantItem(v) => {
                         Self(Self::from_stream_assistant_content(v, tool_calls))
                     },

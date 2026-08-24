@@ -5,8 +5,6 @@ members = [
     "crates/aries-cli",
     "crates/aries-compact",
     "crates/aries-context",
-    "crates/aries-cron",
-    "crates/aries-daemon",
     "crates/aries-event",
     "crates/aries-extension",
     "crates/aries-filesystem",
@@ -17,13 +15,9 @@ members = [
     "crates/aries-mode",
     "crates/aries-persistence",
     "crates/aries-preamble",
-    "crates/aries-sandbox",
-    "crates/aries-selfimprove",
     "crates/aries-session",
-    "crates/aries-telemetry",
     "crates/aries-tokenopt",
     "crates/aries-tools",
-    "crates/aries-workflow",
 ]
 default-members = ["crates/aries-cli"]
 resolver = "3"
