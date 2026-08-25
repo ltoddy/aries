@@ -17,5 +17,6 @@ itertools.workspace = true
 parking_lot.workspace = true
 rig.workspace = true
 serde_json.workspace = true
-tokio = { workspace = true, features = ["sync"] }
+tokio = { workspace = true, features = ["net", "sync"] }
+tokio-util = { workspace = true, features = ["compat"] }
 tracing.workspace = true

@@ -10,19 +10,8 @@ use serde_json::Value;
 
 pub use self::args::{BatchArgs, BatchCall, NAME};
 pub use self::error::BatchError;
-pub use self::output::BatchOutput;
-use crate::bash::{BashArgs, BashTool};
-use crate::codesearch::{CodeSearchArgs, CodeSearchTool};
+pub use self::output::{BatchOutput, ToolOutput};
 use crate::context::ToolContext;
-use crate::edit::{EditArgs, EditTool};
-use crate::glob::{GlobArgs, GlobTool};
-use crate::grep::{GrepArgs, GrepTool};
-use crate::multiedit::{MultiEditArgs, MultiEditTool};
-use crate::question::{AskUserQuestionArgs, AskUserQuestionTool};
-use crate::read::{ReadArgs, ReadTool};
-use crate::webfetch::{WebFetchArgs, WebFetchTool};
-use crate::websearch::{WebSearchArgs, WebSearchTool};
-use crate::write::{WriteArgs, WriteTool};
 use crate::{
     agent, bash, codesearch, edit, glob, grep, multiedit, question, read, webfetch, websearch,
     write,
@@ -36,6 +25,120 @@ pub struct BatchTool {
 impl BatchTool {
     pub fn new(cwd: impl AsRef<Path>, ctx: ToolContext) -> Self {
         Self { cwd: cwd.as_ref().to_path_buf(), ctx }
+    }
+
+    async fn dispatch(
+        &self,
+        tool_name: String,
+        params: Value,
+        context: &mut rig::tool::ToolContext,
+    ) -> Result<Value, BatchError> {
+        let cwd = self.cwd.clone();
+        let ctx = self.ctx.clone();
+
+        match tool_name.as_str() {
+            agent::NAME => Err(BatchError::agent_not_allowed()),
+            bash::NAME => {
+                let args = serde_json::from_value::<bash::BashArgs>(params)
+                    .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
+                let res = Tool::call(&bash::BashTool::new(cwd), context, args)
+                    .await
+                    .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
+                serde_json::to_value(res)
+                    .map_err(|e| BatchError::serialize_output(tool_name.clone(), e))
+            },
+            read::NAME => {
+                let args = serde_json::from_value::<read::ReadArgs>(params)
+                    .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
+                let res = Tool::call(&read::ReadTool::new(cwd, ctx), context, args)
+                    .await
+                    .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
+                serde_json::to_value(res)
+                    .map_err(|e| BatchError::serialize_output(tool_name.clone(), e))
+            },
+            write::NAME => {
+                let args = serde_json::from_value::<write::WriteArgs>(params)
+                    .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
+                let res = Tool::call(&write::WriteTool::new(cwd, ctx), context, args)
+                    .await
+                    .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
+                serde_json::to_value(res)
+                    .map_err(|e| BatchError::serialize_output(tool_name.clone(), e))
+            },
+            glob::NAME => {
+                let args = serde_json::from_value::<glob::GlobArgs>(params)
+                    .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
+                let res = Tool::call(&glob::GlobTool::new(cwd), context, args)
+                    .await
+                    .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
+                serde_json::to_value(res)
+                    .map_err(|e| BatchError::serialize_output(tool_name.clone(), e))
+            },
+            grep::NAME => {
+                let args = serde_json::from_value::<grep::GrepArgs>(params)
+                    .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
+                let res = Tool::call(&grep::GrepTool::new(cwd), context, args)
+                    .await
+                    .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
+                serde_json::to_value(res)
+                    .map_err(|e| BatchError::serialize_output(tool_name.clone(), e))
+            },
+            multiedit::NAME => {
+                let args = serde_json::from_value::<multiedit::MultiEditArgs>(params)
+                    .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
+                let res = Tool::call(&multiedit::MultiEditTool::new(cwd, ctx), context, args)
+                    .await
+                    .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
+                serde_json::to_value(res)
+                    .map_err(|e| BatchError::serialize_output(tool_name.clone(), e))
+            },
+            edit::NAME => {
+                let args = serde_json::from_value::<edit::EditArgs>(params)
+                    .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
+                let res = Tool::call(&edit::EditTool::new(cwd, ctx), context, args)
+                    .await
+                    .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
+                serde_json::to_value(res)
+                    .map_err(|e| BatchError::serialize_output(tool_name.clone(), e))
+            },
+            question::NAME => {
+                let args = serde_json::from_value::<question::AskUserQuestionArgs>(params)
+                    .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
+                let res = Tool::call(&question::AskUserQuestionTool, context, args)
+                    .await
+                    .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
+                serde_json::to_value(res)
+                    .map_err(|e| BatchError::serialize_output(tool_name.clone(), e))
+            },
+            webfetch::NAME => {
+                let args = serde_json::from_value::<webfetch::WebFetchArgs>(params)
+                    .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
+                let res = Tool::call(&webfetch::WebFetchTool, context, args)
+                    .await
+                    .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
+                serde_json::to_value(res)
+                    .map_err(|e| BatchError::serialize_output(tool_name.clone(), e))
+            },
+            websearch::NAME => {
+                let args = serde_json::from_value::<websearch::WebSearchArgs>(params)
+                    .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
+                let res = Tool::call(&websearch::WebSearchTool::new(), context, args)
+                    .await
+                    .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
+                serde_json::to_value(res)
+                    .map_err(|e| BatchError::serialize_output(tool_name.clone(), e))
+            },
+            codesearch::NAME => {
+                let args = serde_json::from_value::<codesearch::CodeSearchArgs>(params)
+                    .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
+                let res = Tool::call(&codesearch::CodeSearchTool, context, args)
+                    .await
+                    .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
+                serde_json::to_value(res)
+                    .map_err(|e| BatchError::serialize_output(tool_name.clone(), e))
+            },
+            _ => Err(BatchError::unsupported_tool(tool_name)),
+        }
     }
 }
 
@@ -85,15 +188,12 @@ impl Tool for BatchTool {
         for call in args.calls.into_iter().take(25) {
             let tool_name = call.tool.clone();
             let params = call.parameters;
-            let cwd = self.cwd.clone();
-            let ctx = self.ctx.clone();
-
             let mut context = context.clone();
             let future = async move {
                 if tool_name == NAME {
-                    Err("Nested batch calls are not allowed".to_string())
+                    Err(BatchError::nested_batch())
                 } else {
-                    dispatch(tool_name, params, cwd, ctx, &mut context).await
+                    self.dispatch(tool_name, params, &mut context).await
                 }
             };
             futures.push(future);
@@ -104,112 +204,11 @@ impl Tool for BatchTool {
         let mut final_results = Vec::new();
         for res in executed_results.into_iter() {
             match res {
-                Ok(value) => {
-                    final_results.push(serde_json::json!({
-                        "success": true,
-                        "result": value
-                    }));
-                },
-                Err(e) => {
-                    final_results.push(serde_json::json!({
-                        "success": false,
-                        "error": e
-                    }));
-                },
+                Ok(value) => final_results.push(ToolOutput::success(value)),
+                Err(e) => final_results.push(ToolOutput::failed(e)),
             }
         }
 
-        Ok(BatchOutput { results: final_results })
-    }
-}
-
-async fn dispatch(
-    tool_name: String,
-    params: Value,
-    cwd: PathBuf,
-    ctx: ToolContext,
-    context: &mut rig::tool::ToolContext,
-) -> Result<Value, String> {
-    match tool_name.as_str() {
-        bash::NAME => {
-            let args: BashArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
-            Tool::call(&BashTool::new(cwd), context, args)
-                .await
-                .map(|res| serde_json::to_value(res).unwrap())
-                .map_err(|e| e.to_string())
-        },
-        read::NAME => {
-            let args: ReadArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
-            Tool::call(&ReadTool::new(cwd, ctx), context, args)
-                .await
-                .map(|res| serde_json::to_value(res).unwrap())
-                .map_err(|e| e.to_string())
-        },
-        write::NAME => {
-            let args: WriteArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
-            Tool::call(&WriteTool::new(cwd, ctx), context, args)
-                .await
-                .map(|res| serde_json::to_value(res).unwrap())
-                .map_err(|e| e.to_string())
-        },
-        glob::NAME => {
-            let args: GlobArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
-            Tool::call(&GlobTool::new(cwd), context, args)
-                .await
-                .map(|res| serde_json::to_value(res).unwrap())
-                .map_err(|e| e.to_string())
-        },
-        grep::NAME => {
-            let args: GrepArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
-            Tool::call(&GrepTool::new(cwd), context, args)
-                .await
-                .map(|res| serde_json::to_value(res).unwrap())
-                .map_err(|e| e.to_string())
-        },
-        multiedit::NAME => {
-            let args: MultiEditArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
-            Tool::call(&MultiEditTool::new(cwd, ctx), context, args)
-                .await
-                .map(|res| serde_json::to_value(res).unwrap())
-                .map_err(|e| e.to_string())
-        },
-        edit::NAME => {
-            let args: EditArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
-            Tool::call(&EditTool::new(cwd, ctx), context, args)
-                .await
-                .map(|res| serde_json::to_value(res).unwrap())
-                .map_err(|e| e.to_string())
-        },
-        question::NAME => {
-            let args: AskUserQuestionArgs =
-                serde_json::from_value(params).map_err(|e| e.to_string())?;
-            Tool::call(&AskUserQuestionTool, context, args)
-                .await
-                .map(|res| serde_json::to_value(res).unwrap())
-                .map_err(|e| e.to_string())
-        },
-        agent::NAME => Err("AgentTool is not allowed in batch".to_string()),
-        webfetch::NAME => {
-            let args: WebFetchArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
-            Tool::call(&WebFetchTool, context, args)
-                .await
-                .map(|res| serde_json::to_value(res).unwrap())
-                .map_err(|e| e.to_string())
-        },
-        websearch::NAME => {
-            let args: WebSearchArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
-            Tool::call(&WebSearchTool::new(), context, args)
-                .await
-                .map(|res| serde_json::to_value(res).unwrap())
-                .map_err(|e| e.to_string())
-        },
-        codesearch::NAME => {
-            let args: CodeSearchArgs = serde_json::from_value(params).map_err(|e| e.to_string())?;
-            Tool::call(&CodeSearchTool, context, args)
-                .await
-                .map(|res| serde_json::to_value(res).unwrap())
-                .map_err(|e| e.to_string())
-        },
-        _ => Err(format!("Tool '{}' not found or not supported in batch", tool_name)),
+        Ok(BatchOutput::new(final_results))
     }
 }

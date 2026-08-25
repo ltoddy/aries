@@ -77,7 +77,7 @@ where
                 Level::ERROR => line.red().bold().to_string(),
                 _ => line.yellow().to_string(),
             };
-            print!("{colored}");
+            eprint!("{colored}");
         }
     }
 }
