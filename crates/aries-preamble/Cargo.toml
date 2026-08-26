@@ -9,3 +9,4 @@ aries-filesystem = { path = "../aries-filesystem" }
 aries-init = { path = "../aries-init" }
 git2.workspace = true
 itertools.workspace = true
+jiff.workspace = true
