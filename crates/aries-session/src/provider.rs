@@ -12,6 +12,8 @@ use http::{HeaderMap, header};
 use reqwest_middleware::ClientWithMiddleware;
 use reqwest_retry::RetryTransientMiddleware;
 use reqwest_retry::policies::ExponentialBackoff;
+use rig::agent::ModelHandle;
+use rig::client::CompletionClient;
 use rig::http_client;
 use rig::providers::{anthropic, azure, deepseek, openai};
 use rig::tool::server::ToolServerHandle;
@@ -75,6 +77,18 @@ impl AriesClientProvider {
                     .build()?;
                 Ok(AriesClientProvider::OpenAI(client))
             },
+        }
+    }
+
+    pub fn completion_model(&self, model: impl Into<String>) -> ModelHandle {
+        let model = model.into();
+        match self {
+            AriesClientProvider::Anthropic(c) => {
+                ModelHandle::new(c.completion_model(model.clone()))
+            },
+            AriesClientProvider::Azure(c) => ModelHandle::new(c.completion_model(model.clone())),
+            AriesClientProvider::Deepseek(c) => ModelHandle::new(c.completion_model(model.clone())),
+            AriesClientProvider::OpenAI(c) => ModelHandle::new(c.completion_model(model)),
         }
     }
 

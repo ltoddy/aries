@@ -1,7 +1,7 @@
 use aries_event::Notifier;
 use futures::StreamExt;
-use rig::agent::{Agent, AgentHook, MultiTurnStreamItem, PromptResponse};
-use rig::completion::Message;
+use rig::agent::{Agent, AgentHook, ModelHandle, MultiTurnStreamItem, PromptResponse};
+use rig::completion::{CompletionModel, Message};
 use rig::streaming::StreamingPrompt;
 
 use crate::{AriesError, AriesResult};
@@ -68,5 +68,16 @@ impl AriesAgent {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn set_model_handle(&mut self, model: ModelHandle) {
+        self.inner.set_model_handle(model);
+    }
+
+    pub fn set_model<M>(&mut self, model: M)
+    where
+        M: CompletionModel + 'static,
+    {
+        self.inner.set_model(model);
     }
 }

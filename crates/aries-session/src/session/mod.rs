@@ -159,23 +159,10 @@ impl Session {
 
         let config = self.setting.activate(&alias)?;
 
-        self.client = AriesClientProvider::new(&config)?;
-        let agent = self
-            .client
-            .agent(
-                self.mode,
-                config.clone(),
-                self.cwd.clone(),
-                self.gctx.clone(),
-                self.lsp_client.clone(),
-                self.extensions.clone(),
-                self.tool_server_handle.clone(),
-                Notifier::clone(&self.notifier),
-            )
-            .await
-            .with_context(|| format!("failed to create agent for model {alias}"))?;
+        let client = AriesClientProvider::new(&config)?;
+        self.agent.set_model(client.completion_model(config.model()));
 
-        self.agent = agent;
+        self.client = client;
         self.config = config.to_owned();
         self.compactor.set_agent(self.client.compact_agent(
             self.config.model(),
