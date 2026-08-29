@@ -13,8 +13,8 @@ pub use self::error::BatchError;
 pub use self::output::{BatchOutput, ToolOutput};
 use crate::context::ToolContext;
 use crate::{
-    agent, bash, codesearch, edit, glob, grep, multiedit, question, read, webfetch, websearch,
-    write,
+    agent, bash, codesearch, edit, glob, grep, monitor, multiedit, question, read, task_output,
+    task_stop, webfetch, websearch, write,
 };
 
 pub struct BatchTool {
@@ -41,7 +41,7 @@ impl BatchTool {
             bash::NAME => {
                 let args = serde_json::from_value::<bash::BashArgs>(params)
                     .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
-                let res = Tool::call(&bash::BashTool::new(cwd), context, args)
+                let res = Tool::call(&bash::BashTool::new(cwd, ctx), context, args)
                     .await
                     .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
                 serde_json::to_value(res)
@@ -83,6 +83,15 @@ impl BatchTool {
                 serde_json::to_value(res)
                     .map_err(|e| BatchError::serialize_output(tool_name.clone(), e))
             },
+            monitor::NAME => {
+                let args = serde_json::from_value::<monitor::MonitorArgs>(params)
+                    .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
+                let res = Tool::call(&monitor::MonitorTool::new(cwd, ctx), context, args)
+                    .await
+                    .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
+                serde_json::to_value(res)
+                    .map_err(|e| BatchError::serialize_output(tool_name.clone(), e))
+            },
             multiedit::NAME => {
                 let args = serde_json::from_value::<multiedit::MultiEditArgs>(params)
                     .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
@@ -105,6 +114,24 @@ impl BatchTool {
                 let args = serde_json::from_value::<question::AskUserQuestionArgs>(params)
                     .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
                 let res = Tool::call(&question::AskUserQuestionTool, context, args)
+                    .await
+                    .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
+                serde_json::to_value(res)
+                    .map_err(|e| BatchError::serialize_output(tool_name.clone(), e))
+            },
+            task_output::NAME => {
+                let args = serde_json::from_value::<task_output::TaskOutputArgs>(params)
+                    .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
+                let res = Tool::call(&task_output::TaskOutputTool::new(ctx), context, args)
+                    .await
+                    .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
+                serde_json::to_value(res)
+                    .map_err(|e| BatchError::serialize_output(tool_name.clone(), e))
+            },
+            task_stop::NAME => {
+                let args = serde_json::from_value::<task_stop::TaskStopArgs>(params)
+                    .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
+                let res = Tool::call(&task_stop::TaskStopTool::new(ctx), context, args)
                     .await
                     .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
                 serde_json::to_value(res)

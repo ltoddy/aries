@@ -125,7 +125,13 @@ where
                 let preamble = body.clone();
                 let universe = tool_names_from_mode(Mode::General);
                 let tool_names = frontmatter.filter_tool_names(&universe);
-                let tools = create_tools_from_tool_names(&tool_names, &self.cwd, None, &[]);
+                let tools = create_tools_from_tool_names(
+                    &tool_names,
+                    &self.cwd,
+                    None,
+                    &[],
+                    Notifier::clone(&self.notifier),
+                );
                 let model = frontmatter.model.clone().unwrap_or_else(|| self.model.clone());
                 (name, preamble, tools, model)
             },
@@ -134,7 +140,13 @@ where
                 (
                     mode.name().to_owned(),
                     mode.bare_preamble().to_owned(),
-                    create_tools_from_mode(mode, &self.cwd, None, &[]),
+                    create_tools_from_mode(
+                        mode,
+                        &self.cwd,
+                        None,
+                        &[],
+                        Notifier::clone(&self.notifier),
+                    ),
                     self.model.clone(),
                 )
             },

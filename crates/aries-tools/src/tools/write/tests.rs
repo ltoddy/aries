@@ -15,7 +15,13 @@ async fn test_write_new_file() {
     let file_path = tmp.path().join("hello.txt");
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = WriteTool::new(tmp.path(), ToolContext::new(None));
+    let tool = WriteTool::new(
+        tmp.path(),
+        ToolContext::new(None, {
+            let (notifier, _) = aries_event::Notifier::channel();
+            notifier
+        }),
+    );
     let result = tool
         .call(
             &mut context,
@@ -35,7 +41,13 @@ async fn test_write_creates_parent_dirs() {
 
     let file_path = tmp.path().join("a/b/c/output.txt");
     let mut context = rig::tool::ToolContext::new();
-    let tool = WriteTool::new(tmp.path(), ToolContext::new(None));
+    let tool = WriteTool::new(
+        tmp.path(),
+        ToolContext::new(None, {
+            let (notifier, _) = aries_event::Notifier::channel();
+            notifier
+        }),
+    );
     tool.call(
         &mut context,
         WriteArgs { file_path: file_path.clone(), content: "nested content".to_string() },
@@ -53,7 +65,10 @@ async fn test_write_rejects_non_empty_existing_file() {
     let file_path = tmp.path().join("data.txt");
     fs::write(&file_path, "line1\nline2\nline3\n").unwrap();
 
-    let ctx = ToolContext::new(None);
+    let ctx = ToolContext::new(None, {
+        let (notifier, _) = aries_event::Notifier::channel();
+        notifier
+    });
 
     let mut context = rig::tool::ToolContext::new();
     let tool = WriteTool::new(tmp.path(), ctx);
@@ -77,7 +92,13 @@ async fn test_write_empty_content() {
 
     let file_path = tmp.path().join("empty.txt");
     let mut context = rig::tool::ToolContext::new();
-    let tool = WriteTool::new(tmp.path(), ToolContext::new(None));
+    let tool = WriteTool::new(
+        tmp.path(),
+        ToolContext::new(None, {
+            let (notifier, _) = aries_event::Notifier::channel();
+            notifier
+        }),
+    );
     tool.call(&mut context, WriteArgs { file_path: file_path.clone(), content: String::new() })
         .await
         .unwrap();
@@ -90,7 +111,13 @@ async fn test_write_resolves_relative_path_against_cwd() {
     let tmp = TempDir::new().unwrap();
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = WriteTool::new(tmp.path(), ToolContext::new(None));
+    let tool = WriteTool::new(
+        tmp.path(),
+        ToolContext::new(None, {
+            let (notifier, _) = aries_event::Notifier::channel();
+            notifier
+        }),
+    );
     let result = tool
         .call(
             &mut context,

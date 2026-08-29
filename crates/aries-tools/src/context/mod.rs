@@ -1,21 +1,25 @@
 mod error;
 mod file_checkpoint;
 mod read_state;
+mod task;
 
 use std::path::Path;
 use std::time::UNIX_EPOCH;
 
+use aries_event::Notifier;
 use aries_lspclient::SharedLspClient;
 use tokio::fs;
 
 pub use self::error::GuardWriteError;
 pub use self::file_checkpoint::SharedFileCheckpoint;
 pub use self::read_state::{ReadRecord, SharedReadState};
+pub use self::task::{StopTaskError, TaskKind, TaskRegistry, TaskSnapshot, TaskStatus};
 
 #[derive(Clone)]
 pub struct ToolContext {
     lsp_client: Option<SharedLspClient>,
     pub file_checkpoint: SharedFileCheckpoint,
+    pub task: TaskRegistry,
     read_state: SharedReadState,
 }
 
@@ -24,17 +28,19 @@ impl std::fmt::Debug for ToolContext {
         f.debug_struct("ToolContext")
             .field("has_lsp_client", &self.lsp_client.is_some())
             .field("file_checkpoint", &self.file_checkpoint)
+            .field("task", &self.task)
             .field("read_state", &self.read_state)
             .finish()
     }
 }
 
 impl ToolContext {
-    pub fn new(lsp_client: Option<SharedLspClient>) -> Self {
+    pub fn new(lsp_client: Option<SharedLspClient>, notifier: Notifier) -> Self {
         let file_checkpoint = SharedFileCheckpoint::new();
+        let task = TaskRegistry::new(notifier);
         let read_state = SharedReadState::new();
 
-        Self { lsp_client, file_checkpoint, read_state }
+        Self { lsp_client, file_checkpoint, task, read_state }
     }
 
     pub async fn on_file_read(&self, file_path: impl AsRef<Path>) {

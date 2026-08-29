@@ -307,9 +307,10 @@ impl Session {
         let memory_store = self.memory_store.clone();
         let query = query.into();
         let reply = reply.into();
+        let notifier = Notifier::clone(&self.notifier);
         tokio::spawn(async move {
             let manifest = memory_store.read_manifest().await.ok().flatten();
-            let memory_agent = client.memory_agent(model, memory_store.dir()).await;
+            let memory_agent = client.memory_agent(model, memory_store.dir(), notifier).await;
             memory_agent.run(manifest, query, reply).await;
         });
     }

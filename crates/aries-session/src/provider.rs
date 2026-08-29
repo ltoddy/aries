@@ -169,12 +169,21 @@ impl AriesClientProvider {
         &self,
         model: impl Into<String>,
         mem_dir: impl AsRef<Path>,
+        notifier: Notifier,
     ) -> MemoryAgent {
         match self {
-            AriesClientProvider::Anthropic(c) => MemoryAgent::new(c.clone(), model, mem_dir).await,
-            AriesClientProvider::Azure(c) => MemoryAgent::new(c.clone(), model, mem_dir).await,
-            AriesClientProvider::Deepseek(c) => MemoryAgent::new(c.clone(), model, mem_dir).await,
-            AriesClientProvider::OpenAI(c) => MemoryAgent::new(c.clone(), model, mem_dir).await,
+            AriesClientProvider::Anthropic(c) => {
+                MemoryAgent::new(c.clone(), model, mem_dir, notifier).await
+            },
+            AriesClientProvider::Azure(c) => {
+                MemoryAgent::new(c.clone(), model, mem_dir, notifier).await
+            },
+            AriesClientProvider::Deepseek(c) => {
+                MemoryAgent::new(c.clone(), model, mem_dir, notifier).await
+            },
+            AriesClientProvider::OpenAI(c) => {
+                MemoryAgent::new(c.clone(), model, mem_dir, notifier).await
+            },
         }
     }
 

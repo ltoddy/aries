@@ -1,5 +1,7 @@
 ## TODO
 
+- [ ] 实现后台执行任务的 Tool
+- [ ] BatchTool 支持调用 AgentTool
 - [ ] 从错误中恢复
   - 输出被截断 (Anthropic 的接口可以设置 max_tokens)
   - [x] 上下文超长 (agent loop 内发送端过滤, 详见 docs/error-recovery.md)

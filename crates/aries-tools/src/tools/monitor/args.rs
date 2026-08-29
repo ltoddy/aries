@@ -1,26 +1,17 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct BashArgs {
+pub struct MonitorArgs {
     pub command: String,
     #[serde(default)]
     pub description: Option<String>,
-    #[serde(default)]
-    pub background: bool,
 }
 
-impl BashArgs {
+impl MonitorArgs {
     pub fn title(&self) -> String {
-        let command = self.command.trim();
-        if command.is_empty() {
-            "Run a shell command".to_owned()
-        } else {
-            format!("Run shell command: {command}")
-        }
+        format!("Monitor command: {}", self.command.trim())
     }
-}
 
-impl BashArgs {
     pub fn render_args(raw: &str) -> Result<(String, Option<String>), serde_json::Error> {
         let args: Self = serde_json::from_str(raw)?;
         Ok((args.command, args.description))

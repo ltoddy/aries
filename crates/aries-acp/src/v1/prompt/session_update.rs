@@ -8,8 +8,8 @@ use agent_client_protocol::schema::v1::{
 use aries_event::AgentEvent;
 use aries_tools::tools::format_tool_output;
 use aries_tools::{
-    agent, bash, batch, codesearch, edit, glob, grep, lsp, multiedit, question, read, skill,
-    update_plan, webfetch, websearch, write,
+    agent, bash, batch, codesearch, edit, glob, grep, lsp, monitor, multiedit, question, read,
+    skill, task_output, task_stop, update_plan, webfetch, websearch, write,
 };
 use itertools::Itertools;
 use parking_lot::Mutex;
@@ -239,6 +239,9 @@ fn parse_tool_call(t: ToolCall) -> (String, Vec<ToolCallContent>) {
         lsp::NAME => serde_json::from_value::<lsp::LspArgs>(arguments)
             .map(|args| (args.title(), vec![]))
             .unwrap_or_else(|_| (default_title, vec![])),
+        monitor::NAME => serde_json::from_value::<monitor::MonitorArgs>(arguments)
+            .map(|args| (args.title(), vec![]))
+            .unwrap_or_else(|_| (default_title, vec![])),
         read::NAME => serde_json::from_value::<read::ReadArgs>(arguments)
             .map(|args| (args.title(), vec![]))
             .unwrap_or_else(|_| (default_title, vec![])),
@@ -284,6 +287,12 @@ fn parse_tool_call(t: ToolCall) -> (String, Vec<ToolCallContent>) {
         skill::NAME => serde_json::from_value::<skill::SkillArgs>(arguments)
             .map(|args| (args.title(), vec![]))
             .unwrap_or_else(|_| (default_title, vec![])),
+        task_output::NAME => serde_json::from_value::<task_output::TaskOutputArgs>(arguments)
+            .map(|args| (args.title(), vec![]))
+            .unwrap_or_else(|_| (default_title, vec![])),
+        task_stop::NAME => serde_json::from_value::<task_stop::TaskStopArgs>(arguments)
+            .map(|args| (args.title(), vec![]))
+            .unwrap_or_else(|_| (default_title, vec![])),
         update_plan::NAME => serde_json::from_value::<update_plan::UpdatePlanArgs>(arguments)
             .map(|args| (args.title(), vec![]))
             .unwrap_or_else(|_| (default_title, vec![])),
@@ -294,10 +303,10 @@ fn parse_tool_call(t: ToolCall) -> (String, Vec<ToolCallContent>) {
 fn tool_kind(tool_name: &Option<String>) -> ToolKind {
     match tool_name {
         Some(tool_name) => match tool_name.as_str() {
-            glob::NAME | read::NAME => ToolKind::Read,
+            glob::NAME | read::NAME | task_output::NAME => ToolKind::Read,
             edit::NAME | multiedit::NAME | write::NAME => ToolKind::Edit,
             grep::NAME | codesearch::NAME | lsp::NAME => ToolKind::Search,
-            bash::NAME | batch::NAME => ToolKind::Execute,
+            bash::NAME | batch::NAME | monitor::NAME | task_stop::NAME => ToolKind::Execute,
             webfetch::NAME | websearch::NAME => ToolKind::Fetch,
             agent::NAME | skill::NAME | update_plan::NAME => ToolKind::Think,
             _ => ToolKind::Other,

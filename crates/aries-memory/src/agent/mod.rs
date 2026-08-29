@@ -3,6 +3,7 @@ mod tests;
 
 use std::path::Path;
 
+use aries_event::Notifier;
 use itertools::Itertools;
 use rig::client::AgentClientExt;
 use rig::completion::Prompt;
@@ -18,7 +19,12 @@ pub struct MemoryAgent {
 impl MemoryAgent {
     const DEFAULT_MAX_TURNS: usize = 50;
 
-    pub async fn new<C>(c: C, model: impl Into<String>, memory_dir: impl AsRef<Path>) -> Self
+    pub async fn new<C>(
+        c: C,
+        model: impl Into<String>,
+        memory_dir: impl AsRef<Path>,
+        notifier: Notifier,
+    ) -> Self
     where
         C: AgentClientExt + 'static,
     {
@@ -29,7 +35,8 @@ impl MemoryAgent {
             aries_tools::glob::NAME,
             aries_tools::grep::NAME,
         ];
-        let toolset = aries_tools::create_tools_from_tool_names(&tool_names, memory_dir, None, &[]);
+        let toolset =
+            aries_tools::create_tools_from_tool_names(&tool_names, memory_dir, None, &[], notifier);
         let tool_server_handle = ToolServer::new().run();
         tool_server_handle.append_toolset(toolset).await;
 

@@ -75,13 +75,14 @@ where
             &self.cwd,
             self.lsp_client.clone(),
             &self.extensions.skills,
+            Notifier::clone(&self.notifier),
         );
         if self.mode == Mode::Build || self.mode == Mode::General {
             tools.add_tool(agent::AgentTool::<C>::new(
                 self.client.clone(),
                 &self.model,
                 &self.cwd,
-                self.notifier.clone(),
+                Notifier::clone(&self.notifier),
                 self.extensions.agents.clone(),
             ));
         }

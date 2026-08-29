@@ -19,7 +19,10 @@ async fn seed_file(ctx: &ToolContext, path: &std::path::Path, content: &str) {
 async fn test_multiedit_basic() {
     let dir = TempDir::new().unwrap();
     let file_path = dir.path().join("test.txt");
-    let ctx = ToolContext::new(None);
+    let ctx = ToolContext::new(None, {
+        let (notifier, _) = aries_event::Notifier::channel();
+        notifier
+    });
     seed_file(&ctx, &file_path, "hello world").await;
 
     let mut context = rig::tool::ToolContext::new();
@@ -58,7 +61,13 @@ async fn test_multiedit_creates_file() {
     let file_path = dir.path().join("new_file.txt");
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = MultiEditTool::new(dir.path(), ToolContext::new(None));
+    let tool = MultiEditTool::new(
+        dir.path(),
+        ToolContext::new(None, {
+            let (notifier, _) = aries_event::Notifier::channel();
+            notifier
+        }),
+    );
     let result = tool
         .call(
             &mut context,
@@ -83,7 +92,10 @@ async fn test_multiedit_creates_file() {
 async fn test_multiedit_identical_text_error() {
     let dir = TempDir::new().unwrap();
     let file_path = dir.path().join("test.txt");
-    let ctx = ToolContext::new(None);
+    let ctx = ToolContext::new(None, {
+        let (notifier, _) = aries_event::Notifier::channel();
+        notifier
+    });
     seed_file(&ctx, &file_path, "hello").await;
 
     let mut context = rig::tool::ToolContext::new();
@@ -113,7 +125,13 @@ async fn test_multiedit_rejects_unread_file() {
     fs::write(&file_path, "hello world").unwrap();
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = MultiEditTool::new(dir.path(), ToolContext::new(None));
+    let tool = MultiEditTool::new(
+        dir.path(),
+        ToolContext::new(None, {
+            let (notifier, _) = aries_event::Notifier::channel();
+            notifier
+        }),
+    );
     let result = tool
         .call(
             &mut context,

@@ -15,7 +15,13 @@ async fn test_read_file() {
     fs::write(&file_path, "line1\nline2\nline3").unwrap();
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = ReadTool::new(dir.path(), ToolContext::new(None));
+    let tool = ReadTool::new(
+        dir.path(),
+        ToolContext::new(None, {
+            let (notifier, _) = aries_event::Notifier::channel();
+            notifier
+        }),
+    );
     let result =
         tool.call(&mut context, ReadArgs { file_path, offset: None, limit: None }).await.unwrap();
 
@@ -30,7 +36,13 @@ async fn test_read_file_with_offset() {
     fs::write(&file_path, "line1\nline2\nline3").unwrap();
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = ReadTool::new(dir.path(), ToolContext::new(None));
+    let tool = ReadTool::new(
+        dir.path(),
+        ToolContext::new(None, {
+            let (notifier, _) = aries_event::Notifier::channel();
+            notifier
+        }),
+    );
     let result = tool
         .call(&mut context, ReadArgs { file_path, offset: Some(2), limit: None })
         .await
@@ -47,7 +59,13 @@ async fn test_read_file_with_limit() {
     fs::write(&file_path, "line1\nline2\nline3\nline4").unwrap();
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = ReadTool::new(dir.path(), ToolContext::new(None));
+    let tool = ReadTool::new(
+        dir.path(),
+        ToolContext::new(None, {
+            let (notifier, _) = aries_event::Notifier::channel();
+            notifier
+        }),
+    );
     let result = tool
         .call(&mut context, ReadArgs { file_path, offset: Some(2), limit: Some(2) })
         .await
@@ -65,7 +83,13 @@ async fn test_read_file_respects_default_line_cap() {
     fs::write(&file_path, content).unwrap();
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = ReadTool::new(dir.path(), ToolContext::new(None));
+    let tool = ReadTool::new(
+        dir.path(),
+        ToolContext::new(None, {
+            let (notifier, _) = aries_event::Notifier::channel();
+            notifier
+        }),
+    );
     let result =
         tool.call(&mut context, ReadArgs { file_path, offset: None, limit: None }).await.unwrap();
 
@@ -82,7 +106,13 @@ async fn test_read_empty_file() {
     fs::write(&file_path, "").unwrap();
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = ReadTool::new(dir.path(), ToolContext::new(None));
+    let tool = ReadTool::new(
+        dir.path(),
+        ToolContext::new(None, {
+            let (notifier, _) = aries_event::Notifier::channel();
+            notifier
+        }),
+    );
     let result =
         tool.call(&mut context, ReadArgs { file_path, offset: None, limit: None }).await.unwrap();
 
@@ -94,7 +124,13 @@ async fn test_read_directory_is_rejected() {
     let dir = TempDir::new().unwrap();
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = ReadTool::new(dir.path(), ToolContext::new(None));
+    let tool = ReadTool::new(
+        dir.path(),
+        ToolContext::new(None, {
+            let (notifier, _) = aries_event::Notifier::channel();
+            notifier
+        }),
+    );
     let result = tool
         .call(
             &mut context,
@@ -108,7 +144,13 @@ async fn test_read_directory_is_rejected() {
 #[tokio::test]
 async fn test_read_file_not_found() {
     let mut context = rig::tool::ToolContext::new();
-    let tool = ReadTool::new(".", ToolContext::new(None));
+    let tool = ReadTool::new(
+        ".",
+        ToolContext::new(None, {
+            let (notifier, _) = aries_event::Notifier::channel();
+            notifier
+        }),
+    );
     let result = tool
         .call(
             &mut context,

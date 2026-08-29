@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+aries-event = { path = "../aries-event" }
 aries-filesystem = { path = "../aries-filesystem" }
 aries-tools = { path = "../aries-tools" }
 itertools.workspace = true

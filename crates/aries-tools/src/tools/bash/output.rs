@@ -7,15 +7,30 @@ pub struct BashOutput {
     pub stdout: String,
     pub stderr: String,
     pub exit_code: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub task_id: Option<String>,
 }
 
 impl BashOutput {
     pub fn new(stdout: impl Into<String>, stderr: impl Into<String>, exit_code: i32) -> Self {
-        Self { stdout: truncate(stdout), stderr: truncate(stderr), exit_code }
+        Self { stdout: truncate(stdout), stderr: truncate(stderr), exit_code, task_id: None }
+    }
+
+    pub fn background(task_id: impl Into<String>) -> Self {
+        Self {
+            stdout: String::new(),
+            stderr: String::new(),
+            exit_code: 0,
+            task_id: Some(task_id.into()),
+        }
     }
 
     pub fn render_output(raw: serde_json::Value) -> Result<String, serde_json::Error> {
         let output: Self = serde_json::from_value(raw)?;
+        if let Some(task_id) = output.task_id {
+            return Ok(format!("task_id: {task_id}"));
+        }
+
         let mut text = String::new();
         if !output.stdout.is_empty() {
             text.push_str(&output.stdout);

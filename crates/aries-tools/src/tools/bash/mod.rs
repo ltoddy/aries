@@ -6,7 +6,6 @@ mod tests;
 
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::time::Duration;
 
 use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
@@ -16,23 +15,22 @@ use tree_sitter::{Language, Node, Parser};
 pub use self::args::BashArgs;
 pub use self::error::BashError;
 pub use self::output::BashOutput;
+use crate::context::{self, TaskKind};
 
 pub const NAME: &str = "Bash";
 
 pub struct BashTool {
     cwd: PathBuf,
+    ctx: context::ToolContext,
     language: Language,
 }
 
 impl BashTool {
-    const DEFAULT_TIMEOUT_MS: u64 = 120_000;
-    const MAX_TIMEOUT_MS: u64 = 600_000;
-
-    pub fn new(cwd: impl AsRef<Path>) -> Self {
-        let cwd = cwd.as_ref().to_path_buf();
+    pub fn new(cwd: impl AsRef<Path>, ctx: context::ToolContext) -> Self {
+        let cwd = cwd.as_ref();
         let language = tree_sitter_bash::LANGUAGE.into();
 
-        Self { cwd, language }
+        Self { cwd: cwd.to_owned(), ctx, language }
     }
 
     fn attempt_rewrite_last_command(&self, cmd: &str) -> Option<String> {
@@ -66,17 +64,13 @@ impl Tool for BashTool {
                     "type": "string",
                     "description": "The shell command to execute"
                 },
-                "timeout": {
-                    "type": "number",
-                    "description": format!(
-                        "Optional timeout in milliseconds (default {}, max {})",
-                        Self::DEFAULT_TIMEOUT_MS,
-                        Self::MAX_TIMEOUT_MS
-                    )
-                },
                 "description": {
                     "type": "string",
                     "description": "Clear, concise description of what this command does in 5-10 words"
+                },
+                "background": {
+                    "type": "boolean",
+                    "description": "Set to true to run this command in the background. Use TaskOutput to read the output later."
                 }
             },
             "required": ["command"]
@@ -90,12 +84,11 @@ impl Tool for BashTool {
     ) -> Result<Self::Output, Self::Error> {
         let arg = self.attempt_rewrite_last_command(&args.command).unwrap_or(args.command);
 
-        let timeout = args
-            .timeout
-            .filter(|&ms| ms > 0)
-            .unwrap_or(Self::DEFAULT_TIMEOUT_MS)
-            .min(Self::MAX_TIMEOUT_MS);
-        let timeout = Duration::from_millis(timeout);
+        if args.background {
+            let task =
+                self.ctx.task.spawn(TaskKind::Bash, &self.cwd, arg, args.description).await?;
+            return Ok(BashOutput::background(task.task_id));
+        }
 
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "bash".to_owned());
         let mut command = Command::new(shell);
@@ -107,10 +100,7 @@ impl Tool for BashTool {
             .stderr(Stdio::piped())
             .kill_on_drop(true);
 
-        let output = match tokio::time::timeout(timeout, command.output()).await {
-            Ok(result) => result.map_err(BashError::Io)?,
-            Err(_) => return Err(BashError::Timeout(timeout.as_millis() as u64)),
-        };
+        let output = command.output().await.map_err(BashError::io)?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);

@@ -17,7 +17,10 @@ async fn seed_file(ctx: &ToolContext, path: &std::path::Path, content: &str) {
 async fn test_edit_simple_replacement() {
     let dir = TempDir::new().unwrap();
     let file_path = dir.path().join("test.txt");
-    let ctx = ToolContext::new(None);
+    let ctx = ToolContext::new(None, {
+        let (notifier, _) = aries_event::Notifier::channel();
+        notifier
+    });
     seed_file(&ctx, &file_path, "hello world").await;
 
     let mut context = rig::tool::ToolContext::new();
@@ -46,7 +49,10 @@ async fn test_edit_simple_replacement() {
 async fn test_edit_replace_all() {
     let dir = TempDir::new().unwrap();
     let file_path = dir.path().join("test.txt");
-    let ctx = ToolContext::new(None);
+    let ctx = ToolContext::new(None, {
+        let (notifier, _) = aries_event::Notifier::channel();
+        notifier
+    });
     seed_file(&ctx, &file_path, "foo foo foo").await;
 
     let mut context = rig::tool::ToolContext::new();
@@ -72,7 +78,13 @@ async fn test_edit_replace_all() {
 async fn test_edit_file_not_found() {
     let dir = TempDir::new().unwrap();
     let mut context = rig::tool::ToolContext::new();
-    let tool = EditTool::new(dir.path(), ToolContext::new(None));
+    let tool = EditTool::new(
+        dir.path(),
+        ToolContext::new(None, {
+            let (notifier, _) = aries_event::Notifier::channel();
+            notifier
+        }),
+    );
     let result = tool
         .call(
             &mut context,
@@ -92,7 +104,10 @@ async fn test_edit_file_not_found() {
 async fn test_edit_old_text_not_found() {
     let dir = TempDir::new().unwrap();
     let file_path = dir.path().join("test.txt");
-    let ctx = ToolContext::new(None);
+    let ctx = ToolContext::new(None, {
+        let (notifier, _) = aries_event::Notifier::channel();
+        notifier
+    });
     seed_file(&ctx, &file_path, "hello world").await;
 
     let mut context = rig::tool::ToolContext::new();
@@ -116,7 +131,10 @@ async fn test_edit_old_text_not_found() {
 async fn test_edit_multiple_matches_without_replace_all() {
     let dir = TempDir::new().unwrap();
     let file_path = dir.path().join("test.txt");
-    let ctx = ToolContext::new(None);
+    let ctx = ToolContext::new(None, {
+        let (notifier, _) = aries_event::Notifier::channel();
+        notifier
+    });
     seed_file(&ctx, &file_path, "a a a").await;
 
     let mut context = rig::tool::ToolContext::new();
@@ -144,7 +162,13 @@ async fn test_edit_rejects_unread_file() {
     fs::write(&file_path, "hello world").await.unwrap();
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = EditTool::new(dir.path(), ToolContext::new(None));
+    let tool = EditTool::new(
+        dir.path(),
+        ToolContext::new(None, {
+            let (notifier, _) = aries_event::Notifier::channel();
+            notifier
+        }),
+    );
     let result = tool
         .call(
             &mut context,
@@ -164,7 +188,10 @@ async fn test_edit_rejects_unread_file() {
 async fn test_edit_rejects_modified_since_read() {
     let dir = TempDir::new().unwrap();
     let file_path = dir.path().join("test.txt");
-    let ctx = ToolContext::new(None);
+    let ctx = ToolContext::new(None, {
+        let (notifier, _) = aries_event::Notifier::channel();
+        notifier
+    });
     seed_file(&ctx, &file_path, "hello world").await;
 
     // 读取之后文件被外部修改（mtime 前移），编辑应被拒绝。
