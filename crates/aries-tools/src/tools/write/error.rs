@@ -15,6 +15,6 @@ impl WriteError {
     pub fn file_not_empty(file_path: impl AsRef<Path>) -> Self {
         let file_path = file_path.as_ref();
 
-        Self::FileNotEmpty(file_path.to_path_buf())
+        Self::FileNotEmpty(file_path.to_owned())
     }
 }

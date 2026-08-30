@@ -53,7 +53,7 @@ pub fn walk_dirs(
                 if path == root {
                     return WalkState::Continue;
                 }
-                visited.lock().push(path.to_path_buf());
+                visited.lock().push(path.to_owned());
                 WalkState::Continue
             })
         });

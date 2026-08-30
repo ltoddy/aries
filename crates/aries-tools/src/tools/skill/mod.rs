@@ -108,7 +108,7 @@ impl Tool for SkillTool {
         Ok(SkillOutput {
             title: format!("Loaded skill: {}", args.name),
             output,
-            metadata: SkillMetadata { name: args.name, dir: dir.to_path_buf() },
+            metadata: SkillMetadata { name: args.name, dir: dir.to_owned() },
         })
     }
 }

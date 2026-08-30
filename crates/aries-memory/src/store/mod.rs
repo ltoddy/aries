@@ -22,7 +22,7 @@ impl MemoryStore {
         let dir = dir.as_ref();
         _ = tokio::fs::create_dir_all(dir).await;
 
-        Self { dir: dir.to_path_buf() }
+        Self { dir: dir.to_owned() }
     }
 
     pub async fn read_memory(&self, file_name: impl Into<String>) -> Option<String> {
@@ -96,7 +96,7 @@ impl Memory {
         let file_name = file_name.into();
         let body = body.into();
 
-        Self { location: location.to_path_buf(), file_name, frontmatter, body }
+        Self { location: location.to_owned(), file_name, frontmatter, body }
     }
 
     pub fn to_retriever_line(&self) -> String {

@@ -19,7 +19,7 @@ pub struct MultiEditOutput {
 
 impl MultiEditOutput {
     pub fn for_create(file_path: impl AsRef<Path>, additions: usize) -> Self {
-        let file_path = file_path.as_ref().to_path_buf();
+        let file_path = file_path.as_ref().to_owned();
 
         Self {
             kind: WriteKind::Create,
@@ -38,7 +38,7 @@ impl MultiEditOutput {
         additions: usize,
         deletions: usize,
     ) -> Self {
-        let file_path = file_path.as_ref().to_path_buf();
+        let file_path = file_path.as_ref().to_owned();
         let original_content = original_content.into();
 
         Self {

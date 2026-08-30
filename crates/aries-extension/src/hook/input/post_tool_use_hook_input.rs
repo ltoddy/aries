@@ -49,7 +49,7 @@ where
         tool_use_id: impl Into<String>,
     ) -> Self {
         let session_id = session_id.into();
-        let cwd = cwd.as_ref().to_path_buf();
+        let cwd = cwd.as_ref().to_owned();
         let tool_name = tool_name.into();
         let tool_use_id = tool_use_id.into();
 
@@ -65,7 +65,7 @@ where
     }
 
     pub fn transcript_path(mut self, transcript_path: impl AsRef<Path>) -> Self {
-        self.transcript_path = Some(transcript_path.as_ref().to_path_buf());
+        self.transcript_path = Some(transcript_path.as_ref().to_owned());
         self
     }
 

@@ -16,10 +16,10 @@ impl SkillDefinition {
         frontmatter: Frontmatter,
         body: impl Into<String>,
     ) -> Self {
-        let location = location.as_ref().to_path_buf();
+        let location = location.as_ref();
         let body = body.into();
 
-        Self { location, frontmatter, body }
+        Self { location: location.to_owned(), frontmatter, body }
     }
 }
 

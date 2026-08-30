@@ -25,7 +25,7 @@ pub struct GlobTool {
 
 impl GlobTool {
     pub fn new(cwd: impl AsRef<Path>) -> Self {
-        let cwd = cwd.as_ref().to_path_buf();
+        let cwd = cwd.as_ref().to_owned();
 
         Self { cwd }
     }
@@ -107,7 +107,7 @@ impl Tool for GlobTool {
                 .and_then(|m| m.modified().ok())
                 .unwrap_or(SystemTime::UNIX_EPOCH);
 
-            matches.push((relative.to_path_buf(), modified));
+            matches.push((relative.to_owned(), modified));
         }
 
         matches.sort_by_key(|next| std::cmp::Reverse(next.1));

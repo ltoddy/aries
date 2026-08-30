@@ -83,12 +83,12 @@ pub enum DocumentError {
 
 impl DocumentError {
     pub fn io(file_path: impl AsRef<Path>, err: io::Error) -> Self {
-        let file_path = file_path.as_ref().to_path_buf();
+        let file_path = file_path.as_ref().to_owned();
         Self::Io { file_path, err }
     }
 
     pub fn yaml(file_path: impl AsRef<Path>, err: serde_yaml::Error) -> Self {
-        let file_path = file_path.as_ref().to_path_buf();
+        let file_path = file_path.as_ref().to_owned();
         Self::Yaml { file_path, err }
     }
 
@@ -97,7 +97,7 @@ impl DocumentError {
     }
 
     pub fn wrong_format(file_path: impl AsRef<Path>) -> Self {
-        let file_path = file_path.as_ref().to_path_buf();
+        let file_path = file_path.as_ref().to_owned();
         Self::WrongFormat { file_path }
     }
 }

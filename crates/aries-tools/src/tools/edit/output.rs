@@ -23,11 +23,11 @@ impl EditOutput {
         additions: usize,
         deletions: usize,
     ) -> Self {
-        let file_path = file_path.as_ref().to_path_buf();
+        let file_path = file_path.as_ref();
         let original_content = original_content.into();
 
         Self {
-            file_path,
+            file_path: file_path.to_owned(),
             structured_patch,
             original_content: Some(original_content),
             additions,

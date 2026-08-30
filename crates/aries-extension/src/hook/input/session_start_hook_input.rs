@@ -32,7 +32,7 @@ impl SessionStartHookInput {
         agent_type: impl Into<String>,
     ) -> Self {
         let session_id = session_id.into();
-        let cwd = cwd.as_ref().to_path_buf();
+        let cwd = cwd.as_ref().to_owned();
         let model = model.into();
         let agent_type = agent_type.into();
 
@@ -40,7 +40,7 @@ impl SessionStartHookInput {
     }
 
     pub fn transcript_path(mut self, transcript_path: impl AsRef<Path>) -> Self {
-        self.transcript_path = Some(transcript_path.as_ref().to_path_buf());
+        self.transcript_path = Some(transcript_path.as_ref().to_owned());
         self
     }
 

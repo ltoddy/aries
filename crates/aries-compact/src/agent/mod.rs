@@ -49,7 +49,7 @@ impl CompactAgent {
     where
         C: AgentClientExt + 'static,
     {
-        let transcript_path = transcript_path.as_ref().to_path_buf();
+        let transcript_path = transcript_path.as_ref().to_owned();
 
         let agent = c
             .agent(model)

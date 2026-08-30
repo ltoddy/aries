@@ -10,7 +10,7 @@ pub struct WriteOutput {
 
 impl WriteOutput {
     pub fn new(file_path: impl AsRef<Path>, additions: usize) -> Self {
-        Self { file_path: file_path.as_ref().to_path_buf(), additions }
+        Self { file_path: file_path.as_ref().to_owned(), additions }
     }
 
     pub fn render_output(raw: serde_json::Value) -> Result<String, serde_json::Error> {

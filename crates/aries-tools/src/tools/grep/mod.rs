@@ -171,7 +171,7 @@ impl Tool for GrepTool {
                         .ok()
                         .and_then(|m| m.modified().ok())
                         .unwrap_or(SystemTime::UNIX_EPOCH);
-                    file_entries.push((relative_path.to_path_buf(), modified));
+                    file_entries.push((relative_path.to_owned(), modified));
                 },
                 OutputMode::Count => {
                     count_lines.push(format!("{path_display}:{}", match_indices.len()));

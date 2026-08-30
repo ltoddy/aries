@@ -19,7 +19,7 @@ pub async fn path_to_uri(path: impl AsRef<Path>) -> String {
 
 pub fn path_to_slug(path: impl AsRef<Path>) -> String {
     let path = path.as_ref();
-    let path = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let path = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_owned());
 
     path.to_string_lossy()
         .chars()

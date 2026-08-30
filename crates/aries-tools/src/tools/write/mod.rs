@@ -22,9 +22,9 @@ pub struct WriteTool {
 
 impl WriteTool {
     pub fn new(cwd: impl AsRef<Path>, ctx: crate::context::ToolContext) -> Self {
-        let cwd = cwd.as_ref().to_path_buf();
+        let cwd = cwd.as_ref();
 
-        Self { cwd, ctx }
+        Self { cwd: cwd.to_owned(), ctx }
     }
 }
 

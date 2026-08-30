@@ -33,7 +33,7 @@ pub async fn write<'a, S: Serialize + 'a>(
 }
 
 pub async fn read<D: DeserializeOwned>(path: impl AsRef<Path>) -> io::Result<Vec<D>> {
-    let path = path.as_ref().to_path_buf();
+    let path = path.as_ref().to_owned();
     let content = tokio::fs::read_to_string(&path).await?;
 
     let elements: Vec<D> = Deserializer::from_str(&content)

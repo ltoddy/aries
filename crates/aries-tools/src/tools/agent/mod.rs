@@ -47,7 +47,7 @@ where
         custom_agents: Vec<AgentDefinition>,
     ) -> Self {
         let model = model.into();
-        let cwd = cwd.as_ref().to_path_buf();
+        let cwd = cwd.as_ref().to_owned();
 
         Self { client, model, cwd, notifier, custom_agents }
     }

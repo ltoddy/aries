@@ -27,13 +27,13 @@ impl PreCompactHookInput {
         custom_instructions: PreCompactCustomInstructions,
     ) -> Self {
         let session_id = session_id.into();
-        let cwd = cwd.as_ref().to_path_buf();
+        let cwd = cwd.as_ref().to_owned();
 
         Self { session_id, cwd, trigger, custom_instructions, ..Default::default() }
     }
 
     pub fn transcript_path(mut self, transcript_path: impl AsRef<Path>) -> Self {
-        self.transcript_path = Some(transcript_path.as_ref().to_path_buf());
+        self.transcript_path = Some(transcript_path.as_ref().to_owned());
         self
     }
 }

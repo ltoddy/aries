@@ -21,9 +21,9 @@ pub struct LspTool {
 
 impl LspTool {
     pub fn new(client: SharedLspClient, cwd: impl AsRef<Path>) -> Self {
-        let cwd = cwd.as_ref().to_path_buf();
+        let cwd = cwd.as_ref();
 
-        Self { client, cwd }
+        Self { client, cwd: cwd.to_owned() }
     }
 
     fn extract_position_args(

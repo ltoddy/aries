@@ -4,6 +4,7 @@ mod output;
 
 use std::path::{Path, PathBuf};
 
+use aries_event::Notifier;
 use futures::future::join_all;
 use rig::tool::Tool;
 use serde_json::Value;
@@ -20,11 +21,14 @@ use crate::{
 pub struct BatchTool {
     cwd: PathBuf,
     ctx: ToolContext,
+    notifier: Notifier,
 }
 
 impl BatchTool {
-    pub fn new(cwd: impl AsRef<Path>, ctx: ToolContext) -> Self {
-        Self { cwd: cwd.as_ref().to_path_buf(), ctx }
+    pub fn new(cwd: impl AsRef<Path>, ctx: ToolContext, notifier: Notifier) -> Self {
+        let cwd = cwd.as_ref();
+
+        Self { cwd: cwd.to_owned(), ctx, notifier }
     }
 
     async fn dispatch(

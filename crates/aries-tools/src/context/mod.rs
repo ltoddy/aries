@@ -48,16 +48,14 @@ impl ToolContext {
 
         let Some(modified) = Self::modified_at(file_path).await else { return };
 
-        let file_path =
-            fs::canonicalize(file_path).await.unwrap_or_else(|_| file_path.to_path_buf());
+        let file_path = fs::canonicalize(file_path).await.unwrap_or_else(|_| file_path.to_owned());
 
         self.read_state.record(file_path, modified);
     }
 
     pub async fn guard_write(&self, file_path: impl AsRef<Path>) -> Result<(), GuardWriteError> {
         let file_path = file_path.as_ref();
-        let file_path =
-            fs::canonicalize(file_path).await.unwrap_or_else(|_| file_path.to_path_buf());
+        let file_path = fs::canonicalize(file_path).await.unwrap_or_else(|_| file_path.to_owned());
 
         let Some(record) = self.read_state.get(&file_path) else {
             return Err(GuardWriteError::NotRead);

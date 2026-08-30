@@ -95,7 +95,7 @@ pub fn create_tools_from_tool_names(
     let tool_names = tool_names.iter().unique().collect_vec();
     let mut tool_set = ToolSet::default();
 
-    let ctx = context::ToolContext::new(lsp_client.clone(), notifier);
+    let ctx = context::ToolContext::new(lsp_client.clone(), Notifier::clone(&notifier));
 
     for &tool_name in tool_names {
         match tool_name {
@@ -103,7 +103,11 @@ pub fn create_tools_from_tool_names(
                 tool_set.add_tool(bash::BashTool::new(cwd, ctx.clone()));
             },
             batch::NAME => {
-                tool_set.add_tool(batch::BatchTool::new(cwd, ctx.clone()));
+                tool_set.add_tool(batch::BatchTool::new(
+                    cwd,
+                    ctx.clone(),
+                    Notifier::clone(&notifier),
+                ));
             },
             codesearch::NAME => {
                 tool_set.add_tool(codesearch::CodeSearchTool::new());

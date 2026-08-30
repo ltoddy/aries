@@ -41,14 +41,14 @@ where
         gctx: GlobalContext,
         notifier: Notifier,
     ) -> Self {
-        let cwd = cwd.as_ref().to_path_buf();
+        let cwd = cwd.as_ref();
         let model = model.into();
 
         Self {
             client,
             model,
             mode,
-            cwd,
+            cwd: cwd.to_owned(),
             gctx,
             lsp_client: None,
             extensions: AgentExtensions::empty(),
