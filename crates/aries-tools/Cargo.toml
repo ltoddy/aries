@@ -16,6 +16,7 @@ futures.workspace = true
 globset.workspace = true
 ignore.workspace = true
 itertools.workspace = true
+jiff = { workspace = true, features = ["serde"] }
 parking_lot.workspace = true
 regex-lite.workspace = true
 reqwest.workspace = true

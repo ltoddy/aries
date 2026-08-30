@@ -1,6 +1,5 @@
 ## TODO
 
-- [ ] 实现后台执行任务的 Tool
 - [ ] BatchTool 支持调用 AgentTool
 - [ ] 从错误中恢复
   - 输出被截断 (Anthropic 的接口可以设置 max_tokens)

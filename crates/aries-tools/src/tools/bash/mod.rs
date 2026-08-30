@@ -86,7 +86,7 @@ impl Tool for BashTool {
 
         if args.background {
             let task =
-                self.ctx.task.spawn(TaskKind::Bash, &self.cwd, arg, args.description).await?;
+                self.ctx.task.spawn(TaskKind::Shell, &self.cwd, arg, args.description).await?;
             return Ok(BashOutput::background(task.task_id));
         }
 

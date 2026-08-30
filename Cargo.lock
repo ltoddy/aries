@@ -577,6 +577,7 @@ dependencies = [
  "globset",
  "ignore",
  "itertools 0.15.0",
+ "jiff",
  "parking_lot",
  "regex-lite",
  "reqwest 0.13.4",
