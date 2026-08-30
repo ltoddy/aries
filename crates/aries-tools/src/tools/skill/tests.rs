@@ -2,7 +2,7 @@
 
 use std::fs;
 
-use aries_extension::skill::definition::{Frontmatter, SkillDefinition};
+use aries_extension::{SkillDefinition, SkillFrontmatter};
 use rig::tool::{Tool, ToolContext};
 use tempfile::TempDir;
 
@@ -21,7 +21,7 @@ fn make_skill(tmp: &TempDir, name: &str, allowed_tools: Option<Vec<String>>) -> 
     let location = dir.join("SKILL.md");
     fs::write(&location, "skill body").unwrap();
 
-    let frontmatter = Frontmatter {
+    let frontmatter = SkillFrontmatter {
         name: name.to_owned(),
         description: "desc".to_owned(),
         license: None,

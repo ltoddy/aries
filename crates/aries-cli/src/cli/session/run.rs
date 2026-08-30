@@ -1,10 +1,9 @@
 use std::env::current_dir;
 use std::time::Instant;
 
-use aries_extension::mcp::McpDefinition;
+use aries_extension::McpDefinition;
 use aries_init::{GlobalContext, SettingLoader};
-use aries_session::SessionRegistry;
-use aries_session::session::SessionArgs;
+use aries_session::{SessionArgs, SessionRegistry};
 use colored::Colorize;
 use rustyline::error::ReadlineError;
 use tracing::info_span;

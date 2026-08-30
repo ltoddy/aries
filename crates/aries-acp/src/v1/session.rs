@@ -13,8 +13,7 @@ use agent_client_protocol::schema::v1::{
 use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
 use aries_init::Setting;
 use aries_mode::Mode;
-use aries_session::commands::BUILTIN_COMMANDS;
-use aries_session::session::SessionArgs;
+use aries_session::{BUILTIN_COMMANDS, SessionArgs};
 use itertools::Itertools;
 use tracing::{info, instrument};
 

@@ -4,7 +4,7 @@ mod output;
 #[cfg(test)]
 mod tests;
 
-use aries_extension::skill::definition::SkillDefinition;
+use aries_extension::SkillDefinition;
 use aries_filesystem::path_to_uri;
 use aries_filesystem::walk::walk_dir;
 use itertools::Itertools;

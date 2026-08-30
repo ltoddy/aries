@@ -7,7 +7,7 @@ use agent_client_protocol::schema::v1::{
     StringPropertySchema,
 };
 use agent_client_protocol::{Client, ConnectionTo};
-use aries_session::session::resume_input;
+use aries_session::resume_input;
 use aries_tools::question::AskUserQuestionArgs;
 use tracing::warn;
 

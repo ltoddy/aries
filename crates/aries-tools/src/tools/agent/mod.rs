@@ -4,7 +4,7 @@ mod output;
 use std::path::{Path, PathBuf};
 
 use aries_event::Notifier;
-use aries_extension::agent::AgentDefinition;
+use aries_extension::AgentDefinition;
 use aries_mode::Mode;
 use futures::StreamExt;
 use rig::agent::{MultiTurnStreamItem, PromptResponse, StreamingError};

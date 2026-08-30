@@ -1,16 +1,19 @@
-pub mod agent;
-pub mod command;
+mod agent;
+mod command;
 pub mod hook;
 pub mod mcp;
-pub mod skill;
+mod skill;
 
 use std::path::{Path, PathBuf};
 
-use crate::agent::{AgentDefinition, AgentsLoader};
-use crate::command::{CommandDefinition, CommandsLoader};
-use crate::hook::{HooksDefinition, HooksLoader};
-use crate::mcp::{McpDefinition, McpsLoader};
-use crate::skill::{SkillDefinition, SkillsLoader};
+pub use self::agent::{AgentDefinition, AgentsLoader, Frontmatter as AgentFrontmatter};
+pub use self::command::{CommandDefinition, CommandsLoader, Frontmatter as CommandFrontmatter};
+pub use self::hook::{HookDecision, HooksDefinition, HooksExecutor, HooksLoader};
+pub use self::mcp::{
+    Http, McpConnectError, McpDefinition, McpLoadResult, McpParseError, McpServerConfig,
+    McpsLoader, Sse, Stdio, connect,
+};
+pub use self::skill::{Frontmatter as SkillFrontmatter, SkillDefinition, SkillsLoader};
 
 #[derive(Debug, Clone, Default)]
 pub struct AgentExtensions {

@@ -6,10 +6,9 @@ use agent_client_protocol::schema::v1::{
     ToolCallUpdate, ToolCallUpdateFields, ToolKind, UsageUpdate,
 };
 use aries_event::AgentEvent;
-use aries_tools::tools::format_tool_output;
 use aries_tools::{
-    agent, bash, batch, codesearch, edit, glob, grep, lsp, monitor, multiedit, question, read,
-    skill, task_output, task_stop, update_plan, webfetch, websearch, write,
+    agent, bash, batch, codesearch, edit, format_tool_output, glob, grep, lsp, monitor, multiedit,
+    question, read, skill, task_output, task_stop, update_plan, webfetch, websearch, write,
 };
 use itertools::Itertools;
 use parking_lot::Mutex;

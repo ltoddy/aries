@@ -10,8 +10,7 @@ use std::sync::Arc;
 
 use agent_client_protocol::{Agent, ConnectTo, on_receive_notification, on_receive_request};
 use aries_init::{GlobalContext, Setting};
-use aries_session::SessionRegistry;
-use aries_session::session::SessionArgs;
+use aries_session::{SessionArgs, SessionRegistry};
 use tokio::sync::Mutex;
 
 use self::authenticate::authenticate;

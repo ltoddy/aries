@@ -1,5 +1,5 @@
 use aries_agent::AriesAgent;
-use aries_extension::command::CommandDefinition;
+use aries_extension::CommandDefinition;
 use rig::message::Message;
 
 pub struct SlashCommandsExecutor<'a> {

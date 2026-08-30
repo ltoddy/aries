@@ -1,4 +1,4 @@
-use aries_session::commands::BUILTIN_COMMANDS;
+use aries_session::BUILTIN_COMMANDS;
 use dialoguer::Select;
 use dialoguer::theme::ColorfulTheme;
 use itertools::Itertools;

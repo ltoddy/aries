@@ -1,7 +1,7 @@
-pub mod definition;
+mod definition;
 pub mod executor;
 pub mod input;
-pub mod loader;
+mod loader;
 #[cfg(test)]
 mod tests;
 

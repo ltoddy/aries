@@ -1,6 +1,6 @@
 /// see more: https://agentskills.io/specification
-pub mod definition;
-pub mod loader;
+mod definition;
+mod loader;
 #[cfg(test)]
 mod tests;
 

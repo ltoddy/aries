@@ -4,8 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use aries_event::AgentEvent;
 use aries_init::{GlobalContext, SettingLoader};
-use aries_session::SessionRegistry;
-use aries_session::session::SessionArgs;
+use aries_session::{SessionArgs, SessionRegistry};
 use clap::Parser;
 use colored::Colorize;
 use tracing::info_span;

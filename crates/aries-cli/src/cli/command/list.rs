@@ -1,7 +1,7 @@
 use std::env::current_dir;
 
 use anyhow::Context;
-use aries_extension::command::CommandsLoader;
+use aries_extension::CommandsLoader;
 use aries_init::GlobalContext;
 use clap::Parser;
 use prettytable::{Cell, Row, Table, row};

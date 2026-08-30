@@ -1,14 +1,18 @@
-pub mod context;
-pub mod tools;
+mod context;
+mod tools;
 
 use std::path::Path;
 
 use aries_event::Notifier;
-use aries_extension::skill::SkillDefinition;
+use aries_extension::SkillDefinition;
 use aries_mode::Mode;
 use itertools::Itertools;
 use rig::tool::ToolSet;
-pub use tools::*;
+
+pub use self::tools::{
+    agent, bash, batch, codesearch, edit, format_tool_output, glob, grep, lsp, monitor, multiedit,
+    question, read, skill, task_output, task_stop, update_plan, webfetch, websearch, write,
+};
 
 pub const ALL_TOOL_NAMES: &[&str] = &[
     agent::NAME,

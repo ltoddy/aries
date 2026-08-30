@@ -1,8 +1,8 @@
-pub mod definition;
+mod definition;
 pub mod executor;
-pub mod loader;
+mod loader;
 #[cfg(test)]
-pub mod tests;
+mod tests;
 
 pub use self::definition::{CommandDefinition, Frontmatter};
 pub use self::loader::CommandsLoader;

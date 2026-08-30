@@ -12,7 +12,7 @@ use tokio::fs;
 
 pub use self::error::GuardWriteError;
 pub use self::file_checkpoint::SharedFileCheckpoint;
-pub use self::read_state::{ReadRecord, SharedReadState};
+pub use self::read_state::SharedReadState;
 pub use self::task::{StopTaskError, TaskKind, TaskRegistry, TaskSnapshot, TaskStatus};
 
 #[derive(Clone)]

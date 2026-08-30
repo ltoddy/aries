@@ -121,7 +121,7 @@ pub fn format_tool_call_args(tool_name: &str, args: &str) -> (String, Option<Str
 }
 
 pub fn format_tool_result_output(tool_name: &str, value: serde_json::Value) -> String {
-    let output = aries_tools::tools::format_tool_output(tool_name, value);
+    let output = aries_tools::format_tool_output(tool_name, value);
     let output = if output.is_empty() { "No output".to_string() } else { output };
 
     text::preview(output).dimmed().to_string()

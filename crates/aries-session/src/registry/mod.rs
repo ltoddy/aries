@@ -2,14 +2,13 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::Context;
-use aries_extension::mcp::McpDefinition;
+use aries_extension::McpDefinition;
 use aries_init::{GlobalContext, Setting};
 use aries_persistence::SessionRepository;
 use toasty::Db;
 use tracing::{Instrument, info_span};
 
-use crate::Session;
-use crate::session::SessionArgs;
+use crate::{Session, SessionArgs};
 
 pub struct SessionRegistry {
     gctx: GlobalContext,

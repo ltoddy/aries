@@ -4,7 +4,7 @@ mod slash;
 use aries_agent::AriesAgent;
 use aries_compact::ContextCompactor;
 use aries_event::Notifier;
-use aries_extension::command::CommandDefinition;
+use aries_extension::CommandDefinition;
 
 pub use self::builtin::BUILTIN_COMMANDS;
 

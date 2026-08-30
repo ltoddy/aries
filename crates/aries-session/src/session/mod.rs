@@ -19,8 +19,7 @@ use aries_extension::hook::input::{
     StopFailureHookInput, StopHookInput, UserPromptSubmitHookInput,
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
-use aries_extension::mcp::McpDefinition;
-use aries_extension::{AgentExtensions, mcp};
+use aries_extension::{AgentExtensions, McpDefinition, mcp};
 use aries_init::{GlobalContext, ModelConfig, Setting, SettingLoader};
 use aries_lspclient::{LspServerInfo, SharedLspClient, warm_up};
 use aries_memory::MemoryStore;
@@ -358,7 +357,7 @@ impl Session {
         self.hooks_executor.fire_session_end(input).await;
     }
 
-    pub fn list_slash_commands(&self) -> Vec<aries_extension::command::Frontmatter> {
+    pub fn list_slash_commands(&self) -> Vec<aries_extension::CommandFrontmatter> {
         self.extensions.commands.iter().map(|c| c.frontmatter.clone()).collect_vec()
     }
 

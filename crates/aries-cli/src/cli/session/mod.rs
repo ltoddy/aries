@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use aries_event::AgentEvent;
-use aries_session::session::{Session, resume_input};
+use aries_session::{Session, resume_input};
 use aries_tools::question::{AskUserQuestionArgs, AskUserQuestionTool};
 use clap::Subcommand;
 use colored::Colorize;
