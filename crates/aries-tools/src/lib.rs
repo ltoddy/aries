@@ -4,9 +4,10 @@ mod tools;
 use std::path::Path;
 
 use aries_event::Notifier;
-use aries_extension::SkillDefinition;
+use aries_extension::AgentExtensions;
 use aries_mode::Mode;
 use itertools::Itertools;
+use rig::client::AgentClientExt;
 use rig::tool::ToolSet;
 
 pub use self::tools::{
@@ -40,16 +41,21 @@ pub fn is_builtin_tool(tool_name: &str) -> bool {
     ALL_TOOL_NAMES.contains(&tool_name)
 }
 
-pub fn create_tools_from_mode(
+pub fn create_tools_from_mode<C>(
     mode: Mode,
+    client: C,
+    model: impl Into<String>,
     cwd: impl AsRef<Path>,
     lsp_client: Option<aries_lspclient::SharedLspClient>,
-    skills: &[SkillDefinition],
+    extensions: AgentExtensions,
     notifier: Notifier,
-) -> ToolSet {
+) -> ToolSet
+where
+    C: AgentClientExt + Clone + Send + Sync + 'static,
+{
     let tool_names = tool_names_from_mode(mode);
 
-    create_tools_from_tool_names(&tool_names, cwd, lsp_client, skills, notifier)
+    create_tools_from_tool_names(&tool_names, client, model, cwd, lsp_client, extensions, notifier)
 }
 
 pub fn tool_names_from_mode(mode: Mode) -> Vec<&'static str> {
@@ -67,6 +73,7 @@ pub fn tool_names_from_mode(mode: Mode) -> Vec<&'static str> {
 
     match mode {
         Mode::Build | Mode::General => tool_names.extend_from_slice(&[
+            agent::NAME,
             batch::NAME,
             edit::NAME,
             lsp::NAME,
@@ -84,13 +91,19 @@ pub fn tool_names_from_mode(mode: Mode) -> Vec<&'static str> {
     tool_names
 }
 
-pub fn create_tools_from_tool_names(
+pub fn create_tools_from_tool_names<C>(
     tool_names: &[&str],
+    client: C,
+    model: impl Into<String>,
     cwd: impl AsRef<Path>,
     lsp_client: Option<aries_lspclient::SharedLspClient>,
-    skills: &[SkillDefinition],
+    extensions: AgentExtensions,
     notifier: Notifier,
-) -> ToolSet {
+) -> ToolSet
+where
+    C: AgentClientExt + Clone + Send + Sync + 'static,
+{
+    let model = model.into();
     let cwd = cwd.as_ref();
     let tool_names = tool_names.iter().unique().collect_vec();
     let mut tool_set = ToolSet::default();
@@ -99,14 +112,26 @@ pub fn create_tools_from_tool_names(
 
     for &tool_name in tool_names {
         match tool_name {
+            agent::NAME => {
+                tool_set.add_tool(agent::AgentTool::new(
+                    client.clone(),
+                    &model,
+                    cwd,
+                    Notifier::clone(&notifier),
+                    extensions.clone(),
+                ));
+            },
             bash::NAME => {
                 tool_set.add_tool(bash::BashTool::new(cwd, ctx.clone()));
             },
             batch::NAME => {
                 tool_set.add_tool(batch::BatchTool::new(
+                    client.clone(),
+                    &model,
                     cwd,
                     ctx.clone(),
                     Notifier::clone(&notifier),
+                    extensions.clone(),
                 ));
             },
             codesearch::NAME => {
@@ -139,10 +164,10 @@ pub fn create_tools_from_tool_names(
                 tool_set.add_tool(read::ReadTool::new(cwd, ctx.clone()));
             },
             skill::NAME => {
-                if skills.is_empty() {
+                if extensions.skills.is_empty() {
                     continue;
                 }
-                tool_set.add_tool(skill::SkillTool::new(skills.to_vec()));
+                tool_set.add_tool(skill::SkillTool::new(extensions.skills.clone()));
             },
             task_output::NAME => {
                 tool_set.add_tool(task_output::TaskOutputTool::new(ctx.clone()));

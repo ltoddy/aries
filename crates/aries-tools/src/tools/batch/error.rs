@@ -3,9 +3,6 @@ pub enum BatchError {
     #[error("nested batch calls are not allowed")]
     NestedBatch,
 
-    #[error("AgentTool is not allowed in batch")]
-    AgentNotAllowed,
-
     #[error("tool '{0}' not found or not supported in batch")]
     UnsupportedTool(String),
 
@@ -22,10 +19,6 @@ pub enum BatchError {
 impl BatchError {
     pub fn nested_batch() -> Self {
         Self::NestedBatch
-    }
-
-    pub fn agent_not_allowed() -> Self {
-        Self::AgentNotAllowed
     }
 
     pub fn unsupported_tool(tool: impl Into<String>) -> Self {

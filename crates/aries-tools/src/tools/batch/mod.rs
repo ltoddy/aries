@@ -5,7 +5,9 @@ mod output;
 use std::path::{Path, PathBuf};
 
 use aries_event::Notifier;
+use aries_extension::AgentExtensions;
 use futures::future::join_all;
+use rig::client::AgentClientExt;
 use rig::tool::Tool;
 use serde_json::Value;
 
@@ -18,17 +20,34 @@ use crate::{
     task_stop, webfetch, websearch, write,
 };
 
-pub struct BatchTool {
+pub struct BatchTool<C>
+where
+    C: AgentClientExt,
+{
+    client: C,
+    model: String,
     cwd: PathBuf,
     ctx: ToolContext,
     notifier: Notifier,
+    extensions: AgentExtensions,
 }
 
-impl BatchTool {
-    pub fn new(cwd: impl AsRef<Path>, ctx: ToolContext, notifier: Notifier) -> Self {
+impl<C> BatchTool<C>
+where
+    C: AgentClientExt + Clone + Sync + Send + 'static,
+{
+    pub fn new(
+        client: C,
+        model: impl Into<String>,
+        cwd: impl AsRef<Path>,
+        ctx: ToolContext,
+        notifier: Notifier,
+        extensions: AgentExtensions,
+    ) -> Self {
+        let model = model.into();
         let cwd = cwd.as_ref();
 
-        Self { cwd: cwd.to_owned(), ctx, notifier }
+        Self { client, model, cwd: cwd.to_owned(), ctx, notifier, extensions }
     }
 
     async fn dispatch(
@@ -37,11 +56,29 @@ impl BatchTool {
         params: Value,
         context: &mut rig::tool::ToolContext,
     ) -> Result<Value, BatchError> {
-        let cwd = self.cwd.clone();
+        let cwd = &self.cwd;
         let ctx = self.ctx.clone();
 
         match tool_name.as_str() {
-            agent::NAME => Err(BatchError::agent_not_allowed()),
+            agent::NAME => {
+                let args = serde_json::from_value::<agent::AgentArgs>(params)
+                    .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
+                let res = Tool::call(
+                    &agent::AgentTool::new(
+                        self.client.clone(),
+                        &self.model,
+                        cwd,
+                        Notifier::clone(&self.notifier),
+                        self.extensions.clone(),
+                    ),
+                    context,
+                    args,
+                )
+                .await
+                .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
+                serde_json::to_value(res)
+                    .map_err(|e| BatchError::serialize_output(tool_name.clone(), e))
+            },
             bash::NAME => {
                 let args = serde_json::from_value::<bash::BashArgs>(params)
                     .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
@@ -173,7 +210,10 @@ impl BatchTool {
     }
 }
 
-impl Tool for BatchTool {
+impl<C> Tool for BatchTool<C>
+where
+    C: AgentClientExt + Clone + Sync + Send + 'static,
+{
     const NAME: &'static str = NAME;
     type Args = BatchArgs;
     type Output = BatchOutput;

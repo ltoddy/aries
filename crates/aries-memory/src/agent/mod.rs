@@ -20,14 +20,15 @@ impl MemoryAgent {
     const DEFAULT_MAX_TURNS: usize = 50;
 
     pub async fn new<C>(
-        c: C,
+        client: C,
         model: impl Into<String>,
         memory_dir: impl AsRef<Path>,
         notifier: Notifier,
     ) -> Self
     where
-        C: AgentClientExt + 'static,
+        C: AgentClientExt + Clone + Send + Sync + 'static,
     {
+        let model = model.into();
         let tool_names = [
             aries_tools::read::NAME,
             aries_tools::write::NAME,
@@ -35,12 +36,19 @@ impl MemoryAgent {
             aries_tools::glob::NAME,
             aries_tools::grep::NAME,
         ];
-        let toolset =
-            aries_tools::create_tools_from_tool_names(&tool_names, memory_dir, None, &[], notifier);
+        let toolset = aries_tools::create_tools_from_tool_names(
+            &tool_names,
+            client.clone(),
+            &model,
+            memory_dir,
+            None,
+            Default::default(),
+            notifier,
+        );
         let tool_server_handle = ToolServer::new().run();
         tool_server_handle.append_toolset(toolset).await;
 
-        let inner = c
+        let inner = client
             .agent(model)
             .name("memory-agent")
             .description("分析对话并将值得跨会话持久化的信息写入或更新到记忆系统的子代理")

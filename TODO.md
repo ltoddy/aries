@@ -1,12 +1,10 @@
 ## TODO
 
-- [ ] BatchTool 支持调用 AgentTool
 - [ ] 从错误中恢复
   - 输出被截断 (Anthropic 的接口可以设置 max_tokens)
   - [x] 上下文超长 (agent loop 内发送端过滤, 详见 docs/error-recovery.md)
 - [ ] acp 协议 v2 支持 (https://agentclientprotocol.com/protocol/v2/overview 等什么时候不再是 draft 了, 立马跟进实现)
 - [ ] 优化执行 slash commad 的代码
-- [ ] batch tool 支持 agent 同时在 acp 中体现 multi-agent
 - [ ] 支持 worktree (如果通过 rsync 实现 sandbox 之后是不是就不需要支持 worktree 了？)
 - [ ] 支持 Workflow
 - [ ] agent (参考 https://github.com/vercel/eve 对 agent 的目录结构设计来支持)

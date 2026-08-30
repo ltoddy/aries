@@ -4,7 +4,7 @@ mod output;
 use std::path::{Path, PathBuf};
 
 use aries_event::Notifier;
-use aries_extension::AgentDefinition;
+use aries_extension::{AgentDefinition, AgentExtensions};
 use aries_mode::Mode;
 use futures::StreamExt;
 use rig::agent::{MultiTurnStreamItem, PromptResponse, StreamingError};
@@ -32,7 +32,7 @@ where
     model: String,
     cwd: PathBuf,
     notifier: Notifier,
-    custom_agents: Vec<AgentDefinition>,
+    extensions: AgentExtensions,
 }
 
 impl<C> AgentTool<C>
@@ -44,18 +44,21 @@ where
         model: impl Into<String>,
         cwd: impl AsRef<Path>,
         notifier: Notifier,
-        custom_agents: Vec<AgentDefinition>,
+        extensions: AgentExtensions,
     ) -> Self {
         let model = model.into();
         let cwd = cwd.as_ref().to_owned();
 
-        Self { client, model, cwd, notifier, custom_agents }
+        Self { client, model, cwd, notifier, extensions }
     }
 
     fn find_agent(&self, mode: impl Into<String>) -> Option<&AgentDefinition> {
         let mode = mode.into();
 
-        self.custom_agents.iter().find(|agent| agent.frontmatter.name.eq_ignore_ascii_case(&mode))
+        self.extensions
+            .agents
+            .iter()
+            .find(|agent| agent.frontmatter.name.eq_ignore_ascii_case(&mode))
     }
 }
 
@@ -71,10 +74,10 @@ where
     fn description(&self) -> String {
         let mut description = vec![DESCRIPTION_HEAD.to_owned()];
 
-        if !self.custom_agents.is_empty() {
+        if !self.extensions.agents.is_empty() {
             description.push("\n可用的自定义子智能体（把名字填入 `mode`）：\n".to_owned());
 
-            for AgentDefinition { frontmatter, .. } in &self.custom_agents {
+            for AgentDefinition { frontmatter, .. } in &self.extensions.agents {
                 let desc = format!(
                     "- {}: {} (Tools: {})\n",
                     frontmatter.name,
@@ -127,9 +130,11 @@ where
                 let tool_names = frontmatter.filter_tool_names(&universe);
                 let tools = create_tools_from_tool_names(
                     &tool_names,
+                    self.client.clone(),
+                    &self.model,
                     &self.cwd,
                     None,
-                    &[],
+                    AgentExtensions::empty(),
                     Notifier::clone(&self.notifier),
                 );
                 let model = frontmatter.model.clone().unwrap_or_else(|| self.model.clone());
@@ -142,9 +147,11 @@ where
                     mode.bare_preamble().to_owned(),
                     create_tools_from_mode(
                         mode,
+                        self.client.clone(),
+                        &self.model,
                         &self.cwd,
                         None,
-                        &[],
+                        AgentExtensions::empty(),
                         Notifier::clone(&self.notifier),
                     ),
                     self.model.clone(),

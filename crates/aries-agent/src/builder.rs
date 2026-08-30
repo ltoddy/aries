@@ -6,7 +6,6 @@ use aries_extension::AgentExtensions;
 use aries_init::GlobalContext;
 use aries_lspclient::SharedLspClient;
 use aries_mode::Mode;
-use aries_tools::agent;
 use itertools::Itertools;
 use rig::client::AgentClientExt;
 use rig::tool::server::ToolServerHandle;
@@ -70,22 +69,15 @@ where
         let mode = self.mode;
         let name = mode.name();
 
-        let mut tools = aries_tools::create_tools_from_mode(
+        let tools = aries_tools::create_tools_from_mode(
             self.mode,
+            self.client.clone(),
+            &self.model,
             &self.cwd,
             self.lsp_client.clone(),
-            &self.extensions.skills,
+            self.extensions.clone(),
             Notifier::clone(&self.notifier),
         );
-        if self.mode == Mode::Build || self.mode == Mode::General {
-            tools.add_tool(agent::AgentTool::<C>::new(
-                self.client.clone(),
-                &self.model,
-                &self.cwd,
-                Notifier::clone(&self.notifier),
-                self.extensions.agents.clone(),
-            ));
-        }
         tool_server_handle.append_toolset(tools).await;
 
         let sections = aries_preamble::sections(
