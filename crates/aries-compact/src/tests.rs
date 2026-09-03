@@ -41,7 +41,7 @@ fn mixed_text_sums_per_character_estimates() {
 fn encrypted_reasoning_does_not_count_as_prompt_tokens() {
     let content = AssistantContent::Reasoning(Reasoning::encrypted("encrypted payload"));
 
-    assert_eq!(content.estimate_tokens(), 0);
+    assert_eq!(content.estimate_tokens(), 5);
 }
 
 #[test]

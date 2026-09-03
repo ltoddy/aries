@@ -90,10 +90,11 @@ impl Tool for SkillTool {
                 .to_owned(),
         ];
 
-        if let Some(allowed_tools) = &skill.frontmatter.allowed_tools
-            && !allowed_tools.is_empty()
-        {
-            lines.push(format!("Allowed tools for this skill: {}", allowed_tools.join(", ")));
+        if !skill.frontmatter.allowed_tools.is_empty() {
+            lines.push(format!(
+                "Allowed tools for this skill: {}",
+                skill.frontmatter.allowed_tools.as_slice().join(", ")
+            ));
         }
 
         lines.extend([

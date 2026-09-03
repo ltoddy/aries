@@ -3,6 +3,7 @@ mod command;
 pub mod hook;
 pub mod mcp;
 mod skill;
+mod tool;
 
 use std::path::{Path, PathBuf};
 

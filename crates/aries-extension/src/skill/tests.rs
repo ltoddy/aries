@@ -7,6 +7,7 @@ use itertools::Itertools;
 use tempfile::TempDir;
 
 use super::*;
+use crate::tool::ToolList;
 
 fn frontmatter() -> Frontmatter {
     Frontmatter {
@@ -15,7 +16,7 @@ fn frontmatter() -> Frontmatter {
         license: None,
         compatibility: None,
         metadata: None,
-        allowed_tools: None,
+        allowed_tools: ToolList::default(),
     }
 }
 
@@ -45,7 +46,18 @@ allowed-tools:
     assert_eq!(fm.description, "fix typos in the codebase");
     assert_eq!(fm.license.as_deref(), Some("MIT"));
     assert_eq!(fm.compatibility.as_deref(), Some("any"));
-    assert_eq!(fm.allowed_tools.as_deref(), Some(&["Read".to_owned(), "Edit".to_owned()][..]));
+    assert_eq!(fm.allowed_tools.as_slice(), &["Read".to_owned(), "Edit".to_owned()]);
+}
+
+#[test]
+fn deserializes_string_allowed_tools() {
+    let yaml = "\
+name: fix-typo
+description: fix typos in the codebase
+allowed-tools: Read, Edit
+";
+    let fm: Frontmatter = serde_yaml::from_str(yaml).unwrap();
+    assert_eq!(fm.allowed_tools.as_slice(), &["Read".to_owned(), "Edit".to_owned()]);
 }
 
 #[test]
@@ -58,7 +70,7 @@ description: fix typos in the codebase
     assert!(fm.license.is_none());
     assert!(fm.compatibility.is_none());
     assert!(fm.metadata.is_none());
-    assert!(fm.allowed_tools.is_none());
+    assert!(fm.allowed_tools.is_empty());
 }
 
 #[test]

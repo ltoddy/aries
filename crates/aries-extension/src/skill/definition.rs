@@ -3,6 +3,8 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::tool::ToolList;
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SkillDefinition {
     pub location: PathBuf,
@@ -30,11 +32,22 @@ pub struct Frontmatter {
     pub license: Option<String>,
     pub compatibility: Option<String>,
     pub metadata: Option<HashMap<String, serde_yaml::Value>>,
-    #[serde(rename = "allowed-tools")]
-    pub allowed_tools: Option<Vec<String>>,
+    #[serde(rename = "allowed-tools", default)]
+    pub allowed_tools: ToolList,
 }
 
 impl Frontmatter {
+    pub fn new(name: impl Into<String>, description: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            description: description.into(),
+            license: None,
+            compatibility: None,
+            metadata: None,
+            allowed_tools: ToolList::default(),
+        }
+    }
+
     pub fn render(&self, file_path: impl AsRef<Path>) -> String {
         let name = &self.name;
         let description = &self.description;

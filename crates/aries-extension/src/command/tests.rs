@@ -13,7 +13,7 @@ fn frontmatter() -> Frontmatter {
         name: "fix-typo".to_owned(),
         description: "fix typos in the codebase".to_owned(),
         argument_hint: None,
-        allowed_tools: None,
+        allowed_tools: Vec::new().into(),
     }
 }
 
@@ -41,7 +41,18 @@ allowed-tools:
     assert_eq!(fm.name, "fix-typo");
     assert_eq!(fm.description, "fix typos in the codebase");
     assert_eq!(fm.argument_hint.as_deref(), Some("<file>"));
-    assert_eq!(fm.allowed_tools.as_deref(), Some(&["Read".to_owned(), "Edit".to_owned()][..]));
+    assert_eq!(fm.allowed_tools.as_slice(), &["Read".to_owned(), "Edit".to_owned()]);
+}
+
+#[test]
+fn deserializes_string_allowed_tools() {
+    let yaml = "\
+name: fix-typo
+description: fix typos in the codebase
+allowed-tools: Bash(openspec:*)
+";
+    let fm: Frontmatter = serde_yaml::from_str(yaml).unwrap();
+    assert_eq!(fm.allowed_tools.as_slice(), &["Bash(openspec:*)".to_owned()]);
 }
 
 #[test]
@@ -52,14 +63,14 @@ description: fix typos in the codebase
 ";
     let fm: Frontmatter = serde_yaml::from_str(yaml).unwrap();
     assert!(fm.argument_hint.is_none());
-    assert!(fm.allowed_tools.is_none());
+    assert!(fm.allowed_tools.is_empty());
 }
 
 #[test]
 fn serializes_with_kebab_case_keys() {
     let mut fm = frontmatter();
     fm.argument_hint = Some("<file>".to_owned());
-    fm.allowed_tools = Some(vec!["Read".to_owned()]);
+    fm.allowed_tools = vec!["Read".to_owned()].into();
 
     let yaml = serde_yaml::to_string(&fm).unwrap();
     assert!(yaml.contains("argument-hint: <file>"));

@@ -5,6 +5,8 @@ use itertools::Itertools;
 use regex_lite::Regex;
 use serde::{Deserialize, Serialize};
 
+use crate::tool::ToolList;
+
 static ARGUMENT_PATTERN: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\$(?:(\d+)|ARGUMENTS)").expect("static regex is valid"));
 
@@ -58,8 +60,8 @@ pub struct Frontmatter {
     pub description: String,
     #[serde(rename = "argument-hint")]
     pub argument_hint: Option<String>,
-    #[serde(rename = "allowed-tools")]
-    pub allowed_tools: Option<Vec<String>>,
+    #[serde(rename = "allowed-tools", default)]
+    pub allowed_tools: ToolList,
     // pub model: Option<String>,
     // #[serde(rename = "disable-model-invocation")]
     // pub disable_model_invocation: Option<bool>,

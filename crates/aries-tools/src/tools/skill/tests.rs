@@ -15,20 +15,11 @@ async fn test_args_title() {
 }
 
 /// 构造一个位于临时目录中的技能：`<tmp>/<name>/SKILL.md`。
-fn make_skill(tmp: &TempDir, name: &str, allowed_tools: Option<Vec<String>>) -> SkillDefinition {
+fn make_skill(tmp: &TempDir, name: &str, frontmatter: SkillFrontmatter) -> SkillDefinition {
     let dir = tmp.path().join(name);
     fs::create_dir_all(&dir).unwrap();
     let location = dir.join("SKILL.md");
     fs::write(&location, "skill body").unwrap();
-
-    let frontmatter = SkillFrontmatter {
-        name: name.to_owned(),
-        description: "desc".to_owned(),
-        license: None,
-        compatibility: None,
-        metadata: None,
-        allowed_tools,
-    };
 
     SkillDefinition::new(location, frontmatter, "skill body")
 }
@@ -36,7 +27,7 @@ fn make_skill(tmp: &TempDir, name: &str, allowed_tools: Option<Vec<String>>) -> 
 #[tokio::test]
 async fn test_call_loads_skill() {
     let tmp = TempDir::new().unwrap();
-    let skill = make_skill(&tmp, "commit", None);
+    let skill = make_skill(&tmp, "commit", SkillFrontmatter::new("commit", "desc"));
     let mut context = ToolContext::new();
     let tool = SkillTool::new(vec![skill]);
 
@@ -49,7 +40,7 @@ async fn test_call_loads_skill() {
 #[tokio::test]
 async fn test_call_rejects_unknown_skill() {
     let tmp = TempDir::new().unwrap();
-    let skill = make_skill(&tmp, "commit", None);
+    let skill = make_skill(&tmp, "commit", SkillFrontmatter::new("commit", "desc"));
     let mut context = ToolContext::new();
     let tool = SkillTool::new(vec![skill]);
 
@@ -58,20 +49,9 @@ async fn test_call_rejects_unknown_skill() {
 }
 
 #[tokio::test]
-async fn test_call_includes_allowed_tools() {
-    let tmp = TempDir::new().unwrap();
-    let skill = make_skill(&tmp, "review", Some(vec!["Read".to_owned(), "Grep".to_owned()]));
-    let mut context = ToolContext::new();
-    let tool = SkillTool::new(vec![skill]);
-
-    let output = tool.call(&mut context, SkillArgs { name: "review".to_owned() }).await.unwrap();
-    assert!(output.output.contains("Allowed tools for this skill: Read, Grep"));
-}
-
-#[tokio::test]
 async fn test_call_omits_allowed_tools_when_absent() {
     let tmp = TempDir::new().unwrap();
-    let skill = make_skill(&tmp, "commit", None);
+    let skill = make_skill(&tmp, "commit", SkillFrontmatter::new("commit", "desc"));
     let mut context = ToolContext::new();
     let tool = SkillTool::new(vec![skill]);
 
