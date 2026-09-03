@@ -103,7 +103,7 @@ impl Tool for GrepTool {
         };
 
         let mut builder = WalkBuilder::new(&self.cwd);
-        builder.hidden(false);
+        builder.hidden(false).git_ignore(true);
 
         if let Some(include) = &args.include {
             let glob = GlobBuilder::new(include).literal_separator(true).build()?;
