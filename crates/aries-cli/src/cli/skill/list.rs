@@ -29,7 +29,7 @@ pub async fn execute(_args: ListSkillArgs, gctx: GlobalContext) -> anyhow::Resul
     for SkillDefinition { location, frontmatter, .. } in skills {
         table.add_row(Row::new(vec![
             Cell::new(&frontmatter.name),
-            Cell::new(&text::wrap(&frontmatter.description, 50)),
+            Cell::new(&text::wrap(&frontmatter.description, 30)),
             Cell::new(&location.display().to_string()),
         ]));
     }

@@ -29,7 +29,7 @@ pub async fn execute(_args: ListCommandArgs, gctx: GlobalContext) -> anyhow::Res
     for command in commands {
         table.add_row(Row::new(vec![
             Cell::new(&command.frontmatter.name),
-            Cell::new(&text::wrap(&command.frontmatter.description, 50)),
+            Cell::new(&text::wrap(&command.frontmatter.description, 30)),
             Cell::new(&command.location().display().to_string()),
         ]));
     }

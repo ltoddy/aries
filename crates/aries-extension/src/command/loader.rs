@@ -27,7 +27,7 @@ impl CommandsLoader {
     }
 
     pub async fn load(&self) -> Vec<CommandDefinition> {
-        let Ok(file_paths) = walk::walk_dirs(&self.roots, false, true) else { return vec![] };
+        let Ok(file_paths) = walk::walk_dirs(&self.roots, true, true) else { return vec![] };
 
         let file_paths = file_paths
             .into_iter()
