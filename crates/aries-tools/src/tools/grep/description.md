@@ -6,6 +6,7 @@
 - `case_insensitive` 对应 `-i`，开启大小写不敏感搜索（缺省为 false）。
 - `show_line_numbers` 对应 `-n`，仅在 `content` 模式下决定是否显示行号（缺省为 true）。
 - `context_before` / `context_after` / `context` 对应 `-B` / `-A` / `-C`，显示匹配行前后的上下文行，仅在 `content` 模式下生效；`context` 优先于前两者。
+- `respect_gitignore` 控制是否遵循 `.gitignore` 和其他 ignore 规则（缺省为 true）。
 - `head_limit` 限制返回的行数/条目数（缺省 250，传 0 表示不限制）；超出上限时会截断并给出提示。
-- 工具会以工作目录为根，遵循 `.gitignore` 等忽略规则递归查找文件，但不会跳过隐藏文件/目录（`hidden(false)`）。
+- 工具会以工作目录为根递归查找文件；默认遵循 `.gitignore` 等忽略规则，但不会跳过隐藏文件/目录（`hidden(false)`）。
 - 当需要进行多轮交叉的 glob + grep 搜索时，可以改用 `Agent` 工具委派给子智能体。

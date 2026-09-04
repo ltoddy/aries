@@ -80,6 +80,10 @@ impl Tool for GrepTool {
                     "type": "integer",
                     "description": "Number of lines to show before and after each match (rg -C). Takes precedence over context_before/context_after. Only applies to output_mode \"content\"."
                 },
+                "respect_gitignore": {
+                    "type": "boolean",
+                    "description": "Respect .gitignore and other ignore rules. Defaults to true."
+                },
                 "head_limit": {
                     "type": "integer",
                     "description": "Limit output to the first N lines/entries across all modes. Defaults to 250. Pass 0 for unlimited."
@@ -103,7 +107,12 @@ impl Tool for GrepTool {
         };
 
         let mut builder = WalkBuilder::new(&self.cwd);
-        builder.hidden(false).git_ignore(true);
+        builder
+            .hidden(false)
+            .git_ignore(args.respect_gitignore)
+            .git_exclude(args.respect_gitignore)
+            .git_global(args.respect_gitignore)
+            .ignore(args.respect_gitignore);
 
         if let Some(include) = &args.include {
             let glob = GlobBuilder::new(include).literal_separator(true).build()?;

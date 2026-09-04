@@ -18,6 +18,9 @@ pub struct GrepArgs {
     pub context_after: Option<usize>,
     pub context: Option<usize>,
 
+    #[serde(default = "default_respect_gitignore")]
+    pub respect_gitignore: bool,
+
     #[serde(default = "default_head_limit")]
     pub head_limit: usize,
 }
@@ -54,6 +57,10 @@ pub enum OutputMode {
 }
 
 fn default_show_line_numbers() -> bool {
+    true
+}
+
+fn default_respect_gitignore() -> bool {
     true
 }
 

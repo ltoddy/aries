@@ -1,5 +1,7 @@
 // This file contains tests generated with AI assistance.
 
+use tokio::process::Command as Bash;
+
 use super::*;
 
 /// 构造带默认值的 GrepArgs，减少各用例的样板。
@@ -13,6 +15,7 @@ fn grep_args(pattern: &str) -> GrepArgs {
         context_before: None,
         context_after: None,
         context: None,
+        respect_gitignore: true,
         head_limit: 250,
     }
 }
@@ -30,11 +33,12 @@ fn test_grep_args_title() {
 #[test]
 fn test_grep_args_serde_defaults() {
     // 只给 pattern 时：output_mode=files_with_matches、case_insensitive=false、
-    // show_line_numbers=true、head_limit=250、上下文行均为 None。
+    // show_line_numbers=true、respect_gitignore=true、head_limit=250、上下文行均为 None。
     let args: GrepArgs = serde_json::from_str(r#"{"pattern": "foo"}"#).unwrap();
     assert_eq!(args.output_mode, OutputMode::FilesWithMatches);
     assert!(!args.case_insensitive);
     assert!(args.show_line_numbers);
+    assert!(args.respect_gitignore);
     assert_eq!(args.head_limit, 250);
     assert_eq!(args.context, None);
 }
@@ -208,4 +212,39 @@ async fn test_grep_no_matches_found() {
     // render_output 对空结果返回 "No matches found"。
     let raw = serde_json::to_value(&result).unwrap();
     assert_eq!(GrepOutput::render_output(raw).unwrap(), "No matches found");
+}
+
+#[tokio::test]
+async fn test_grep_respects_gitignore_by_default() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    Bash::new("git").args(["init", "-q"]).current_dir(tmp.path()).output().await.unwrap();
+    tokio::fs::write(tmp.path().join(".gitignore"), "ignored/\n").await.unwrap();
+    tokio::fs::create_dir(tmp.path().join("ignored")).await.unwrap();
+    tokio::fs::write(tmp.path().join("ignored").join("a.rs"), "needle\n").await.unwrap();
+    tokio::fs::write(tmp.path().join("visible.rs"), "needle\n").await.unwrap();
+
+    let mut context = ToolContext::new();
+    let tool = GrepTool::new(tmp.path().to_path_buf());
+    let result = tool.call(&mut context, grep_args("needle")).await.unwrap();
+
+    assert_eq!(result.matches, vec!["visible.rs".to_string()]);
+}
+
+#[tokio::test]
+async fn test_grep_can_disable_gitignore_filtering() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    Bash::new("git").args(["init", "-q"]).current_dir(tmp.path()).output().await.unwrap();
+    tokio::fs::write(tmp.path().join(".gitignore"), "ignored/\n").await.unwrap();
+    tokio::fs::create_dir(tmp.path().join("ignored")).await.unwrap();
+    tokio::fs::write(tmp.path().join("ignored").join("a.rs"), "needle\n").await.unwrap();
+    tokio::fs::write(tmp.path().join("visible.rs"), "needle\n").await.unwrap();
+
+    let mut context = ToolContext::new();
+    let tool = GrepTool::new(tmp.path().to_path_buf());
+    let mut args = grep_args("needle");
+    args.respect_gitignore = false;
+    let result = tool.call(&mut context, args).await.unwrap();
+
+    assert!(result.matches.contains(&"visible.rs".to_string()));
+    assert!(result.matches.contains(&"ignored/a.rs".to_string()));
 }
