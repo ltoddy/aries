@@ -186,7 +186,9 @@ async fn test_grep_context_saturates_no_overflow() {
 async fn test_grep_head_limit_truncates_match_groups() {
     let tmp = tempfile::TempDir::new().unwrap();
     for i in 0..10 {
-        tokio::fs::write(tmp.path().join(format!("f{i}.rs")), format!("needle-{i}\n")).await.unwrap();
+        tokio::fs::write(tmp.path().join(format!("f{i}.rs")), format!("needle-{i}\n"))
+            .await
+            .unwrap();
     }
 
     let mut context = ToolContext::new();

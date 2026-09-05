@@ -5,9 +5,11 @@ mod output;
 mod tests;
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::SystemTime;
 
-use ignore::WalkBuilder;
+use ignore::{WalkBuilder, WalkState};
+use parking_lot::Mutex;
 use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
 
@@ -89,26 +91,42 @@ impl Tool for GlobTool {
         walker
             .hidden(!args.hidden)
             .git_ignore(args.respect_gitignore)
+            .git_exclude(args.respect_gitignore)
+            .git_global(args.respect_gitignore)
             .ignore(args.respect_gitignore);
 
-        let mut matches = Vec::<(PathBuf, SystemTime)>::new();
-        for entry in walker.build() {
-            let Ok(entry) = entry else { continue };
+        let matches = Arc::new(Mutex::new(Vec::<(PathBuf, SystemTime)>::new()));
+        let base_dir = Arc::new(base_dir);
+        let set = Arc::new(set);
 
-            let Ok(relative) = entry.path().strip_prefix(&base_dir) else { continue };
+        walker.build_parallel().run(|| {
+            let base_dir = base_dir.clone();
+            let matches = matches.clone();
+            let set = set.clone();
 
-            if !set.is_match(relative) {
-                continue;
-            }
+            Box::new(move |entry| {
+                let Ok(entry) = entry else { return WalkState::Continue };
 
-            let modified = entry
-                .metadata()
-                .ok()
-                .and_then(|m| m.modified().ok())
-                .unwrap_or(SystemTime::UNIX_EPOCH);
+                let Ok(relative) = entry.path().strip_prefix(base_dir.as_path()) else {
+                    return WalkState::Continue;
+                };
 
-            matches.push((relative.to_owned(), modified));
-        }
+                if !set.is_match(relative) {
+                    return WalkState::Continue;
+                }
+
+                let modified = entry
+                    .metadata()
+                    .ok()
+                    .and_then(|m| m.modified().ok())
+                    .unwrap_or(SystemTime::UNIX_EPOCH);
+
+                matches.lock().push((relative.to_owned(), modified));
+                WalkState::Continue
+            })
+        });
+
+        let mut matches = Arc::into_inner(matches).expect("glob matches still shared").into_inner();
 
         matches.sort_by_key(|next| std::cmp::Reverse(next.1));
 
