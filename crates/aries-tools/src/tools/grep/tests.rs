@@ -183,19 +183,21 @@ async fn test_grep_context_saturates_no_overflow() {
 }
 
 #[tokio::test]
-async fn test_grep_head_limit_truncates() {
+async fn test_grep_head_limit_truncates_match_groups() {
     let tmp = tempfile::TempDir::new().unwrap();
     for i in 0..10 {
-        tokio::fs::write(tmp.path().join(format!("f{i}.rs")), "needle\n").await.unwrap();
+        tokio::fs::write(tmp.path().join(format!("f{i}.rs")), format!("needle-{i}\n")).await.unwrap();
     }
 
     let mut context = ToolContext::new();
     let tool = GrepTool::new(tmp.path().to_path_buf());
     let mut args = grep_args("needle");
+    args.output_mode = OutputMode::Content;
     args.head_limit = 3;
     let result = tool.call(&mut context, args).await.unwrap();
     assert_eq!(result.matches.len(), 3);
     assert!(result.truncated);
+    assert!(result.matches.iter().all(|line| line.contains("needle-")));
 }
 
 #[tokio::test]
@@ -247,4 +249,40 @@ async fn test_grep_can_disable_gitignore_filtering() {
 
     assert!(result.matches.contains(&"visible.rs".to_string()));
     assert!(result.matches.contains(&"ignored/a.rs".to_string()));
+}
+
+#[tokio::test]
+async fn test_grep_include_filters_files() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    tokio::fs::create_dir_all(tmp.path().join("src")).await.unwrap();
+    tokio::fs::create_dir_all(tmp.path().join("docs")).await.unwrap();
+    tokio::fs::write(tmp.path().join("src").join("main.rs"), "needle\n").await.unwrap();
+    tokio::fs::write(tmp.path().join("docs").join("note.txt"), "needle\n").await.unwrap();
+
+    let mut context = ToolContext::new();
+    let tool = GrepTool::new(tmp.path().to_path_buf());
+    let mut args = grep_args("needle");
+    args.include = Some("src/**/*.rs".to_string());
+    let result = tool.call(&mut context, args).await.unwrap();
+
+    assert_eq!(result.matches, vec!["src/main.rs".to_string()]);
+}
+
+#[tokio::test]
+async fn test_grep_include_keeps_nested_target_subtree() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    tokio::fs::create_dir_all(tmp.path().join("src").join("nested")).await.unwrap();
+    tokio::fs::create_dir_all(tmp.path().join("vendor")).await.unwrap();
+    tokio::fs::write(tmp.path().join("src").join("nested").join("lib.rs"), "needle\n")
+        .await
+        .unwrap();
+    tokio::fs::write(tmp.path().join("vendor").join("lib.rs"), "needle\n").await.unwrap();
+
+    let mut context = ToolContext::new();
+    let tool = GrepTool::new(tmp.path().to_path_buf());
+    let mut args = grep_args("needle");
+    args.include = Some("src/**/*.rs".to_string());
+    let result = tool.call(&mut context, args).await.unwrap();
+
+    assert_eq!(result.matches, vec!["src/nested/lib.rs".to_string()]);
 }

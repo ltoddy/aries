@@ -69,7 +69,7 @@ fn walk_node(node: tree_sitter::Node, source: &str, commands: &mut Vec<String>) 
     }
 
     for i in 0..node.child_count() {
-        if let Some(child) = node.child(i as u32) {
+        if let Some(child) = node.child(i) {
             walk_node(child, source, commands);
         }
     }

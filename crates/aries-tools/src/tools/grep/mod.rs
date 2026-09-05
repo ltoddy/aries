@@ -1,19 +1,17 @@
 mod args;
+mod driver;
 mod error;
 mod output;
 #[cfg(test)]
 mod tests;
 
-use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
+use std::sync::Arc;
 
-use globset::GlobBuilder;
-use ignore::WalkBuilder;
-use regex_lite::RegexBuilder;
+use driver::{Collector, Query, StopState, walk_parallel};
+use grep_regex::RegexMatcherBuilder;
 use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
-use tokio::fs;
 
 pub use self::args::{GrepArgs, OutputMode};
 pub use self::error::GrepError;
@@ -28,7 +26,6 @@ pub struct GrepTool {
 impl GrepTool {
     pub fn new(cwd: impl AsRef<Path>) -> Self {
         let cwd = cwd.as_ref().to_owned();
-
         Self { cwd }
     }
 }
@@ -86,7 +83,7 @@ impl Tool for GrepTool {
                 },
                 "head_limit": {
                     "type": "integer",
-                    "description": "Limit output to the first N lines/entries across all modes. Defaults to 250. Pass 0 for unlimited."
+                    "description": "Limit output to the first N match groups in \"content\" mode, or the first N entries in \"files_with_matches\" and \"count\" modes. Defaults to 250. Pass 0 for unlimited."
                 }
             },
             "required": ["pattern"]
@@ -98,109 +95,17 @@ impl Tool for GrepTool {
         _context: &mut ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
-        let re =
-            RegexBuilder::new(&args.pattern).case_insensitive(args.case_insensitive).build()?;
+        let matcher = RegexMatcherBuilder::new()
+            .case_insensitive(args.case_insensitive)
+            .build(&args.pattern)?;
+        let stop = Arc::new(StopState::new(args.head_limit));
+        let collector = Arc::new(Collector::new(args.output_mode, stop));
 
-        let (before, after) = match args.context {
-            Some(c) => (c, c),
-            None => (args.context_before.unwrap_or(0), args.context_after.unwrap_or(0)),
-        };
+        let query = Query::from(args);
 
-        let mut builder = WalkBuilder::new(&self.cwd);
-        builder
-            .hidden(false)
-            .git_ignore(args.respect_gitignore)
-            .git_exclude(args.respect_gitignore)
-            .git_global(args.respect_gitignore)
-            .ignore(args.respect_gitignore);
-
-        if let Some(include) = &args.include {
-            let glob = GlobBuilder::new(include).literal_separator(true).build()?;
-            let matcher = glob.compile_matcher();
-            let prefix = self.cwd.clone();
-            builder.filter_entry(move |entry| {
-                entry.file_type().is_some_and(|ft| ft.is_dir())
-                    || entry
-                        .path()
-                        .strip_prefix(&prefix)
-                        .map(|rel| matcher.is_match(rel))
-                        .unwrap_or(false)
-            });
-        }
-
-        let mut content_lines = Vec::<String>::new();
-        let mut file_entries = Vec::<(PathBuf, SystemTime)>::new();
-        let mut count_lines = Vec::<String>::new();
-
-        for entry in builder.build() {
-            let Ok(entry) = entry else { continue };
-            if !entry.file_type().is_some_and(|f| f.is_file()) {
-                continue;
-            }
-
-            let path = entry.path();
-            let Ok(content) = fs::read_to_string(path).await else { continue };
-
-            let lines = content.lines().collect::<Vec<_>>();
-            let match_indices = lines
-                .iter()
-                .enumerate()
-                .filter_map(|(i, line)| if re.is_match(line) { Some(i) } else { None })
-                .collect::<Vec<_>>();
-            if match_indices.is_empty() {
-                continue;
-            }
-
-            let relative_path = path.strip_prefix(&self.cwd).unwrap_or(path);
-            let path_display = relative_path.display().to_string();
-            match args.output_mode {
-                OutputMode::Content => {
-                    let mut emit = BTreeSet::<usize>::new();
-
-                    for index in &match_indices {
-                        let start = index.saturating_sub(before);
-                        let end = index.saturating_add(after).saturating_add(1).min(lines.len());
-                        emit.extend(start..end);
-                    }
-
-                    for i in emit {
-                        let is_match = match_indices.binary_search(&i).is_ok();
-                        let sep = if is_match { ':' } else { '-' };
-                        let rendered = if args.show_line_numbers {
-                            format!("{path_display}{sep}{}{sep}{}", i + 1, lines[i])
-                        } else {
-                            format!("{path_display}{sep}{}", lines[i])
-                        };
-                        content_lines.push(rendered);
-                    }
-                },
-                OutputMode::FilesWithMatches => {
-                    let modified = entry
-                        .metadata()
-                        .ok()
-                        .and_then(|m| m.modified().ok())
-                        .unwrap_or(SystemTime::UNIX_EPOCH);
-                    file_entries.push((relative_path.to_owned(), modified));
-                },
-                OutputMode::Count => {
-                    count_lines.push(format!("{path_display}:{}", match_indices.len()));
-                },
-            }
-        }
-
-        let mut matches = match args.output_mode {
-            OutputMode::Content => content_lines,
-            OutputMode::FilesWithMatches => {
-                file_entries.sort_by_key(|(_, mtime)| std::cmp::Reverse(*mtime));
-                file_entries.into_iter().map(|(path, _)| path.display().to_string()).collect()
-            },
-            OutputMode::Count => count_lines,
-        };
-
-        let truncated = args.head_limit != 0 && matches.len() > args.head_limit;
-        if args.head_limit != 0 {
-            matches.truncate(args.head_limit);
-        }
+        walk_parallel(&self.cwd, query, matcher, collector.clone())?;
+        let collector = Arc::into_inner(collector).ok_or(GrepError::CollectorStillShared)?;
+        let (matches, truncated) = collector.finish();
 
         Ok(GrepOutput::new(matches, truncated))
     }
