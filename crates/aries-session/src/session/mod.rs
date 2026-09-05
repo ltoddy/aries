@@ -377,11 +377,8 @@ impl Session {
             ContextCompactor::clone(&self.compactor),
             Notifier::clone(&self.notifier),
         );
-        if executor.execute(input).await {
-            let mut guard = self.receiver.lock().await;
-            while let Ok(event) = guard.try_recv() {
-                callback(event).await;
-            }
+        let cancel_token = self.cancel_token.lock().clone();
+        if executor.execute(input, &self.receiver, &cancel_token, callback).await {
             return true;
         };
         false

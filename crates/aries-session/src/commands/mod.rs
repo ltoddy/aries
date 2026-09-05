@@ -5,6 +5,7 @@ use aries_agent::AriesAgent;
 use aries_compact::ContextCompactor;
 use aries_event::Notifier;
 use aries_extension::CommandDefinition;
+use tokio_util::sync::CancellationToken;
 
 pub use self::builtin::BUILTIN_COMMANDS;
 
@@ -28,7 +29,19 @@ impl<'a> CommandsExecutor<'a> {
         Self { slash_commands_executor, builtin_commands_executor }
     }
 
-    pub async fn execute(&mut self, input: impl AsRef<str>) -> bool {
+    pub async fn execute<F, Fut>(
+        &mut self,
+        input: impl AsRef<str>,
+        receiver: &tokio::sync::Mutex<
+            tokio::sync::mpsc::UnboundedReceiver<aries_event::AgentEvent>,
+        >,
+        cancel_token: &CancellationToken,
+        callback: F,
+    ) -> bool
+    where
+        F: Fn(aries_event::AgentEvent) -> Fut + Clone,
+        Fut: Future<Output = ()>,
+    {
         let input = input.as_ref();
         let input = input.trim();
 
@@ -41,6 +54,6 @@ impl<'a> CommandsExecutor<'a> {
         if self.builtin_commands_executor.is_builtin_command(command) {
             return self.builtin_commands_executor.execute(command, args).await;
         }
-        self.slash_commands_executor.execute(command, args).await
+        self.slash_commands_executor.execute(command, args, receiver, cancel_token, callback).await
     }
 }
