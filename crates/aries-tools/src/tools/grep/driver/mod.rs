@@ -18,7 +18,8 @@ pub struct Query {
     pub context_before: Option<usize>,
     pub context_after: Option<usize>,
     pub context: Option<usize>,
-    pub respect_gitignore: bool,
+    pub hidden: bool,
+    pub respect_ignore: bool,
 }
 
 impl From<GrepArgs> for Query {
@@ -30,7 +31,8 @@ impl From<GrepArgs> for Query {
             context_before: value.context_before,
             context_after: value.context_after,
             context: value.context,
-            respect_gitignore: value.respect_gitignore,
+            hidden: value.hidden,
+            respect_ignore: value.respect_ignore,
         }
     }
 }

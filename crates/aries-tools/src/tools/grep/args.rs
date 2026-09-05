@@ -18,11 +18,14 @@ pub struct GrepArgs {
     pub context_after: Option<usize>,
     pub context: Option<usize>,
 
-    #[serde(default = "default_respect_gitignore")]
-    pub respect_gitignore: bool,
+    #[serde(default)]
+    pub hidden: bool,
 
-    #[serde(default = "default_head_limit")]
-    pub head_limit: usize,
+    #[serde(default = "default_respect_ignore")]
+    pub respect_ignore: bool,
+
+    #[serde(default = "default_limit")]
+    pub limit: usize,
 }
 
 impl GrepArgs {
@@ -60,10 +63,10 @@ fn default_show_line_numbers() -> bool {
     true
 }
 
-fn default_respect_gitignore() -> bool {
+fn default_respect_ignore() -> bool {
     true
 }
 
-fn default_head_limit() -> usize {
+fn default_limit() -> usize {
     250
 }

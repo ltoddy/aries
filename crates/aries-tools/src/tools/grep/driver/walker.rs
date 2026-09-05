@@ -125,11 +125,11 @@ impl EntryMatcher {
 
     fn configure(&self, builder: &mut WalkBuilder, query: &Query) {
         builder
-            .hidden(false)
-            .git_ignore(query.respect_gitignore)
-            .git_exclude(query.respect_gitignore)
-            .git_global(query.respect_gitignore)
-            .ignore(query.respect_gitignore);
+            .hidden(!query.hidden)
+            .git_ignore(query.respect_ignore)
+            .git_exclude(query.respect_ignore)
+            .git_global(query.respect_ignore)
+            .ignore(query.respect_ignore);
 
         let matcher = self.clone();
         builder.filter_entry(move |entry| matcher.matches(entry));

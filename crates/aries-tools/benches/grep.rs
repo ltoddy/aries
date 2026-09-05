@@ -61,8 +61,9 @@ fn grep_args(pattern: &str) -> GrepArgs {
         context_before: None,
         context_after: None,
         context: None,
-        respect_gitignore: false,
-        head_limit: 0,
+        hidden: false,
+        respect_ignore: false,
+        limit: 0,
     }
 }
 

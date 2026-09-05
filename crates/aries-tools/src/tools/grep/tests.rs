@@ -15,8 +15,9 @@ fn grep_args(pattern: &str) -> GrepArgs {
         context_before: None,
         context_after: None,
         context: None,
-        respect_gitignore: true,
-        head_limit: 250,
+        hidden: false,
+        respect_ignore: true,
+        limit: 250,
     }
 }
 
@@ -33,13 +34,14 @@ fn test_grep_args_title() {
 #[test]
 fn test_grep_args_serde_defaults() {
     // 只给 pattern 时：output_mode=files_with_matches、case_insensitive=false、
-    // show_line_numbers=true、respect_gitignore=true、head_limit=250、上下文行均为 None。
+    // show_line_numbers=true、hidden=false、respect_ignore=true、limit=250、上下文行均为 None。
     let args: GrepArgs = serde_json::from_str(r#"{"pattern": "foo"}"#).unwrap();
     assert_eq!(args.output_mode, OutputMode::FilesWithMatches);
     assert!(!args.case_insensitive);
     assert!(args.show_line_numbers);
-    assert!(args.respect_gitignore);
-    assert_eq!(args.head_limit, 250);
+    assert!(!args.hidden);
+    assert!(args.respect_ignore);
+    assert_eq!(args.limit, 250);
     assert_eq!(args.context, None);
 }
 
@@ -183,7 +185,7 @@ async fn test_grep_context_saturates_no_overflow() {
 }
 
 #[tokio::test]
-async fn test_grep_head_limit_truncates_match_groups() {
+async fn test_grep_limit_truncates_match_groups() {
     let tmp = tempfile::TempDir::new().unwrap();
     for i in 0..10 {
         tokio::fs::write(tmp.path().join(format!("f{i}.rs")), format!("needle-{i}\n"))
@@ -195,7 +197,7 @@ async fn test_grep_head_limit_truncates_match_groups() {
     let tool = GrepTool::new(tmp.path().to_path_buf());
     let mut args = grep_args("needle");
     args.output_mode = OutputMode::Content;
-    args.head_limit = 3;
+    args.limit = 3;
     let result = tool.call(&mut context, args).await.unwrap();
     assert_eq!(result.matches.len(), 3);
     assert!(result.truncated);
@@ -246,7 +248,7 @@ async fn test_grep_can_disable_gitignore_filtering() {
     let mut context = ToolContext::new();
     let tool = GrepTool::new(tmp.path().to_path_buf());
     let mut args = grep_args("needle");
-    args.respect_gitignore = false;
+    args.respect_ignore = false;
     let result = tool.call(&mut context, args).await.unwrap();
 
     assert!(result.matches.contains(&"visible.rs".to_string()));

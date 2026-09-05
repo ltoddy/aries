@@ -3,7 +3,13 @@
 use super::*;
 
 fn glob_args(pattern: &str) -> GlobArgs {
-    GlobArgs { pattern: pattern.to_owned(), base_dir: None, hidden: false, respect_gitignore: true }
+    GlobArgs {
+        pattern: pattern.to_owned(),
+        base_dir: None,
+        hidden: false,
+        respect_ignore: true,
+        limit: 100,
+    }
 }
 
 #[test]
@@ -14,10 +20,11 @@ fn test_glob_args_title() {
 
 #[test]
 fn test_glob_args_serde_defaults() {
-    // 只给 pattern 时，hidden 默认 false、respect_gitignore 默认 true。
+    // 只给 pattern 时，hidden 默认 false、respect_ignore 默认 true、limit 默认 100。
     let args: GlobArgs = serde_json::from_str(r#"{"pattern": "*.rs"}"#).unwrap();
     assert!(!args.hidden);
-    assert!(args.respect_gitignore);
+    assert!(args.respect_ignore);
+    assert_eq!(args.limit, 100);
 }
 
 #[tokio::test]
@@ -65,7 +72,7 @@ async fn test_glob_sorts_by_mtime_newest_first() {
 #[tokio::test]
 async fn test_glob_truncates_over_limit() {
     let tmp = tempfile::TempDir::new().unwrap();
-    for i in 0..(MAX_RESULTS + 10) {
+    for i in 0..110 {
         tokio::fs::write(tmp.path().join(format!("f{i}.rs")), "").await.unwrap();
     }
 
@@ -73,7 +80,7 @@ async fn test_glob_truncates_over_limit() {
     let tool = GlobTool::new(tmp.path().to_path_buf());
     let result = tool.call(&mut context, glob_args("*.rs")).await.unwrap();
 
-    assert_eq!(result.files.len(), MAX_RESULTS);
+    assert_eq!(result.files.len(), 100);
     assert!(result.truncated);
 }
 
@@ -109,7 +116,8 @@ async fn test_glob_hidden_files() {
         pattern: "*.rs".to_owned(),
         base_dir: None,
         hidden: true,
-        respect_gitignore: true,
+        respect_ignore: true,
+        limit: 100,
     };
     let hidden_result = tool.call(&mut context, args).await.unwrap();
     assert!(hidden_result.files.contains(&PathBuf::from(".hidden.rs")));

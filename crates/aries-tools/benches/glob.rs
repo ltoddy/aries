@@ -61,7 +61,8 @@ fn glob_args(pattern: &str) -> GlobArgs {
         pattern: pattern.to_string(),
         base_dir: None,
         hidden: false,
-        respect_gitignore: true,
+        respect_ignore: true,
+        limit: 100,
     }
 }
 
@@ -97,7 +98,7 @@ fn bench_glob(c: &mut Criterion) {
         }),
         ("all_rs_without_gitignore", {
             let mut args = glob_args("**/*.rs");
-            args.respect_gitignore = false;
+            args.respect_ignore = false;
             args
         }),
     ];

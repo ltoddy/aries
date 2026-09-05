@@ -1,4 +1,5 @@
 mod args;
+mod driver;
 mod error;
 mod output;
 #[cfg(test)]
@@ -6,10 +7,8 @@ mod tests;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::SystemTime;
 
-use ignore::{WalkBuilder, WalkState};
-use parking_lot::Mutex;
+use driver::{Collector, walk_parallel};
 use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
 
@@ -18,8 +17,6 @@ pub use self::error::GlobError;
 pub use self::output::GlobOutput;
 
 pub const NAME: &str = "Glob";
-
-const MAX_RESULTS: usize = 100;
 
 pub struct GlobTool {
     cwd: PathBuf,
@@ -59,9 +56,13 @@ impl Tool for GlobTool {
                     "type": "boolean",
                     "description": "Include hidden files (starting with '.'). Defaults to false."
                 },
-                "respect_gitignore": {
+                "respect_ignore": {
                     "type": "boolean",
                     "description": "Respect .gitignore and other ignore rules. Defaults to true."
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of matched paths to return. Defaults to 100. Pass 0 for unlimited."
                 }
             },
             "required": ["pattern"]
@@ -86,53 +87,12 @@ impl Tool for GlobTool {
 
         let pattern = globset::Glob::new(&pattern)?;
         let set = globset::GlobSetBuilder::new().add(pattern).build()?;
+        let collector = Arc::new(Collector::new(args.limit));
 
-        let mut walker = WalkBuilder::new(&base_dir);
-        walker
-            .hidden(!args.hidden)
-            .git_ignore(args.respect_gitignore)
-            .git_exclude(args.respect_gitignore)
-            .git_global(args.respect_gitignore)
-            .ignore(args.respect_gitignore);
+        walk_parallel(&base_dir, args.hidden, args.respect_ignore, set, collector.clone())?;
 
-        let matches = Arc::new(Mutex::new(Vec::<(PathBuf, SystemTime)>::new()));
-        let base_dir = Arc::new(base_dir);
-        let set = Arc::new(set);
-
-        walker.build_parallel().run(|| {
-            let base_dir = base_dir.clone();
-            let matches = matches.clone();
-            let set = set.clone();
-
-            Box::new(move |entry| {
-                let Ok(entry) = entry else { return WalkState::Continue };
-
-                let Ok(relative) = entry.path().strip_prefix(base_dir.as_path()) else {
-                    return WalkState::Continue;
-                };
-
-                if !set.is_match(relative) {
-                    return WalkState::Continue;
-                }
-
-                let modified = entry
-                    .metadata()
-                    .ok()
-                    .and_then(|m| m.modified().ok())
-                    .unwrap_or(SystemTime::UNIX_EPOCH);
-
-                matches.lock().push((relative.to_owned(), modified));
-                WalkState::Continue
-            })
-        });
-
-        let mut matches = Arc::into_inner(matches).expect("glob matches still shared").into_inner();
-
-        matches.sort_by_key(|next| std::cmp::Reverse(next.1));
-
-        let truncated = matches.len() > MAX_RESULTS;
-        let files =
-            matches.into_iter().take(MAX_RESULTS).map(|(filename, _)| filename).collect::<Vec<_>>();
+        let collector = Arc::into_inner(collector).ok_or(GlobError::CollectorStillShared)?;
+        let (files, truncated) = collector.finish();
 
         Ok(GlobOutput::new(files, truncated))
     }

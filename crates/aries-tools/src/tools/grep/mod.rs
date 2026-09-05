@@ -77,11 +77,15 @@ impl Tool for GrepTool {
                     "type": "integer",
                     "description": "Number of lines to show before and after each match (rg -C). Takes precedence over context_before/context_after. Only applies to output_mode \"content\"."
                 },
-                "respect_gitignore": {
+                "hidden": {
+                    "type": "boolean",
+                    "description": "Include hidden files and directories. Defaults to false."
+                },
+                "respect_ignore": {
                     "type": "boolean",
                     "description": "Respect .gitignore and other ignore rules. Defaults to true."
                 },
-                "head_limit": {
+                "limit": {
                     "type": "integer",
                     "description": "Limit output to the first N match groups in \"content\" mode, or the first N entries in \"files_with_matches\" and \"count\" modes. Defaults to 250. Pass 0 for unlimited."
                 }
@@ -98,7 +102,7 @@ impl Tool for GrepTool {
         let matcher = RegexMatcherBuilder::new()
             .case_insensitive(args.case_insensitive)
             .build(&args.pattern)?;
-        let stop = Arc::new(StopState::new(args.head_limit));
+        let stop = Arc::new(StopState::new(args.limit));
         let collector = Arc::new(Collector::new(args.output_mode, stop));
 
         let query = Query::from(args);

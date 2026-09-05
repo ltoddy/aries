@@ -10,8 +10,11 @@ pub struct GlobArgs {
     #[serde(default)]
     pub hidden: bool,
 
-    #[serde(default = "default_respect_gitignore")]
-    pub respect_gitignore: bool,
+    #[serde(default = "default_respect_ignore")]
+    pub respect_ignore: bool,
+
+    #[serde(default = "default_limit")]
+    pub limit: usize,
 }
 
 impl GlobArgs {
@@ -38,6 +41,10 @@ impl GlobArgs {
     }
 }
 
-fn default_respect_gitignore() -> bool {
+fn default_respect_ignore() -> bool {
     true
+}
+
+fn default_limit() -> usize {
+    100
 }
