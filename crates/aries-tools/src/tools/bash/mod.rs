@@ -53,7 +53,11 @@ impl Tool for BashTool {
     type Error = BashError;
 
     fn description(&self) -> String {
-        include_str!("description.md").to_owned()
+        let Ok(_) = git2::Repository::discover(&self.cwd) else {
+            return include_str!("description.md").to_owned();
+        };
+
+        [include_str!("description.md"), include_str!("description-git.md")].join("\n")
     }
 
     fn parameters(&self) -> Value {

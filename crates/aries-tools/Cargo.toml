@@ -13,6 +13,7 @@ aries-preamble = { path = "../aries-preamble" }
 dialoguer.workspace = true
 firecrawl.workspace = true
 futures.workspace = true
+git2.workspace = true
 globset.workspace = true
 grep-regex.workspace = true
 grep-searcher.workspace = true

@@ -181,3 +181,20 @@ fn test_rewrite_with_comment() {
         "aries exec echo hello # this is a comment"
     );
 }
+
+#[test]
+fn test_description_excludes_git_section_outside_repo() {
+    let dir = TempDir::new().unwrap();
+    let tool = tool(dir.path());
+
+    assert!(!tool.description().contains("# 使用 git 提交改动"));
+}
+
+#[test]
+fn test_description_includes_git_section_inside_repo() {
+    let dir = TempDir::new().unwrap();
+    git2::Repository::init(dir.path()).unwrap();
+    let tool = tool(dir.path());
+
+    assert!(tool.description().contains("# 使用 git 提交改动"));
+}

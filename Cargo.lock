@@ -590,6 +590,7 @@ dependencies = [
  "dialoguer",
  "firecrawl",
  "futures",
+ "git2",
  "globset",
  "grep-regex",
  "grep-searcher",
