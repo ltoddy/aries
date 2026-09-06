@@ -162,6 +162,12 @@ fn extra_whitespace_in_arguments_is_collapsed() {
 }
 
 #[test]
+fn quoted_arguments_are_preserved_for_positionals() {
+    let def = CommandDefinition::new("/tmp/x.md", frontmatter(), "$1|$2|$ARGUMENTS");
+    assert_eq!(def.expand_arguments("'hello world' tail"), "hello world|tail|'hello world' tail");
+}
+
+#[test]
 fn placeholder_names_are_case_sensitive() {
     let def =
         CommandDefinition::new("/tmp/x.md", frontmatter(), "$arguments $Arguments $ARGUMENTS");

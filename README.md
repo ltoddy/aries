@@ -16,7 +16,7 @@
 
 安装命令, 如果有 just 命令的情况下可以通过:
 
-> just installl
+> just install
 
 如果没有 just 命令，可以通过:
 

@@ -137,6 +137,21 @@ async fn test_grep_files_with_matches_sorted_by_mtime() {
 }
 
 #[tokio::test]
+async fn test_grep_files_with_matches_applies_limit_without_collecting_all_results() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    tokio::fs::write(tmp.path().join("old.rs"), "needle\n").await.unwrap();
+    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    tokio::fs::write(tmp.path().join("new.rs"), "needle\n").await.unwrap();
+
+    let mut context = ToolContext::new();
+    let tool = GrepTool::new(tmp.path().to_path_buf());
+    let mut args = grep_args("needle");
+    args.limit = 1;
+    let result = tool.call(&mut context, args).await.unwrap();
+    assert_eq!(result.matches, vec!["new.rs".to_string()]);
+}
+
+#[tokio::test]
 async fn test_grep_count_mode() {
     let tmp = tempfile::TempDir::new().unwrap();
     tokio::fs::write(tmp.path().join("a.rs"), "hit\nmiss\nhit\nhit\n").await.unwrap();

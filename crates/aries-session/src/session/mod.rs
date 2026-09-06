@@ -280,8 +280,8 @@ impl Session {
         }
         self.fire_stop(final_res.output()).await;
         self.sift(final_res.messages(), title, final_res.output());
-        if let Some(complection) = final_res.completion_calls.last() {
-            self.compactor.post_compact(complection.usage, callback).await;
+        if let Some(completion) = final_res.completion_calls.last() {
+            self.compactor.post_compact(completion.usage, callback).await;
         }
 
         Ok(())

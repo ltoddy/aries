@@ -62,7 +62,7 @@ impl Tool for TaskOutputTool {
 
         if args.block && snapshot.status == TaskStatus::Running {
             loop {
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                self.ctx.task.wait_for_change().await;
                 snapshot = self
                     .ctx
                     .task

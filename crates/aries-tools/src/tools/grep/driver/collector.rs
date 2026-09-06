@@ -1,3 +1,5 @@
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -12,7 +14,7 @@ pub struct Collector {
     mode: OutputMode,
     stop: Arc<StopState>,
     content_groups: Mutex<Vec<Vec<String>>>,
-    file_entries: Mutex<Vec<(PathBuf, SystemTime)>>,
+    file_entries: Mutex<BinaryHeap<Reverse<(SystemTime, PathBuf)>>>,
     count_lines: Mutex<Vec<String>>,
 }
 
@@ -40,12 +42,11 @@ impl Collector {
         let matches = match self.mode {
             OutputMode::Content => self.content_groups.into_inner().into_iter().flatten().collect(),
             OutputMode::FilesWithMatches => {
-                let mut entries = self.file_entries.into_inner();
-                entries.sort_by_key(|(_, modified)| std::cmp::Reverse(*modified));
+                let mut entries = self.file_entries.into_inner().into_sorted_vec();
                 if self.stop.limit() > 0 {
                     entries.truncate(self.stop.limit());
                 }
-                entries.into_iter().map(|(path, _)| path.display().to_string()).collect()
+                entries.into_iter().map(|Reverse((_, path))| path.display().to_string()).collect()
             },
             OutputMode::Count => self.count_lines.into_inner(),
         };
@@ -71,18 +72,33 @@ impl Collector {
     }
 
     fn on_files_with_matches(&self, batch: Vec<FileMatch>) {
-        let file_entries = batch
+        let mut file_entries = batch
             .into_iter()
             .filter_map(|result| {
                 if let FileMatch::Path { path, modified } = result {
-                    Some((path, modified))
+                    Some(Reverse((modified, path)))
                 } else {
                     None
                 }
             })
             .collect::<Vec<_>>();
 
-        self.file_entries.lock().extend(file_entries);
+        let limit = self.stop.limit();
+        let mut entries = self.file_entries.lock();
+        for entry in file_entries.drain(..) {
+            if limit == 0 || entries.len() < limit {
+                entries.push(entry);
+                continue;
+            }
+
+            let should_replace = entries.peek().is_some_and(|oldest| entry < *oldest);
+            if should_replace {
+                entries.pop();
+                entries.push(entry);
+            } else {
+                self.stop.should_stop();
+            }
+        }
     }
 
     fn on_count(&self, batch: Vec<FileMatch>) {

@@ -27,7 +27,8 @@ serde.workspace = true
 serde_json.workspace = true
 similar.workspace = true
 thiserror.workspace = true
-tokio = { workspace = true, features = ["fs", "process"] }
+tokio = { workspace = true, features = ["fs", "process", "sync", "time", "io-util"] }
+nix = { workspace = true, features = ["signal", "process"] }
 tree-sitter.workspace = true
 tree-sitter-bash.workspace = true
 

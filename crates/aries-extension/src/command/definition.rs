@@ -1,7 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
-use itertools::Itertools;
 use regex_lite::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -35,7 +34,8 @@ impl CommandDefinition {
 
     // 没有参数就传递空字符串
     pub fn expand_arguments(&self, arguments: &str) -> String {
-        let positional = arguments.split_whitespace().collect_vec();
+        let positional =
+            shell_words::split(arguments).unwrap_or_else(|_| vec![arguments.to_owned()]);
 
         ARGUMENT_PATTERN
             .replace_all(&self.body, |caps: &regex_lite::Captures| {
@@ -44,7 +44,7 @@ impl CommandDefinition {
                     index
                         .and_then(|i| i.checked_sub(1))
                         .and_then(|i| positional.get(i))
-                        .copied()
+                        .map(String::as_str)
                         .unwrap_or("")
                 } else {
                     arguments
