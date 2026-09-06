@@ -10,13 +10,11 @@ pub mod session;
 use agent_client_protocol::{Agent, ConnectTo, on_receive_notification, on_receive_request};
 use aries_init::{GlobalContext, Setting};
 
-// WIP
-
 pub async fn run(
     _gctx: GlobalContext,
     _setting: Setting,
     transport: impl ConnectTo<Agent> + 'static,
-) -> anyhow::Result<()> {
+) -> Result<(), agent_client_protocol::Error> {
     Agent
         .v2()
         .name("aries")
@@ -26,12 +24,18 @@ pub async fn run(
         .on_receive_request(session::new_session, on_receive_request!())
         .on_receive_request(session::list_sessions, on_receive_request!())
         .on_receive_request(session::delete_session, on_receive_request!())
-        .on_receive_request(prompt::prompt, on_receive_request!())
         .on_receive_request(session::close_session, on_receive_request!())
         .on_receive_request(session::resume_session, on_receive_request!())
+        .on_receive_request(session::set_session_mode, on_receive_request!())
         .on_receive_request(session::set_session_config_option, on_receive_request!())
         .on_receive_request(session::fork_session, on_receive_request!())
+        .on_receive_request(prompt::prompt, on_receive_request!())
+        .on_receive_request(mcp::connect, on_receive_request!())
+        .on_receive_request(mcp::message, on_receive_request!())
+        .on_receive_request(mcp::disconnect, on_receive_request!())
+        .on_receive_notification(cancel::cancel_request, on_receive_notification!())
         .on_receive_notification(cancel::cancel, on_receive_notification!())
+        .on_receive_notification(mcp::message_notification, on_receive_notification!())
         .with_spawned(connection::on_connection_established)
         .on_close(connection::on_connection_closed)
         .connect_to(transport)

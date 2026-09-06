@@ -72,16 +72,18 @@ pub async fn execute(
         Transport::Stdio => {
             let transport = Stdio::new();
             match version {
-                AcpVersion::V1 => aries_acp::v1::run(gctx, setting, transport, bare).await,
-                AcpVersion::V2 => aries_acp::v2::run(gctx, setting, transport).await,
+                AcpVersion::V1 => aries_acp::v1::run(gctx, setting, transport, bare).await?,
+                AcpVersion::V2 => aries_acp::v2::run(gctx, setting, transport).await?,
             }
         },
         Transport::Tcp(addr) => {
             let transport = aries_acp::transport::TcpTransport::bind(addr).await?;
             match version {
-                AcpVersion::V1 => aries_acp::v1::run(gctx, setting, transport, bare).await,
-                AcpVersion::V2 => aries_acp::v2::run(gctx, setting, transport).await,
+                AcpVersion::V1 => aries_acp::v1::run(gctx, setting, transport, bare).await?,
+                AcpVersion::V2 => aries_acp::v2::run(gctx, setting, transport).await?,
             }
         },
     }
+
+    Ok(())
 }

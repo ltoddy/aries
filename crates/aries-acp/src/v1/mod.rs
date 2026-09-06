@@ -30,7 +30,7 @@ pub async fn run(
     setting: Setting,
     transport: impl ConnectTo<Agent> + 'static,
     bare: bool,
-) -> anyhow::Result<()> {
+) -> Result<(), agent_client_protocol::Error> {
     let registry: SharedRegistry = Arc::new(Mutex::new(SessionRegistry::new(gctx, setting).await?));
 
     Agent

@@ -23,7 +23,7 @@ default-members = ["crates/aries-cli"]
 resolver = "3"
 
 [workspace.dependencies]
-agent-client-protocol = "2.0"
+agent-client-protocol = "2.1"
 anyhow = "1"
 base64 = "0.23"
 clap = "4"
