@@ -35,7 +35,7 @@ async fn test_glob_finds_files() {
     tokio::fs::write(tmp.path().join("sub/b.rs"), "").await.unwrap();
 
     let mut context = ToolContext::new();
-    let tool = GlobTool::new(tmp.path().to_path_buf());
+    let tool = GlobTool::new(tmp.path());
     let result = tool.call(&mut context, glob_args("*.rs")).await.unwrap();
     assert!(result.files.contains(&PathBuf::from("a.rs")));
 }
@@ -47,7 +47,7 @@ async fn test_glob_recursive() {
     tokio::fs::write(tmp.path().join("sub/b.rs"), "").await.unwrap();
 
     let mut context = ToolContext::new();
-    let tool = GlobTool::new(tmp.path().to_path_buf());
+    let tool = GlobTool::new(tmp.path());
     let result = tool.call(&mut context, glob_args("**/*.rs")).await.unwrap();
     assert_eq!(result.files, vec![PathBuf::from("sub/b.rs")]);
     assert!(!result.truncated);
@@ -62,7 +62,7 @@ async fn test_glob_sorts_by_mtime_newest_first() {
     tokio::fs::write(tmp.path().join("new.rs"), "").await.unwrap();
 
     let mut context = ToolContext::new();
-    let tool = GlobTool::new(tmp.path().to_path_buf());
+    let tool = GlobTool::new(tmp.path());
     let result = tool.call(&mut context, glob_args("*.rs")).await.unwrap();
 
     // 降序：最新在前。
@@ -77,7 +77,7 @@ async fn test_glob_truncates_over_limit() {
     }
 
     let mut context = ToolContext::new();
-    let tool = GlobTool::new(tmp.path().to_path_buf());
+    let tool = GlobTool::new(tmp.path());
     let result = tool.call(&mut context, glob_args("*.rs")).await.unwrap();
 
     assert_eq!(result.files.len(), 100);
@@ -90,7 +90,7 @@ async fn test_glob_no_files_found() {
     tokio::fs::write(tmp.path().join("a.txt"), "").await.unwrap();
 
     let mut context = ToolContext::new();
-    let tool = GlobTool::new(tmp.path().to_path_buf());
+    let tool = GlobTool::new(tmp.path());
     let result = tool.call(&mut context, glob_args("*.rs")).await.unwrap();
     assert!(result.files.is_empty());
 
@@ -105,7 +105,7 @@ async fn test_glob_hidden_files() {
     tokio::fs::write(tmp.path().join(".hidden.rs"), "").await.unwrap();
 
     let mut context = ToolContext::new();
-    let tool = GlobTool::new(tmp.path().to_path_buf());
+    let tool = GlobTool::new(tmp.path());
 
     // 默认跳过隐藏文件。
     let default_result = tool.call(&mut context, glob_args("*.rs")).await.unwrap();

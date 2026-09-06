@@ -8,10 +8,10 @@ build:
     @cargo build
 
 check:
-    @cargo check
+    @cargo check --workspace --all-targets
 
 clippy:
-    @cargo clippy
+    @cargo clippy --workspace --all-targets
 
 test:
     @cargo test --workspace --lib --bins --tests

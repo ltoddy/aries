@@ -53,7 +53,7 @@ async fn test_grep_finds_pattern() {
         .unwrap();
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path().to_path_buf());
+    let tool = GrepTool::new(tmp.path());
     let mut args = grep_args("println");
     args.output_mode = OutputMode::Content;
     let result = tool.call(&mut context, args).await.unwrap();
@@ -69,7 +69,7 @@ async fn test_grep_case_insensitive() {
     tokio::fs::write(tmp.path().join("a.rs"), "Hello World\n").await.unwrap();
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path().to_path_buf());
+    let tool = GrepTool::new(tmp.path());
 
     // 默认区分大小写：小写 pattern 不命中。
     let mut sensitive = grep_args("hello");
@@ -89,7 +89,7 @@ async fn test_grep_no_line_numbers() {
     tokio::fs::write(tmp.path().join("a.rs"), "target line\n").await.unwrap();
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path().to_path_buf());
+    let tool = GrepTool::new(tmp.path());
     let mut args = grep_args("target");
     args.output_mode = OutputMode::Content;
     args.show_line_numbers = false;
@@ -106,7 +106,7 @@ async fn test_grep_context_lines() {
     tokio::fs::write(tmp.path().join("a.rs"), "line1\nline2\nMATCH\nline4\nline5\n").await.unwrap();
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path().to_path_buf());
+    let tool = GrepTool::new(tmp.path());
     let mut args = grep_args("MATCH");
     args.output_mode = OutputMode::Content;
     args.context = Some(1);
@@ -130,7 +130,7 @@ async fn test_grep_files_with_matches_sorted_by_mtime() {
     tokio::fs::write(tmp.path().join("new.rs"), "needle\n").await.unwrap();
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path().to_path_buf());
+    let tool = GrepTool::new(tmp.path());
     // 默认 output_mode 即 files_with_matches。
     let result = tool.call(&mut context, grep_args("needle")).await.unwrap();
     assert_eq!(result.matches, vec!["new.rs".to_string(), "old.rs".to_string()]);
@@ -144,7 +144,7 @@ async fn test_grep_files_with_matches_applies_limit_without_collecting_all_resul
     tokio::fs::write(tmp.path().join("new.rs"), "needle\n").await.unwrap();
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path().to_path_buf());
+    let tool = GrepTool::new(tmp.path());
     let mut args = grep_args("needle");
     args.limit = 1;
     let result = tool.call(&mut context, args).await.unwrap();
@@ -157,7 +157,7 @@ async fn test_grep_count_mode() {
     tokio::fs::write(tmp.path().join("a.rs"), "hit\nmiss\nhit\nhit\n").await.unwrap();
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path().to_path_buf());
+    let tool = GrepTool::new(tmp.path());
     let mut args = grep_args("hit");
     args.output_mode = OutputMode::Count;
     let result = tool.call(&mut context, args).await.unwrap();
@@ -173,7 +173,7 @@ async fn test_grep_context_at_file_boundary() {
     tokio::fs::write(tmp.path().join("a.rs"), "line1\nline2\nMATCH\n").await.unwrap();
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path().to_path_buf());
+    let tool = GrepTool::new(tmp.path());
     let mut args = grep_args("MATCH");
     args.output_mode = OutputMode::Content;
     args.context_after = Some(5);
@@ -190,7 +190,7 @@ async fn test_grep_context_saturates_no_overflow() {
     tokio::fs::write(tmp.path().join("a.rs"), "alpha\nMATCH\nomega\n").await.unwrap();
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path().to_path_buf());
+    let tool = GrepTool::new(tmp.path());
     let mut args = grep_args("MATCH");
     args.output_mode = OutputMode::Content;
     args.context = Some(usize::MAX);
@@ -209,7 +209,7 @@ async fn test_grep_limit_truncates_match_groups() {
     }
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path().to_path_buf());
+    let tool = GrepTool::new(tmp.path());
     let mut args = grep_args("needle");
     args.output_mode = OutputMode::Content;
     args.limit = 3;
@@ -225,7 +225,7 @@ async fn test_grep_no_matches_found() {
     tokio::fs::write(tmp.path().join("a.rs"), "nothing here\n").await.unwrap();
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path().to_path_buf());
+    let tool = GrepTool::new(tmp.path());
     let result = tool.call(&mut context, grep_args("absent_pattern")).await.unwrap();
     assert!(result.matches.is_empty());
     assert!(!result.truncated);
@@ -245,7 +245,7 @@ async fn test_grep_respects_gitignore_by_default() {
     tokio::fs::write(tmp.path().join("visible.rs"), "needle\n").await.unwrap();
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path().to_path_buf());
+    let tool = GrepTool::new(tmp.path());
     let result = tool.call(&mut context, grep_args("needle")).await.unwrap();
 
     assert_eq!(result.matches, vec!["visible.rs".to_string()]);
@@ -261,7 +261,7 @@ async fn test_grep_can_disable_gitignore_filtering() {
     tokio::fs::write(tmp.path().join("visible.rs"), "needle\n").await.unwrap();
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path().to_path_buf());
+    let tool = GrepTool::new(tmp.path());
     let mut args = grep_args("needle");
     args.respect_ignore = false;
     let result = tool.call(&mut context, args).await.unwrap();
@@ -279,7 +279,7 @@ async fn test_grep_include_filters_files() {
     tokio::fs::write(tmp.path().join("docs").join("note.txt"), "needle\n").await.unwrap();
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path().to_path_buf());
+    let tool = GrepTool::new(tmp.path());
     let mut args = grep_args("needle");
     args.include = Some("src/**/*.rs".to_string());
     let result = tool.call(&mut context, args).await.unwrap();
@@ -298,7 +298,7 @@ async fn test_grep_include_keeps_nested_target_subtree() {
     tokio::fs::write(tmp.path().join("vendor").join("lib.rs"), "needle\n").await.unwrap();
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path().to_path_buf());
+    let tool = GrepTool::new(tmp.path());
     let mut args = grep_args("needle");
     args.include = Some("src/**/*.rs".to_string());
     let result = tool.call(&mut context, args).await.unwrap();

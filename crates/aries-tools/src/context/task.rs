@@ -236,7 +236,7 @@ impl TaskRegistry {
                         if exit_code == 0 { TaskStatus::Completed } else { TaskStatus::Failed };
                 },
                 Err(err) => {
-                    state.stderr.push(&format!("\nfailed to wait for command: {err}"));
+                    state.stderr.push(format!("\nfailed to wait for command: {err}"));
                     state.exit_code = Some(-1);
                     state.status = TaskStatus::Failed;
                 },
@@ -397,8 +397,9 @@ impl PartialOrd for OutputChunk {
 
 #[cfg(test)]
 mod tests {
-    use super::{BoundedOutput, TaskKind, TaskRegistry, TaskState, TaskStatus};
     use aries_event::Notifier;
+
+    use super::{BoundedOutput, TaskKind, TaskRegistry, TaskState, TaskStatus};
 
     #[test]
     fn bounded_output_drops_oldest_chunks() {
