@@ -33,6 +33,7 @@ impl BashTool {
         Self { cwd: cwd.to_owned(), ctx, language }
     }
 
+    #[allow(dead_code)]
     fn attempt_rewrite_last_command(&self, cmd: &str) -> Option<String> {
         let mut parser = Parser::new();
         parser.set_language(&self.language).ok()?;
@@ -86,7 +87,9 @@ impl Tool for BashTool {
         _context: &mut ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
-        let arg = self.attempt_rewrite_last_command(&args.command).unwrap_or(args.command);
+        // attempt_rewrite_last_command 有边缘 case, 逐步修复它
+        // let arg = self.attempt_rewrite_last_command(&args.command).unwrap_or(args.command);
+        let arg = args.command;
 
         if args.background {
             let task =
