@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use itertools::Itertools;
 use tempfile::TempDir;
@@ -30,6 +30,7 @@ fn command_hook(command: &str) -> HookCommand {
 
 fn hooks_definition(event: HookEvent, hooks: Vec<HookCommand>) -> HooksDefinition {
     HooksDefinition {
+        location: PathBuf::new(),
         description: None,
         hooks: HooksSettings(HashMap::from([(event, vec![HookMatcher { matcher: None, hooks }])])),
     }
@@ -161,6 +162,7 @@ async fn executor_continues_when_no_hooks_registered() {
 #[tokio::test]
 async fn executor_blocks_pre_tool_use_when_hook_exits_two() {
     let preset = HooksDefinition {
+        location: PathBuf::new(),
         description: None,
         hooks: HooksSettings(HashMap::from([(
             HookEvent::PreToolUse,
@@ -182,6 +184,7 @@ async fn executor_blocks_pre_tool_use_when_hook_exits_two() {
 #[tokio::test]
 async fn executor_skips_hook_when_matcher_does_not_match() {
     let preset = HooksDefinition {
+        location: PathBuf::new(),
         description: None,
         hooks: HooksSettings(HashMap::from([(
             HookEvent::PreToolUse,
@@ -254,6 +257,7 @@ async fn executor_adds_plain_stdout_for_session_start() {
 #[tokio::test]
 async fn executor_combines_context_from_multiple_matching_hooks() {
     let executor = HooksExecutor::new(vec![HooksDefinition {
+        location: PathBuf::new(),
         description: None,
         hooks: HooksSettings(HashMap::from([(
             HookEvent::PreToolUse,

@@ -3,6 +3,7 @@ pub mod agent;
 pub mod command;
 pub mod exec;
 pub mod gc;
+pub mod hook;
 pub mod mcp;
 pub mod model;
 pub mod prompt;
@@ -18,6 +19,7 @@ use crate::cli::acp::AcpArgs;
 use crate::cli::agent::AgentCommand;
 use crate::cli::command::CommandCommand;
 use crate::cli::exec::ExecArgs;
+use crate::cli::hook::HookCommand;
 use crate::cli::mcp::McpCommand;
 use crate::cli::model::ModelCommand;
 use crate::cli::session::SessionCommand;
@@ -54,8 +56,11 @@ pub enum Subcommands {
     Exec(ExecArgs),
     #[command(about = "Garbage collect stale database records")]
     Gc,
-    #[command(about = "Run git hook integrations")]
-    Hook {},
+    #[command(about = "Manage lifecycle hooks")]
+    Hook {
+        #[command(subcommand)]
+        command: HookCommand,
+    },
     #[command(about = "Manage MCP (Model Context Protocol) servers")]
     Mcp {
         #[command(subcommand)]

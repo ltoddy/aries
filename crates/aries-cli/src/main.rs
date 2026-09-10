@@ -11,6 +11,7 @@ use mimalloc::MiMalloc;
 
 use crate::cli::agent::{self, AgentCommand};
 use crate::cli::command::{self, CommandCommand};
+use crate::cli::hook::{self, HookCommand};
 use crate::cli::mcp::{self, McpCommand};
 use crate::cli::model::{self, ModelCommand};
 use crate::cli::session::{self, SessionCommand};
@@ -40,8 +41,8 @@ async fn main() -> anyhow::Result<()> {
         },
         Some(cli::Subcommands::Exec(args)) => cli::exec::execute(args).await,
         Some(cli::Subcommands::Gc) => cli::gc::execute(gctx).await,
-        Some(cli::Subcommands::Hook { .. }) => {
-            todo!()
+        Some(cli::Subcommands::Hook { command }) => match command {
+            HookCommand::List(args) => hook::list::execute(args, gctx).await,
         },
         Some(cli::Subcommands::Mcp { command }) => match command {
             McpCommand::List(args) => mcp::list::execute(args, gctx).await,

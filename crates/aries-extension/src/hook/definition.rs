@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use regex_lite::Regex;
 use serde::{Deserialize, Serialize};
@@ -9,6 +9,7 @@ use tracing::info;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct HooksDefinition {
+    pub location: PathBuf,
     pub description: Option<String>,
     pub hooks: HooksSettings,
 }
@@ -22,12 +23,24 @@ pub enum HooksFileParseError {
 }
 
 impl HooksDefinition {
+    fn new(location: PathBuf, description: Option<String>, hooks: HooksSettings) -> Self {
+        Self { location, description, hooks }
+    }
+
     pub async fn parse(file_path: impl AsRef<Path>) -> Result<Self, HooksFileParseError> {
         let file_path = file_path.as_ref();
         info!("Parsing hooks file: {}", file_path.display());
 
+        #[derive(Debug, Clone, Deserialize, Serialize)]
+        struct Definition {
+            pub description: Option<String>,
+            pub hooks: HooksSettings,
+        }
+
         let content = tokio::fs::read_to_string(file_path).await?;
-        Ok(serde_json::from_str::<Self>(&content)?)
+        let definition = serde_json::from_str::<Definition>(&content)?;
+
+        Ok(HooksDefinition::new(file_path.to_owned(), definition.description, definition.hooks))
     }
 }
 
