@@ -16,8 +16,8 @@ pub use self::error::BatchError;
 pub use self::output::{BatchOutput, ToolOutput};
 use crate::context::ToolContext;
 use crate::{
-    agent, bash, codesearch, edit, glob, grep, monitor, multiedit, question, read, task_output,
-    task_stop, webfetch, websearch, write,
+    agent, bash, codesearch, edit, glob, grep, monitor, multiedit, read, task_output, task_stop,
+    webfetch, websearch, write,
 };
 
 pub struct BatchTool<C>
@@ -146,15 +146,6 @@ where
                 let args = serde_json::from_value::<edit::EditArgs>(params)
                     .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
                 let res = Tool::call(&edit::EditTool::new(cwd, ctx), context, args)
-                    .await
-                    .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
-                serde_json::to_value(res)
-                    .map_err(|e| BatchError::serialize_output(tool_name.clone(), e))
-            },
-            question::NAME => {
-                let args = serde_json::from_value::<question::AskUserQuestionArgs>(params)
-                    .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
-                let res = Tool::call(&question::AskUserQuestionTool, context, args)
                     .await
                     .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
                 serde_json::to_value(res)
