@@ -5,7 +5,6 @@ pub struct AgentArgs {
     pub description: String,
     pub prompt: String,
     pub mode: String,
-    pub task_id: Option<String>,
 }
 
 impl AgentArgs {
@@ -20,10 +19,6 @@ impl AgentArgs {
 
         let mut first = args.description;
         first.push_str(&format!(", mode = {}", args.mode));
-        if let Some(task_id) = &args.task_id {
-            first.push_str(&format!(", task_id = {}", task_id));
-        }
-
         Ok((first, Some(args.prompt)))
     }
 }

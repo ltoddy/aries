@@ -46,6 +46,7 @@ pub fn create_tools_from_mode<C>(
     client: C,
     model: impl Into<String>,
     cwd: impl AsRef<Path>,
+    parent_dir: impl AsRef<Path>,
     lsp_client: Option<aries_lspclient::SharedLspClient>,
     extensions: AgentExtensions,
     notifier: Notifier,
@@ -55,7 +56,16 @@ where
 {
     let tool_names = tool_names_from_mode(mode);
 
-    create_tools_from_tool_names(&tool_names, client, model, cwd, lsp_client, extensions, notifier)
+    create_tools_from_tool_names(
+        &tool_names,
+        client,
+        model,
+        cwd,
+        parent_dir,
+        lsp_client,
+        extensions,
+        notifier,
+    )
 }
 
 pub fn tool_names_from_mode(mode: Mode) -> Vec<&'static str> {
@@ -96,6 +106,7 @@ pub fn create_tools_from_tool_names<C>(
     client: C,
     model: impl Into<String>,
     cwd: impl AsRef<Path>,
+    parent_dir: impl AsRef<Path>,
     lsp_client: Option<aries_lspclient::SharedLspClient>,
     extensions: AgentExtensions,
     notifier: Notifier,
@@ -105,6 +116,7 @@ where
 {
     let model = model.into();
     let cwd = cwd.as_ref();
+    let parent_dir = parent_dir.as_ref();
     let tool_names = tool_names.iter().unique().collect_vec();
     let mut tool_set = ToolSet::default();
 
@@ -117,6 +129,7 @@ where
                     client.clone(),
                     &model,
                     cwd,
+                    parent_dir,
                     Notifier::clone(&notifier),
                     extensions.clone(),
                 ));
@@ -129,6 +142,7 @@ where
                     client.clone(),
                     &model,
                     cwd,
+                    parent_dir,
                     ctx.clone(),
                     Notifier::clone(&notifier),
                     extensions.clone(),

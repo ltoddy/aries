@@ -25,12 +25,11 @@ use aries_lspclient::{LspServerInfo, SharedLspClient, warm_up};
 use aries_memory::MemoryStore;
 use aries_mode::Mode;
 use aries_persistence::SessionRepository;
-use aries_tools::{edit, write};
 use itertools::Itertools;
 use jiff::Zoned;
 use rig::agent::PromptResponse;
 use rig::completion::Message;
-use rig::message::{AssistantContent, UserContent};
+use rig::message::UserContent;
 use rig::tool::rmcp::McpClientHandler;
 use rig::tool::server::{ToolServer, ToolServerHandle};
 use rmcp::RoleClient;
@@ -40,7 +39,6 @@ use tokio::pin;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_util::sync::CancellationToken;
-use tracing::info;
 
 pub use self::args::SessionArgs;
 use self::config::SessionConfig;
@@ -181,7 +179,7 @@ impl Session {
             .agent(
                 mode,
                 self.config.clone(),
-                self.cwd.clone(),
+                &self.session_dir,
                 self.gctx.clone(),
                 self.lsp_client.clone(),
                 self.extensions.clone(),
@@ -279,39 +277,11 @@ impl Session {
             self.append_messages(messages).await;
         }
         self.fire_stop(final_res.output()).await;
-        self.sift(final_res.messages(), title, final_res.output());
         if let Some(completion) = final_res.completion_calls.last() {
             self.compactor.post_compact(completion.usage, callback).await;
         }
 
         Ok(())
-    }
-
-    pub fn sift(
-        &self,
-        messages: Option<&[Message]>,
-        query: impl Into<String>,
-        reply: impl Into<String>,
-    ) {
-        if messages
-            .map(|messages| agent_wrote_memory(messages, self.memory_store.dir()))
-            .unwrap_or(false)
-        {
-            info!("本轮主模型已直接写入记忆，跳过后台记忆代理");
-            return;
-        }
-
-        let client = self.client.clone();
-        let model = self.config.model();
-        let memory_store = self.memory_store.clone();
-        let query = query.into();
-        let reply = reply.into();
-        let notifier = Notifier::clone(&self.notifier);
-        tokio::spawn(async move {
-            let manifest = memory_store.read_manifest().await.ok().flatten();
-            let memory_agent = client.memory_agent(model, memory_store.dir(), notifier).await;
-            memory_agent.run(manifest, query, reply).await;
-        });
     }
 
     pub fn id(&self) -> String {
@@ -432,7 +402,7 @@ impl Session {
             .agent(
                 mode,
                 config.clone(),
-                cwd,
+                &session_dir,
                 gctx.clone(),
                 lsp_client.clone(),
                 extensions.clone(),
@@ -614,23 +584,4 @@ fn message_to_simple_text(message: &Message) -> String {
             .join(""),
         _ => String::new(),
     }
-}
-
-fn agent_wrote_memory(messages: &[Message], memory_dir: impl AsRef<Path>) -> bool {
-    let memory_dir = memory_dir.as_ref();
-
-    messages
-        .iter()
-        .filter_map(|m| match m {
-            Message::Assistant { content, .. } => Some(content),
-            _ => None,
-        })
-        .flatten()
-        .filter_map(|c| match c {
-            AssistantContent::ToolCall(tc) => Some(tc),
-            _ => None,
-        })
-        .filter(|tc| matches!(tc.function.name.as_str(), write::NAME | edit::NAME))
-        .filter_map(|tc| tc.function.arguments.get("file_path").and_then(|v| v.as_str()))
-        .any(|file_path| PathBuf::from(file_path).starts_with(memory_dir))
 }

@@ -31,6 +31,7 @@ where
     client: C,
     model: String,
     cwd: PathBuf,
+    parent_dir: PathBuf,
     notifier: Notifier,
     extensions: AgentExtensions,
 }
@@ -43,13 +44,22 @@ where
         client: C,
         model: impl Into<String>,
         cwd: impl AsRef<Path>,
+        parent_dir: impl AsRef<Path>,
         notifier: Notifier,
         extensions: AgentExtensions,
     ) -> Self {
         let model = model.into();
-        let cwd = cwd.as_ref().to_owned();
+        let cwd = cwd.as_ref();
+        let parent_dir = parent_dir.as_ref();
 
-        Self { client, model, cwd, notifier, extensions }
+        Self {
+            client,
+            model,
+            cwd: cwd.to_owned(),
+            parent_dir: parent_dir.to_owned(),
+            notifier,
+            extensions,
+        }
     }
 
     fn find_agent(&self, mode: impl Into<String>) -> Option<&AgentDefinition> {
@@ -107,10 +117,6 @@ where
                 "mode": {
                     "type": "string",
                     "description": "The type of agent to launch (e.g. 'explore', 'plan', 'default')"
-                },
-                "task_id": {
-                    "type": "string",
-                    "description": "Optional task ID to resume a previous subagent session"
                 }
             },
             "required": ["description", "prompt", "mode"]
@@ -122,6 +128,7 @@ where
         _context: &mut ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
+        let task_id = nanoid::nanoid!();
         let (name, preamble, tools, model) = match self.find_agent(&args.mode) {
             Some(AgentDefinition { frontmatter, body, .. }) => {
                 let name = frontmatter.name.clone();
@@ -133,6 +140,7 @@ where
                     self.client.clone(),
                     &self.model,
                     &self.cwd,
+                    &self.parent_dir,
                     None,
                     AgentExtensions::empty(),
                     Notifier::clone(&self.notifier),
@@ -150,6 +158,7 @@ where
                         self.client.clone(),
                         &self.model,
                         &self.cwd,
+                        &self.parent_dir,
                         None,
                         AgentExtensions::empty(),
                         Notifier::clone(&self.notifier),
@@ -184,6 +193,15 @@ where
             }
         }
 
-        Ok(AgentOutput { task_id: args.task_id, result: final_res.output })
+        if let Some(messages) = final_res.messages() {
+            let mut file_path = self.parent_dir.join("subagent").join(&task_id);
+            if let Some(parent) = file_path.parent() {
+                _ = tokio::fs::create_dir_all(parent).await;
+            }
+            file_path.set_extension("jsonl");
+            let _ = aries_filesystem::jsonl::write(file_path, messages).await;
+        }
+
+        Ok(AgentOutput { task_id, result: final_res.output })
     }
 }

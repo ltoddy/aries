@@ -27,6 +27,7 @@ where
     client: C,
     model: String,
     cwd: PathBuf,
+    parent_dir: PathBuf,
     ctx: ToolContext,
     notifier: Notifier,
     extensions: AgentExtensions,
@@ -40,14 +41,24 @@ where
         client: C,
         model: impl Into<String>,
         cwd: impl AsRef<Path>,
+        parent_dir: impl AsRef<Path>,
         ctx: ToolContext,
         notifier: Notifier,
         extensions: AgentExtensions,
     ) -> Self {
         let model = model.into();
         let cwd = cwd.as_ref();
+        let parent_dir = parent_dir.as_ref();
 
-        Self { client, model, cwd: cwd.to_owned(), ctx, notifier, extensions }
+        Self {
+            client,
+            model,
+            cwd: cwd.to_owned(),
+            parent_dir: parent_dir.to_owned(),
+            ctx,
+            notifier,
+            extensions,
+        }
     }
 
     async fn dispatch(
@@ -57,6 +68,7 @@ where
         context: &mut rig::tool::ToolContext,
     ) -> Result<Value, BatchError> {
         let cwd = &self.cwd;
+        let parent_dir = &self.parent_dir;
         let ctx = self.ctx.clone();
 
         match tool_name.as_str() {
@@ -68,6 +80,7 @@ where
                         self.client.clone(),
                         &self.model,
                         cwd,
+                        parent_dir,
                         Notifier::clone(&self.notifier),
                         self.extensions.clone(),
                     ),

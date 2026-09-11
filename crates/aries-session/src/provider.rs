@@ -6,7 +6,7 @@ use aries_event::Notifier;
 use aries_extension::AgentExtensions;
 use aries_init::{GlobalContext, ModelConfig};
 use aries_lspclient::SharedLspClient;
-use aries_memory::{MemoryAgent, MemoryRetriever};
+use aries_memory::MemoryRetriever;
 use aries_mode::Mode;
 use http::{HeaderMap, header};
 use reqwest_middleware::ClientWithMiddleware;
@@ -97,7 +97,7 @@ impl AriesClientProvider {
         &self,
         mode: Mode,
         config: ModelConfig,
-        cwd: impl AsRef<Path>,
+        root_dir: impl AsRef<Path>,
         gctx: GlobalContext,
         lsp_client: Option<SharedLspClient>,
         extensions: AgentExtensions,
@@ -105,11 +105,10 @@ impl AriesClientProvider {
         notifier: Notifier,
     ) -> anyhow::Result<AriesAgent> {
         let model = config.model();
-        let cwd = cwd.as_ref().to_owned();
 
         match self {
             AriesClientProvider::Anthropic(c) => {
-                let agent = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx, notifier)
+                let agent = AgentBuilder::new(c.clone(), &model, mode, root_dir, gctx, notifier)
                     .with_lsp_client(lsp_client)
                     .with_extensions(extensions)
                     .build(tool_server_handle)
@@ -117,7 +116,7 @@ impl AriesClientProvider {
                 Ok(agent)
             },
             AriesClientProvider::Azure(c) => {
-                let agent = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx, notifier)
+                let agent = AgentBuilder::new(c.clone(), &model, mode, root_dir, gctx, notifier)
                     .with_lsp_client(lsp_client)
                     .with_extensions(extensions)
                     .build(tool_server_handle)
@@ -125,7 +124,7 @@ impl AriesClientProvider {
                 Ok(agent)
             },
             AriesClientProvider::Deepseek(c) => {
-                let agent = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx, notifier)
+                let agent = AgentBuilder::new(c.clone(), &model, mode, root_dir, gctx, notifier)
                     .with_lsp_client(lsp_client)
                     .with_extensions(extensions)
                     .build(tool_server_handle)
@@ -133,7 +132,7 @@ impl AriesClientProvider {
                 Ok(agent)
             },
             AriesClientProvider::OpenAI(c) => {
-                let agent = AgentBuilder::new(c.clone(), &model, mode, cwd, gctx, notifier)
+                let agent = AgentBuilder::new(c.clone(), &model, mode, root_dir, gctx, notifier)
                     .with_lsp_client(lsp_client)
                     .with_extensions(extensions)
                     .build(tool_server_handle)
@@ -161,28 +160,6 @@ impl AriesClientProvider {
             },
             AriesClientProvider::OpenAI(c) => {
                 CompactAgent::new(c.clone(), model, transcript_path, notifier)
-            },
-        }
-    }
-
-    pub async fn memory_agent(
-        &self,
-        model: impl Into<String>,
-        mem_dir: impl AsRef<Path>,
-        notifier: Notifier,
-    ) -> MemoryAgent {
-        match self {
-            AriesClientProvider::Anthropic(c) => {
-                MemoryAgent::new(c.clone(), model, mem_dir, notifier).await
-            },
-            AriesClientProvider::Azure(c) => {
-                MemoryAgent::new(c.clone(), model, mem_dir, notifier).await
-            },
-            AriesClientProvider::Deepseek(c) => {
-                MemoryAgent::new(c.clone(), model, mem_dir, notifier).await
-            },
-            AriesClientProvider::OpenAI(c) => {
-                MemoryAgent::new(c.clone(), model, mem_dir, notifier).await
             },
         }
     }

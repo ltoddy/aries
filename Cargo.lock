@@ -597,6 +597,7 @@ dependencies = [
  "ignore",
  "itertools 0.15.0",
  "jiff",
+ "nanoid",
  "nix",
  "parking_lot",
  "reqwest 0.13.4",

@@ -19,7 +19,7 @@ where
     client: C,
     model: String,
     mode: Mode,
-    cwd: PathBuf,
+    root_dir: PathBuf,
     gctx: GlobalContext,
     lsp_client: Option<SharedLspClient>,
 
@@ -36,18 +36,18 @@ where
         client: C,
         model: impl Into<String>,
         mode: Mode,
-        cwd: impl AsRef<Path>,
+        root_dir: impl AsRef<Path>,
         gctx: GlobalContext,
         notifier: Notifier,
     ) -> Self {
-        let cwd = cwd.as_ref();
+        let root_dir = root_dir.as_ref();
         let model = model.into();
 
         Self {
             client,
             model,
             mode,
-            cwd: cwd.to_owned(),
+            root_dir: root_dir.to_owned(),
             gctx,
             lsp_client: None,
             extensions: AgentExtensions::empty(),
@@ -73,7 +73,8 @@ where
             self.mode,
             self.client.clone(),
             &self.model,
-            &self.cwd,
+            self.gctx.current_dir(),
+            &self.root_dir,
             self.lsp_client.clone(),
             self.extensions.clone(),
             Notifier::clone(&self.notifier),
@@ -82,7 +83,7 @@ where
 
         let sections = aries_preamble::sections(
             self.gctx.clone(),
-            &self.cwd,
+            self.gctx.current_dir(),
             &self.model,
             &self.extensions.skills,
         )
