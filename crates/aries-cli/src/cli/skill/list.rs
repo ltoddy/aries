@@ -1,6 +1,3 @@
-use std::env::current_dir;
-
-use anyhow::Context;
 use aries_extension::{SkillDefinition, SkillsLoader};
 use aries_init::GlobalContext;
 use clap::Parser;
@@ -13,9 +10,9 @@ use crate::text;
 pub struct ListSkillArgs {}
 
 pub async fn execute(_args: ListSkillArgs, gctx: GlobalContext) -> anyhow::Result<()> {
-    let cwd = current_dir().with_context(|| "could not determine current directory")?;
+    let cwd = gctx.current_dir();
 
-    let loader = SkillsLoader::new(cwd, gctx.home_dir);
+    let loader = SkillsLoader::new(&cwd, gctx.home_dir());
     let mut skills = loader.load().await;
     skills.sort_by(|prev, next| prev.frontmatter.name.cmp(&next.frontmatter.name));
 

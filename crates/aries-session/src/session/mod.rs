@@ -104,7 +104,7 @@ impl Session {
     ) -> anyhow::Result<Self> {
         let id = id.into();
         let cwd = cwd.as_ref();
-        let session_dir = gctx.root_dir.join(format!("session-{id}"));
+        let session_dir = gctx.root_dir().join(format!("session-{id}"));
 
         let session_config = SessionConfig::new(args.bare);
         session_config.save(&session_dir).await;
@@ -135,7 +135,7 @@ impl Session {
     ) -> anyhow::Result<Self> {
         let id = id.into();
         let cwd = cwd.as_ref();
-        let session_dir = gctx.root_dir.join(format!("session-{id}"));
+        let session_dir = gctx.root_dir().join(format!("session-{id}"));
 
         let session_config = SessionConfig::load(&session_dir).await;
 
@@ -169,7 +169,7 @@ impl Session {
             Notifier::clone(&self.notifier),
         ));
 
-        let loader = SettingLoader::new(&self.gctx.root_dir);
+        let loader = SettingLoader::new(self.gctx.root_dir());
         let _ = loader.save(&self.setting).await;
 
         Ok(())
@@ -398,7 +398,7 @@ impl Session {
     ) -> anyhow::Result<Self> {
         let id = id.into();
         let cwd = cwd.as_ref();
-        let session_dir = gctx.root_dir.join(format!("session-{id}"));
+        let session_dir = gctx.root_dir().join(format!("session-{id}"));
         let transcript_path = session_dir.join("transcripts");
 
         aries_logger::register(&id, &session_dir);
@@ -414,7 +414,8 @@ impl Session {
         let mcp_clients = mcp::connect(&extensions.mcps, tool_server_handle.clone()).await;
 
         let memory_store =
-            MemoryStore::new(gctx.memory_root_dir.join(aries_filesystem::path_to_slug(cwd))).await;
+            MemoryStore::new(gctx.memory_root_dir().join(aries_filesystem::path_to_slug(cwd)))
+                .await;
 
         let chat_history = ChatHistory::new(&session_dir)
             .await

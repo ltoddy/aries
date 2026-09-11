@@ -7,7 +7,7 @@ use clap::Parser;
 pub struct ListModelArgs {}
 
 pub async fn execute(_: ListModelArgs, gctx: GlobalContext) -> anyhow::Result<()> {
-    let loader = SettingLoader::new(gctx.root_dir);
+    let loader = SettingLoader::new(gctx.root_dir());
     let setting = loader.load().await.with_context(
         || "failed to load setting; run `aries setup` to initialize the configuration",
     )?;

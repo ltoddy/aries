@@ -63,10 +63,10 @@ pub async fn execute(
     AcpArgs { version, bare, transport }: AcpArgs,
     gctx: GlobalContext,
 ) -> anyhow::Result<()> {
-    let loader = SettingLoader::new(&gctx.root_dir);
+    let loader = SettingLoader::new(gctx.root_dir());
     let setting = loader.load().await?;
 
-    aries_logger::init(gctx.root_dir.join("logs"));
+    aries_logger::init(gctx.root_dir().join("logs"));
 
     match transport {
         Transport::Stdio => {

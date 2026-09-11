@@ -453,6 +453,7 @@ dependencies = [
  "anyhow",
  "aries-filesystem",
  "aries-persistence",
+ "parking_lot",
  "prettytable-rs",
  "serde",
  "thiserror 2.0.20",

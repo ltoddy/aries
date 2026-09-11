@@ -1,6 +1,3 @@
-use std::env::current_dir;
-
-use anyhow::Context;
 use aries_extension::HooksLoader;
 use aries_init::GlobalContext;
 use clap::Parser;
@@ -14,9 +11,9 @@ use crate::text;
 pub struct ListHooksArgs {}
 
 pub async fn execute(_args: ListHooksArgs, gctx: GlobalContext) -> anyhow::Result<()> {
-    let cwd = current_dir().with_context(|| "could not determine current directory")?;
+    let cwd = gctx.current_dir();
 
-    let loader = HooksLoader::new(&cwd, &gctx.home_dir);
+    let loader = HooksLoader::new(&cwd, gctx.home_dir());
     let mut hooks = loader.load().await;
     hooks.sort_by(|prev, next| prev.location.cmp(&next.location));
 

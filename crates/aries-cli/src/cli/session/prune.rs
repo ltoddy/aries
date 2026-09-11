@@ -17,9 +17,10 @@ pub struct PruneSessionsArgs {
 }
 
 pub async fn execute(args: PruneSessionsArgs, gctx: GlobalContext) -> anyhow::Result<()> {
-    let db = aries_persistence::connect(&gctx.root_dir)
+    let root_dir = gctx.root_dir();
+    let db = aries_persistence::connect(&root_dir)
         .await
-        .with_context(|| format!("failed to connect local storage: {}", gctx.root_dir.display()))
+        .with_context(|| format!("failed to connect local storage: {}", root_dir.display()))
         .expect("Run `aries init -h` for initialization");
     let mut session_repo = aries_persistence::SessionRepository::new(db);
 

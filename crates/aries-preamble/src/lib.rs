@@ -9,7 +9,7 @@ use std::path::Path;
 use aries_extension::SkillDefinition;
 use aries_init::GlobalContext;
 
-pub fn sections(
+pub async fn sections(
     gctx: GlobalContext,
     cwd: impl AsRef<Path>,
     model: impl Into<String>,
@@ -22,7 +22,7 @@ pub fn sections(
         skill::section(skills),
         env::section(cwd, model),
         repository::section(cwd),
-        memory::section(gctx.memory_root_dir.join(aries_filesystem::path_to_slug(cwd))),
+        memory::section(gctx.memory_root_dir().join(aries_filesystem::path_to_slug(cwd))),
         agentsmd::section(cwd),
     ]
 }

@@ -5,7 +5,7 @@ use aries_init::GlobalContext;
 use ferris_says::say;
 use terminal_size::{Width, terminal_size};
 
-pub fn welcome(
+pub async fn welcome(
     provider: impl Into<String>,
     model: impl Into<String>,
     session_id: impl Into<String>,
@@ -20,11 +20,9 @@ pub fn welcome(
     let name = env!("CARGO_BIN_NAME");
     let version = env!("CARGO_PKG_VERSION");
 
-    let greeting = if context.user.is_empty() {
-        "Welcome!".to_string()
-    } else {
-        format!("Welcome, {}!", context.user)
-    };
+    let user = context.user();
+    let greeting =
+        if user.is_empty() { "Welcome!".to_string() } else { format!("Welcome, {user}!") };
     let info = [
         format!("{name} v{version}"),
         format!("{model} · {provider}"),

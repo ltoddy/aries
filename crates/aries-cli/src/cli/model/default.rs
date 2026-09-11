@@ -9,7 +9,7 @@ use dialoguer::theme::ColorfulTheme;
 pub struct DefaultModelArgs {}
 
 pub async fn execute(_: DefaultModelArgs, gctx: GlobalContext) -> anyhow::Result<()> {
-    let loader = SettingLoader::new(gctx.root_dir);
+    let loader = SettingLoader::new(gctx.root_dir());
     let mut setting = loader.load().await.with_context(
         || "failed to load setting; run `aries setup` to initialize the configuration",
     )?;

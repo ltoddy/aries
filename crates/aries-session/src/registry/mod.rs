@@ -21,9 +21,10 @@ pub struct SessionRegistry {
 
 impl SessionRegistry {
     pub async fn new(gctx: GlobalContext, setting: Setting) -> anyhow::Result<Self> {
-        let db = aries_persistence::connect(&gctx.root_dir)
+        let root_dir = gctx.root_dir();
+        let db = aries_persistence::connect(&root_dir)
             .await
-            .with_context(|| format!("connecting to database at {}", gctx.root_dir.display()))?;
+            .with_context(|| format!("connecting to database at {}", root_dir.display()))?;
         let session_repo = SessionRepository::new(db.clone());
 
         Ok(Self { gctx, setting, db, active_sessions: Default::default(), session_repo })

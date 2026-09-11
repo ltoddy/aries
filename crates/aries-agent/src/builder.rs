@@ -85,7 +85,8 @@ where
             &self.cwd,
             &self.model,
             &self.extensions.skills,
-        );
+        )
+        .await;
         let preamble = iter::once(mode.bare_preamble().to_owned()).chain(sections).join("\n");
 
         let builder = self

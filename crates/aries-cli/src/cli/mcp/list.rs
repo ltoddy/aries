@@ -1,6 +1,3 @@
-use std::env::current_dir;
-
-use anyhow::Context;
 use aries_extension::{McpServerConfig, McpsLoader};
 use aries_init::GlobalContext;
 use clap::Parser;
@@ -11,9 +8,9 @@ use prettytable::{Cell, Row, Table, row};
 pub struct ListMcpArgs {}
 
 pub async fn execute(_args: ListMcpArgs, gctx: GlobalContext) -> anyhow::Result<()> {
-    let cwd = current_dir().with_context(|| "could not determine current directory")?;
+    let cwd = gctx.current_dir();
 
-    let loader = McpsLoader::new(&cwd, &gctx.home_dir);
+    let loader = McpsLoader::new(&cwd, gctx.home_dir());
     let definitions = loader.load().await;
 
     if definitions.is_empty() {

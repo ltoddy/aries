@@ -7,6 +7,7 @@ edition = "2024"
 anyhow.workspace = true
 aries-filesystem = { path = "../aries-filesystem" }
 aries-persistence = { path = "../aries-persistence" }
+parking_lot.workspace = true
 prettytable.workspace = true
 serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true

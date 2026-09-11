@@ -26,7 +26,7 @@ async fn main() -> anyhow::Result<()> {
     let args = cli::Args::parse();
 
     let gctx = GlobalContext::new().await;
-    aries_init::init(&gctx.root_dir).await;
+    aries_init::init(gctx.root_dir()).await;
 
     match args.command {
         Some(cli::Subcommands::Acp(args)) => cli::acp::execute(args, gctx).await,

@@ -5,7 +5,7 @@ use dialoguer::{Input, Select};
 
 pub async fn execute(gctx: GlobalContext) -> anyhow::Result<()> {
     let setting = setup()?;
-    let loader = SettingLoader::new(gctx.root_dir);
+    let loader = SettingLoader::new(gctx.root_dir());
     loader.save(&setting).await?;
 
     let file_path = loader.file_path();

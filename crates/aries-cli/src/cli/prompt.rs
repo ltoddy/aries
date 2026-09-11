@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::env::current_dir;
 use std::sync::{Arc, Mutex};
 
 use aries_event::AgentEvent;
@@ -23,14 +22,14 @@ pub struct PromptArgs {
 pub async fn execute(args: PromptArgs, gctx: GlobalContext) -> anyhow::Result<()> {
     let session_id = args.session_id.unwrap_or_else(|| nanoid::nanoid!());
 
-    let loader = SettingLoader::new(&gctx.root_dir);
+    let loader = SettingLoader::new(gctx.root_dir());
     let setting = loader.load().await?;
 
     let mut registry = SessionRegistry::new(gctx.clone(), setting).await?;
 
-    aries_logger::init(gctx.root_dir.join("logs"));
+    aries_logger::init(gctx.root_dir().join("logs"));
 
-    let current_dir = current_dir().expect("Unable to get current directory");
+    let current_dir = gctx.current_dir();
 
     let session_args = SessionArgs::default();
     let mut session = registry.try_session(current_dir, &session_id, session_args).await?;

@@ -1,11 +1,20 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use parking_lot::RwLock;
 
 #[derive(Debug, Clone)]
 pub struct GlobalContext {
-    pub home_dir: PathBuf,
-    pub root_dir: PathBuf,
-    pub memory_root_dir: PathBuf,
-    pub user: String,
+    inner: Arc<RwLock<Inner>>,
+}
+
+#[derive(Debug)]
+struct Inner {
+    home_dir: Arc<Path>,
+    root_dir: Arc<Path>,
+    memory_root_dir: Arc<Path>,
+    user: Arc<str>,
+    current_dir: PathBuf,
 }
 
 impl GlobalContext {
@@ -19,6 +28,40 @@ impl GlobalContext {
 
         let user = whoami::realname().unwrap_or_default();
 
-        Self { home_dir, root_dir, memory_root_dir, user }
+        let current_dir = std::env::current_dir().expect("failed to determine current directory");
+
+        let inner = Inner {
+            home_dir: Arc::from(home_dir),
+            root_dir: Arc::from(root_dir),
+            memory_root_dir: Arc::from(memory_root_dir),
+            user: Arc::from(user),
+            current_dir,
+        };
+
+        Self { inner: Arc::new(RwLock::new(inner)) }
+    }
+
+    pub fn home_dir(&self) -> Arc<Path> {
+        Arc::clone(&self.inner.read().home_dir)
+    }
+
+    pub fn root_dir(&self) -> Arc<Path> {
+        Arc::clone(&self.inner.read().root_dir)
+    }
+
+    pub fn memory_root_dir(&self) -> Arc<Path> {
+        Arc::clone(&self.inner.read().memory_root_dir)
+    }
+
+    pub fn user(&self) -> Arc<str> {
+        Arc::clone(&self.inner.read().user)
+    }
+
+    pub fn current_dir(&self) -> PathBuf {
+        self.inner.read().current_dir.clone()
+    }
+
+    pub fn set_current_dir(&self, dir: impl Into<PathBuf>) {
+        self.inner.write().current_dir = dir.into();
     }
 }

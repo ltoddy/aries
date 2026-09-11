@@ -12,9 +12,10 @@ use prettytable::{Cell, Row, Table, row};
 pub struct ToolArgs {}
 
 pub async fn execute(gctx: GlobalContext, _: ToolArgs) -> anyhow::Result<()> {
-    let db = aries_persistence::connect(&gctx.root_dir)
+    let root_dir = gctx.root_dir();
+    let db = aries_persistence::connect(&root_dir)
         .await
-        .with_context(|| format!("connecting to database at {}", gctx.root_dir.display()))?;
+        .with_context(|| format!("connecting to database at {}", root_dir.display()))?;
 
     let now = Zoned::now();
     let thirty_days_ago = now.saturating_sub(Span::new().days(30));
@@ -24,7 +25,7 @@ pub async fn execute(gctx: GlobalContext, _: ToolArgs) -> anyhow::Result<()> {
     let tool_calls = tool_call_repo
         .find_by_created_at_greater_than(Timestamp::from(&thirty_days_ago))
         .await
-        .with_context(|| format!("finding tool calls from {}", gctx.root_dir.display()))?;
+        .with_context(|| format!("finding tool calls from {}", root_dir.display()))?;
 
     let mut calls_by_tool = BTreeMap::<String, Vec<ToolCall>>::new();
     for tool_call in tool_calls {
