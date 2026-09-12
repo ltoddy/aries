@@ -193,15 +193,15 @@ where
             }
         }
 
+        let mut file_path = self.parent_dir.join("subagent").join(&task_id);
         if let Some(messages) = final_res.messages() {
-            let mut file_path = self.parent_dir.join("subagent").join(&task_id);
             if let Some(parent) = file_path.parent() {
                 _ = tokio::fs::create_dir_all(parent).await;
             }
             file_path.set_extension("jsonl");
-            let _ = aries_filesystem::jsonl::write(file_path, messages).await;
+            let _ = aries_filesystem::jsonl::write(&file_path, messages).await;
         }
 
-        Ok(AgentOutput { task_id, result: final_res.output })
+        Ok(AgentOutput::new(task_id, final_res.output, file_path))
     }
 }

@@ -183,4 +183,53 @@ impl SessionRegistry {
 
         Ok(session)
     }
+
+    pub async fn fork_session(
+        &mut self,
+        parent_session_id: impl Into<String>,
+        cwd: impl AsRef<Path>,
+        external_mcp_config: McpDefinition,
+    ) -> anyhow::Result<Session> {
+        let parent_session_id = parent_session_id.into();
+        let cwd = cwd.as_ref();
+        let session_id = nanoid::nanoid!();
+
+        let parent_session = self
+            .active_sessions
+            .get(&parent_session_id)
+            .with_context(|| format!("parent session {parent_session_id} is not active"))?;
+
+        let model_config = self.setting.active_model()?;
+        let session = Session::new(
+            &session_id,
+            self.gctx.clone(),
+            cwd,
+            model_config,
+            self.setting.clone(),
+            self.db.clone(),
+            external_mcp_config,
+            parent_session.args(),
+        )
+        .instrument(info_span!("session_init", session_id = %session_id))
+        .await
+        .with_context(|| format!("failed to fork session {session_id} from {parent_session_id}"))?;
+
+        let parent_context = parent_session.context().await;
+        session.overwrite_context(parent_context).await;
+
+        self.active_sessions.insert(session.id(), session.clone());
+        self.session_repo
+            .create(
+                &session.id(),
+                cwd.display().to_string(),
+                session.session_dir().display().to_string(),
+                session.transcript_path().display().to_string(),
+            )
+            .await
+            .with_context(|| {
+                format!("failed to create session info in local storage for session {session_id}")
+            })?;
+
+        Ok(session)
+    }
 }

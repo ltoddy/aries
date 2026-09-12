@@ -59,6 +59,7 @@ pub struct Session {
     client: AriesClientProvider,
     agent: AriesAgent,
     mode: Mode,
+    args: SessionArgs,
 
     lsp_client: Option<SharedLspClient>,
     chat_history: ChatHistory,
@@ -300,6 +301,18 @@ impl Session {
         &self.setting
     }
 
+    pub fn args(&self) -> SessionArgs {
+        self.args.clone()
+    }
+
+    pub async fn context(&self) -> Vec<Message> {
+        self.chat_context.history().await.to_vec()
+    }
+
+    pub async fn overwrite_context(&self, messages: Vec<Message>) {
+        self.chat_context.overwrite(messages).await;
+    }
+
     pub async fn clear_context(&mut self) {
         self.chat_context.overwrite([]).await;
     }
@@ -438,6 +451,7 @@ impl Session {
             client,
             agent,
             mode,
+            args,
             lsp_client,
             chat_history,
             chat_context,

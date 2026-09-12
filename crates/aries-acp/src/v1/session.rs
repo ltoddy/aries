@@ -4,11 +4,13 @@ use std::str::FromStr;
 use agent_client_protocol::schema::v1::{
     AvailableCommand, AvailableCommandInput, AvailableCommandsUpdate, CloseSessionRequest,
     CloseSessionResponse, ContentBlock, ContentChunk, DeleteSessionRequest, DeleteSessionResponse,
-    ListSessionsRequest, ListSessionsResponse, LoadSessionRequest, LoadSessionResponse,
-    NewSessionRequest, NewSessionResponse, ResumeSessionRequest, ResumeSessionResponse,
-    SessionConfigId, SessionConfigOption, SessionConfigOptionCategory, SessionConfigSelectOption,
-    SessionConfigSelectOptions, SessionInfo, SessionNotification, SessionUpdate,
-    SetSessionConfigOptionRequest, SetSessionConfigOptionResponse, UnstructuredCommandInput,
+    ForkSessionRequest, ForkSessionResponse, ListSessionsRequest, ListSessionsResponse,
+    LoadSessionRequest, LoadSessionResponse, NewSessionRequest, NewSessionResponse,
+    ResumeSessionRequest, ResumeSessionResponse, SessionConfigId, SessionConfigOption,
+    SessionConfigOptionCategory, SessionConfigSelectOption, SessionConfigSelectOptions,
+    SessionInfo, SessionNotification, SessionUpdate, SetSessionConfigOptionRequest,
+    SetSessionConfigOptionResponse, SetSessionModeRequest, SetSessionModeResponse,
+    UnstructuredCommandInput,
 };
 use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
 use aries_init::Setting;
@@ -32,8 +34,7 @@ pub async fn new_session(
     let mcp_servers = McpServers(req.mcp_servers);
     let mcp_config = mcp_servers.into();
     let mut registry = registry.lock().await;
-    let cwd = req.cwd.display().to_string();
-    let session = match registry.new_session(cwd, mcp_config, args).await {
+    let session = match registry.new_session(req.cwd, mcp_config, args).await {
         Ok(session) => session,
         Err(err) => {
             return responder.respond_with_internal_error(err.to_string());
@@ -203,6 +204,24 @@ pub async fn delete_session(
     responder.respond(resp)
 }
 
+pub async fn fork_session(
+    req: ForkSessionRequest,
+    responder: Responder<ForkSessionResponse>,
+    _: ConnectionTo<Client>,
+    registry: SharedRegistry,
+) -> Result<(), Error> {
+    info!("Received fork session request {req:?}");
+    let session_id = req.session_id.to_string();
+    let mcp_servers = McpServers(req.mcp_servers);
+
+    let mut registry = registry.lock().await;
+    let session = registry.fork_session(session_id, req.cwd, mcp_servers.into()).await?;
+
+    let config_options = config_options(session.setting(), session.mode());
+    let resp = ForkSessionResponse::new(session.id()).config_options(config_options);
+    responder.respond(resp)
+}
+
 #[instrument(
     name = "acp.set_session_config_option",
     skip_all,
@@ -271,6 +290,15 @@ pub async fn resume_session(
     info!("Received resume session request {req:?}");
 
     let resp = ResumeSessionResponse::new();
+    responder.respond(resp)
+}
+
+pub async fn set_session_mode(
+    _req: SetSessionModeRequest,
+    responder: Responder<SetSessionModeResponse>,
+    _: ConnectionTo<Client>,
+) -> Result<(), Error> {
+    let resp = SetSessionModeResponse::new();
     responder.respond(resp)
 }
 
