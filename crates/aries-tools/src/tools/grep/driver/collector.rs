@@ -38,6 +38,10 @@ impl Collector {
         self.stop.should_stop()
     }
 
+    pub fn mark_truncated(&self) {
+        self.stop.mark_truncated();
+    }
+
     pub fn finish(self) -> (Vec<String>, bool) {
         let matches = match self.mode {
             OutputMode::Content => self.content_groups.into_inner().into_iter().flatten().collect(),

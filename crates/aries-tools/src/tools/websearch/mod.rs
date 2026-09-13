@@ -97,8 +97,7 @@ impl Tool for WebSearchTool {
         );
 
         let start = Instant::now();
-        let response =
-            self.tavily.search(request).await.map_err(|err| WebSearchError::search_error(err))?;
+        let response = self.tavily.search(request).await.map_err(WebSearchError::search_error)?;
         let elapsed = start.elapsed();
 
         let results = response

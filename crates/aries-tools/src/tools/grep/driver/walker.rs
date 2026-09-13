@@ -54,6 +54,7 @@ impl SearchWorker {
         if self.collector.should_stop()
             && !matches!(self.query.output_mode, crate::grep::OutputMode::FilesWithMatches)
         {
+            self.collector.mark_truncated();
             self.flush_batch();
             return WalkState::Quit;
         }
@@ -73,6 +74,7 @@ impl SearchWorker {
         if self.collector.should_stop()
             && !matches!(self.query.output_mode, crate::grep::OutputMode::FilesWithMatches)
         {
+            self.collector.mark_truncated();
             WalkState::Quit
         } else {
             WalkState::Continue
