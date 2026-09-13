@@ -66,14 +66,20 @@ impl Tool for WriteTool {
             args.file_path
         };
 
-        if let Some(parent) = file_path.parent() {
-            fs::create_dir_all(parent).await?;
-        }
-
-        if let Ok(metadata) = fs::metadata(&file_path).await
-            && metadata.len() > 0
-        {
-            return Err(WriteError::file_not_empty(&file_path));
+        match fs::metadata(&file_path).await {
+            Ok(metadata) if metadata.len() > 0 => {
+                return Err(WriteError::file_not_empty(&file_path));
+            },
+            Ok(_) => {
+                self.ctx.guard_write(&file_path).await?;
+                let _ = self.ctx.file_checkpoint.push(&file_path, "").await;
+            },
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                if let Some(parent) = file_path.parent() {
+                    fs::create_dir_all(parent).await?;
+                }
+            },
+            Err(err) => return Err(err.into()),
         }
 
         fs::write(&file_path, &args.content).await?;

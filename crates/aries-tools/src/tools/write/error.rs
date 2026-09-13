@@ -1,5 +1,7 @@
 use std::path::Path;
 
+use crate::context::GuardWriteError;
+
 #[derive(Debug, thiserror::Error)]
 pub enum WriteError {
     #[error("failed to write file: {0}")]
@@ -9,6 +11,9 @@ pub enum WriteError {
         "the file {0} already exists and is not empty. use the edit or multiedit tool to modify it instead."
     )]
     FileNotEmpty(std::path::PathBuf),
+
+    #[error(transparent)]
+    GuardWrite(#[from] GuardWriteError),
 }
 
 impl WriteError {

@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct BatchOutput {
@@ -21,13 +20,13 @@ impl BatchOutput {
 pub struct ToolOutput {
     success: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    result: Option<Value>,
+    result: Option<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     error: Option<String>,
 }
 
 impl ToolOutput {
-    pub fn success(result: Value) -> Self {
+    pub fn success(result: serde_json::Value) -> Self {
         Self { success: true, result: Some(result), error: None }
     }
 

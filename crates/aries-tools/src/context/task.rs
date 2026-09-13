@@ -317,8 +317,6 @@ pub enum StopTaskError {
     NotRunning,
     #[error("task has no process id")]
     MissingPid,
-    #[error("failed to stop task: {0}")]
-    Io(std::io::Error),
     #[error("failed to signal task: {0}")]
     Signal(nix::Error),
 }

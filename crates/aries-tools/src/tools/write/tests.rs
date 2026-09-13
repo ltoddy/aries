@@ -10,18 +10,19 @@ use super::*;
 use crate::context::ToolContext;
 
 #[tokio::test]
-async fn test_write_new_file() {
+async fn test_write_empty_existing_file() {
     let tmp = TempDir::new().unwrap();
     let file_path = tmp.path().join("hello.txt");
+    fs::write(&file_path, "").unwrap();
+
+    let ctx = ToolContext::new(None, {
+        let (notifier, _) = aries_event::Notifier::channel();
+        notifier
+    });
+    ctx.on_file_read(&file_path).await;
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = WriteTool::new(
-        tmp.path(),
-        ToolContext::new(None, {
-            let (notifier, _) = aries_event::Notifier::channel();
-            notifier
-        }),
-    );
+    let tool = WriteTool::new(tmp.path(), ctx);
     let result = tool
         .call(
             &mut context,
@@ -36,10 +37,10 @@ async fn test_write_new_file() {
 }
 
 #[tokio::test]
-async fn test_write_creates_parent_dirs() {
+async fn test_write_new_file() {
     let tmp = TempDir::new().unwrap();
+    let file_path = tmp.path().join("missing.txt");
 
-    let file_path = tmp.path().join("a/b/c/output.txt");
     let mut context = rig::tool::ToolContext::new();
     let tool = WriteTool::new(
         tmp.path(),
@@ -48,14 +49,40 @@ async fn test_write_creates_parent_dirs() {
             notifier
         }),
     );
-    tool.call(
-        &mut context,
-        WriteArgs { file_path: file_path.clone(), content: "nested content".to_string() },
-    )
-    .await
-    .unwrap();
+    let result = tool
+        .call(
+            &mut context,
+            WriteArgs { file_path: file_path.clone(), content: "content".to_string() },
+        )
+        .await
+        .unwrap();
 
-    assert_eq!(fs::read_to_string(&file_path).unwrap(), "nested content");
+    assert_eq!(result.file_path, file_path);
+    assert_eq!(fs::read_to_string(&file_path).unwrap(), "content");
+}
+
+#[tokio::test]
+async fn test_write_rejects_unread_empty_file() {
+    let tmp = TempDir::new().unwrap();
+    let file_path = tmp.path().join("empty.txt");
+    fs::write(&file_path, "").unwrap();
+
+    let ctx = ToolContext::new(None, {
+        let (notifier, _) = aries_event::Notifier::channel();
+        notifier
+    });
+
+    let mut context = rig::tool::ToolContext::new();
+    let tool = WriteTool::new(tmp.path(), ctx);
+    let result = tool
+        .call(
+            &mut context,
+            WriteArgs { file_path: file_path.clone(), content: "content".to_string() },
+        )
+        .await;
+
+    assert!(matches!(result, Err(WriteError::GuardWrite(_))));
+    assert_eq!(fs::read_to_string(&file_path).unwrap(), "");
 }
 
 #[tokio::test]
@@ -91,14 +118,16 @@ async fn test_write_empty_content() {
     let tmp = TempDir::new().unwrap();
 
     let file_path = tmp.path().join("empty.txt");
+    fs::write(&file_path, "").unwrap();
+
+    let ctx = ToolContext::new(None, {
+        let (notifier, _) = aries_event::Notifier::channel();
+        notifier
+    });
+    ctx.on_file_read(&file_path).await;
+
     let mut context = rig::tool::ToolContext::new();
-    let tool = WriteTool::new(
-        tmp.path(),
-        ToolContext::new(None, {
-            let (notifier, _) = aries_event::Notifier::channel();
-            notifier
-        }),
-    );
+    let tool = WriteTool::new(tmp.path(), ctx);
     tool.call(&mut context, WriteArgs { file_path: file_path.clone(), content: String::new() })
         .await
         .unwrap();
@@ -109,6 +138,8 @@ async fn test_write_empty_content() {
 #[tokio::test]
 async fn test_write_resolves_relative_path_against_cwd() {
     let tmp = TempDir::new().unwrap();
+
+    let file_path = tmp.path().join("sub/rel.txt");
 
     let mut context = rig::tool::ToolContext::new();
     let tool = WriteTool::new(
@@ -126,7 +157,7 @@ async fn test_write_resolves_relative_path_against_cwd() {
         .await
         .unwrap();
 
-    assert_eq!(result.file_path, tmp.path().join("sub/rel.txt"));
+    assert_eq!(result.file_path, file_path);
     assert_eq!(fs::read_to_string(tmp.path().join("sub/rel.txt")).unwrap(), "relative");
 }
 

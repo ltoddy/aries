@@ -45,15 +45,7 @@ impl StopState {
     }
 
     pub fn should_stop(&self) -> bool {
-        if self.limit == 0 {
-            return false;
-        }
-
-        if self.emitted.load(Ordering::Relaxed) >= self.limit {
-            self.truncated.store(true, Ordering::Relaxed);
-            return true;
-        }
-        false
+        self.limit > 0 && self.emitted.load(Ordering::Relaxed) >= self.limit
     }
 
     pub fn mark_truncated(&self) {
