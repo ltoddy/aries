@@ -20,6 +20,8 @@ use crate::{
     webfetch, websearch, write,
 };
 
+const MAX_BATCH_CALLS: usize = 25;
+
 pub struct BatchTool<C>
 where
     C: AgentClientExt,
@@ -233,6 +235,7 @@ where
             "properties": {
                 "calls": {
                     "type": "array",
+                    "maxItems": MAX_BATCH_CALLS,
                     "items": {
                         "type": "object",
                         "properties": {
@@ -258,9 +261,13 @@ where
         context: &mut rig::tool::ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
+        if args.calls.len() > MAX_BATCH_CALLS {
+            return Err(BatchError::too_many_calls(MAX_BATCH_CALLS, args.calls.len()));
+        }
+
         let mut futures = Vec::new();
 
-        for call in args.calls.into_iter().take(25) {
+        for call in args.calls {
             let tool_name = call.tool.clone();
             let params = call.parameters;
             let mut context = context.clone();

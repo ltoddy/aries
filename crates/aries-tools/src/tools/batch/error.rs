@@ -3,6 +3,9 @@ pub enum BatchError {
     #[error("nested batch calls are not allowed")]
     NestedBatch,
 
+    #[error("batch supports at most {max} calls, got {actual}")]
+    TooManyCalls { max: usize, actual: usize },
+
     #[error("tool '{0}' not found or not supported in batch")]
     UnsupportedTool(String),
 
@@ -19,6 +22,10 @@ pub enum BatchError {
 impl BatchError {
     pub fn nested_batch() -> Self {
         Self::NestedBatch
+    }
+
+    pub fn too_many_calls(max: usize, actual: usize) -> Self {
+        Self::TooManyCalls { max, actual }
     }
 
     pub fn unsupported_tool(tool: impl Into<String>) -> Self {

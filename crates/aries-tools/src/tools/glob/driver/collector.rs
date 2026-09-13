@@ -35,7 +35,10 @@ impl Collector {
                 continue;
             }
 
-            if entries.peek().is_some_and(|oldest| entry > *oldest) {
+            if entries
+                .peek()
+                .is_some_and(|Reverse((oldest_modified, _))| modified > *oldest_modified)
+            {
                 entries.pop();
                 entries.push(entry);
             }

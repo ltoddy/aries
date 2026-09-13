@@ -85,6 +85,25 @@ async fn test_glob_truncates_over_limit() {
 }
 
 #[tokio::test]
+async fn test_glob_limit_keeps_newest_files() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    for name in ["old.rs", "middle.rs", "new.rs"] {
+        tokio::fs::write(tmp.path().join(name), "").await.unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+
+    let mut args = glob_args("*.rs");
+    args.limit = 2;
+
+    let mut context = ToolContext::new();
+    let tool = GlobTool::new(tmp.path());
+    let result = tool.call(&mut context, args).await.unwrap();
+
+    assert_eq!(result.files, vec![PathBuf::from("new.rs"), PathBuf::from("middle.rs")]);
+    assert!(result.truncated);
+}
+
+#[tokio::test]
 async fn test_glob_no_files_found() {
     let tmp = tempfile::TempDir::new().unwrap();
     tokio::fs::write(tmp.path().join("a.txt"), "").await.unwrap();

@@ -1,9 +1,11 @@
 use std::collections::{BinaryHeap, HashMap};
 use std::fmt::{Display, Formatter};
+use std::os::unix::process::ExitStatusExt;
 use std::path::Path;
 use std::process::Stdio;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
 
 use aries_event::Notifier;
 use jiff::Timestamp;
@@ -200,6 +202,7 @@ impl TaskRegistry {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true)
+            .process_group(0)
             .spawn()?;
 
         let stdout = child.stdout.take();
@@ -230,10 +233,20 @@ impl TaskRegistry {
             }
             match result {
                 Ok(status) => {
-                    let exit_code = status.code().unwrap_or(-1);
-                    state.exit_code = Some(exit_code);
-                    state.status =
-                        if exit_code == 0 { TaskStatus::Completed } else { TaskStatus::Failed };
+                    let signal = status.signal();
+                    let code =
+                        status.code().or_else(|| signal.map(|signal| 128 + signal)).unwrap_or(-1);
+                    state.exit_code = Some(code);
+                    state.status = if matches!(
+                        signal,
+                        Some(signal) if signal == Signal::SIGTERM as i32 || signal == Signal::SIGKILL as i32
+                    ) {
+                        TaskStatus::Killed
+                    } else if code == 0 {
+                        TaskStatus::Completed
+                    } else {
+                        TaskStatus::Failed
+                    };
                 },
                 Err(err) => {
                     state.stderr.push(format!("\nfailed to wait for command: {err}"));
@@ -272,19 +285,18 @@ impl TaskRegistry {
             state.pid
         };
 
-        if let Some(pid) = pid {
-            killpg(Pid::from_raw(pid as i32), Signal::SIGTERM).map_err(StopTaskError::Signal)?;
+        let pid = pid.ok_or(StopTaskError::MissingPid)?;
+        killpg(Pid::from_raw(pid as i32), Signal::SIGTERM).map_err(StopTaskError::Signal)?;
+
+        loop {
+            {
+                let state = state.lock();
+                if state.status != TaskStatus::Running {
+                    return Ok(TaskSnapshot::new(task_id, &state));
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
         }
-
-        let mut state = state.lock();
-        state.status = TaskStatus::Killed;
-        state.exit_code = Some(137);
-        state.finished_at = Some(Timestamp::now());
-
-        self.notifier.notify(state.notification(task_id));
-        self.changed.notify_waiters();
-
-        Ok(TaskSnapshot::new(task_id, &state))
     }
 
     fn next_task_id(&self, kind: TaskKind) -> String {
@@ -303,6 +315,8 @@ pub enum StopTaskError {
     NotFound,
     #[error("task is not running")]
     NotRunning,
+    #[error("task has no process id")]
+    MissingPid,
     #[error("failed to stop task: {0}")]
     Io(std::io::Error),
     #[error("failed to signal task: {0}")]
@@ -474,5 +488,18 @@ mod tests {
         assert_eq!(registry.next_task_id(TaskKind::Shell), "shell00000001");
         assert_eq!(registry.next_task_id(TaskKind::Monitor), "monitor00000002");
         assert_eq!(registry.next_task_id(TaskKind::Shell), "shell00000003");
+    }
+
+    #[tokio::test]
+    async fn stop_terminates_running_task() {
+        let (notifier, _receiver) = Notifier::channel();
+        let registry = TaskRegistry::new(notifier);
+        let task = registry.spawn(TaskKind::Shell, ".", "sleep 30", None).await.unwrap();
+
+        let snapshot = registry.stop(&task.task_id).await.unwrap();
+
+        assert_eq!(snapshot.status, TaskStatus::Killed);
+        assert_eq!(snapshot.exit_code, Some(143));
+        assert!(snapshot.finished_at.is_some());
     }
 }

@@ -26,8 +26,8 @@ impl TaskStopOutput {
     pub fn render_output(raw: serde_json::Value) -> Result<String, serde_json::Error> {
         let output: Self = serde_json::from_value(raw)?;
         Ok(format!(
-            "Stopped background task {} ({:?}): {}",
-            output.task_id, output.task_type, output.command
+            "Background task {} ({:?}) is {}: {}",
+            output.task_id, output.task_type, output.status, output.command
         ))
     }
 }

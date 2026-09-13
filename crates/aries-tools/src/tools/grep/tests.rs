@@ -149,6 +149,7 @@ async fn test_grep_files_with_matches_applies_limit_without_collecting_all_resul
     args.limit = 1;
     let result = tool.call(&mut context, args).await.unwrap();
     assert_eq!(result.matches, vec!["new.rs".to_string()]);
+    assert!(result.truncated);
 }
 
 #[tokio::test]

@@ -56,6 +56,10 @@ impl StopState {
         false
     }
 
+    pub fn mark_truncated(&self) {
+        self.truncated.store(true, Ordering::Relaxed);
+    }
+
     pub fn limit(&self) -> usize {
         self.limit
     }

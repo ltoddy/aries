@@ -91,12 +91,11 @@ impl Collector {
                 continue;
             }
 
+            self.stop.mark_truncated();
             let should_replace = entries.peek().is_some_and(|oldest| entry < *oldest);
             if should_replace {
                 entries.pop();
                 entries.push(entry);
-            } else {
-                self.stop.should_stop();
             }
         }
     }
