@@ -4,9 +4,10 @@ use tracing::info;
 
 pub async fn authenticate(
     req: LoginAuthRequest,
-    _responder: Responder<LoginAuthResponse>,
+    responder: Responder<LoginAuthResponse>,
     _cx: V2ConnectionTo<Client>,
 ) -> Result<(), Error> {
     info!("Received authenticate request (v2): {req:?}");
-    todo!()
+    let resp = LoginAuthResponse::new();
+    responder.respond(resp)
 }

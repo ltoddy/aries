@@ -4,9 +4,10 @@ use tracing::info;
 
 pub async fn logout(
     req: LogoutAuthRequest,
-    _responder: Responder<LogoutAuthResponse>,
+    responder: Responder<LogoutAuthResponse>,
     _cx: V2ConnectionTo<Client>,
 ) -> Result<(), Error> {
     info!("Received logout request (v2): {req:?}");
-    todo!()
+    let resp = LogoutAuthResponse::new();
+    responder.respond(resp)
 }
