@@ -1,8 +1,7 @@
 use agent_client_protocol::schema::v2::{CancelRequestNotification, CancelSessionNotification};
 use agent_client_protocol::{Client, Error, V2ConnectionTo};
+use aries_session::SharedRegistry;
 use tracing::info;
-
-use super::SharedRegistry;
 
 pub async fn cancel_request(
     notif: CancelRequestNotification,

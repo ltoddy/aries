@@ -23,15 +23,14 @@ use self::session::{
     resume_session, set_session_config_option, set_session_mode,
 };
 
-pub type SharedRegistry = Arc<Mutex<SessionRegistry>>;
-
 pub async fn run(
     gctx: GlobalContext,
     setting: Setting,
     transport: impl ConnectTo<Agent> + 'static,
     bare: bool,
 ) -> Result<(), agent_client_protocol::Error> {
-    let registry: SharedRegistry = Arc::new(Mutex::new(SessionRegistry::new(gctx, setting).await?));
+    let registry: aries_session::SharedRegistry =
+        Arc::new(Mutex::new(SessionRegistry::new(gctx, setting).await?));
 
     Agent
         .builder()

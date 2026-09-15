@@ -10,6 +10,7 @@ use agent_client_protocol::schema::v1::{
 };
 use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
 use aries_event::AgentEvent;
+use aries_session::SharedRegistry;
 use aries_tools::question::AskUserQuestionArgs;
 use parking_lot::Mutex;
 use rig::completion::Message;
@@ -19,7 +20,6 @@ use tracing::{info, instrument, warn};
 use self::elicitation::Elicitation;
 use self::message::UserMessage;
 use self::session_update::SessionUpdates;
-use super::SharedRegistry;
 
 #[instrument(name = "acp.prompt", skip_all, fields(session_id = %req.session_id))]
 pub async fn prompt(

@@ -1,0 +1,307 @@
+use std::collections::HashMap;
+
+use agent_client_protocol::schema::v2::{
+    ContentBlock, ContentChunk, PlanUpdate, PlanUpdateContent, SessionInfoUpdate, SessionUpdate,
+    ToolCallContent, ToolCallId, ToolCallLocation, ToolCallStatus, ToolCallUpdate, ToolKind,
+    UsageUpdate,
+};
+use aries_event::AgentEvent;
+use aries_tools::{
+    agent, bash, batch, codesearch, edit, format_tool_output, glob, grep, lsp, monitor, multiedit,
+    question, read, skill, task_output, task_stop, update_plan, webfetch, websearch, write,
+};
+use itertools::Itertools;
+use parking_lot::Mutex;
+use rig::agent::MultiTurnStreamItem;
+use rig::message::{ReasoningContent, ToolCall, ToolFunction, ToolResultContent};
+use rig::streaming::{StreamedAssistantContent, StreamedUserContent};
+
+use super::plan::PlanEntry;
+
+pub struct SessionUpdates(Vec<SessionUpdate>);
+
+impl SessionUpdates {
+    pub fn new(event: AgentEvent, tool_calls: &Mutex<HashMap<String, ToolCall>>) -> Self {
+        match event {
+            AgentEvent::Notification(text) => Self(vec![SessionUpdate::AgentMessageChunk(
+                ContentChunk::new(ContentBlock::from(text), "notification"),
+            )]),
+            AgentEvent::StreamItem(stream_item) => match *stream_item {
+                MultiTurnStreamItem::StreamAssistantItem(content) => {
+                    Self(Self::from_stream_assistant_content(content, tool_calls))
+                },
+                MultiTurnStreamItem::StreamUserItem(content) => {
+                    Self(Self::from_stream_user_content(content, tool_calls))
+                },
+                MultiTurnStreamItem::FinalResponse(res) => {
+                    let usage = res.usage();
+                    let text = format!(
+                        "\n\nCompletion({}) - This turn token usage: input tokens = {} (cached = {}), output tokens = {}, total tokens = {}, reasoning tokens = {}",
+                        res.completion_calls.len(),
+                        usage.input_tokens,
+                        usage.cached_input_tokens,
+                        usage.output_tokens,
+                        usage.total_tokens,
+                        usage.reasoning_tokens,
+                    );
+                    if let Some(completion) = res.completion_calls.last() {
+                        return Self(vec![
+                            SessionUpdate::AgentMessageChunk(ContentChunk::new(
+                                ContentBlock::from(text),
+                                "usage",
+                            )),
+                            SessionUpdate::UsageUpdate(UsageUpdate::new(
+                                completion.usage.total_tokens,
+                                0,
+                            )),
+                        ]);
+                    }
+                    Self(Vec::new())
+                },
+                _ => Self(Vec::new()),
+            },
+            AgentEvent::AwaitingUserInput { .. } => Self(Vec::new()),
+            AgentEvent::SessionInfoUpdate { title, updated_at } => {
+                Self(vec![SessionUpdate::SessionInfoUpdate(
+                    SessionInfoUpdate::new().title(title).updated_at(updated_at),
+                )])
+            },
+        }
+    }
+
+    fn from_stream_assistant_content(
+        content: StreamedAssistantContent,
+        tool_calls: &Mutex<HashMap<String, ToolCall>>,
+    ) -> Vec<SessionUpdate> {
+        match content {
+            StreamedAssistantContent::Text(t) => vec![SessionUpdate::AgentMessageChunk(
+                ContentChunk::new(ContentBlock::from(t.text()), "assistant_text"),
+            )],
+            StreamedAssistantContent::Reasoning { reasoning, id } => reasoning
+                .content
+                .into_iter()
+                .map(|rc| match rc {
+                    ReasoningContent::Text { text, .. } => text,
+                    ReasoningContent::Encrypted(s) => s,
+                    ReasoningContent::Redacted { data } => data,
+                    ReasoningContent::Summary(s) => s,
+                })
+                .map(|text| {
+                    SessionUpdate::AgentThoughtChunk(ContentChunk::new(
+                        ContentBlock::from(text),
+                        id.clone(),
+                    ))
+                })
+                .collect(),
+            StreamedAssistantContent::ReasoningDelta { reasoning, .. } => {
+                vec![SessionUpdate::AgentThoughtChunk(ContentChunk::new(
+                    ContentBlock::from(reasoning),
+                    "reasoning_delta",
+                ))]
+            },
+            StreamedAssistantContent::ToolCall { tool_call, internal_call_id, .. } => {
+                if tool_call.function.name == question::NAME {
+                    return Vec::new();
+                }
+
+                tool_calls.lock().insert(internal_call_id, tool_call.clone());
+
+                let (title, content) = parse_tool_call(tool_call.clone());
+                let locations = locations(tool_call.clone()).unwrap_or_default();
+                let ToolFunction { name, arguments } = tool_call.function;
+
+                let update = ToolCallUpdate::new(ToolCallId::new(tool_call.id.as_str()))
+                    .title(title)
+                    .kind(tool_kind(&Some(name)))
+                    .status(ToolCallStatus::InProgress)
+                    .content(content)
+                    .locations(locations)
+                    .raw_input(arguments);
+                vec![SessionUpdate::ToolCallUpdate(update)]
+            },
+            _ => Vec::new(),
+        }
+    }
+
+    fn from_stream_user_content(
+        content: StreamedUserContent,
+        tool_calls: &Mutex<HashMap<String, ToolCall>>,
+    ) -> Vec<SessionUpdate> {
+        match content {
+            StreamedUserContent::ToolResult { tool_result, internal_call_id } => {
+                let raw_output = tool_result
+                    .content
+                    .into_iter()
+                    .filter_map(|c| match c {
+                        ToolResultContent::Text(text) => Some(text.text),
+                        _ => None,
+                    })
+                    .join("\n");
+
+                let tool_call = tool_calls.lock().remove(&internal_call_id);
+                let (name, raw_input, content) = match tool_call {
+                    Some(t) => {
+                        let ToolFunction { name, arguments, .. } = t.function.clone();
+                        if name == update_plan::NAME
+                            && let Ok(output) =
+                                serde_json::from_str::<update_plan::UpdatePlanOutput>(&raw_output)
+                        {
+                            return Self::from_plan_entries(output.items);
+                        }
+
+                        let content = tool_result_content(&name, t, &raw_output);
+                        (Some(name), Some(arguments), Some(content))
+                    },
+                    None => (None, None, None),
+                };
+
+                let mut update = ToolCallUpdate::new(ToolCallId::new(tool_result.call.as_str()))
+                    .kind(tool_kind(&name))
+                    .status(ToolCallStatus::Completed)
+                    .raw_output(serde_json::Value::String(raw_output));
+                if let Some(raw_input) = raw_input {
+                    update = update.raw_input(raw_input);
+                }
+                if let Some(content) = content {
+                    update = update.content(content);
+                }
+
+                vec![SessionUpdate::ToolCallUpdate(update)]
+            },
+        }
+    }
+
+    fn from_plan_entries(entries: Vec<update_plan::PlanEntry>) -> Vec<SessionUpdate> {
+        let entries = entries.into_iter().map(|e| PlanEntry::new(e).into()).collect();
+        vec![SessionUpdate::PlanUpdate(PlanUpdate::new(PlanUpdateContent::items("main", entries)))]
+    }
+}
+
+impl IntoIterator for SessionUpdates {
+    type Item = SessionUpdate;
+    type IntoIter = std::vec::IntoIter<SessionUpdate>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+fn parse_tool_call(t: ToolCall) -> (String, Vec<ToolCallContent>) {
+    let ToolFunction { name, arguments, .. } = t.function;
+    let default_title = format!("{name}: {arguments}");
+
+    match name.as_str() {
+        agent::NAME => serde_json::from_value::<agent::AgentArgs>(arguments)
+            .map(|args| {
+                (args.title(), vec![ToolCallContent::from(ContentBlock::from(args.prompt))])
+            })
+            .unwrap_or_else(|_| (default_title, vec![])),
+        bash::NAME => serde_json::from_value::<bash::BashArgs>(arguments)
+            .map(|args| (args.title(), vec![]))
+            .unwrap_or_else(|_| (default_title, vec![])),
+        batch::NAME => serde_json::from_value::<batch::BatchArgs>(arguments)
+            .map(|args| (args.title(), vec![]))
+            .unwrap_or_else(|_| (default_title, vec![])),
+        glob::NAME => serde_json::from_value::<glob::GlobArgs>(arguments)
+            .map(|args| (args.title(), vec![]))
+            .unwrap_or_else(|_| (default_title, vec![])),
+        grep::NAME => serde_json::from_value::<grep::GrepArgs>(arguments)
+            .map(|args| (args.title(), vec![]))
+            .unwrap_or_else(|_| (default_title, vec![])),
+        lsp::NAME => serde_json::from_value::<lsp::LspArgs>(arguments)
+            .map(|args| (args.title(), vec![]))
+            .unwrap_or_else(|_| (default_title, vec![])),
+        monitor::NAME => serde_json::from_value::<monitor::MonitorArgs>(arguments)
+            .map(|args| (args.title(), vec![]))
+            .unwrap_or_else(|_| (default_title, vec![])),
+        read::NAME => serde_json::from_value::<read::ReadArgs>(arguments)
+            .map(|args| (args.title(), vec![]))
+            .unwrap_or_else(|_| (default_title, vec![])),
+        edit::NAME => serde_json::from_value::<edit::EditArgs>(arguments)
+            .map(|args| {
+                (args.title(), vec![ToolCallContent::from(ContentBlock::from(args.new_text))])
+            })
+            .unwrap_or_else(|_| (default_title, vec![])),
+        multiedit::NAME => serde_json::from_value::<multiedit::MultiEditArgs>(arguments)
+            .map(|args| (args.title(), vec![]))
+            .unwrap_or_else(|_| (default_title, vec![])),
+        write::NAME => serde_json::from_value::<write::WriteArgs>(arguments)
+            .map(|args| {
+                (args.title(), vec![ToolCallContent::from(ContentBlock::from(args.content))])
+            })
+            .unwrap_or_else(|_| (default_title, vec![])),
+        webfetch::NAME => serde_json::from_value::<webfetch::WebFetchArgs>(arguments)
+            .map(|args| (args.title(), vec![]))
+            .unwrap_or_else(|_| (default_title, vec![])),
+        websearch::NAME => serde_json::from_value::<websearch::WebSearchArgs>(arguments)
+            .map(|args| (args.title(), vec![]))
+            .unwrap_or_else(|_| (default_title, vec![])),
+        codesearch::NAME => serde_json::from_value::<codesearch::CodeSearchArgs>(arguments)
+            .map(|args| (args.title(), vec![]))
+            .unwrap_or_else(|_| (default_title, vec![])),
+        skill::NAME => serde_json::from_value::<skill::SkillArgs>(arguments)
+            .map(|args| (args.title(), vec![]))
+            .unwrap_or_else(|_| (default_title, vec![])),
+        task_output::NAME => serde_json::from_value::<task_output::TaskOutputArgs>(arguments)
+            .map(|args| (args.title(), vec![]))
+            .unwrap_or_else(|_| (default_title, vec![])),
+        task_stop::NAME => serde_json::from_value::<task_stop::TaskStopArgs>(arguments)
+            .map(|args| (args.title(), vec![]))
+            .unwrap_or_else(|_| (default_title, vec![])),
+        update_plan::NAME => serde_json::from_value::<update_plan::UpdatePlanArgs>(arguments)
+            .map(|args| (args.title(), vec![]))
+            .unwrap_or_else(|_| (default_title, vec![])),
+        _ => (default_title, vec![]),
+    }
+}
+
+fn tool_result_content(name: &str, t: ToolCall, raw_output: &str) -> Vec<ToolCallContent> {
+    match name {
+        edit::NAME | multiedit::NAME | write::NAME => parse_tool_call(t).1,
+        _ => {
+            let output = serde_json::from_str::<serde_json::Value>(raw_output)
+                .unwrap_or_else(|_| serde_json::Value::String(raw_output.to_owned()));
+            vec![ToolCallContent::from(ContentBlock::from(format_tool_output(name, output)))]
+        },
+    }
+}
+
+fn tool_kind(tool_name: &Option<String>) -> ToolKind {
+    match tool_name {
+        Some(tool_name) => match tool_name.as_str() {
+            glob::NAME | read::NAME | task_output::NAME => ToolKind::Read,
+            edit::NAME | multiedit::NAME | write::NAME => ToolKind::Edit,
+            grep::NAME | codesearch::NAME | lsp::NAME => ToolKind::Search,
+            bash::NAME | batch::NAME | monitor::NAME | task_stop::NAME => ToolKind::Execute,
+            webfetch::NAME | websearch::NAME => ToolKind::Fetch,
+            agent::NAME | skill::NAME | update_plan::NAME => ToolKind::Think,
+            _ => ToolKind::Other,
+        },
+        None => ToolKind::Other,
+    }
+}
+
+fn locations(t: ToolCall) -> Option<Vec<ToolCallLocation>> {
+    let name = t.function.name;
+    let arguments = t.function.arguments;
+
+    match name.as_str() {
+        read::NAME => serde_json::from_value::<read::ReadArgs>(arguments)
+            .map(|args| vec![ToolCallLocation::new(args.file_path.display().to_string())])
+            .ok(),
+        write::NAME => serde_json::from_value::<write::WriteArgs>(arguments)
+            .map(|args| vec![ToolCallLocation::new(args.file_path.display().to_string())])
+            .ok(),
+        edit::NAME => serde_json::from_value::<edit::EditArgs>(arguments)
+            .map(|args| vec![ToolCallLocation::new(args.file_path.display().to_string())])
+            .ok(),
+        multiedit::NAME => serde_json::from_value::<multiedit::MultiEditArgs>(arguments)
+            .map(|args| vec![ToolCallLocation::new(args.file_path.display().to_string())])
+            .ok(),
+        glob::NAME => serde_json::from_value::<glob::GlobArgs>(arguments)
+            .ok()
+            .and_then(|args| args.base_dir)
+            .map(|path| vec![ToolCallLocation::new(path.display().to_string())]),
+        _ => None,
+    }
+}

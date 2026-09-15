@@ -15,11 +15,10 @@ use agent_client_protocol::schema::v1::{
 use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
 use aries_init::Setting;
 use aries_mode::Mode;
-use aries_session::{BUILTIN_COMMANDS, SessionArgs};
+use aries_session::{BUILTIN_COMMANDS, SessionArgs, SharedRegistry};
 use itertools::Itertools;
 use tracing::{info, instrument};
 
-use super::SharedRegistry;
 use crate::v1::mcp::McpServers;
 
 pub async fn new_session(

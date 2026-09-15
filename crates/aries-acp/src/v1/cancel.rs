@@ -1,8 +1,7 @@
 use agent_client_protocol::schema::v1::CancelNotification;
 use agent_client_protocol::{Client, ConnectionTo, Error};
+use aries_session::SharedRegistry;
 use tracing::{info, instrument};
-
-use super::SharedRegistry;
 
 #[instrument(name = "acp.cancel", skip_all, fields(session_id = %args.session_id))]
 pub async fn cancel(
