@@ -41,6 +41,7 @@ pub fn is_builtin_tool(tool_name: &str) -> bool {
     ALL_TOOL_NAMES.contains(&tool_name)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_tools_from_mode<C>(
     mode: Mode,
     client: C,
@@ -101,6 +102,7 @@ pub fn tool_names_from_mode(mode: Mode) -> Vec<&'static str> {
     tool_names
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_tools_from_tool_names<C>(
     tool_names: &[&str],
     client: C,
