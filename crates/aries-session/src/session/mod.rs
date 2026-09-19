@@ -19,7 +19,7 @@ use aries_extension::hook::input::{
     StopFailureHookInput, StopHookInput, UserPromptSubmitHookInput,
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
-use aries_extension::{AgentExtensions, McpDefinition, SlashCommandsExecutor, mcp};
+use aries_extension::{AgentExtensions, McpDefinition, SkillExecutor, SlashCommandsExecutor, mcp};
 use aries_init::{GlobalContext, ModelConfig, Setting, SettingLoader};
 use aries_lspclient::{LspServerInfo, SharedLspClient, warm_up};
 use aries_memory::MemoryStore;
@@ -289,10 +289,6 @@ impl Session {
         self.id.clone()
     }
 
-    pub fn system_prompt(&self) -> &str {
-        self.agent.preamble()
-    }
-
     pub fn mode(&self) -> Mode {
         self.mode
     }
@@ -340,12 +336,18 @@ impl Session {
         self.hooks_executor.fire_session_end(input).await;
     }
 
-    pub fn list_slash_commands(&self) -> Vec<aries_extension::CommandFrontmatter> {
-        self.extensions.commands.iter().map(|c| c.frontmatter.clone()).collect_vec()
+    pub fn list_available_commands(&self) -> Vec<aries_extension::AvailableCommand> {
+        self.extensions.available_commands()
     }
 
     async fn try_execute_slash_command(&mut self, input: impl AsRef<str>) -> Option<String> {
+        let input = input.as_ref();
         let executor = SlashCommandsExecutor::new(&self.extensions.commands);
+        if let Some(command) = executor.execute(input).await {
+            return Some(command);
+        }
+
+        let executor = SkillExecutor::new(&self.extensions.skills);
         executor.execute(input).await
     }
 
