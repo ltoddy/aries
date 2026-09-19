@@ -71,7 +71,6 @@ where
 
 pub fn tool_names_from_mode(mode: Mode) -> Vec<&'static str> {
     let mut tool_names = vec![
-        bash::NAME,
         read::NAME,
         glob::NAME,
         grep::NAME,
@@ -79,12 +78,12 @@ pub fn tool_names_from_mode(mode: Mode) -> Vec<&'static str> {
         webfetch::NAME,
         websearch::NAME,
         task_output::NAME,
-        task_stop::NAME,
     ];
 
     match mode {
         Mode::Build | Mode::General => tool_names.extend_from_slice(&[
             agent::NAME,
+            bash::NAME,
             batch::NAME,
             edit::NAME,
             lsp::NAME,
@@ -94,6 +93,7 @@ pub fn tool_names_from_mode(mode: Mode) -> Vec<&'static str> {
             update_plan::NAME,
             write::NAME,
             monitor::NAME,
+            task_stop::NAME,
         ]),
         Mode::Plan => tool_names.push(question::NAME),
         Mode::Explore => {},
