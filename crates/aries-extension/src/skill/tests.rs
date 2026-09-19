@@ -107,6 +107,110 @@ fn new_stores_location_and_body() {
 }
 
 #[tokio::test]
+async fn executor_expands_skill_content() {
+    let tmp = TempDir::new().expect("test operation should succeed");
+    let dir = tmp.path().join("skill");
+    fs::create_dir_all(&dir).expect("test operation should succeed");
+    let location = dir.join("SKILL.md");
+    fs::write(&location, "body $ARGUMENTS from ${SKILL_DIR}")
+        .expect("test operation should succeed");
+    fs::write(dir.join("script.sh"), "#!/bin/sh").expect("test operation should succeed");
+
+    let skill = SkillDefinition::new(&location, frontmatter(), "body $ARGUMENTS from ${SKILL_DIR}");
+    let output = SkillExecutor::new(&[skill])
+        .execute("fix-typo requested changes")
+        .await
+        .expect("skill should execute");
+
+    assert!(output.contains(r#"<skill_content name="fix-typo">"#));
+    assert!(output.contains("# Skill: fix-typo"));
+    assert!(output.contains(&format!("body requested changes from {}", dir.display())));
+    assert!(output.contains("Base directory for this skill: file://"));
+    assert!(output.contains(&format!("<file>{}</file>", location.display())));
+    assert!(output.contains(&format!("<file>{}</file>", dir.join("script.sh").display())));
+    assert!(output.contains("</skill_content>"));
+}
+
+#[tokio::test]
+async fn executor_trims_input_before_matching() {
+    let tmp = TempDir::new().expect("test operation should succeed");
+    let location = tmp.path().join("SKILL.md");
+    fs::write(&location, "body").expect("test operation should succeed");
+    let skill = SkillDefinition::new(&location, frontmatter(), "args:$ARGUMENTS");
+    let output = SkillExecutor::new(&[skill])
+        .execute("  fix-typo file.rs  ")
+        .await
+        .expect("skill should execute");
+
+    assert!(output.contains("args:file.rs"));
+}
+
+#[tokio::test]
+async fn executor_includes_allowed_tools_when_present() {
+    let tmp = TempDir::new().expect("test operation should succeed");
+    let location = tmp.path().join("SKILL.md");
+    fs::write(&location, "body").expect("test operation should succeed");
+    let mut frontmatter = frontmatter();
+    frontmatter.allowed_tools = vec!["Read".to_owned(), "Edit".to_owned()].into();
+    let skill = SkillDefinition::new(&location, frontmatter, "body");
+    let output =
+        SkillExecutor::new(&[skill]).execute("fix-typo").await.expect("skill should execute");
+
+    assert!(output.contains("Allowed tools for this skill: Read, Edit"));
+}
+
+#[tokio::test]
+async fn executor_omits_allowed_tools_when_empty() {
+    let tmp = TempDir::new().expect("test operation should succeed");
+    let location = tmp.path().join("SKILL.md");
+    fs::write(&location, "body").expect("test operation should succeed");
+    let skill = SkillDefinition::new(&location, frontmatter(), "body");
+    let output =
+        SkillExecutor::new(&[skill]).execute("fix-typo").await.expect("skill should execute");
+
+    assert!(!output.contains("Allowed tools for this skill:"));
+}
+
+#[tokio::test]
+async fn executor_returns_none_when_skill_location_has_no_parent() {
+    let location = PathBuf::from(std::path::MAIN_SEPARATOR.to_string());
+    let skill = SkillDefinition::new(location, frontmatter(), "body");
+    let output = SkillExecutor::new(&[skill]).execute("fix-typo").await;
+
+    assert!(output.is_none());
+}
+
+#[tokio::test]
+async fn executor_uses_first_matching_skill() {
+    let tmp = TempDir::new().expect("test operation should succeed");
+    let first_location = tmp.path().join("first").join("SKILL.md");
+    let second_location = tmp.path().join("second").join("SKILL.md");
+    fs::create_dir_all(first_location.parent().expect("test path should have parent"))
+        .expect("test operation should succeed");
+    fs::create_dir_all(second_location.parent().expect("test path should have parent"))
+        .expect("test operation should succeed");
+    fs::write(&first_location, "first").expect("test operation should succeed");
+    fs::write(&second_location, "second").expect("test operation should succeed");
+    let first = SkillDefinition::new(&first_location, frontmatter(), "first");
+    let second = SkillDefinition::new(&second_location, frontmatter(), "second");
+    let output = SkillExecutor::new(&[first, second])
+        .execute("fix-typo")
+        .await
+        .expect("skill should execute");
+
+    assert!(output.contains("\nfirst\n"));
+    assert!(!output.contains("\nsecond\n"));
+}
+
+#[tokio::test]
+async fn executor_returns_none_for_unknown_skill() {
+    let skill = SkillDefinition::new("/tmp/SKILL.md", frontmatter(), "body");
+    let output = SkillExecutor::new(&[skill]).execute("review").await;
+
+    assert!(output.is_none());
+}
+
+#[tokio::test]
 async fn load_finds_skills_from_home_and_cwd() {
     let tmp = TempDir::new().expect("test operation should succeed");
     let home = tmp.path().join("home");

@@ -42,8 +42,8 @@ pub async fn resume_session(
         )),
     ));
 
-    let slash_commands = session
-        .list_slash_commands()
+    let available_commands = session
+        .list_available_commands()
         .into_iter()
         .map(|c| {
             AvailableCommand::new(c.name, c.description).input(
@@ -54,7 +54,7 @@ pub async fn resume_session(
         .collect_vec();
     let _ = cx.send_notification(UpdateSessionNotification::new(
         session.id(),
-        SessionUpdate::AvailableCommandsUpdate(AvailableCommandsUpdate::new(slash_commands)),
+        SessionUpdate::AvailableCommandsUpdate(AvailableCommandsUpdate::new(available_commands)),
     ));
 
     let resp = ResumeSessionResponse::new()

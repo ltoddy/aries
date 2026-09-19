@@ -175,6 +175,47 @@ fn placeholder_names_are_case_sensitive() {
 }
 
 #[tokio::test]
+async fn executor_runs_matching_command() {
+    let command = CommandDefinition::new("/tmp/x.md", frontmatter(), "fix $1 with $ARGUMENTS");
+    let output = SlashCommandsExecutor::new(&[command]).execute("fix-typo file.rs carefully").await;
+
+    assert_eq!(output.as_deref(), Some("fix file.rs with file.rs carefully"));
+}
+
+#[tokio::test]
+async fn executor_trims_input_before_matching() {
+    let command = CommandDefinition::new("/tmp/x.md", frontmatter(), "fix $1");
+    let output = SlashCommandsExecutor::new(&[command]).execute("  fix-typo file.rs  ").await;
+
+    assert_eq!(output.as_deref(), Some("fix file.rs"));
+}
+
+#[tokio::test]
+async fn executor_runs_command_without_arguments() {
+    let command = CommandDefinition::new("/tmp/x.md", frontmatter(), "fix $ARGUMENTS");
+    let output = SlashCommandsExecutor::new(&[command]).execute("fix-typo").await;
+
+    assert_eq!(output.as_deref(), Some("fix "));
+}
+
+#[tokio::test]
+async fn executor_returns_none_for_unknown_command() {
+    let command = CommandDefinition::new("/tmp/x.md", frontmatter(), "fix $ARGUMENTS");
+    let output = SlashCommandsExecutor::new(&[command]).execute("review file.rs").await;
+
+    assert!(output.is_none());
+}
+
+#[tokio::test]
+async fn executor_uses_first_matching_command() {
+    let first = CommandDefinition::new("/tmp/first.md", frontmatter(), "first");
+    let second = CommandDefinition::new("/tmp/second.md", frontmatter(), "second");
+    let output = SlashCommandsExecutor::new(&[first, second]).execute("fix-typo").await;
+
+    assert_eq!(output.as_deref(), Some("first"));
+}
+
+#[tokio::test]
 async fn load_finds_commands_from_home_and_cwd() {
     let tmp = TempDir::new().expect("test operation should succeed");
     let home = tmp.path().join("home");
