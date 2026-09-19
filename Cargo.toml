@@ -21,6 +21,7 @@ members = [
 ]
 default-members = ["crates/aries-cli"]
 resolver = "3"
+package = { license = "MIT" }
 
 [workspace.dependencies]
 agent-client-protocol = "2.2"
