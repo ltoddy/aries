@@ -8,7 +8,9 @@ mod tool;
 use std::path::{Path, PathBuf};
 
 pub use self::agent::{AgentDefinition, AgentsLoader, Frontmatter as AgentFrontmatter};
-pub use self::command::{CommandDefinition, CommandsLoader, Frontmatter as CommandFrontmatter};
+pub use self::command::{
+    CommandDefinition, CommandsLoader, Frontmatter as CommandFrontmatter, SlashCommandsExecutor,
+};
 pub use self::hook::{HookDecision, HooksDefinition, HooksExecutor, HooksLoader};
 pub use self::mcp::{
     Http, McpConnectError, McpDefinition, McpLoadResult, McpParseError, McpServerConfig,

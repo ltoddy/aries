@@ -4,7 +4,7 @@ use agent_client_protocol::schema::v2::{
     UpdateSessionNotification,
 };
 use agent_client_protocol::{Client, Error, Responder, V2ConnectionTo};
-use aries_session::{BUILTIN_COMMANDS, SharedRegistry};
+use aries_session::SharedRegistry;
 use itertools::Itertools;
 use tracing::info;
 
@@ -42,13 +42,6 @@ pub async fn resume_session(
         )),
     ));
 
-    let builtin_commands = BUILTIN_COMMANDS
-        .iter()
-        .map(|(name, desc, hint)| {
-            AvailableCommand::new(name.to_string(), desc.to_string())
-                .input(hint.map(|hint| AvailableCommandInput::Text(TextCommandInput::new(hint))))
-        })
-        .collect_vec();
     let slash_commands = session
         .list_slash_commands()
         .into_iter()
@@ -59,10 +52,9 @@ pub async fn resume_session(
             )
         })
         .collect_vec();
-    let available_commands = builtin_commands.into_iter().chain(slash_commands).collect_vec();
     let _ = cx.send_notification(UpdateSessionNotification::new(
         session.id(),
-        SessionUpdate::AvailableCommandsUpdate(AvailableCommandsUpdate::new(available_commands)),
+        SessionUpdate::AvailableCommandsUpdate(AvailableCommandsUpdate::new(slash_commands)),
     ));
 
     let resp = ResumeSessionResponse::new()

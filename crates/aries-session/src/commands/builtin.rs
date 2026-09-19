@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use aries_agent::AriesAgent;
 use aries_compact::ContextCompactor;
 use aries_event::Notifier;
