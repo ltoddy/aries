@@ -17,21 +17,24 @@ async fn test_args_title() {
 /// 构造一个位于临时目录中的技能：`<tmp>/<name>/SKILL.md`。
 fn make_skill(tmp: &TempDir, name: &str, frontmatter: SkillFrontmatter) -> SkillDefinition {
     let dir = tmp.path().join(name);
-    fs::create_dir_all(&dir).unwrap();
+    fs::create_dir_all(&dir).expect("test operation should succeed");
     let location = dir.join("SKILL.md");
-    fs::write(&location, "skill body").unwrap();
+    fs::write(&location, "skill body").expect("test operation should succeed");
 
     SkillDefinition::new(location, frontmatter, "skill body")
 }
 
 #[tokio::test]
 async fn test_call_loads_skill() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().expect("test operation should succeed");
     let skill = make_skill(&tmp, "commit", SkillFrontmatter::new("commit", "desc"));
     let mut context = ToolContext::new();
     let tool = SkillTool::new(vec![skill]);
 
-    let output = tool.call(&mut context, SkillArgs { name: "commit".to_owned() }).await.unwrap();
+    let output = tool
+        .call(&mut context, SkillArgs { name: "commit".to_owned() })
+        .await
+        .expect("test operation should succeed");
     assert_eq!(output.metadata.name, "commit");
     assert!(output.output.contains("<skill_content name=\"commit\">"));
     assert!(output.output.contains("# Skill: commit"));
@@ -39,7 +42,7 @@ async fn test_call_loads_skill() {
 
 #[tokio::test]
 async fn test_call_rejects_unknown_skill() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().expect("test operation should succeed");
     let skill = make_skill(&tmp, "commit", SkillFrontmatter::new("commit", "desc"));
     let mut context = ToolContext::new();
     let tool = SkillTool::new(vec![skill]);
@@ -50,11 +53,14 @@ async fn test_call_rejects_unknown_skill() {
 
 #[tokio::test]
 async fn test_call_omits_allowed_tools_when_absent() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().expect("test operation should succeed");
     let skill = make_skill(&tmp, "commit", SkillFrontmatter::new("commit", "desc"));
     let mut context = ToolContext::new();
     let tool = SkillTool::new(vec![skill]);
 
-    let output = tool.call(&mut context, SkillArgs { name: "commit".to_owned() }).await.unwrap();
+    let output = tool
+        .call(&mut context, SkillArgs { name: "commit".to_owned() })
+        .await
+        .expect("test operation should succeed");
     assert!(!output.output.contains("Allowed tools for this skill"));
 }

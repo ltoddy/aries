@@ -86,7 +86,7 @@ disallowed-tools:
   - Write
 model: sonnet
 ";
-    let fm: Frontmatter = serde_yaml::from_str(yaml).unwrap();
+    let fm: Frontmatter = serde_yaml::from_str(yaml).expect("test operation should succeed");
     assert_eq!(fm.tools.as_deref(), Some(&["Read".to_owned()][..]));
     assert_eq!(fm.disallowed_tools.as_deref(), Some(&["Write".to_owned()][..]));
     assert_eq!(fm.model.as_deref(), Some("sonnet"));
@@ -98,7 +98,7 @@ fn deserializes_with_optional_fields_absent() {
 name: reviewer
 description: review code
 ";
-    let fm: Frontmatter = serde_yaml::from_str(yaml).unwrap();
+    let fm: Frontmatter = serde_yaml::from_str(yaml).expect("test operation should succeed");
     assert!(fm.tools.is_none());
     assert!(fm.disallowed_tools.is_none());
     assert!(fm.model.is_none());

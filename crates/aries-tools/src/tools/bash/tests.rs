@@ -23,7 +23,10 @@ fn tool(cwd: impl AsRef<std::path::Path>) -> BashTool {
 async fn test_bash_echo() {
     let mut context = ToolContext::new();
     let tool = tool(std::env::temp_dir());
-    let result = tool.call(&mut context, bash_args("echo hello")).await.unwrap();
+    let result = tool
+        .call(&mut context, bash_args("echo hello"))
+        .await
+        .expect("test operation should succeed");
 
     assert_eq!(result.stdout.trim(), "hello");
     assert_eq!(result.exit_code, 0);
@@ -33,7 +36,8 @@ async fn test_bash_echo() {
 async fn test_bash_failed_command() {
     let mut context = ToolContext::new();
     let tool = tool(std::env::temp_dir());
-    let result = tool.call(&mut context, bash_args("exit 1")).await.unwrap();
+    let result =
+        tool.call(&mut context, bash_args("exit 1")).await.expect("test operation should succeed");
 
     assert_eq!(result.exit_code, 1);
 }
@@ -42,7 +46,10 @@ async fn test_bash_failed_command() {
 async fn test_bash_nonexistent_command() {
     let mut context = ToolContext::new();
     let tool = tool(std::env::temp_dir());
-    let result = tool.call(&mut context, bash_args("nonexistent_cmd_12345")).await.unwrap();
+    let result = tool
+        .call(&mut context, bash_args("nonexistent_cmd_12345"))
+        .await
+        .expect("test operation should succeed");
 
     assert_ne!(result.exit_code, 0);
     assert!(!result.stderr.is_empty());
@@ -50,14 +57,16 @@ async fn test_bash_nonexistent_command() {
 
 #[tokio::test]
 async fn test_bash_runs_in_cwd() {
-    let dir = TempDir::new().unwrap();
+    let dir = TempDir::new().expect("test operation should succeed");
     let mut context = ToolContext::new();
     let tool = tool(dir.path());
-    let result = tool.call(&mut context, bash_args("pwd")).await.unwrap();
+    let result =
+        tool.call(&mut context, bash_args("pwd")).await.expect("test operation should succeed");
 
     // 规范化后比较，规避 macOS 下 /var 与 /private/var 的软链接差异。
-    let expected = std::fs::canonicalize(dir.path()).unwrap();
-    let actual = std::fs::canonicalize(result.stdout.trim()).unwrap();
+    let expected = std::fs::canonicalize(dir.path()).expect("test operation should succeed");
+    let actual =
+        std::fs::canonicalize(result.stdout.trim()).expect("test operation should succeed");
     assert_eq!(actual, expected);
 }
 
@@ -71,13 +80,13 @@ async fn test_bash_background() {
     let tool = BashTool::new(std::env::temp_dir(), ctx.clone());
     let mut args = bash_args("printf hello");
     args.background = true;
-    let result = tool.call(&mut context, args).await.unwrap();
+    let result = tool.call(&mut context, args).await.expect("test operation should succeed");
     let task_id = result.task_id.expect("background task id");
 
     let task = crate::task_output::TaskOutputTool::new(ctx)
         .call(&mut context, crate::task_output::TaskOutputArgs { task_id, block: true })
         .await
-        .unwrap();
+        .expect("test operation should succeed");
 
     assert_eq!(task.output, "hello");
     assert_eq!(task.exit_code, Some(0));
@@ -88,7 +97,10 @@ async fn test_bash_output_truncation() {
     let mut context = ToolContext::new();
     let tool = tool(std::env::temp_dir());
     // 打印约 40000 个字符，超过 30000 上限。
-    let result = tool.call(&mut context, bash_args("printf 'a%.0s' $(seq 1 40000)")).await.unwrap();
+    let result = tool
+        .call(&mut context, bash_args("printf 'a%.0s' $(seq 1 40000)"))
+        .await
+        .expect("test operation should succeed");
 
     assert!(result.stdout.contains("lines truncated"));
     assert!(result.stdout.len() < 40_000);
@@ -108,14 +120,18 @@ async fn test_bash_args_title() {
 #[test]
 fn test_rewrite_single_command() {
     let tool = tool(std::env::temp_dir());
-    assert_eq!(tool.attempt_rewrite_last_command("echo hello").unwrap(), "aries exec echo hello");
+    assert_eq!(
+        tool.attempt_rewrite_last_command("echo hello").expect("test operation should succeed"),
+        "aries exec echo hello"
+    );
 }
 
 #[test]
 fn test_rewrite_two_commands_with_and_and() {
     let tool = tool(std::env::temp_dir());
     assert_eq!(
-        tool.attempt_rewrite_last_command("echo hello && ls -la").unwrap(),
+        tool.attempt_rewrite_last_command("echo hello && ls -la")
+            .expect("test operation should succeed"),
         "echo hello && aries exec ls -la"
     );
 }
@@ -124,7 +140,8 @@ fn test_rewrite_two_commands_with_and_and() {
 fn test_rewrite_two_commands_with_semicolon() {
     let tool = tool(std::env::temp_dir());
     assert_eq!(
-        tool.attempt_rewrite_last_command("echo hello; echo world").unwrap(),
+        tool.attempt_rewrite_last_command("echo hello; echo world")
+            .expect("test operation should succeed"),
         "echo hello; aries exec echo world"
     );
 }
@@ -133,7 +150,8 @@ fn test_rewrite_two_commands_with_semicolon() {
 fn test_rewrite_two_commands_with_or_or() {
     let tool = tool(std::env::temp_dir());
     assert_eq!(
-        tool.attempt_rewrite_last_command("false || echo fallback").unwrap(),
+        tool.attempt_rewrite_last_command("false || echo fallback")
+            .expect("test operation should succeed"),
         "false || aries exec echo fallback"
     );
 }
@@ -143,7 +161,8 @@ fn test_rewrite_pipeline() {
     let tool = tool(std::env::temp_dir());
     // 管道中每个段是独立的 command 节点，最后一个段前插入 aries exec。
     assert_eq!(
-        tool.attempt_rewrite_last_command("cat file | grep foo | wc -l").unwrap(),
+        tool.attempt_rewrite_last_command("cat file | grep foo | wc -l")
+            .expect("test operation should succeed"),
         "cat file | grep foo | aries exec wc -l"
     );
 }
@@ -152,7 +171,8 @@ fn test_rewrite_pipeline() {
 fn test_rewrite_newline_separated() {
     let tool = tool(std::env::temp_dir());
     assert_eq!(
-        tool.attempt_rewrite_last_command("echo hello\necho world").unwrap(),
+        tool.attempt_rewrite_last_command("echo hello\necho world")
+            .expect("test operation should succeed"),
         "echo hello\naries exec echo world"
     );
 }
@@ -161,7 +181,8 @@ fn test_rewrite_newline_separated() {
 fn test_rewrite_three_commands() {
     let tool = tool(std::env::temp_dir());
     assert_eq!(
-        tool.attempt_rewrite_last_command("echo a; echo b; echo c").unwrap(),
+        tool.attempt_rewrite_last_command("echo a; echo b; echo c")
+            .expect("test operation should succeed"),
         "echo a; echo b; aries exec echo c"
     );
 }
@@ -177,14 +198,15 @@ fn test_rewrite_empty_returns_none() {
 fn test_rewrite_with_comment() {
     let tool = tool(std::env::temp_dir());
     assert_eq!(
-        tool.attempt_rewrite_last_command("echo hello # this is a comment").unwrap(),
+        tool.attempt_rewrite_last_command("echo hello # this is a comment")
+            .expect("test operation should succeed"),
         "aries exec echo hello # this is a comment"
     );
 }
 
 #[test]
 fn test_description_excludes_git_section_outside_repo() {
-    let dir = TempDir::new().unwrap();
+    let dir = TempDir::new().expect("test operation should succeed");
     let tool = tool(dir.path());
 
     assert!(!tool.description().contains("# 使用 git 提交改动"));
@@ -192,8 +214,8 @@ fn test_description_excludes_git_section_outside_repo() {
 
 #[test]
 fn test_description_includes_git_section_inside_repo() {
-    let dir = TempDir::new().unwrap();
-    git2::Repository::init(dir.path()).unwrap();
+    let dir = TempDir::new().expect("test operation should succeed");
+    git2::Repository::init(dir.path()).expect("test operation should succeed");
     let tool = tool(dir.path());
 
     assert!(tool.description().contains("# 使用 git 提交改动"));

@@ -17,15 +17,16 @@ use crate::hook::input::{PreToolUseHookInput, SessionStartHookInput, SessionStar
 /// 在 `root/.agents/hooks/` 下写入一个 hooks.json，事件名为 key。
 fn write_hooks_json(root: &Path, event: &str) {
     let dir = root.join(".agents").join("hooks");
-    fs::create_dir_all(&dir).unwrap();
+    fs::create_dir_all(&dir).expect("test operation should succeed");
     let content = format!(
         r#"{{"description": "{event} demo", "hooks": {{"{event}": [{{"hooks": [{{"type": "command", "command": "echo hi"}}]}}]}}}}"#
     );
-    fs::write(dir.join("hooks.json"), content).unwrap();
+    fs::write(dir.join("hooks.json"), content).expect("test operation should succeed");
 }
 
 fn command_hook(command: &str) -> HookCommand {
-    serde_json::from_value(serde_json::json!({ "type": "command", "command": command })).unwrap()
+    serde_json::from_value(serde_json::json!({ "type": "command", "command": command }))
+        .expect("test operation should succeed")
 }
 
 fn hooks_definition(event: HookEvent, hooks: Vec<HookCommand>) -> HooksDefinition {
@@ -38,13 +39,17 @@ fn hooks_definition(event: HookEvent, hooks: Vec<HookCommand>) -> HooksDefinitio
 
 #[test]
 fn deserializes_hook_events() {
-    let event: HookEvent = serde_json::from_str(r#""PreToolUse""#).unwrap();
+    let event: HookEvent =
+        serde_json::from_str(r#""PreToolUse""#).expect("test operation should succeed");
     assert_eq!(event, HookEvent::PreToolUse);
-    let event: HookEvent = serde_json::from_str(r#""PostToolUse""#).unwrap();
+    let event: HookEvent =
+        serde_json::from_str(r#""PostToolUse""#).expect("test operation should succeed");
     assert_eq!(event, HookEvent::PostToolUse);
-    let event: HookEvent = serde_json::from_str(r#""Stop""#).unwrap();
+    let event: HookEvent =
+        serde_json::from_str(r#""Stop""#).expect("test operation should succeed");
     assert_eq!(event, HookEvent::Stop);
-    let event: HookEvent = serde_json::from_str(r#""SessionStart""#).unwrap();
+    let event: HookEvent =
+        serde_json::from_str(r#""SessionStart""#).expect("test operation should succeed");
     assert_eq!(event, HookEvent::SessionStart);
 }
 
@@ -54,7 +59,8 @@ fn deserializes_hooks_settings() {
         "PreToolUse": [{"matcher": "Write", "hooks": [{"type": "command", "command": "echo hi"}]}],
         "Stop": []
     }"#;
-    let settings: HooksSettings = serde_json::from_str(json).unwrap();
+    let settings: HooksSettings =
+        serde_json::from_str(json).expect("test operation should succeed");
     assert_eq!(settings.0.len(), 2);
     assert!(settings.0.contains_key(&HookEvent::PreToolUse));
     assert!(settings.0.contains_key(&HookEvent::Stop));
@@ -62,47 +68,58 @@ fn deserializes_hooks_settings() {
 
 #[test]
 fn deserializes_hook_command_variants() {
-    let cmd: HookCommand =
-        serde_json::from_str(r#"{"type": "command", "command": "echo hi"}"#).unwrap();
+    let cmd: HookCommand = serde_json::from_str(r#"{"type": "command", "command": "echo hi"}"#)
+        .expect("test operation should succeed");
     assert!(matches!(cmd, HookCommand::Command(_)));
 
-    let prompt: HookCommand =
-        serde_json::from_str(r#"{"type": "prompt", "prompt": "assess"}"#).unwrap();
+    let prompt: HookCommand = serde_json::from_str(r#"{"type": "prompt", "prompt": "assess"}"#)
+        .expect("test operation should succeed");
     assert!(matches!(prompt, HookCommand::Prompt(_)));
 
     // let agent: HookCommand =
-    //     serde_json::from_str(r#"{"type": "agent", "prompt": "verify"}"#).unwrap();
+    //     serde_json::from_str(r#"{"type": "agent", "prompt": "verify"}"#).expect("test operation should succeed");
     // assert!(matches!(agent, HookCommand::Agent(_)));
 
     let http: HookCommand =
-        serde_json::from_str(r#"{"type": "http", "url": "https://example.com"}"#).unwrap();
+        serde_json::from_str(r#"{"type": "http", "url": "https://example.com"}"#)
+            .expect("test operation should succeed");
     assert!(matches!(http, HookCommand::Http(_)));
 }
 
 #[test]
 fn matcher_matches_all_when_absent_or_wildcard() {
-    assert!(HookMatcher { matcher: None, hooks: vec![] }.matches("Write").unwrap());
-    assert!(HookMatcher { matcher: Some("*".to_owned()), hooks: vec![] }.matches("Bash").unwrap());
     assert!(
-        HookMatcher { matcher: Some("   ".to_owned()), hooks: vec![] }.matches("Bash").unwrap()
+        HookMatcher { matcher: None, hooks: vec![] }
+            .matches("Write")
+            .expect("test operation should succeed")
+    );
+    assert!(
+        HookMatcher { matcher: Some("*".to_owned()), hooks: vec![] }
+            .matches("Bash")
+            .expect("test operation should succeed")
+    );
+    assert!(
+        HookMatcher { matcher: Some("   ".to_owned()), hooks: vec![] }
+            .matches("Bash")
+            .expect("test operation should succeed")
     );
 }
 
 #[test]
 fn matcher_matches_tool_name_regex() {
     let matcher = HookMatcher { matcher: Some("(Read|Edit)".to_owned()), hooks: vec![] };
-    assert!(matcher.matches("Read").unwrap());
-    assert!(matcher.matches("Edit").unwrap());
-    assert!(!matcher.matches("Write").unwrap());
+    assert!(matcher.matches("Read").expect("test operation should succeed"));
+    assert!(matcher.matches("Edit").expect("test operation should succeed"));
+    assert!(!matcher.matches("Write").expect("test operation should succeed"));
 }
 
 #[test]
 fn matcher_anchors_alternation() {
     let matcher = HookMatcher { matcher: Some("Edit|Write".to_owned()), hooks: vec![] };
-    assert!(matcher.matches("Edit").unwrap());
-    assert!(matcher.matches("Write").unwrap());
-    assert!(!matcher.matches("Editor").unwrap());
-    assert!(!matcher.matches("Rewrite").unwrap());
+    assert!(matcher.matches("Edit").expect("test operation should succeed"));
+    assert!(matcher.matches("Write").expect("test operation should succeed"));
+    assert!(!matcher.matches("Editor").expect("test operation should succeed"));
+    assert!(!matcher.matches("Rewrite").expect("test operation should succeed"));
 }
 
 #[test]
@@ -121,7 +138,7 @@ fn shell_type_invocation() {
 
 #[tokio::test]
 async fn parses_hooks_preset() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().expect("test operation should succeed");
     let file = tmp.path().join("hooks.json");
     fs::write(
         &file,
@@ -134,9 +151,9 @@ async fn parses_hooks_preset() {
             }
         }"#,
     )
-    .unwrap();
+    .expect("test operation should succeed");
 
-    let preset = HooksDefinition::parse(&file).await.unwrap();
+    let preset = HooksDefinition::parse(&file).await.expect("test operation should succeed");
     assert_eq!(preset.description.as_deref(), Some("demo"));
     assert_eq!(preset.hooks.0.len(), 1);
     assert!(preset.hooks.0.contains_key(&HookEvent::PreToolUse));
@@ -290,11 +307,11 @@ async fn executor_combines_context_from_multiple_matching_hooks() {
 
 #[tokio::test]
 async fn load_finds_hooks_from_home_and_cwd() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().expect("test operation should succeed");
     let home = tmp.path().join("home");
     let cwd = tmp.path().join("cwd");
-    fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(&cwd).unwrap();
+    fs::create_dir_all(&home).expect("test operation should succeed");
+    fs::create_dir_all(&cwd).expect("test operation should succeed");
 
     write_hooks_json(&home, "PreToolUse");
     write_hooks_json(&cwd, "Stop");
@@ -310,16 +327,17 @@ async fn load_finds_hooks_from_home_and_cwd() {
 
 #[tokio::test]
 async fn load_ignores_non_hooks_json() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().expect("test operation should succeed");
     let home = tmp.path().join("home");
     let cwd = tmp.path().join("cwd");
-    fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(&cwd).unwrap();
+    fs::create_dir_all(&home).expect("test operation should succeed");
+    fs::create_dir_all(&cwd).expect("test operation should succeed");
 
     write_hooks_json(&home, "PreToolUse");
     let dir = cwd.join(".agents").join("hooks");
-    fs::create_dir_all(&dir).unwrap();
-    fs::write(dir.join("other.json"), r#"{"description": "x", "hooks": {}}"#).unwrap();
+    fs::create_dir_all(&dir).expect("test operation should succeed");
+    fs::write(dir.join("other.json"), r#"{"description": "x", "hooks": {}}"#)
+        .expect("test operation should succeed");
 
     let loader = HooksLoader::new(&cwd, &home);
     let presets = loader.load().await;
@@ -328,11 +346,11 @@ async fn load_ignores_non_hooks_json() {
 
 #[tokio::test]
 async fn load_returns_empty_when_no_roots_exist() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().expect("test operation should succeed");
     let home = tmp.path().join("home");
     let cwd = tmp.path().join("cwd");
-    fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(&cwd).unwrap();
+    fs::create_dir_all(&home).expect("test operation should succeed");
+    fs::create_dir_all(&cwd).expect("test operation should succeed");
 
     let loader = HooksLoader::new(&cwd, &home);
     let presets = loader.load().await;

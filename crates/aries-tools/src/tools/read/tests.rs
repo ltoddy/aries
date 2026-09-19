@@ -10,9 +10,9 @@ use crate::context::ToolContext;
 
 #[tokio::test]
 async fn test_read_file() {
-    let dir = TempDir::new().unwrap();
+    let dir = TempDir::new().expect("test operation should succeed");
     let file_path = dir.path().join("test.txt");
-    fs::write(&file_path, "line1\nline2\nline3").unwrap();
+    fs::write(&file_path, "line1\nline2\nline3").expect("test operation should succeed");
 
     let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(
@@ -22,8 +22,10 @@ async fn test_read_file() {
             notifier
         }),
     );
-    let result =
-        tool.call(&mut context, ReadArgs { file_path, offset: None, limit: None }).await.unwrap();
+    let result = tool
+        .call(&mut context, ReadArgs { file_path, offset: None, limit: None })
+        .await
+        .expect("test operation should succeed");
 
     // 带行号输出，行号右对齐到 6 列 + U+2192 分隔。
     assert_eq!(result.content, "     1\u{2192}line1\n     2\u{2192}line2\n     3\u{2192}line3");
@@ -31,9 +33,9 @@ async fn test_read_file() {
 
 #[tokio::test]
 async fn test_read_file_with_offset() {
-    let dir = TempDir::new().unwrap();
+    let dir = TempDir::new().expect("test operation should succeed");
     let file_path = dir.path().join("test.txt");
-    fs::write(&file_path, "line1\nline2\nline3").unwrap();
+    fs::write(&file_path, "line1\nline2\nline3").expect("test operation should succeed");
 
     let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(
@@ -46,7 +48,7 @@ async fn test_read_file_with_offset() {
     let result = tool
         .call(&mut context, ReadArgs { file_path, offset: Some(2), limit: None })
         .await
-        .unwrap();
+        .expect("test operation should succeed");
 
     // 从第 2 行开始，行号也从 2 起算。
     assert_eq!(result.content, "     2\u{2192}line2\n     3\u{2192}line3");
@@ -54,9 +56,9 @@ async fn test_read_file_with_offset() {
 
 #[tokio::test]
 async fn test_read_file_with_limit() {
-    let dir = TempDir::new().unwrap();
+    let dir = TempDir::new().expect("test operation should succeed");
     let file_path = dir.path().join("test.txt");
-    fs::write(&file_path, "line1\nline2\nline3\nline4").unwrap();
+    fs::write(&file_path, "line1\nline2\nline3\nline4").expect("test operation should succeed");
 
     let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(
@@ -69,7 +71,7 @@ async fn test_read_file_with_limit() {
     let result = tool
         .call(&mut context, ReadArgs { file_path, offset: Some(2), limit: Some(2) })
         .await
-        .unwrap();
+        .expect("test operation should succeed");
 
     // 从第 2 行起读 2 行：line2、line3。
     assert_eq!(result.content, "     2\u{2192}line2\n     3\u{2192}line3");
@@ -77,10 +79,10 @@ async fn test_read_file_with_limit() {
 
 #[tokio::test]
 async fn test_read_file_respects_default_line_cap() {
-    let dir = TempDir::new().unwrap();
+    let dir = TempDir::new().expect("test operation should succeed");
     let file_path = dir.path().join("big.txt");
     let content = (1..=2500).map(|i| format!("line{i}")).collect::<Vec<_>>().join("\n");
-    fs::write(&file_path, content).unwrap();
+    fs::write(&file_path, content).expect("test operation should succeed");
 
     let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(
@@ -90,8 +92,10 @@ async fn test_read_file_respects_default_line_cap() {
             notifier
         }),
     );
-    let result =
-        tool.call(&mut context, ReadArgs { file_path, offset: None, limit: None }).await.unwrap();
+    let result = tool
+        .call(&mut context, ReadArgs { file_path, offset: None, limit: None })
+        .await
+        .expect("test operation should succeed");
 
     // 默认最多 2000 行。
     assert_eq!(result.content.lines().count(), MAX_LINES_TO_READ);
@@ -101,9 +105,9 @@ async fn test_read_file_respects_default_line_cap() {
 
 #[tokio::test]
 async fn test_read_empty_file() {
-    let dir = TempDir::new().unwrap();
+    let dir = TempDir::new().expect("test operation should succeed");
     let file_path = dir.path().join("empty.txt");
-    fs::write(&file_path, "").unwrap();
+    fs::write(&file_path, "").expect("test operation should succeed");
 
     let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(
@@ -113,15 +117,17 @@ async fn test_read_empty_file() {
             notifier
         }),
     );
-    let result =
-        tool.call(&mut context, ReadArgs { file_path, offset: None, limit: None }).await.unwrap();
+    let result = tool
+        .call(&mut context, ReadArgs { file_path, offset: None, limit: None })
+        .await
+        .expect("test operation should succeed");
 
     assert_eq!(result.content, EMPTY_FILE_NOTICE);
 }
 
 #[tokio::test]
 async fn test_read_directory_is_rejected() {
-    let dir = TempDir::new().unwrap();
+    let dir = TempDir::new().expect("test operation should succeed");
 
     let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(

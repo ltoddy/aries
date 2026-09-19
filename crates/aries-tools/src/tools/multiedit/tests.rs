@@ -11,13 +11,13 @@ use crate::multiedit::WriteKind;
 
 /// 写入文件并在共享 ctx 中登记一次完整读取，模拟“先 Read 后 MultiEdit”。
 async fn seed_file(ctx: &ToolContext, path: &std::path::Path, content: &str) {
-    fs::write(path, content).unwrap();
+    fs::write(path, content).expect("test operation should succeed");
     ctx.on_file_read(path).await;
 }
 
 #[tokio::test]
 async fn test_multiedit_basic() {
-    let dir = TempDir::new().unwrap();
+    let dir = TempDir::new().expect("test operation should succeed");
     let file_path = dir.path().join("test.txt");
     let ctx = ToolContext::new(None, {
         let (notifier, _) = aries_event::Notifier::channel();
@@ -47,17 +47,17 @@ async fn test_multiedit_basic() {
             },
         )
         .await
-        .unwrap();
+        .expect("test operation should succeed");
 
     assert_eq!(result.kind, WriteKind::Update);
     assert_eq!(result.original_content.as_deref(), Some("hello world"));
     assert!(!result.structured_patch.is_empty());
-    assert_eq!(fs::read_to_string(&file_path).unwrap(), "hi earth");
+    assert_eq!(fs::read_to_string(&file_path).expect("test operation should succeed"), "hi earth");
 }
 
 #[tokio::test]
 async fn test_multiedit_creates_file() {
-    let dir = TempDir::new().unwrap();
+    let dir = TempDir::new().expect("test operation should succeed");
     let file_path = dir.path().join("new_file.txt");
 
     let mut context = rig::tool::ToolContext::new();
@@ -81,16 +81,19 @@ async fn test_multiedit_creates_file() {
             },
         )
         .await
-        .unwrap();
+        .expect("test operation should succeed");
 
     assert_eq!(result.kind, WriteKind::Create);
     assert!(result.original_content.is_none());
-    assert_eq!(fs::read_to_string(&file_path).unwrap(), "new content");
+    assert_eq!(
+        fs::read_to_string(&file_path).expect("test operation should succeed"),
+        "new content"
+    );
 }
 
 #[tokio::test]
 async fn test_multiedit_identical_text_error() {
-    let dir = TempDir::new().unwrap();
+    let dir = TempDir::new().expect("test operation should succeed");
     let file_path = dir.path().join("test.txt");
     let ctx = ToolContext::new(None, {
         let (notifier, _) = aries_event::Notifier::channel();
@@ -119,10 +122,10 @@ async fn test_multiedit_identical_text_error() {
 
 #[tokio::test]
 async fn test_multiedit_rejects_unread_file() {
-    let dir = TempDir::new().unwrap();
+    let dir = TempDir::new().expect("test operation should succeed");
     let file_path = dir.path().join("test.txt");
     // 已存在但未经 Read：应被读后写校验拒绝。
-    fs::write(&file_path, "hello world").unwrap();
+    fs::write(&file_path, "hello world").expect("test operation should succeed");
 
     let mut context = rig::tool::ToolContext::new();
     let tool = MultiEditTool::new(

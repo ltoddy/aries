@@ -13,11 +13,11 @@ struct BenchRepo {
 
 impl BenchRepo {
     fn new(files: usize, lines_per_file: usize) -> Self {
-        let tempdir = TempDir::new().unwrap();
+        let tempdir = TempDir::new().expect("benchmark setup should succeed");
         let root = tempdir.path().to_path_buf();
-        std::fs::create_dir_all(root.join("src")).unwrap();
-        std::fs::create_dir_all(root.join("docs")).unwrap();
-        std::fs::create_dir_all(root.join("vendor")).unwrap();
+        std::fs::create_dir_all(root.join("src")).expect("benchmark setup should succeed");
+        std::fs::create_dir_all(root.join("docs")).expect("benchmark setup should succeed");
+        std::fs::create_dir_all(root.join("vendor")).expect("benchmark setup should succeed");
 
         for i in 0..files {
             let dir = match i % 3 {
@@ -48,7 +48,7 @@ fn write_fixture_file(path: &Path, file_index: usize, lines_per_file: usize) {
                 .push_str(&format!("line {line} filler content for benchmark file {file_index}\n"));
         }
     }
-    std::fs::write(path, content).unwrap();
+    std::fs::write(path, content).expect("benchmark setup should succeed");
 }
 
 fn grep_args(pattern: &str) -> GrepArgs {
@@ -68,10 +68,13 @@ fn grep_args(pattern: &str) -> GrepArgs {
 }
 
 fn run_grep(tool: &GrepTool, args: GrepArgs) {
-    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("benchmark setup should succeed");
     runtime.block_on(async {
         let mut context = ToolContext::new();
-        let output = tool.call(&mut context, args).await.unwrap();
+        let output = tool.call(&mut context, args).await.expect("benchmark setup should succeed");
         black_box(output);
     });
 }
@@ -101,9 +104,18 @@ fn bench_grep(c: &mut Criterion) {
     ];
 
     let total_bytes: u64 = std::fs::read_dir(&repo.root)
-        .unwrap()
-        .flat_map(|entry| std::fs::read_dir(entry.unwrap().path()).unwrap())
-        .map(|entry| entry.unwrap().metadata().unwrap().len())
+        .expect("benchmark setup should succeed")
+        .flat_map(|entry| {
+            std::fs::read_dir(entry.expect("benchmark setup should succeed").path())
+                .expect("benchmark setup should succeed")
+        })
+        .map(|entry| {
+            entry
+                .expect("benchmark setup should succeed")
+                .metadata()
+                .expect("benchmark setup should succeed")
+                .len()
+        })
         .sum();
 
     let mut group = c.benchmark_group("grep_tool");

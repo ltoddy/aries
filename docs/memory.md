@@ -15,18 +15,15 @@ aries 的长期记忆让 AI 助手能够跨会话记住用户信息、偏好与�
 
 ## 架构
 
-长期记忆由三个角色组成：
+长期记忆由两个角色组成：
 
 - **MemoryStore**：基于文件持久化，按项目目录隔离，负责扫描、读取记忆与 `MEMORY.md` 索引（manifest）。
 - **MemoryRetriever**：在 prompt 前根据当前查询召回相关记忆（最多 5 条），注入为 `system-reminder`（用户不可见）。
-- **MemoryAgent**：一个受限工具集（read / write / edit / glob / grep）的后台子代理，在 prompt 后分析对话并写入 /
-  更新记忆，不阻塞主流程。
 
 ## 工作流程
 
 1. 用户提交 prompt 前，`recall_context` 扫描记忆并召回相关内容。
 2. 相关记忆以 `<system-reminder>` 形式注入历史。
-3. 一轮对话结束后，后台 `MemoryAgent` 判断是否有值得跨会话保存的经验，并写盘或更新 `MEMORY.md` 索引。
 
 ## 存储位置
 

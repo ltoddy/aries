@@ -93,8 +93,8 @@ fn micro_compact_reports_changes_and_replaces_old_tool_results_with_placeholder(
 
 #[tokio::test]
 async fn overwritten_chat_context_reloads_micro_compacted_placeholders() {
-    let tmp = tempfile::TempDir::new().unwrap();
-    let context = ChatContext::new(tmp.path()).await.unwrap();
+    let tmp = tempfile::TempDir::new().expect("test operation should succeed");
+    let context = ChatContext::new(tmp.path()).await.expect("test operation should succeed");
     let messages = tool_result_messages(3);
     context.append(&messages).await;
 
@@ -102,7 +102,7 @@ async fn overwritten_chat_context_reloads_micro_compacted_placeholders() {
     assert!(micro_compact(&mut compacted, 1));
     context.overwrite(compacted).await;
 
-    let reloaded = ChatContext::new(tmp.path()).await.unwrap();
+    let reloaded = ChatContext::new(tmp.path()).await.expect("test operation should succeed");
     let history = reloaded.history().await;
     assert_old_tool_results_cleared(&history);
 }
@@ -120,7 +120,7 @@ fn tool_result_messages(count: usize) -> Vec<Message> {
 }
 
 fn assert_old_tool_results_cleared(messages: &[Message]) {
-    let serialized = serde_json::to_string(messages).unwrap();
+    let serialized = serde_json::to_string(messages).expect("test operation should succeed");
     assert!(serialized.contains("[Old tool result content cleared]"));
     assert!(!serialized.contains("full result 0"));
     assert!(!serialized.contains("full result 1"));

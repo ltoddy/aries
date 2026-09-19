@@ -11,9 +11,9 @@ use crate::context::ToolContext;
 
 #[tokio::test]
 async fn test_write_empty_existing_file() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().expect("test operation should succeed");
     let file_path = tmp.path().join("hello.txt");
-    fs::write(&file_path, "").unwrap();
+    fs::write(&file_path, "").expect("test operation should succeed");
 
     let ctx = ToolContext::new(None, {
         let (notifier, _) = aries_event::Notifier::channel();
@@ -29,16 +29,19 @@ async fn test_write_empty_existing_file() {
             WriteArgs { file_path: file_path.clone(), content: "Hello, world!".to_string() },
         )
         .await
-        .unwrap();
+        .expect("test operation should succeed");
 
     assert_eq!(result.file_path, file_path);
     assert_eq!(result.additions, 1);
-    assert_eq!(fs::read_to_string(&file_path).unwrap(), "Hello, world!");
+    assert_eq!(
+        fs::read_to_string(&file_path).expect("test operation should succeed"),
+        "Hello, world!"
+    );
 }
 
 #[tokio::test]
 async fn test_write_new_file() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().expect("test operation should succeed");
     let file_path = tmp.path().join("missing.txt");
 
     let mut context = rig::tool::ToolContext::new();
@@ -55,17 +58,17 @@ async fn test_write_new_file() {
             WriteArgs { file_path: file_path.clone(), content: "content".to_string() },
         )
         .await
-        .unwrap();
+        .expect("test operation should succeed");
 
     assert_eq!(result.file_path, file_path);
-    assert_eq!(fs::read_to_string(&file_path).unwrap(), "content");
+    assert_eq!(fs::read_to_string(&file_path).expect("test operation should succeed"), "content");
 }
 
 #[tokio::test]
 async fn test_write_rejects_unread_empty_file() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().expect("test operation should succeed");
     let file_path = tmp.path().join("empty.txt");
-    fs::write(&file_path, "").unwrap();
+    fs::write(&file_path, "").expect("test operation should succeed");
 
     let ctx = ToolContext::new(None, {
         let (notifier, _) = aries_event::Notifier::channel();
@@ -82,15 +85,15 @@ async fn test_write_rejects_unread_empty_file() {
         .await;
 
     assert!(matches!(result, Err(WriteError::GuardWrite(_))));
-    assert_eq!(fs::read_to_string(&file_path).unwrap(), "");
+    assert_eq!(fs::read_to_string(&file_path).expect("test operation should succeed"), "");
 }
 
 #[tokio::test]
 async fn test_write_rejects_non_empty_existing_file() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().expect("test operation should succeed");
 
     let file_path = tmp.path().join("data.txt");
-    fs::write(&file_path, "line1\nline2\nline3\n").unwrap();
+    fs::write(&file_path, "line1\nline2\nline3\n").expect("test operation should succeed");
 
     let ctx = ToolContext::new(None, {
         let (notifier, _) = aries_event::Notifier::channel();
@@ -110,15 +113,18 @@ async fn test_write_rejects_non_empty_existing_file() {
         .await;
 
     assert!(matches!(result, Err(WriteError::FileNotEmpty(path)) if path == file_path));
-    assert_eq!(fs::read_to_string(&file_path).unwrap(), "line1\nline2\nline3\n");
+    assert_eq!(
+        fs::read_to_string(&file_path).expect("test operation should succeed"),
+        "line1\nline2\nline3\n"
+    );
 }
 
 #[tokio::test]
 async fn test_write_empty_content() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().expect("test operation should succeed");
 
     let file_path = tmp.path().join("empty.txt");
-    fs::write(&file_path, "").unwrap();
+    fs::write(&file_path, "").expect("test operation should succeed");
 
     let ctx = ToolContext::new(None, {
         let (notifier, _) = aries_event::Notifier::channel();
@@ -130,14 +136,14 @@ async fn test_write_empty_content() {
     let tool = WriteTool::new(tmp.path(), ctx);
     tool.call(&mut context, WriteArgs { file_path: file_path.clone(), content: String::new() })
         .await
-        .unwrap();
+        .expect("test operation should succeed");
 
-    assert_eq!(fs::read_to_string(&file_path).unwrap(), "");
+    assert_eq!(fs::read_to_string(&file_path).expect("test operation should succeed"), "");
 }
 
 #[tokio::test]
 async fn test_write_resolves_relative_path_against_cwd() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().expect("test operation should succeed");
 
     let file_path = tmp.path().join("sub/rel.txt");
 
@@ -155,10 +161,13 @@ async fn test_write_resolves_relative_path_against_cwd() {
             WriteArgs { file_path: PathBuf::from("sub/rel.txt"), content: "relative".to_string() },
         )
         .await
-        .unwrap();
+        .expect("test operation should succeed");
 
     assert_eq!(result.file_path, file_path);
-    assert_eq!(fs::read_to_string(tmp.path().join("sub/rel.txt")).unwrap(), "relative");
+    assert_eq!(
+        fs::read_to_string(tmp.path().join("sub/rel.txt")).expect("test operation should succeed"),
+        "relative"
+    );
 }
 
 #[test]
@@ -176,9 +185,9 @@ fn test_render_output_create() {
         file_path: PathBuf::from("/tmp/new.txt"),
         additions: 1,
     })
-    .unwrap();
+    .expect("test operation should succeed");
     assert_eq!(
-        WriteOutput::render_output(create).unwrap(),
+        WriteOutput::render_output(create).expect("test operation should succeed"),
         "File created successfully at: /tmp/new.txt"
     );
 }
