@@ -200,7 +200,7 @@ impl Session {
         &mut self,
         prompt: impl Into<Message>,
         callback: F,
-    ) -> aries_agent::AriesResult<()>
+    ) -> aries_agent::AriesResult<String>
     where
         F: Fn(AgentEvent) -> Fut + Clone,
         Fut: Future<Output = ()>,
@@ -212,13 +212,14 @@ impl Session {
             guard.clone()
         };
         self.last_assistant_message = None;
+        let message_id = format!("user-{}", nanoid::nanoid!());
 
         if let Message::User { ref content } = prompt
             && let Some(UserContent::Text(text)) = content.first()
             && let Some(input) = text.text.trim().strip_prefix("/")
             && self.try_execute_slash_command(input, callback.clone()).await
         {
-            return Ok(());
+            return Ok(message_id);
         }
 
         let title = self.update_title(&prompt).await;
@@ -265,7 +266,7 @@ impl Session {
                 Ok(res) => res,
                 Err(err) => {
                     if err.is_awaiting_user_input() {
-                        return Ok(());
+                        return Ok(message_id);
                     }
                     self.fire_stop_failure(err.to_string()).await;
                     return Err(err);
@@ -282,7 +283,7 @@ impl Session {
             self.compactor.post_compact(completion.usage, callback).await;
         }
 
-        Ok(())
+        Ok(message_id)
     }
 
     pub fn id(&self) -> String {
