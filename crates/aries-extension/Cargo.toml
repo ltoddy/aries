@@ -2,6 +2,7 @@
 name = "aries-extension"
 version = "0.1.0"
 edition = "2024"
+license.workspace = true
 
 [dependencies]
 aries-filesystem = { path = "../aries-filesystem" }
