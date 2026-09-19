@@ -11,15 +11,13 @@ use agent_client_protocol::schema::v2::{
 use agent_client_protocol::{Client, Error, Responder, V2ConnectionTo};
 use aries_event::AgentEvent;
 use aries_session::SharedRegistry;
-use aries_tools::question::AskUserQuestionArgs;
 use parking_lot::Mutex;
 use rig::completion::Message;
 use rig::message::ToolCall;
-use tracing::{info, warn};
+use tracing::info;
 
 use self::message::UserMessage;
 use self::session_update::SessionUpdates;
-use crate::v1::prompt::elicitation::ElicitationAnswer;
 
 pub async fn prompt(
     req: PromptRequest,
@@ -40,41 +38,19 @@ pub async fn prompt(
         }
     };
 
-    let user_message = UserMessage::from(req.prompt);
-    let prompt = user_message.into();
-
     let tool_calls = Mutex::new(HashMap::<String, ToolCall>::new());
-    let pending = Mutex::new(None::<AskUserQuestionArgs>);
-    let callback = async |event: AgentEvent| match event {
-        AgentEvent::AwaitingUserInput { args } => {
-            match serde_json::from_value::<AskUserQuestionArgs>(args.clone()) {
-                Ok(question) => *pending.lock() = Some(question),
-                Err(err) => warn!("failed to parse AskUserQuestion args: {err}"),
-            }
-        },
-        _ => {
-            SessionUpdates::new(event, &tool_calls).into_iter().for_each(|u| {
-                let _ = cx.send_notification(UpdateSessionNotification::new(session_id.clone(), u));
-            });
-        },
+    let callback = async |event: AgentEvent| {
+        SessionUpdates::new(event, &tool_calls).into_iter().for_each(|u| {
+            let _ = cx.send_notification(UpdateSessionNotification::new(session_id.clone(), u));
+        });
     };
 
-    let mut prompt = prompt;
-    loop {
-        match session.prompt(prompt, callback).await {
-            Ok(_) => {
-                let question = pending.lock().take();
-                match question {
-                    Some(question) => {
-                        let answer = ElicitationAnswer::Cancelled;
-                        prompt = Message::user(answer.to_input(&question));
-                    },
-                    None => break,
-                }
-            },
-            Err(err) => return responder.respond_with_internal_error(err.to_string()),
-        }
-    }
+    let user_message = UserMessage::from(req.prompt);
+    let prompt: Message = user_message.into();
+    let message_id = match session.prompt(prompt, callback).await {
+        Ok(message_id) => message_id,
+        Err(err) => return responder.respond_with_internal_error(err.to_string()),
+    };
 
     let _ = cx.send_notification(UpdateSessionNotification::new(
         session_id.clone(),
@@ -85,5 +61,5 @@ pub async fn prompt(
 
     let mut registry = registry.lock().await;
     registry.putback_session(session);
-    responder.respond(PromptResponse::new())
+    responder.respond(PromptResponse::new(message_id))
 }
