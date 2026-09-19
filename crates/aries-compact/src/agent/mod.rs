@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Context;
@@ -17,6 +18,10 @@ use tokio::pin;
 const PREAMBLE: &str = include_str!("preamble.md");
 const NAME: &str = "Archivist";
 const DESCRIPTION: &str = "Summarises a conversation transcript into a structured digest.";
+
+static SUMMARY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?s)<summary>(.*?)</summary>").expect("summary regex should be valid")
+});
 
 #[derive(Debug)]
 pub enum CompactOutcome {
@@ -145,9 +150,8 @@ fn resume_prompt(formatted_summary: &str, transcript_path: impl AsRef<Path>) -> 
 
 /// 从模型输出中提取 `<summary>` 块内容，格式化为 "Summary:\n..."。
 pub fn compact_summary(raw: &str) -> String {
-    let re = Regex::new(r"(?s)<summary>(.*?)</summary>").unwrap();
-
-    re.captures(raw)
+    SUMMARY_REGEX
+        .captures(raw)
         .map(|caps| format!("Summary:\n{}", caps[1].trim()))
         .unwrap_or_else(|| raw.trim().to_owned())
 }

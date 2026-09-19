@@ -38,7 +38,7 @@ async fn test_call_echoes_items() {
     let tool = UpdatePlanTool::new();
     let args =
         UpdatePlanArgs { items: vec![entry("Test", "Testing", PlanEntryStatus::InProgress)] };
-    let output = tool.call(&mut context, args).await.unwrap();
+    let output = tool.call(&mut context, args).await.expect("test operation should succeed");
     assert_eq!(output.items.len(), 1);
     assert_eq!(output.items[0].active_form, "Testing");
 }
@@ -54,7 +54,7 @@ async fn test_call_clears_when_all_completed() {
             entry("B", "Doing B", PlanEntryStatus::Completed),
         ],
     };
-    let output = tool.call(&mut context, args).await.unwrap();
+    let output = tool.call(&mut context, args).await.expect("test operation should succeed");
     assert!(output.items.is_empty());
 }
 
@@ -68,7 +68,7 @@ async fn test_call_keeps_items_when_partially_done() {
             entry("B", "Doing B", PlanEntryStatus::InProgress),
         ],
     };
-    let output = tool.call(&mut context, args).await.unwrap();
+    let output = tool.call(&mut context, args).await.expect("test operation should succeed");
     assert_eq!(output.items.len(), 2);
 }
 

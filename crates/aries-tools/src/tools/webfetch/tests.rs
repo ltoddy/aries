@@ -6,5 +6,8 @@ use super::*;
 fn renders_markdown_output() {
     let raw = serde_json::json!({ "content": "# Firecrawl" });
 
-    assert_eq!(WebFetchOutput::render_output(raw).unwrap(), "# Firecrawl");
+    assert_eq!(
+        WebFetchOutput::render_output(raw).expect("test operation should succeed"),
+        "# Firecrawl"
+    );
 }

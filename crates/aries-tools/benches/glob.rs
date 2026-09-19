@@ -13,19 +13,20 @@ struct BenchRepo {
 
 impl BenchRepo {
     fn new(files: usize, nested_dirs: usize) -> Self {
-        let tempdir = TempDir::new().unwrap();
+        let tempdir = TempDir::new().expect("benchmark setup should succeed");
         let root = tempdir.path().to_path_buf();
 
-        std::fs::create_dir_all(root.join("src")).unwrap();
-        std::fs::create_dir_all(root.join("docs")).unwrap();
-        std::fs::create_dir_all(root.join("vendor")).unwrap();
-        std::fs::create_dir_all(root.join(".hidden")).unwrap();
+        std::fs::create_dir_all(root.join("src")).expect("benchmark setup should succeed");
+        std::fs::create_dir_all(root.join("docs")).expect("benchmark setup should succeed");
+        std::fs::create_dir_all(root.join("vendor")).expect("benchmark setup should succeed");
+        std::fs::create_dir_all(root.join(".hidden")).expect("benchmark setup should succeed");
 
-        std::fs::write(root.join(".gitignore"), "vendor/\n").unwrap();
+        std::fs::write(root.join(".gitignore"), "vendor/\n")
+            .expect("benchmark setup should succeed");
 
         for i in 0..nested_dirs {
             std::fs::create_dir_all(root.join("src").join(format!("nested_{i}")).join("deep"))
-                .unwrap();
+                .expect("benchmark setup should succeed");
         }
 
         for i in 0..files {
@@ -53,7 +54,8 @@ impl BenchRepo {
 }
 
 fn write_fixture_file(path: &Path, index: usize) {
-    std::fs::write(path, format!("fixture file {index}\n")).unwrap();
+    std::fs::write(path, format!("fixture file {index}\n"))
+        .expect("benchmark setup should succeed");
 }
 
 fn glob_args(pattern: &str) -> GlobArgs {
@@ -68,17 +70,23 @@ fn glob_args(pattern: &str) -> GlobArgs {
 
 fn total_bytes(path: &Path) -> u64 {
     if path.is_file() {
-        return path.metadata().unwrap().len();
+        return path.metadata().expect("benchmark setup should succeed").len();
     }
 
-    std::fs::read_dir(path).unwrap().map(|entry| total_bytes(&entry.unwrap().path())).sum()
+    std::fs::read_dir(path)
+        .expect("benchmark setup should succeed")
+        .map(|entry| total_bytes(&entry.expect("benchmark setup should succeed").path()))
+        .sum()
 }
 
 fn run_glob(tool: &GlobTool, args: GlobArgs) {
-    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("benchmark setup should succeed");
     runtime.block_on(async {
         let mut context = ToolContext::new();
-        let output = tool.call(&mut context, args).await.unwrap();
+        let output = tool.call(&mut context, args).await.expect("benchmark setup should succeed");
         black_box(output);
     });
 }

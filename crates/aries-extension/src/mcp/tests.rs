@@ -15,10 +15,10 @@ fn stdio_config(command: &str) -> McpServerConfig {
 /// 在 `root/.agents/mcps/` 下写入一个 mcp.json，包含名为 `name` 的 server。
 fn write_mcp_json(root: &Path, name: &str) {
     let dir = root.join(".agents").join("mcps");
-    fs::create_dir_all(&dir).unwrap();
+    fs::create_dir_all(&dir).expect("test operation should succeed");
     let content =
         format!(r#"{{"mcpServers": {{"{name}": {{"type": "stdio", "command": "echo"}}}}}}"#);
-    fs::write(dir.join("mcp.json"), content).unwrap();
+    fs::write(dir.join("mcp.json"), content).expect("test operation should succeed");
 }
 
 #[test]
@@ -38,7 +38,7 @@ fn deserializes_mcp_definition() {
             }
         }
     }"#;
-    let def: McpDefinition = serde_json::from_str(json).unwrap();
+    let def: McpDefinition = serde_json::from_str(json).expect("test operation should succeed");
     assert_eq!(def.mcp_servers.len(), 2);
 
     match def.mcp_servers.get("fs") {
@@ -62,7 +62,7 @@ fn deserializes_mcp_definition() {
 #[test]
 fn deserializes_sse_config() {
     let json = r#"{"mcpServers": {"s": {"type": "sse", "url": "https://example.com/sse"}}}"#;
-    let def: McpDefinition = serde_json::from_str(json).unwrap();
+    let def: McpDefinition = serde_json::from_str(json).expect("test operation should succeed");
     match def.mcp_servers.get("s") {
         Some(McpServerConfig::Sse(s)) => assert_eq!(s.url, "https://example.com/sse"),
         _ => panic!("expected sse config"),
@@ -72,7 +72,7 @@ fn deserializes_sse_config() {
 #[test]
 fn deserializes_with_default_empty_fields() {
     let json = r#"{"mcpServers": {"s": {"type": "stdio", "command": "echo"}}}"#;
-    let def: McpDefinition = serde_json::from_str(json).unwrap();
+    let def: McpDefinition = serde_json::from_str(json).expect("test operation should succeed");
     match def.mcp_servers.get("s") {
         Some(McpServerConfig::Stdio(s)) => {
             assert!(s.args.is_empty());
@@ -121,11 +121,12 @@ fn config_constructors() {
 
 #[tokio::test]
 async fn parse_reads_file() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().expect("test operation should succeed");
     let file = tmp.path().join("mcp.json");
-    fs::write(&file, r#"{"mcpServers": {"s": {"type": "stdio", "command": "echo"}}}"#).unwrap();
+    fs::write(&file, r#"{"mcpServers": {"s": {"type": "stdio", "command": "echo"}}}"#)
+        .expect("test operation should succeed");
 
-    let def = McpDefinition::parse(&file).await.unwrap();
+    let def = McpDefinition::parse(&file).await.expect("test operation should succeed");
     assert_eq!(def.mcp_servers.len(), 1);
 }
 
@@ -137,11 +138,11 @@ async fn parse_reports_error_for_missing_file() {
 
 #[tokio::test]
 async fn load_finds_mcps_from_home_and_cwd() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().expect("test operation should succeed");
     let home = tmp.path().join("home");
     let cwd = tmp.path().join("cwd");
-    fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(&cwd).unwrap();
+    fs::create_dir_all(&home).expect("test operation should succeed");
+    fs::create_dir_all(&cwd).expect("test operation should succeed");
 
     write_mcp_json(&home, "home-server");
     write_mcp_json(&cwd, "cwd-server");
@@ -155,16 +156,17 @@ async fn load_finds_mcps_from_home_and_cwd() {
 
 #[tokio::test]
 async fn load_ignores_non_mcp_json() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().expect("test operation should succeed");
     let home = tmp.path().join("home");
     let cwd = tmp.path().join("cwd");
-    fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(&cwd).unwrap();
+    fs::create_dir_all(&home).expect("test operation should succeed");
+    fs::create_dir_all(&cwd).expect("test operation should succeed");
 
     write_mcp_json(&home, "valid");
     let dir = cwd.join(".agents").join("mcps");
-    fs::create_dir_all(&dir).unwrap();
-    fs::write(dir.join("other.json"), r#"{"mcpServers": {}}"#).unwrap();
+    fs::create_dir_all(&dir).expect("test operation should succeed");
+    fs::write(dir.join("other.json"), r#"{"mcpServers": {}}"#)
+        .expect("test operation should succeed");
 
     let loader = McpsLoader::new(&cwd, &home);
     let mcps = loader.load().await;
@@ -173,11 +175,11 @@ async fn load_ignores_non_mcp_json() {
 
 #[tokio::test]
 async fn load_returns_empty_when_no_roots_exist() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().expect("test operation should succeed");
     let home = tmp.path().join("home");
     let cwd = tmp.path().join("cwd");
-    fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(&cwd).unwrap();
+    fs::create_dir_all(&home).expect("test operation should succeed");
+    fs::create_dir_all(&cwd).expect("test operation should succeed");
 
     let loader = McpsLoader::new(&cwd, &home);
     let mcps = loader.load().await;

@@ -13,7 +13,7 @@ fn test_render_args_parses_query_and_domains() {
     })
     .to_string();
 
-    let (first, second) = WebSearchArgs::render_args(&raw).unwrap();
+    let (first, second) = WebSearchArgs::render_args(&raw).expect("test operation should succeed");
     assert_eq!(first, "latest React docs");
     assert_eq!(second, None);
 }
@@ -21,7 +21,7 @@ fn test_render_args_parses_query_and_domains() {
 #[test]
 fn test_render_args_minimal() {
     let raw = json!({ "query": "rust async" }).to_string();
-    let (first, _) = WebSearchArgs::render_args(&raw).unwrap();
+    let (first, _) = WebSearchArgs::render_args(&raw).expect("test operation should succeed");
     assert_eq!(first, "rust async");
 }
 
@@ -45,7 +45,7 @@ fn test_render_output_formats_results_as_markdown() {
         "duration_seconds": 0.5
     });
 
-    let rendered = WebSearchOutput::render_output(output).unwrap();
+    let rendered = WebSearchOutput::render_output(output).expect("test operation should succeed");
     assert!(rendered.contains("Query: rust async"));
     assert!(rendered.contains("1. [Async Book](https://rust-lang.github.io/async-book/)"));
     assert!(rendered.contains("An online version of the Async Book."));
@@ -59,7 +59,7 @@ fn test_render_output_empty_results() {
         "duration_seconds": 0.3
     });
 
-    let rendered = WebSearchOutput::render_output(output).unwrap();
+    let rendered = WebSearchOutput::render_output(output).expect("test operation should succeed");
     assert!(rendered.contains("No search results found"));
 }
 
@@ -72,8 +72,9 @@ fn test_args_round_trip_with_domains() {
         blocked_domains: None,
     };
 
-    let serialized = serde_json::to_string(&args).unwrap();
-    let deserialized: WebSearchArgs = serde_json::from_str(&serialized).unwrap();
+    let serialized = serde_json::to_string(&args).expect("test operation should succeed");
+    let deserialized: WebSearchArgs =
+        serde_json::from_str(&serialized).expect("test operation should succeed");
     assert_eq!(deserialized.query, "test");
     assert_eq!(deserialized.num, Some(7));
     assert_eq!(deserialized.allowed_domains, Some(vec!["a.com".to_owned()]));
@@ -90,7 +91,7 @@ fn test_tavily_request_serializes_domains() {
         exclude_domains: Some(vec!["reddit.com".to_owned()]),
     };
 
-    let json = serde_json::to_value(&request).unwrap();
+    let json = serde_json::to_value(&request).expect("test operation should succeed");
     assert_eq!(json["query"], "rust");
     assert_eq!(json["max_results"], 15);
     assert_eq!(json["include_answer"], false);
@@ -108,7 +109,7 @@ fn test_tavily_request_omits_empty_domains() {
         exclude_domains: None,
     };
 
-    let json = serde_json::to_value(&request).unwrap();
+    let json = serde_json::to_value(&request).expect("test operation should succeed");
     assert!(json.get("include_domains").is_none());
     assert!(json.get("exclude_domains").is_none());
 }

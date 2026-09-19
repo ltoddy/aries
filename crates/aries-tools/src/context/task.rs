@@ -492,9 +492,12 @@ mod tests {
     async fn stop_terminates_running_task() {
         let (notifier, _receiver) = Notifier::channel();
         let registry = TaskRegistry::new(notifier);
-        let task = registry.spawn(TaskKind::Shell, ".", "sleep 30", None).await.unwrap();
+        let task = registry
+            .spawn(TaskKind::Shell, ".", "sleep 30", None)
+            .await
+            .expect("test operation should succeed");
 
-        let snapshot = registry.stop(&task.task_id).await.unwrap();
+        let snapshot = registry.stop(&task.task_id).await.expect("test operation should succeed");
 
         assert_eq!(snapshot.status, TaskStatus::Killed);
         assert_eq!(snapshot.exit_code, Some(143));
