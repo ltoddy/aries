@@ -19,7 +19,7 @@ use aries_extension::hook::input::{
     StopFailureHookInput, StopHookInput, UserPromptSubmitHookInput,
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
-use aries_extension::{AgentExtensions, McpDefinition, mcp};
+use aries_extension::{AgentExtensions, McpDefinition, SlashCommandsExecutor, mcp};
 use aries_init::{GlobalContext, ModelConfig, Setting, SettingLoader};
 use aries_lspclient::{LspServerInfo, SharedLspClient, warm_up};
 use aries_memory::MemoryStore;
@@ -46,7 +46,6 @@ use self::hook::SessionPromptHook;
 use self::instruction::InstructionContext;
 pub use self::question::resume_input;
 use crate::AriesClientProvider;
-use crate::commands::CommandsExecutor;
 
 #[derive(Clone)]
 pub struct Session {
@@ -205,7 +204,7 @@ impl Session {
         F: Fn(AgentEvent) -> Fut + Clone,
         Fut: Future<Output = ()>,
     {
-        let prompt: Message = prompt.into();
+        let mut prompt: Message = prompt.into();
         let cancel_token = {
             let mut guard = self.cancel_token.lock();
             *guard = CancellationToken::new();
@@ -217,9 +216,9 @@ impl Session {
         if let Message::User { ref content } = prompt
             && let Some(UserContent::Text(text)) = content.first()
             && let Some(input) = text.text.trim().strip_prefix("/")
-            && self.try_execute_slash_command(input, callback.clone()).await
+            && let Some(slash_command) = self.try_execute_slash_command(input).await
         {
-            return Ok(message_id);
+            prompt = Message::user(slash_command);
         }
 
         let title = self.update_title(&prompt).await;
@@ -345,27 +344,9 @@ impl Session {
         self.extensions.commands.iter().map(|c| c.frontmatter.clone()).collect_vec()
     }
 
-    async fn try_execute_slash_command<F, Fut>(
-        &mut self,
-        input: impl AsRef<str>,
-        callback: F,
-    ) -> bool
-    where
-        F: Fn(AgentEvent) -> Fut + Clone,
-        Fut: Future<Output = ()>,
-    {
-        let mut executor = CommandsExecutor::new(
-            &self.agent,
-            &self.extensions.commands,
-            &self.id,
-            ContextCompactor::clone(&self.compactor),
-            Notifier::clone(&self.notifier),
-        );
-        let cancel_token = self.cancel_token.lock().clone();
-        if executor.execute(input, &self.receiver, &cancel_token, callback).await {
-            return true;
-        };
-        false
+    async fn try_execute_slash_command(&mut self, input: impl AsRef<str>) -> Option<String> {
+        let executor = SlashCommandsExecutor::new(&self.extensions.commands);
+        executor.execute(input).await
     }
 
     #[allow(clippy::too_many_arguments)]
