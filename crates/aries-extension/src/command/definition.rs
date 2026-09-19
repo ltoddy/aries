@@ -1,13 +1,9 @@
+use std::borrow::Cow;
 use std::path::{Path, PathBuf};
-use std::sync::LazyLock;
 
-use regex_lite::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::tool::ToolList;
-
-static ARGUMENT_PATTERN: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\$(?:(\d+)|ARGUMENTS)").expect("static regex is valid"));
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CommandDefinition {
@@ -37,20 +33,28 @@ impl CommandDefinition {
         let positional =
             shell_words::split(arguments).unwrap_or_else(|_| vec![arguments.to_owned()]);
 
-        ARGUMENT_PATTERN
-            .replace_all(&self.body, |caps: &regex_lite::Captures| {
-                if let Some(digits) = caps.get(1) {
-                    let index = digits.as_str().parse::<usize>().ok();
-                    index
-                        .and_then(|i| i.checked_sub(1))
-                        .and_then(|i| positional.get(i))
-                        .map(String::as_str)
-                        .unwrap_or("")
-                } else {
-                    arguments
-                }
-            })
-            .into_owned()
+        shellexpand::env_with_context_no_errors(&self.body, |name| {
+            if name == "ARGUMENTS" {
+                return Some(Cow::Borrowed(arguments));
+            }
+
+            let digits = name.chars().take_while(char::is_ascii_digit).count();
+            let (index, suffix) = name.split_at(digits);
+            if index.is_empty() {
+                return None;
+            }
+
+            let value = index
+                .parse::<usize>()
+                .ok()
+                .and_then(|i| i.checked_sub(1))
+                .and_then(|i| positional.get(i))
+                .map(String::as_str)
+                .unwrap_or("");
+
+            Some(Cow::Owned(format!("{value}{suffix}")))
+        })
+        .into_owned()
     }
 }
 
