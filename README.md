@@ -8,7 +8,7 @@
 
 ## MSRV
 
-本项目最低支持的 Rust 版本（MSRV）为 **1.85.0**（Rust 2024 edition）。
+本项目最低支持的 Rust 版本（MSRV）为 **1.95.0**（Rust 2024 edition）。
 
 ## 安装
 
