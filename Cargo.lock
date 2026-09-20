@@ -480,12 +480,12 @@ dependencies = [
 name = "aries-lspclient"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "aries-filesystem",
  "parking_lot",
  "serde",
  "serde_json",
  "serde_repr",
+ "thiserror 2.0.20",
  "tokio",
  "tracing",
 ]

@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::time::Duration;
 
 use aries_agent::{AgentBuilder, AriesAgent};
 use aries_compact::CompactAgent;
@@ -35,6 +36,7 @@ impl AriesClientProvider {
         default_headers.insert("X-Title", header::HeaderValue::from_static("Aries"));
         let http_client = reqwest::Client::builder()
             .default_headers(default_headers)
+            .connect_timeout(Duration::from_mins(1))
             .build()
             .expect("Failed to build http client for llm provider");
 
