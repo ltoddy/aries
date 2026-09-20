@@ -3443,9 +3443,9 @@ checksum = "ef25905e51abafe4dcea6c15fec58c57b601cdbd0ee53d22ea1d3016c587d39b"
 
 [[package]]
 name = "firecrawl"
-version = "2.20.0"
+version = "2.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b4e689997f262e7bdced3a7ed624a4c95c680a9b3019e9d4ff23e3e55f5ae15"
+checksum = "64fa8657c0f89a50cd0575d4204053d64bcbaa0d3d85b28870de90c03d30eb23"
 dependencies = [
  "reqwest 0.12.28",
  "serde",
