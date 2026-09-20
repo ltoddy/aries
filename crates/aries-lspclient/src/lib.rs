@@ -1,5 +1,6 @@
 mod client;
 mod detection;
+mod error;
 mod jsonrpc;
 mod schema;
 
@@ -11,13 +12,14 @@ use tracing::error;
 
 pub use self::client::{DocumentSymbolItem, LspClient, LspResult};
 pub use self::detection::LspServerInfo;
+pub use self::error::{Error, Result};
 
 pub type SharedLspClient = Arc<LspClient>;
 
 pub async fn warm_up(
     info: LspServerInfo,
     project_dir: impl AsRef<Path>,
-) -> anyhow::Result<SharedLspClient> {
+) -> Result<SharedLspClient> {
     let lsp = LspClient::start(info.clone()).await.map_err(|err| {
         error!("Failed to start {}: {err}", info.binary);
         err

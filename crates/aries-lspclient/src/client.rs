@@ -14,6 +14,7 @@ use tokio::process::{Child, Command};
 use tokio::sync::oneshot;
 
 use crate::detection::LspServerInfo;
+use crate::error::{Error, Result};
 use crate::jsonrpc::{JsonRpcMessage, Notification, Request, RequestId, Response};
 use crate::schema::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, DocumentSymbol, Hover,
@@ -49,7 +50,7 @@ pub struct LspClient {
 }
 
 impl LspClient {
-    pub async fn start(info: LspServerInfo) -> anyhow::Result<Self> {
+    pub async fn start(info: LspServerInfo) -> Result<Self> {
         let mut child = Command::new(info.binary)
             .args(info.args)
             .stdin(Stdio::piped())
@@ -58,14 +59,8 @@ impl LspClient {
             .kill_on_drop(true)
             .spawn()?;
 
-        let stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| anyhow::anyhow!("Failed to open stdin for LSP process"))?;
-        let stdout = child
-            .stdout
-            .take()
-            .ok_or_else(|| anyhow::anyhow!("Failed to open stdout for LSP process"))?;
+        let stdin = child.stdin.take().ok_or(Error::MissingStdin)?;
+        let stdout = child.stdout.take().ok_or(Error::MissingStdout)?;
 
         let pending: Arc<Mutex<HashMap<RequestId, oneshot::Sender<Value>>>> =
             Arc::new(Mutex::new(HashMap::new()));
@@ -116,7 +111,7 @@ impl LspClient {
         })
     }
 
-    pub async fn initialize(&self, root_uri: &str) -> anyhow::Result<Value> {
+    pub async fn initialize(&self, root_uri: &str) -> Result<Value> {
         let params = serde_json::json!({
             "processId": std::process::id(),
             "rootUri": root_uri,
@@ -140,7 +135,7 @@ impl LspClient {
         Ok(result)
     }
 
-    pub async fn send_request(&self, method: &str, params: Value) -> anyhow::Result<Value> {
+    pub async fn send_request(&self, method: &str, params: Value) -> Result<Value> {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let request = JsonRpcMessage::wrap(Request::new(id, method, params));
 
@@ -184,7 +179,7 @@ impl LspClient {
         file_path: impl AsRef<Path>,
         line: u32,
         character: u32,
-    ) -> anyhow::Result<LspResult> {
+    ) -> Result<LspResult> {
         let params = text_document_position_params(file_path, line, character).await;
         let result = self.send_request("textDocument/definition", params).await?;
         let locations =
@@ -197,7 +192,7 @@ impl LspClient {
         file_path: impl AsRef<Path>,
         line: u32,
         character: u32,
-    ) -> anyhow::Result<LspResult> {
+    ) -> Result<LspResult> {
         let mut params = text_document_position_params(file_path, line, character).await;
         params["context"] = serde_json::json!({ "includeDeclaration": true });
         let result = self.send_request("textDocument/references", params).await?;
@@ -211,14 +206,14 @@ impl LspClient {
         file_path: impl AsRef<Path>,
         line: u32,
         character: u32,
-    ) -> anyhow::Result<LspResult> {
+    ) -> Result<LspResult> {
         let params = text_document_position_params(file_path, line, character).await;
         let result = self.send_request("textDocument/hover", params).await?;
         let hover = serde_json::from_value::<Option<Hover>>(result)?;
         Ok(LspResult::Hover(hover))
     }
 
-    pub async fn document_symbol(&self, file_path: impl AsRef<Path>) -> anyhow::Result<LspResult> {
+    pub async fn document_symbol(&self, file_path: impl AsRef<Path>) -> Result<LspResult> {
         let params = serde_json::json!({
             "textDocument": {
                 "uri": path_to_uri(file_path).await,
@@ -230,7 +225,7 @@ impl LspClient {
         Ok(LspResult::DocumentSymbol(symbols))
     }
 
-    pub async fn workspace_symbol(&self, query: &str) -> anyhow::Result<LspResult> {
+    pub async fn workspace_symbol(&self, query: &str) -> Result<LspResult> {
         let params = serde_json::json!({ "query": query });
         let result = self.send_request("workspace/symbol", params).await?;
         let symbols =
@@ -243,7 +238,7 @@ impl LspClient {
         file_path: impl AsRef<Path>,
         line: u32,
         character: u32,
-    ) -> anyhow::Result<LspResult> {
+    ) -> Result<LspResult> {
         let params = text_document_position_params(file_path, line, character).await;
         let result = self.send_request("textDocument/implementation", params).await?;
         let locations =
@@ -256,7 +251,7 @@ impl LspClient {
         file_path: impl AsRef<Path>,
         line: u32,
         character: u32,
-    ) -> anyhow::Result<LspResult> {
+    ) -> Result<LspResult> {
         let params = text_document_position_params(file_path, line, character).await;
         let result = self.send_request("textDocument/prepareCallHierarchy", params).await?;
         let items =
@@ -264,7 +259,7 @@ impl LspClient {
         Ok(LspResult::PrepareCallHierarchy(items))
     }
 
-    pub async fn incoming_calls(&self, item: Value) -> anyhow::Result<LspResult> {
+    pub async fn incoming_calls(&self, item: Value) -> Result<LspResult> {
         let params = serde_json::json!({ "item": item });
         let result = self.send_request("callHierarchy/incomingCalls", params).await?;
         let calls = serde_json::from_value::<Option<Vec<CallHierarchyIncomingCall>>>(result)?
@@ -272,7 +267,7 @@ impl LspClient {
         Ok(LspResult::IncomingCalls(calls))
     }
 
-    pub async fn outgoing_calls(&self, item: Value) -> anyhow::Result<LspResult> {
+    pub async fn outgoing_calls(&self, item: Value) -> Result<LspResult> {
         let params = serde_json::json!({ "item": item });
         let result = self.send_request("callHierarchy/outgoingCalls", params).await?;
         let calls = serde_json::from_value::<Option<Vec<CallHierarchyOutgoingCall>>>(result)?
@@ -324,7 +319,7 @@ impl LspClient {
         self.send_notification("textDocument/didSave", params).await
     }
 
-    pub async fn shutdown(&self) -> anyhow::Result<()> {
+    pub async fn shutdown(&self) -> Result<()> {
         let _ = self.send_request("shutdown", Value::Null).await;
         self.send_notification("exit", Value::Null).await?;
         Ok(())
