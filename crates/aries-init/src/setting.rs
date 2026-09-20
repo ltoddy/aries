@@ -47,8 +47,7 @@ impl SettingLoader {
             .await
             .with_context(|| format!("failed to read setting from {}", file_path.display()))?;
 
-        let setting = toml::from_str(&content)
-            .with_context(|| format!("failed to parse setting from TOML: {content}"))?;
+        let setting = toml::from_str(&content).context("failed to parse setting from TOML")?;
 
         Ok(setting)
     }
@@ -56,8 +55,7 @@ impl SettingLoader {
     pub async fn save(&self, s: &Setting) -> anyhow::Result<()> {
         let file_path = &self.file_path;
 
-        let content = toml::to_string_pretty(s)
-            .with_context(|| format!("failed to serialize setting to TOML: {s:?}"))?;
+        let content = toml::to_string_pretty(s).context("failed to serialize setting to TOML")?;
 
         tokio::fs::write(file_path, &content)
             .await
@@ -291,7 +289,7 @@ impl Display for Provider {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Anthropic {
     pub alias: String,
@@ -301,7 +299,18 @@ pub struct Anthropic {
     pub max_tokens: u64,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+impl std::fmt::Debug for Anthropic {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Anthropic")
+            .field("alias", &self.alias)
+            .field("model", &self.model)
+            .field("base_url", &self.base_url)
+            .field("max_tokens", &self.max_tokens)
+            .finish()
+    }
+}
+
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Azure {
     pub alias: String,
@@ -311,7 +320,18 @@ pub struct Azure {
     pub api_version: String,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+impl std::fmt::Debug for Azure {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Azure")
+            .field("alias", &self.alias)
+            .field("model", &self.model)
+            .field("azure_endpoint", &self.azure_endpoint)
+            .field("api_version", &self.api_version)
+            .finish()
+    }
+}
+
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Deepseek {
     pub alias: String,
@@ -320,11 +340,31 @@ pub struct Deepseek {
     pub base_url: String,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+impl std::fmt::Debug for Deepseek {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Deepseek")
+            .field("alias", &self.alias)
+            .field("model", &self.model)
+            .field("base_url", &self.base_url)
+            .finish()
+    }
+}
+
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct OpenAI {
     pub alias: String,
     pub model: String,
     pub api_key: String,
     pub base_url: String,
+}
+
+impl std::fmt::Debug for OpenAI {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OpenAI")
+            .field("alias", &self.alias)
+            .field("model", &self.model)
+            .field("base_url", &self.base_url)
+            .finish()
+    }
 }
