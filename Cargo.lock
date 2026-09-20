@@ -419,7 +419,7 @@ dependencies = [
  "regex-lite",
  "reqwest 0.13.5",
  "rig",
- "rmcp",
+ "rmcp 3.4.0",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -558,7 +558,7 @@ dependencies = [
  "reqwest-middleware",
  "reqwest-retry",
  "rig",
- "rmcp",
+ "rmcp 3.4.0",
  "serde",
  "serde_json",
  "toasty",
@@ -6856,9 +6856,9 @@ dependencies = [
 
 [[package]]
 name = "process-wrap"
-version = "9.1.0"
+version = "10.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e842efad9119158434d193c6682e2ebee4b44d6ad801d7b349623b3f57cdf55"
+checksum = "0e3f4237d0e4741eb50bc5584db701f1299c85fa31ff0274dd6445e79dc42d12"
 dependencies = [
  "futures",
  "indexmap 2.14.2",
@@ -7614,7 +7614,7 @@ dependencies = [
  "indexmap 2.14.2",
  "rig-core",
  "rig-derive",
- "rmcp",
+ "rmcp 2.2.0",
  "schemars 1.2.2",
  "serde",
  "serde_json",
@@ -7781,12 +7781,36 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "futures",
+ "pastey 0.2.3",
+ "pin-project-lite",
+ "rmcp-macros 2.2.0",
+ "schemars 1.2.2",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "rmcp"
+version = "3.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b23c62fe489ac1d401ab32688cfacac3737a8978dc3343e5361464c7724fd3cb"
+dependencies = [
+ "base64 0.23.1",
+ "bytes",
+ "chrono",
+ "futures",
  "http",
+ "indexmap 2.14.2",
  "pastey 0.2.3",
  "pin-project-lite",
  "process-wrap",
  "reqwest 0.13.5",
- "rmcp-macros",
+ "rmcp-macros 3.4.0",
  "schemars 1.2.2",
  "serde",
  "serde_json",
@@ -7796,6 +7820,7 @@ dependencies = [
  "tokio-stream",
  "tokio-util",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -7809,6 +7834,19 @@ dependencies = [
  "quote",
  "serde_json",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "rmcp-macros"
+version = "3.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd740c45d66ceb87e5579082abc27bd771665e464e9660a17a048c721b2a6025"
+dependencies = [
+ "darling 0.24.1",
+ "proc-macro2",
+ "quote",
+ "serde_json",
+ "syn 3.0.6",
 ]
 
 [[package]]
