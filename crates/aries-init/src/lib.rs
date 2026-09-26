@@ -27,7 +27,7 @@ pub async fn gc(root_dir: impl AsRef<Path>) {
     let _ = aries_persistence::migrate(&mut db).await;
 
     let lock_file_path = root_dir.join("aries-db.lock");
-    match aries_filesystem::lock::try_lock(lock_file_path).await {
+    match aries_filesystem::lock::lock(lock_file_path).await {
         Ok(file) => {
             black_box(file); // 避免优化器优化掉 file 导致 file drop 了 (可能不会出现这个情况)
             aries_persistence::gc(db).await;
