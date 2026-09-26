@@ -36,9 +36,6 @@ async fn main() -> anyhow::Result<()> {
         Some(cli::Subcommands::Command { command }) => match command {
             CommandCommand::List(args) => command::list::execute(args, gctx).await,
         },
-        Some(cli::Subcommands::Doctor) => {
-            todo!()
-        },
         Some(cli::Subcommands::Exec(args)) => cli::exec::execute(args).await,
         Some(cli::Subcommands::Gc) => cli::gc::execute(gctx).await,
         Some(cli::Subcommands::Hook { command }) => match command {
