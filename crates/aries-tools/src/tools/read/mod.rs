@@ -93,6 +93,9 @@ impl Tool for ReadTool {
         let start_at = args.offset.map(|offset| offset.max(1)).unwrap_or(1);
         let skip = start_at - 1;
         let limit = args.limit.unwrap_or(MAX_LINES_TO_READ);
+        if limit == 0 {
+            return Err(ReadError::invalid_limit());
+        }
 
         let mut lines = reader.lines();
         let mut content_lines = Vec::<String>::new();

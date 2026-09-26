@@ -35,18 +35,16 @@ where
             .await
             .map_err(|err| DocumentError::io(&location, err))?;
 
-        let mut parts = content.splitn(3, DELIMITER);
-        parts.next();
+        let content =
+            content.strip_prefix("---\n").ok_or_else(|| DocumentError::wrong_format(&location))?;
 
-        match (parts.next(), parts.next()) {
-            (Some(frontmatter), Some(body)) => {
-                let frontmatter = serde_yaml::from_str::<F>(frontmatter)
-                    .map_err(|err| DocumentError::yaml(&location, err))?;
+        let (frontmatter, body) =
+            content.split_once("\n---\n").ok_or_else(|| DocumentError::wrong_format(&location))?;
 
-                Ok(Self::new(location, frontmatter, body))
-            },
-            _ => Err(DocumentError::wrong_format(&location)),
-        }
+        let frontmatter = serde_yaml::from_str::<F>(frontmatter)
+            .map_err(|err| DocumentError::yaml(&location, err))?;
+
+        Ok(Self::new(location, frontmatter, body))
     }
 
     pub async fn write(&self) -> Result<(), DocumentError> {

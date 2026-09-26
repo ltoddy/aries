@@ -50,8 +50,6 @@ pub enum Subcommands {
         #[command(subcommand)]
         command: CommandCommand,
     },
-    #[command(about = "Diagnose and fix common issues")]
-    Doctor,
     #[command(about = "Execute a shell command")]
     Exec(ExecArgs),
     #[command(about = "Garbage collect stale database records")]

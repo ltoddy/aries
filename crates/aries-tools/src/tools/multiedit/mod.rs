@@ -115,14 +115,13 @@ impl Tool for MultiEditTool {
             }
         }
 
-        if let Some(parent) = file_path.parent() {
-            let _ = fs::create_dir_all(parent).await;
-        }
-
         if let Some(ref original_content) = original_content {
             let _ = self.ctx.file_checkpoint.push(&file_path, original_content).await;
         }
 
+        if let Some(parent) = file_path.parent() {
+            fs::create_dir_all(parent).await?;
+        }
         fs::write(&file_path, &content).await?;
         self.ctx.on_file_written(&file_path, &content).await;
 

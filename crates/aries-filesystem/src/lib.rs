@@ -1,6 +1,8 @@
 pub mod document;
 pub mod jsonl;
 pub mod lock;
+#[cfg(test)]
+mod tests;
 pub mod walk;
 
 use std::path::{Path, PathBuf};
