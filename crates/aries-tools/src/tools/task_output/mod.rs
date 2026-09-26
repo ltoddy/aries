@@ -8,7 +8,7 @@ use serde_json::Value;
 pub use self::args::TaskOutputArgs;
 pub use self::error::TaskOutputError;
 pub use self::output::TaskOutputOutput;
-use crate::context::{TaskStatus, ToolContext as AriesToolContext};
+use crate::context::ToolContext as AriesToolContext;
 
 pub const NAME: &str = "TaskOutput";
 
@@ -54,25 +54,18 @@ impl Tool for TaskOutputTool {
         _context: &mut ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
-        let mut snapshot = self
-            .ctx
-            .task
-            .get(&args.task_id)
-            .ok_or_else(|| TaskOutputError::not_found(args.task_id.clone()))?;
-
-        if args.block && snapshot.status == TaskStatus::Running {
-            loop {
-                self.ctx.task.wait_for_change().await;
-                snapshot = self
-                    .ctx
-                    .task
-                    .get(&args.task_id)
-                    .ok_or_else(|| TaskOutputError::not_found(args.task_id.clone()))?;
-                if snapshot.status != TaskStatus::Running {
-                    break;
-                }
-            }
-        }
+        let snapshot = if args.block {
+            self.ctx
+                .task
+                .wait_until_finished(&args.task_id)
+                .await
+                .ok_or_else(|| TaskOutputError::not_found(args.task_id))?
+        } else {
+            self.ctx
+                .task
+                .get(&args.task_id)
+                .ok_or_else(|| TaskOutputError::not_found(args.task_id))?
+        };
 
         Ok(snapshot.into())
     }

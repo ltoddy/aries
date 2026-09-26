@@ -15,10 +15,11 @@ use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, BufReader};
 use tokio::process::Command;
-use tokio::sync::Notify;
+use tokio::sync::watch;
 use tokio::task::JoinHandle;
 
 const MAX_TASK_OUTPUT_BYTES: usize = 256 * 1024;
+const STOP_GRACE_PERIOD: Duration = Duration::from_secs(2);
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -157,7 +158,6 @@ pub struct TaskRegistry {
     inner: Arc<Mutex<TaskRegistryInner>>,
     next_id: Arc<AtomicU64>,
     notifier: Notifier,
-    changed: Arc<Notify>,
 }
 
 impl std::fmt::Debug for TaskRegistry {
@@ -167,7 +167,19 @@ impl std::fmt::Debug for TaskRegistry {
 }
 
 struct TaskRegistryInner {
-    tasks: HashMap<String, Arc<Mutex<TaskState>>>,
+    tasks: HashMap<String, TaskEntry>,
+}
+
+#[derive(Clone)]
+struct TaskEntry {
+    state: Arc<Mutex<TaskState>>,
+    receiver: watch::Receiver<TaskStatus>,
+}
+
+impl TaskEntry {
+    pub fn new(state: Arc<Mutex<TaskState>>, receiver: watch::Receiver<TaskStatus>) -> Self {
+        Self { state, receiver }
+    }
 }
 
 impl TaskRegistryInner {
@@ -182,7 +194,6 @@ impl TaskRegistry {
             inner: Arc::new(Mutex::new(TaskRegistryInner::new())),
             next_id: Arc::new(AtomicU64::new(0)),
             notifier,
-            changed: Arc::new(Notify::new()),
         }
     }
 
@@ -210,10 +221,11 @@ impl TaskRegistry {
         let pid = child.id();
         let task_id = self.next_task_id(kind);
         let state = Arc::new(Mutex::new(TaskState::new(kind, command, description, pid)));
+        let (sender, receiver) = watch::channel(TaskStatus::Running);
 
         {
             let mut registry = self.inner.lock();
-            registry.tasks.insert(task_id.clone(), state.clone());
+            registry.tasks.insert(task_id.clone(), TaskEntry::new(state.clone(), receiver));
         }
         let stdout_reader = pipe_output(stdout, state.clone(), OutputStream::Stdout);
         let stderr_reader = pipe_output(stderr, state.clone(), OutputStream::Stderr);
@@ -221,7 +233,6 @@ impl TaskRegistry {
         let task_id_for_waiter = task_id.clone();
         let state_for_waiter = state.clone();
         let notifier = Notifier::clone(&self.notifier);
-        let changed = Arc::clone(&self.changed);
         tokio::spawn(async move {
             let result = child.wait().await;
             for reader in [stdout_reader, stderr_reader] {
@@ -255,8 +266,10 @@ impl TaskRegistry {
                 },
             }
             state.finished_at = Some(Timestamp::now());
+            let final_status = state.status;
             notifier.notify(state.notification(&task_id_for_waiter));
-            changed.notify_waiters();
+            drop(state);
+            let _ = sender.send(final_status);
         });
 
         Ok(TaskSnapshot::new(&task_id, &state.lock()))
@@ -265,17 +278,19 @@ impl TaskRegistry {
     pub fn get(&self, task_id: impl AsRef<str>) -> Option<TaskSnapshot> {
         let task_id = task_id.as_ref();
         let guard = self.inner.lock();
-        let state = guard.tasks.get(task_id)?;
-        Some(TaskSnapshot::new(task_id, &state.lock()))
+        let entry = guard.tasks.get(task_id)?;
+        Some(TaskSnapshot::new(task_id, &entry.state.lock()))
     }
 
     pub async fn stop(&self, task_id: impl AsRef<str>) -> Result<TaskSnapshot, StopTaskError> {
         let task_id = task_id.as_ref();
 
-        let state = {
+        let entry = {
             let guard = self.inner.lock();
             guard.tasks.get(task_id).cloned().ok_or(StopTaskError::NotFound)?
         };
+        let state = entry.state;
+        let mut receiver = entry.receiver;
 
         let pid = {
             let state = state.lock();
@@ -285,18 +300,31 @@ impl TaskRegistry {
             state.pid
         };
 
-        let pid = pid.ok_or(StopTaskError::MissingPid)?;
-        killpg(Pid::from_raw(pid as i32), Signal::SIGTERM).map_err(StopTaskError::Signal)?;
+        let pid = Pid::from_raw(pid.ok_or(StopTaskError::MissingPid)? as i32);
+        killpg(pid, Signal::SIGTERM).map_err(StopTaskError::Signal)?;
 
-        loop {
-            {
-                let state = state.lock();
-                if state.status != TaskStatus::Running {
-                    return Ok(TaskSnapshot::new(task_id, &state));
+        match tokio::time::timeout(STOP_GRACE_PERIOD, receiver.changed()).await {
+            Ok(Ok(())) => {},
+            Ok(Err(_)) => return Err(StopTaskError::Watch),
+            Err(_) => {
+                {
+                    let state = state.lock();
+                    if state.status != TaskStatus::Running {
+                        return Ok(TaskSnapshot::new(task_id, &state));
+                    }
                 }
-            }
-            tokio::time::sleep(Duration::from_millis(10)).await;
+
+                killpg(pid, Signal::SIGKILL).map_err(StopTaskError::Signal)?;
+                match tokio::time::timeout(STOP_GRACE_PERIOD, receiver.changed()).await {
+                    Ok(Ok(())) => {},
+                    Ok(Err(_)) => return Err(StopTaskError::Watch),
+                    Err(_) => return Err(StopTaskError::Timeout),
+                }
+            },
         }
+
+        let state = state.lock();
+        Ok(TaskSnapshot::new(task_id, &state))
     }
 
     fn next_task_id(&self, kind: TaskKind) -> String {
@@ -304,8 +332,27 @@ impl TaskRegistry {
         format!("{kind}{id:08}")
     }
 
-    pub async fn wait_for_change(&self) {
-        self.changed.notified().await;
+    pub async fn wait_until_finished(&self, task_id: impl AsRef<str>) -> Option<TaskSnapshot> {
+        let task_id = task_id.as_ref();
+        let (state, mut receiver) = {
+            let guard = self.inner.lock();
+            let entry = guard.tasks.get(task_id)?;
+            (entry.state.clone(), entry.receiver.clone())
+        };
+
+        loop {
+            {
+                let state = state.lock();
+                if state.status != TaskStatus::Running {
+                    return Some(TaskSnapshot::new(task_id, &state));
+                }
+            }
+
+            if receiver.changed().await.is_err() {
+                let state = state.lock();
+                return Some(TaskSnapshot::new(task_id, &state));
+            }
+        }
     }
 }
 
@@ -319,6 +366,10 @@ pub enum StopTaskError {
     MissingPid,
     #[error("failed to signal task: {0}")]
     Signal(nix::Error),
+    #[error("timed out waiting for task to stop")]
+    Timeout,
+    #[error("failed to watch task status")]
+    Watch,
 }
 
 enum OutputStream {
