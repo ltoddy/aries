@@ -1,15 +1,17 @@
 mod args;
 mod error;
+mod inspector;
 mod output;
 #[cfg(test)]
 mod tests;
 
+use std::io::SeekFrom;
 use std::path::{Path, PathBuf};
 
 use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
 use tokio::fs;
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, BufReader};
 
 pub use self::args::ReadArgs;
 pub use self::error::ReadError;
@@ -81,12 +83,19 @@ impl Tool for ReadTool {
             return Err(ReadError::is_a_directory(file_path));
         }
 
-        let file = fs::File::open(&file_path).await?;
+        let mut file = fs::File::open(&file_path).await?;
         let metadata = file.metadata().await?;
         if metadata.len() == 0 {
             self.ctx.on_file_read(&file_path).await;
-            return Ok(ReadOutput { content: EMPTY_FILE_NOTICE.to_owned() });
+            return Ok(ReadOutput::new(EMPTY_FILE_NOTICE, false));
         }
+
+        let mut probe = vec![0u8; inspector::MAX_SCAN_SIZE];
+        let sniffed = file.read(&mut probe).await?;
+        if inspector::inspect(&probe[..sniffed]).is_binary() {
+            return Err(ReadError::binary_file(file_path));
+        }
+        file.seek(SeekFrom::Start(0)).await?;
 
         let reader = BufReader::new(file);
 
@@ -111,9 +120,10 @@ impl Tool for ReadTool {
             }
         }
 
+        let truncated = lines.next_line().await?.is_some();
         let content = content_lines.join("\n");
         self.ctx.on_file_read(&file_path).await;
 
-        Ok(ReadOutput { content })
+        Ok(ReadOutput::new(content, truncated))
     }
 }

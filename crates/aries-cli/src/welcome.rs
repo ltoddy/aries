@@ -3,7 +3,8 @@ use std::path::Path;
 
 use aries_init::GlobalContext;
 use ferris_says::say;
-use terminal_size::{Width, terminal_size};
+
+const TERMINAL_WIDTH: usize = 80;
 
 pub async fn welcome(
     provider: impl Into<String>,
@@ -31,8 +32,7 @@ pub async fn welcome(
     ]
     .join("\n");
 
-    let term_width = terminal_size().map(|(Width(w), _)| w as usize).unwrap_or(80);
-    let width = term_width.clamp(36, 80).saturating_sub(12);
+    let width = TERMINAL_WIDTH.saturating_sub(12);
 
     println!("{greeting}");
 

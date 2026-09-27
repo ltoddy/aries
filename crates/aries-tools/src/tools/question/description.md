@@ -7,7 +7,7 @@
 行为：
 - `options` 每项包含 `label` 与可选 `description`；展示时格式为 `label - description`（无描述时仅展示 label）。
 - 提供 `options` 时，单选用 `Select`、多选用 `MultiSelect`，最终返回所选 `label`（自定义入口返回用户输入文本）。
-- 不提供 `options` 时，直接通过文本输入收集自由作答。
+- 不提供 `options` 时，直接通过文本输入收集自由作答；`options` 一旦提供就不能为空数组。
 - `custom` 启用时会在选项末尾追加「Type your own answer...」入口，用户选中后可输入自定义文本。
 
 使用建议：

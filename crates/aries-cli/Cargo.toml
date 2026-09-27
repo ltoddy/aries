@@ -42,7 +42,6 @@ rig.workspace = true
 rustyline.workspace = true
 rustyline-derive.workspace = true
 serde_json.workspace = true
-terminal_size.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "fs", "process"] }
 tracing.workspace = true
 tree-sitter.workspace = true

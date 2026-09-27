@@ -1,8 +1,8 @@
-通过 `$SHELL -c` 执行单条 shell 命令，并返回 stdout、stderr、exit_code。
+通过 `$SHELL -c` 执行单条 shell 命令，并返回 stdout、stderr、exit_code；`background: true` 时命令转入后台并立即返回 `task_id`。
 
-工作目录在命令间持久保留，但 shell 状态（变量、别名、函数）不持久。Shell 环境从用户的 profile 初始化（使用 `$SHELL` 环境变量指定的 shell，默认 bash 或 zsh）。
+每次调用都在会话工作目录下启动一个新的 shell：`cd` 不会影响后续调用，shell 状态（变量、别名、函数）也不持久。shell 取自 `$SHELL` 环境变量，缺省为 `bash`。
 
-stdout/stderr 超过 30000 字符时会被截断，并在末尾提示被截断的行数。可选参数 `description` 用于简短描述命令用途（5-10 个词）。不要使用需要交互式输入的命令。
+stdout/stderr 超过 30000 字符时会被截断，并在末尾提示被截断的行数。`background: true` 时命令在后台运行，返回的 `task_id` 可用 `TaskOutput` 查看输出、用 `TaskStop` 停止（此时 stdout/stderr 为空、exit_code 为 0）。可选参数 `description` 用于简短描述命令用途（5-10 个词）。不要使用需要交互式输入的命令。
 
 重要：避免使用本工具执行 `find`、`grep`、`cat`、`head`、`tail`、`sed`、`awk`、`echo` 等命令，除非用户明确要求，或你已确认专用工具无法完成任务。请优先使用对应的专用工具，这会带来更好的体验：
 

@@ -106,7 +106,9 @@ impl Tool for LspTool {
         _context: &mut ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
-        if let Some(ref file_path) = args.file_path {
+        if let Some(file_path) = &args.file_path {
+            let file_path =
+                if file_path.is_absolute() { file_path } else { &self.cwd.join(file_path) };
             self.client.did_open(file_path).await?;
         }
 
