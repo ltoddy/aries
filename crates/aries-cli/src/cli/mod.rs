@@ -27,7 +27,7 @@ use crate::cli::skill::SkillCommand;
 use crate::cli::stats::StatsCommand;
 
 #[derive(Parser, Debug, Clone)]
-#[command(about = "Aries: your terminal AI assistant")]
+#[command(name = "aries", version, about = "Aries: your terminal AI assistant")]
 pub struct Args {
     #[command(subcommand)]
     pub command: Option<Subcommands>,
