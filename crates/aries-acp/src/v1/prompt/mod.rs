@@ -10,7 +10,7 @@ use agent_client_protocol::schema::v1::{
 };
 use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
 use aries_event::AgentEvent;
-use aries_session::SharedRegistry;
+use aries_session::{PromptOutcome, SharedRegistry};
 use aries_tools::question::AskUserQuestionArgs;
 use parking_lot::Mutex;
 use rig::completion::Message;
@@ -62,9 +62,10 @@ pub async fn prompt(
     };
 
     let mut prompt = prompt;
+    let mut stop_reason = StopReason::EndTurn;
     loop {
         match session.prompt(prompt, callback).await {
-            Ok(_) => {
+            Ok(PromptOutcome::Completed(_)) => {
                 let question = pending.lock().take();
                 match question {
                     Some(question) => {
@@ -74,11 +75,15 @@ pub async fn prompt(
                     None => break,
                 }
             },
+            Ok(PromptOutcome::Cancelled(_)) => {
+                stop_reason = StopReason::Cancelled;
+                break;
+            },
             Err(err) => return responder.respond_with_internal_error(err.to_string()),
         }
     }
 
     let mut registry = registry.lock().await;
     registry.putback_session(session);
-    responder.respond(PromptResponse::new(StopReason::EndTurn))
+    responder.respond(PromptResponse::new(stop_reason))
 }
