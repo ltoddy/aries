@@ -10,7 +10,7 @@ use agent_client_protocol::schema::v2::{
 };
 use agent_client_protocol::{Client, Error, Responder, V2ConnectionTo};
 use aries_event::AgentEvent;
-use aries_session::SharedRegistry;
+use aries_session::{PromptOutcome, SharedRegistry};
 use parking_lot::Mutex;
 use rig::completion::Message;
 use rig::message::ToolCall;
@@ -47,15 +47,19 @@ pub async fn prompt(
 
     let user_message = UserMessage::from(req.prompt);
     let prompt: Message = user_message.into();
-    let message_id = match session.prompt(prompt, callback).await {
-        Ok(message_id) => message_id,
+    let result = match session.prompt(prompt, callback).await {
+        Ok(result) => result,
         Err(err) => return responder.respond_with_internal_error(err.to_string()),
+    };
+    let (message_id, stop_reason) = match result {
+        PromptOutcome::Completed(message_id) => (message_id, StopReason::EndTurn),
+        PromptOutcome::Cancelled(message_id) => (message_id, StopReason::Cancelled),
     };
 
     let _ = cx.send_notification(UpdateSessionNotification::new(
         session_id.clone(),
         agent_client_protocol::schema::v2::SessionUpdate::StateUpdate(StateUpdate::Idle(
-            IdleStateUpdate::new().stop_reason(StopReason::EndTurn),
+            IdleStateUpdate::new().stop_reason(stop_reason),
         )),
     ));
 

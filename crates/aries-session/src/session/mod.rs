@@ -47,6 +47,11 @@ use self::instruction::InstructionContext;
 pub use self::question::resume_input;
 use crate::AriesClientProvider;
 
+pub enum PromptOutcome {
+    Completed(String),
+    Cancelled(String),
+}
+
 #[derive(Clone)]
 pub struct Session {
     id: String,
@@ -199,7 +204,7 @@ impl Session {
         &mut self,
         prompt: impl Into<Message>,
         callback: F,
-    ) -> aries_agent::AriesResult<String>
+    ) -> aries_agent::AriesResult<PromptOutcome>
     where
         F: Fn(AgentEvent) -> Fut + Clone,
         Fut: Future<Output = ()>,
@@ -241,10 +246,14 @@ impl Session {
 
             let mut guard = self.receiver.lock().await;
             let mut final_res = Ok(PromptResponse::empty());
+            let mut cancelled = false;
             loop {
                 tokio::select! {
                     biased;
-                    _ = cancel_token.cancelled() => break,
+                    _ = cancel_token.cancelled() => {
+                        cancelled = true;
+                        break;
+                    }
                     event = guard.recv() => {
                         if let Some(event) = event {
                             callback(event).await;
@@ -261,11 +270,15 @@ impl Session {
             }
             drop(guard);
 
+            if cancelled {
+                return Ok(PromptOutcome::Cancelled(message_id));
+            }
+
             match final_res {
                 Ok(res) => res,
                 Err(err) => {
                     if err.is_awaiting_user_input() {
-                        return Ok(message_id);
+                        return Ok(PromptOutcome::Completed(message_id));
                     }
                     self.fire_stop_failure(err.to_string()).await;
                     return Err(err);
@@ -282,7 +295,7 @@ impl Session {
             self.compactor.post_compact(completion.usage, callback).await;
         }
 
-        Ok(message_id)
+        Ok(PromptOutcome::Completed(message_id))
     }
 
     pub fn id(&self) -> String {
