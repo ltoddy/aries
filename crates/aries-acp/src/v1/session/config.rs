@@ -46,7 +46,7 @@ pub(super) struct ParseSessionConfigError;
 
 impl Display for ParseSessionConfigError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        "provieded string was not `mode` or `model`".fmt(f)
+        "provided string was not `mode` or `model`".fmt(f)
     }
 }
 

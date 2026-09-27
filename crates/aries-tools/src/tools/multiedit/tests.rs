@@ -165,3 +165,70 @@ async fn test_multiedit_args_title() {
     assert!(args.title().contains("file.rs"));
     assert!(args.title().contains("1 changes"));
 }
+
+#[tokio::test]
+async fn test_multiedit_rejects_empty_old_text_on_non_empty_file() {
+    let dir = TempDir::new().expect("test operation should succeed");
+    let file_path = dir.path().join("test.txt");
+    let ctx = ToolContext::new(None, {
+        let (notifier, _) = aries_event::Notifier::channel();
+        notifier
+    });
+    seed_file(&ctx, &file_path, "hello world").await;
+
+    let mut context = rig::tool::ToolContext::new();
+    let tool = MultiEditTool::new(dir.path(), ctx);
+    let result = tool
+        .call(
+            &mut context,
+            MultiEditArgs {
+                file_path: file_path.clone(),
+                edits: vec![EditOperation {
+                    old_text: String::new(),
+                    new_text: "replacement".to_owned(),
+                    replace_all: false,
+                }],
+            },
+        )
+        .await;
+
+    assert!(matches!(result, Err(MultiEditError::EmptyOldText)));
+    assert_eq!(
+        fs::read_to_string(&file_path).expect("test operation should succeed"),
+        "hello world"
+    );
+}
+
+#[tokio::test]
+async fn test_multiedit_allows_empty_old_text_on_empty_file() {
+    let dir = TempDir::new().expect("test operation should succeed");
+    let file_path = dir.path().join("test.txt");
+    let ctx = ToolContext::new(None, {
+        let (notifier, _) = aries_event::Notifier::channel();
+        notifier
+    });
+    seed_file(&ctx, &file_path, "").await;
+
+    let mut context = rig::tool::ToolContext::new();
+    let tool = MultiEditTool::new(dir.path(), ctx);
+    let result = tool
+        .call(
+            &mut context,
+            MultiEditArgs {
+                file_path: file_path.clone(),
+                edits: vec![EditOperation {
+                    old_text: String::new(),
+                    new_text: "new content".to_owned(),
+                    replace_all: false,
+                }],
+            },
+        )
+        .await
+        .expect("test operation should succeed");
+
+    assert_eq!(result.kind, WriteKind::Update);
+    assert_eq!(
+        fs::read_to_string(&file_path).expect("test operation should succeed"),
+        "new content"
+    );
+}
