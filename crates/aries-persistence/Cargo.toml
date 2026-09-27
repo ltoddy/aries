@@ -9,3 +9,6 @@ rust-version.workspace = true
 jiff.workspace = true
 toasty = { workspace = true, features = ["jiff", "sqlite"] }
 toasty-driver-sqlite.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }

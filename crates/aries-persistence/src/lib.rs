@@ -1,4 +1,6 @@
 mod session;
+#[cfg(test)]
+mod tests;
 mod token_audit;
 mod tool_call;
 

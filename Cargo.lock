@@ -517,6 +517,7 @@ dependencies = [
  "jiff",
  "toasty",
  "toasty-driver-sqlite",
+ "tokio",
 ]
 
 [[package]]
