@@ -13,7 +13,6 @@ use aries_tools::question::{AskUserQuestionArgs, AskUserQuestionTool};
 use clap::Subcommand;
 use colored::Colorize;
 use parking_lot::Mutex;
-use terminal_size::{Width, terminal_size};
 use tracing::warn;
 
 use self::list::ListSessionsArgs;
@@ -73,13 +72,14 @@ pub async fn prompt_maybe_ask(
     }
 }
 
+const TERMINAL_WIDTH: usize = 80;
+
 fn display_elapsed(start: Instant) {
     let elapsed = start.elapsed();
-    let terminal_width = terminal_size().map(|(Width(w), _)| w as usize).unwrap_or(80);
 
     let prefix = "─".repeat(5);
     let time = format!("⏱️  耗时: {:.2}s", elapsed.as_secs_f64());
-    let remining_width = terminal_width.saturating_sub(prefix.len() + time.len());
+    let remining_width = TERMINAL_WIDTH.saturating_sub(prefix.len() + time.len());
     let line = format!("{}{}{}", "─".repeat(5), time, "─".repeat(remining_width));
     println!("{}\n", line.dimmed());
 }

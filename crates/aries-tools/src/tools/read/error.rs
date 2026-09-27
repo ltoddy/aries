@@ -10,6 +10,9 @@ pub enum ReadError {
 
     #[error("path is a directory, not a file: {0}. to list a directory, use the glob tool instead")]
     IsADirectory(PathBuf),
+
+    #[error("cannot read binary file: {0}")]
+    BinaryFile(PathBuf),
 }
 
 impl ReadError {
@@ -19,5 +22,9 @@ impl ReadError {
 
     pub fn is_a_directory(path: PathBuf) -> ReadError {
         ReadError::IsADirectory(path)
+    }
+
+    pub fn binary_file(path: PathBuf) -> ReadError {
+        ReadError::BinaryFile(path)
     }
 }

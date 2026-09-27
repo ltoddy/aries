@@ -116,7 +116,7 @@ where
                 },
                 "mode": {
                     "type": "string",
-                    "description": "The type of agent to launch (e.g. 'explore', 'plan', 'default')"
+                    "description": "The type of agent to launch (e.g. 'build', 'explore', 'plan', 'general')"
                 }
             },
             "required": ["description", "prompt", "mode"]

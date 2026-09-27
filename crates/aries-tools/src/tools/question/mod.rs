@@ -107,6 +107,7 @@ impl Tool for AskUserQuestionTool {
                 },
                 "options": {
                     "type": "array",
+                    "minItems": 1,
                     "items": {
                         "type": "object",
                         "properties": {
