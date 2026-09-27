@@ -1,5 +1,5 @@
 install:
-    @cargo +stable install --path crates/aries-cli --locked
+    @cargo +stable install --path crates/aries-cli --force --locked
 
 run:
     @cargo run

@@ -1,5 +1,10 @@
 # Aries
 
+[![CI](https://github.com/ltoddy/aries/actions/workflows/ci.yml/badge.svg)](https://github.com/ltoddy/aries/actions/workflows/ci.yml)
+![MSRV](https://img.shields.io/badge/MSRV-1.95-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Rust](https://img.shields.io/badge/rust-2024-orange)
+
 ## 项目名称来源
 
 本项目命名为 **Aries**（白羊座），因为项目创建时正值白羊座时期（3月21日 - 4月19日）。象征着全新的开始与充满活力的探索。
@@ -20,7 +25,7 @@
 
 如果没有 just 命令，可以通过:
 
-> cargo install --path crates/aries-cli --locked
+> cargo install --path crates/aries-cli --force --locked
 
 ## 使用
 
