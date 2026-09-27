@@ -4,14 +4,20 @@ version = "0.1.0"
 edition = "2024"
 license.workspace = true
 rust-version.workspace = true
+authors.workspace = true
+description.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [dependencies]
-aries-event = { path = "../aries-event" }
-aries-extension = { path = "../aries-extension" }
-aries-filesystem = { path = "../aries-filesystem" }
-aries-lspclient = { path = "../aries-lspclient" }
-aries-mode = { path = "../aries-mode" }
-aries-preamble = { path = "../aries-preamble" }
+aries-event = { version = "0.1.0", path = "../aries-event" }
+aries-extension = { version = "0.1.0", path = "../aries-extension" }
+aries-filesystem = { version = "0.1.0", path = "../aries-filesystem" }
+aries-lspclient = { version = "0.1.0", path = "../aries-lspclient" }
+aries-mode = { version = "0.1.0", path = "../aries-mode" }
+aries-preamble = { version = "0.1.0", path = "../aries-preamble" }
 dialoguer.workspace = true
 firecrawl.workspace = true
 futures.workspace = true

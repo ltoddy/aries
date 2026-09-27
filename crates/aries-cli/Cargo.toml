@@ -4,7 +4,12 @@ version = "0.1.0"
 edition = "2024"
 license.workspace = true
 rust-version.workspace = true
-authors = ["ltoddy <taoliu0509@gmail.com>"]
+authors.workspace = true
+description.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [[bin]]
 name = "aries"
@@ -13,15 +18,15 @@ path = "src/main.rs"
 [dependencies]
 agent-client-protocol.workspace = true
 anyhow.workspace = true
-aries-acp = { path = "../aries-acp" }
-aries-event = { path = "../aries-event" }
-aries-extension = { path = "../aries-extension" }
-aries-init = { path = "../aries-init" }
-aries-logger = { path = "../aries-logger" }
-aries-persistence = { path = "../aries-persistence" }
-aries-session = { path = "../aries-session" }
-aries-tokenopt = { path = "../aries-tokenopt" }
-aries-tools = { path = "../aries-tools" }
+aries-acp = { version = "0.1.0", path = "../aries-acp" }
+aries-event = { version = "0.1.0", path = "../aries-event" }
+aries-extension = { version = "0.1.0", path = "../aries-extension" }
+aries-init = { version = "0.1.0", path = "../aries-init" }
+aries-logger = { version = "0.1.0", path = "../aries-logger" }
+aries-persistence = { version = "0.1.0", path = "../aries-persistence" }
+aries-session = { version = "0.1.0", path = "../aries-session" }
+aries-tokenopt = { version = "0.1.0", path = "../aries-tokenopt" }
+aries-tools = { version = "0.1.0", path = "../aries-tools" }
 clap = { workspace = true, features = ["derive"] }
 colored.workspace = true
 dialoguer.workspace = true

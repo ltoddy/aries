@@ -4,9 +4,15 @@ version = "0.1.0"
 edition = "2024"
 license.workspace = true
 rust-version.workspace = true
+authors.workspace = true
+description.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [dependencies]
-aries-filesystem = { path = "../aries-filesystem" }
+aries-filesystem = { version = "0.1.0", path = "../aries-filesystem" }
 futures.workspace = true
 http.workspace = true
 itertools.workspace = true

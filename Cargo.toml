@@ -21,7 +21,16 @@ members = [
 ]
 default-members = ["crates/aries-cli"]
 resolver = "3"
-package = { license = "MIT", rust-version = "1.95" }
+
+[workspace.package]
+authors = ["ltoddy <taoliu0509@gmail.com>"]
+categories = ["command-line-utilities", "development-tools"]
+description = "A terminal AI coding assistant"
+keywords = ["ai", "agent", "terminal", "acp", "cli"]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/ltoddy/aries"
+rust-version = "1.95"
 
 [workspace.dependencies]
 agent-client-protocol = "2.2"

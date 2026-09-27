@@ -4,15 +4,21 @@ version = "0.1.0"
 edition = "2024"
 license.workspace = true
 rust-version.workspace = true
+authors.workspace = true
+description.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [dependencies]
 agent-client-protocol = { workspace = true, features = ["unstable_protocol_v2", "unstable"] }
-aries-event = { path = "../aries-event" }
-aries-extension = { path = "../aries-extension" }
-aries-init = { path = "../aries-init" }
-aries-mode = { path = "../aries-mode" }
-aries-session = { path = "../aries-session" }
-aries-tools = { path = "../aries-tools" }
+aries-event = { version = "0.1.0", path = "../aries-event" }
+aries-extension = { version = "0.1.0", path = "../aries-extension" }
+aries-init = { version = "0.1.0", path = "../aries-init" }
+aries-mode = { version = "0.1.0", path = "../aries-mode" }
+aries-session = { version = "0.1.0", path = "../aries-session" }
+aries-tools = { version = "0.1.0", path = "../aries-tools" }
 base64.workspace = true
 itertools.workspace = true
 parking_lot.workspace = true
