@@ -8,6 +8,9 @@ pub enum MultiEditError {
     #[error("old_text and new_text cannot be identical")]
     IdenticalText,
 
+    #[error("old_text cannot be empty unless the target file is empty or does not exist")]
+    EmptyOldText,
+
     #[error("old_text not found in file (must match exactly including whitespace): {0:?}")]
     OldTextNotFound(String),
 
@@ -18,6 +21,10 @@ pub enum MultiEditError {
 impl MultiEditError {
     pub fn identical_text() -> Self {
         MultiEditError::IdenticalText
+    }
+
+    pub fn empty_old_text() -> Self {
+        MultiEditError::EmptyOldText
     }
 
     pub fn old_text_not_found(text: impl Into<String>) -> Self {

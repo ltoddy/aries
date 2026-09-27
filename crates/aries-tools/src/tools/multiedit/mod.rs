@@ -100,6 +100,9 @@ impl Tool for MultiEditTool {
             }
 
             if edit.old_text.is_empty() {
+                if !content.is_empty() {
+                    return Err(MultiEditError::empty_old_text());
+                }
                 content = edit.new_text;
                 continue;
             }
