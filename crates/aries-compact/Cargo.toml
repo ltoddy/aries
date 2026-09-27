@@ -4,14 +4,20 @@ version = "0.1.0"
 edition = "2024"
 license.workspace = true
 rust-version.workspace = true
+authors.workspace = true
+description.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-aries-context = { path = "../aries-context" }
-aries-event = { path = "../aries-event" }
-aries-extension = { path = "../aries-extension" }
-aries-filesystem = { path = "../aries-filesystem" }
-aries-tools = { path = "../aries-tools" }
+aries-context = { version = "0.1.0", path = "../aries-context" }
+aries-event = { version = "0.1.0", path = "../aries-event" }
+aries-extension = { version = "0.1.0", path = "../aries-extension" }
+aries-filesystem = { version = "0.1.0", path = "../aries-filesystem" }
+aries-tools = { version = "0.1.0", path = "../aries-tools" }
 futures.workspace = true
 parking_lot.workspace = true
 regex-lite.workspace = true
