@@ -1,6 +1,3 @@
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-
 use aries_event::AgentEvent;
 use aries_init::{GlobalContext, SettingLoader};
 use aries_session::{SessionArgs, SessionRegistry};
@@ -38,12 +35,8 @@ pub async fn execute(args: PromptArgs, gctx: GlobalContext) -> anyhow::Result<()
 
     print!("\n{}: ", "Aries".magenta());
 
-    let tool_names: Arc<Mutex<HashMap<String, String>>> = Arc::new(Mutex::new(HashMap::new()));
     let callback = async |event: AgentEvent| {
-        let tool_names = tool_names.clone();
-        if let Ok(mut map) = tool_names.lock() {
-            print_agent_event(event, &mut map);
-        }
+        print_agent_event(event);
     };
     session.prompt(&args.prompt, callback).await?;
     Ok(())

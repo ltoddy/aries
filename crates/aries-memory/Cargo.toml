@@ -12,9 +12,7 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
-aries-event = { version = "0.1.0", path = "../aries-event" }
 aries-filesystem = { version = "0.1.0", path = "../aries-filesystem" }
-aries-tools = { version = "0.1.0", path = "../aries-tools" }
 itertools.workspace = true
 rig.workspace = true
 schemars.workspace = true

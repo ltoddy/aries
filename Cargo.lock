@@ -494,9 +494,7 @@ dependencies = [
 name = "aries-memory"
 version = "0.1.0"
 dependencies = [
- "aries-event",
  "aries-filesystem",
- "aries-tools",
  "itertools 0.15.0",
  "rig",
  "schemars 1.2.2",
