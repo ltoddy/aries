@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::io::Write;
 
 use aries_event::AgentEvent;
@@ -27,12 +26,9 @@ use aries_tools::{
 };
 use colored::Colorize;
 use rig::agent::MultiTurnStreamItem;
-use rig::message::ToolResultContent;
-use rig::streaming::{StreamedAssistantContent, StreamedUserContent};
+use rig::streaming::StreamedAssistantContent;
 
-use crate::text;
-
-pub fn print_agent_event(event: AgentEvent, tool_names: &mut HashMap<String, String>) {
+pub fn print_agent_event(event: AgentEvent) {
     match event {
         AgentEvent::Notification(text) => println!("{text}"),
         AgentEvent::StreamItem(stream_item) => match *stream_item {
@@ -43,9 +39,7 @@ pub fn print_agent_event(event: AgentEvent, tool_names: &mut HashMap<String, Str
                         let _ = std::io::stdout().flush();
                     }
                 },
-                StreamedAssistantContent::ToolCall { tool_call, internal_call_id } => {
-                    tool_names.insert(internal_call_id, tool_call.function.name.clone());
-
+                StreamedAssistantContent::ToolCall { tool_call, .. } => {
                     let args = tool_call.function.arguments.to_string();
                     let (first, rest) = format_tool_call_args(&tool_call.function.name, &args);
                     println!("\n{} {}", "•".cyan(), first);
@@ -63,18 +57,7 @@ pub fn print_agent_event(event: AgentEvent, tool_names: &mut HashMap<String, Str
                 },
                 _ => {},
             },
-            MultiTurnStreamItem::StreamUserItem(StreamedUserContent::ToolResult {
-                tool_result,
-                internal_call_id,
-            }) => {
-                let tool_name = tool_names.remove(&internal_call_id).unwrap_or_default();
-                for result in tool_result.content {
-                    if let ToolResultContent::Json { value } = result {
-                        let formatted = format_tool_result_output(&tool_name, value);
-                        println!("{formatted}");
-                    }
-                }
-            },
+            MultiTurnStreamItem::StreamUserItem(_) => {},
             MultiTurnStreamItem::FinalResponse(res) => {
                 display_token_usage(&res.usage());
             },
@@ -118,13 +101,6 @@ pub fn format_tool_call_args(tool_name: &str, args: &str) -> (String, Option<Str
     let (first, rest) = result.unwrap_or_else(|_| (args.to_string(), None));
 
     (format!("{} {}", tool_name.cyan(), first.yellow()), rest)
-}
-
-pub fn format_tool_result_output(tool_name: &str, value: serde_json::Value) -> String {
-    let output = aries_tools::format_tool_output(tool_name, value);
-    let output = if output.is_empty() { "No output".to_string() } else { output };
-
-    text::preview(output).dimmed().to_string()
 }
 
 pub fn display_token_usage(usage: &rig::completion::Usage) {

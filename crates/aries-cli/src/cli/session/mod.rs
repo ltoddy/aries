@@ -3,7 +3,6 @@ pub mod prune;
 pub mod resume;
 pub mod run;
 
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -37,14 +36,11 @@ pub async fn prompt_maybe_ask(
     let mut prompt_input = input.into();
 
     loop {
-        let tool_names: Arc<Mutex<HashMap<String, String>>> = Arc::new(Mutex::new(HashMap::new()));
         let question: Arc<Mutex<Option<AskUserQuestionArgs>>> = Arc::new(Mutex::new(None));
 
         let callback = {
-            let tool_names = tool_names.clone();
             let question = question.clone();
             move |event: AgentEvent| {
-                let tool_names = tool_names.clone();
                 let question = question.clone();
                 async move {
                     if let AgentEvent::AwaitingUserInput { args } = &event {
@@ -54,8 +50,7 @@ pub async fn prompt_maybe_ask(
                             Err(err) => warn!("failed to parse AskUserQuestion args: {err}"),
                         }
                     }
-                    let mut map = tool_names.lock();
-                    print_agent_event(event, &mut map);
+                    print_agent_event(event);
                 }
             }
         };
