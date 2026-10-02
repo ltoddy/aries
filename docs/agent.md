@@ -19,13 +19,4 @@ aries 的智能体基于 `rig` 框架实现。
 
 支持通过配置文件定义自定义 agent，详见 [extensions.md](extensions.md)。
 
-## 模型提供商
-
-支持 4 种 provider：
-
-- Anthropic
-- Azure
-- DeepSeek
-- OpenAI
-
-可配置 API Key、base URL、max_tokens 等，详见 `aries model add`。
+可配置 API Key、base URL 等，详见 `aries model add`。

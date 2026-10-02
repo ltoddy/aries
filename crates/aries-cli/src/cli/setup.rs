@@ -18,43 +18,12 @@ fn setup() -> anyhow::Result<Setting> {
     println!("Welcome to Aries! Let's set up your AI model configuration.");
     let theme = ColorfulTheme::default();
 
-    let providers: [Provider; 4] =
-        [Provider::Anthropic, Provider::Azure, Provider::DeepSeek, Provider::OpenAI];
+    let providers: [Provider; 3] = [Provider::Azure, Provider::DeepSeek, Provider::OpenAI];
     let items = providers.iter().map(|p| p.to_string()).collect::<Vec<_>>();
     let provider = &providers
         [Select::with_theme(&theme).with_prompt("provider").items(&items).default(0).interact()?];
 
     let model = match provider {
-        Provider::Anthropic => {
-            let base_url = Input::<String>::with_theme(&theme)
-                .with_prompt("base url")
-                .allow_empty(false)
-                .default(String::from("https://api.anthropic.com"))
-                .interact_text()?;
-
-            let api_key = Input::<String>::with_theme(&theme)
-                .with_prompt("api key")
-                .allow_empty(false)
-                .interact_text()?;
-
-            let model = Input::<String>::with_theme(&theme)
-                .with_prompt("model name")
-                .allow_empty(false)
-                .interact_text()?;
-
-            let max_tokens = Input::<u64>::with_theme(&theme)
-                .with_prompt("max tokens")
-                .default(2000)
-                .allow_empty(false)
-                .interact_text()?;
-
-            let alias = Input::<String>::with_theme(&theme)
-                .with_prompt("alias")
-                .allow_empty(false)
-                .interact_text()?;
-
-            ModelConfig::anthropic(alias, model, api_key, base_url, max_tokens)
-        },
         Provider::Azure => {
             let azure_endpoint = Input::<String>::with_theme(&theme)
                 .with_prompt("azure endpoint")
