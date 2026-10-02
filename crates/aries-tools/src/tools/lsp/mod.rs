@@ -161,10 +161,10 @@ impl Tool for LspTool {
                             serde_json::to_value(first_item)
                                 .map_err(|e| LspError::OperationFailed(e.to_string()))?
                         } else {
-                            return Ok(LspOutput { result: LspResult::IncomingCalls(vec![]) });
+                            return Ok(LspOutput::new(LspResult::IncomingCalls(vec![])));
                         }
                     },
-                    _ => return Ok(LspOutput { result: LspResult::IncomingCalls(vec![]) }),
+                    _ => return Ok(LspOutput::new(LspResult::IncomingCalls(vec![]))),
                 };
                 self.client.incoming_calls(item).await
             },
@@ -181,16 +181,16 @@ impl Tool for LspTool {
                             serde_json::to_value(first_item)
                                 .map_err(|e| LspError::OperationFailed(e.to_string()))?
                         } else {
-                            return Ok(LspOutput { result: LspResult::OutgoingCalls(vec![]) });
+                            return Ok(LspOutput::new(LspResult::OutgoingCalls(vec![])));
                         }
                     },
-                    _ => return Ok(LspOutput { result: LspResult::OutgoingCalls(vec![]) }),
+                    _ => return Ok(LspOutput::new(LspResult::OutgoingCalls(vec![]))),
                 };
                 self.client.outgoing_calls(item).await
             },
         };
 
         let lsp_result = result.map_err(|e| LspError::OperationFailed(e.to_string()))?;
-        Ok(LspOutput { result: lsp_result })
+        Ok(LspOutput::new(lsp_result))
     }
 }

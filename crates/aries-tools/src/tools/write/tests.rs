@@ -181,11 +181,8 @@ fn test_write_args_location_and_title() {
 
 #[test]
 fn test_render_output_create() {
-    let create = serde_json::to_value(&WriteOutput {
-        file_path: PathBuf::from("/tmp/new.txt"),
-        additions: 1,
-    })
-    .expect("test operation should succeed");
+    let create = serde_json::to_value(&WriteOutput::new("/tmp/new.txt", 1))
+        .expect("test operation should succeed");
     assert_eq!(
         WriteOutput::render_output(create).expect("test operation should succeed"),
         "File created successfully at: /tmp/new.txt"

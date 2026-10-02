@@ -106,10 +106,6 @@ impl Tool for SkillTool {
 
         let output = lines.join("\n");
 
-        Ok(SkillOutput {
-            title: format!("Loaded skill: {}", args.name),
-            output,
-            metadata: SkillMetadata { name: args.name, dir: dir.to_owned() },
-        })
+        Ok(SkillOutput::new(output, SkillMetadata::new(args.name, dir)))
     }
 }

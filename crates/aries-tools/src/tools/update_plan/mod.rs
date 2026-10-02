@@ -76,6 +76,6 @@ impl Tool for UpdatePlanTool {
 
         let all_done = args.items.iter().all(|v| v.status.is_completed());
         let items = if all_done { Vec::new() } else { args.items };
-        Ok(UpdatePlanOutput { items })
+        Ok(UpdatePlanOutput::new(items))
     }
 }

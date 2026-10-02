@@ -138,12 +138,14 @@ impl Tool for CodeSearchTool {
                 && let Some(result) = data.result
                 && !result.content.is_empty()
             {
-                return Ok(CodeSearchOutput { results: result.content[0].text.clone() });
+                return Ok(CodeSearchOutput::new(result.content[0].text.clone()));
             }
         }
 
-        Ok(CodeSearchOutput {
-            results: "No code snippets or documentation found. Please try a different query, be more specific about the library or programming concept, or check the spelling of framework names.".to_owned(),
-        })
+        Ok(CodeSearchOutput::new(
+            "No code snippets or documentation found. Please try a different query, be more \
+             specific about the library or programming concept, or check the spelling of framework \
+             names.",
+        ))
     }
 }
