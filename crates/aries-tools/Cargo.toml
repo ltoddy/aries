@@ -36,7 +36,6 @@ similar.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["fs", "process", "sync", "time", "io-util"] }
 nanoid.workspace = true
-nix = { workspace = true, features = ["signal", "process"] }
 tree-sitter.workspace = true
 tree-sitter-bash.workspace = true
 
