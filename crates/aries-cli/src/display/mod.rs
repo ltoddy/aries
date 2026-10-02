@@ -11,7 +11,6 @@ use aries_tools::grep::GrepArgs;
 use aries_tools::lsp::LspArgs;
 use aries_tools::monitor::MonitorArgs;
 use aries_tools::multiedit::MultiEditArgs;
-use aries_tools::question::AskUserQuestionArgs;
 use aries_tools::read::ReadArgs;
 use aries_tools::skill::SkillArgs;
 use aries_tools::task_output::TaskOutputArgs;
@@ -21,8 +20,8 @@ use aries_tools::webfetch::WebFetchArgs;
 use aries_tools::websearch::WebSearchArgs;
 use aries_tools::write::WriteArgs;
 use aries_tools::{
-    agent, bash, batch, codesearch, edit, glob, grep, lsp, monitor, multiedit, question, read,
-    skill, task_output, task_stop, update_plan, webfetch, websearch, write,
+    agent, bash, batch, codesearch, edit, glob, grep, lsp, monitor, multiedit, read, skill,
+    task_output, task_stop, update_plan, webfetch, websearch, write,
 };
 use colored::Colorize;
 use rig::agent::MultiTurnStreamItem;
@@ -65,7 +64,6 @@ pub fn print_agent_event(event: AgentEvent) {
             MultiTurnStreamItem::ToolExecutionCommitted { .. } => {},
             MultiTurnStreamItem::ModelTurnRetried { .. } => {},
         },
-        AgentEvent::AwaitingUserInput { .. } => {},
         AgentEvent::SessionInfoUpdate { .. } => {},
     }
 }
@@ -86,7 +84,6 @@ pub fn format_tool_call_args(tool_name: &str, args: &str) -> (String, Option<Str
         lsp::NAME => LspArgs::render_args(args),
         monitor::NAME => MonitorArgs::render_args(args),
         multiedit::NAME => MultiEditArgs::render_args(args),
-        question::NAME => AskUserQuestionArgs::render_args(args),
         read::NAME => ReadArgs::render_args(args),
         skill::NAME => SkillArgs::render_args(args),
         task_output::NAME => TaskOutputArgs::render_args(args).map(|title| (title, None)),

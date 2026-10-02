@@ -1,15 +1,14 @@
 use std::collections::HashSet;
 
-use aries_tools::{agent, edit, multiedit, question, skill, update_plan, write};
+use aries_tools::{agent, edit, multiedit, skill, update_plan, write};
 use rig::message::{AssistantContent, Message, ToolCall, ToolResultContent, UserContent};
 
 const TOOL_RESULT_PLACEHOLDER: &str = "[Old tool result content cleared]";
 const TOOL_CALL_PLACEHOLDER: &str = "[Old tool call content cleared — file can be re-read]";
 pub const KEEP_RECENT: usize = 8;
 
-/// 保留对会话状态有控制语义的工具（Agent/UpdatePlan/Question/Skill），
-const KEEP_TOOL_RESULT_TOOL_NAMES: &[&str; 4] =
-    &[agent::NAME, question::NAME, skill::NAME, update_plan::NAME];
+/// 保留对会话状态有控制语义的工具（Agent/UpdatePlan/Skill）。
+const KEEP_TOOL_RESULT_TOOL_NAMES: &[&str; 3] = &[agent::NAME, skill::NAME, update_plan::NAME];
 
 const COMPACTABLE_TOOL_CALL_TOOL_NAMES: &[&str; 3] = &[edit::NAME, multiedit::NAME, write::NAME];
 

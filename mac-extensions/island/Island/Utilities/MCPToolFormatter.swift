@@ -3,7 +3,6 @@ import Foundation
 enum MCPToolFormatter {
     private static let toolAliases: [String: String] = [
         "AgentOutputTool": "Await Agent",
-        "AskUserQuestion": "Question",
         "TodoWrite": "Todo",
         "TodoRead": "Todo",
         "WebFetch": "Fetch",

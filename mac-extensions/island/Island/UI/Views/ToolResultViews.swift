@@ -26,8 +26,6 @@ struct ToolResultContent: View {
                 WebFetchResultContent(result: r)
             case let .webSearch(r):
                 WebSearchResultContent(result: r)
-            case let .askUserQuestion(r):
-                AskUserQuestionResultContent(result: r)
             case let .bashOutput(r):
                 BashOutputResultContent(result: r)
             case let .killShell(r):
@@ -406,31 +404,6 @@ struct WebSearchResultContent: View {
     }
 }
 
-struct AskUserQuestionResultContent: View {
-    let result: AskUserQuestionResult
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ForEach(Array(result.questions.enumerated()), id: \.offset) { index, question in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(question.question)
-                        .font(.system(size: 11))
-                        .foregroundColor(.white.opacity(0.6))
-
-                    if let answer = result.answers["\(index)"] {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.turn.down.right")
-                                .font(.system(size: 9))
-                            Text(answer)
-                                .font(.system(size: 11, weight: .medium))
-                        }
-                        .foregroundColor(.green.opacity(0.7))
-                    }
-                }
-            }
-        }
-    }
-}
 
 struct BashOutputResultContent: View {
     let result: BashOutputResult

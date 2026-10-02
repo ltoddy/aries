@@ -7,7 +7,8 @@ use colored::Colorize;
 use rustyline::error::ReadlineError;
 use tracing::info_span;
 
-use super::{display_elapsed, prompt_maybe_ask};
+use super::display_elapsed;
+use crate::display::print_agent_event;
 use crate::{commands, input, welcome};
 
 pub async fn execute(gctx: GlobalContext, bare: bool) -> anyhow::Result<()> {
@@ -50,7 +51,13 @@ pub async fn execute(gctx: GlobalContext, bare: bool) -> anyhow::Result<()> {
                 print!("\n{}: ", "Aries".magenta());
                 let start = Instant::now();
 
-                if let Err(err) = prompt_maybe_ask(&mut session, input).await {
+                if let Err(err) = session
+                    .prompt(input, |event| async move {
+                        print_agent_event(event);
+                    })
+                    .await
+                    .map_err(anyhow::Error::from)
+                {
                     eprintln!("\n{}: {}", "Error".red(), err);
                     continue;
                 }

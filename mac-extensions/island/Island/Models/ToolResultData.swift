@@ -11,7 +11,6 @@ enum ToolResultData: Equatable {
     case task(TaskResult)
     case webFetch(WebFetchResult)
     case webSearch(WebSearchResult)
-    case askUserQuestion(AskUserQuestionResult)
     case bashOutput(BashOutputResult)
     case killShell(KillShellResult)
     case exitPlanMode(ExitPlanModeResult)
@@ -145,21 +144,6 @@ struct SearchResultItem: Equatable {
     let snippet: String
 }
 
-struct AskUserQuestionResult: Equatable {
-    let questions: [QuestionItem]
-    let answers: [String: String]
-}
-
-struct QuestionItem: Equatable {
-    let question: String
-    let header: String?
-    let options: [QuestionOption]
-}
-
-struct QuestionOption: Equatable {
-    let label: String
-    let description: String?
-}
 
 struct BashOutputResult: Equatable {
     let shellId: String
@@ -306,9 +290,6 @@ struct ToolStatusDisplay {
                 "\(Int(r.durationSeconds * 1000))ms"
             let searchWord = r.results.count == 1 ? "search" : "searches"
             return ToolStatusDisplay(text: "Did 1 \(searchWord) in \(time)")
-
-        case .askUserQuestion:
-            return ToolStatusDisplay(text: "Answered")
 
         case let .bashOutput(r):
             return ToolStatusDisplay(text: "Status: \(r.status)")

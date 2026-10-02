@@ -1,4 +1,3 @@
-pub mod elicitation;
 pub mod message;
 pub mod plan;
 pub mod session_update;
@@ -11,13 +10,11 @@ use agent_client_protocol::schema::v1::{
 use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
 use aries_event::AgentEvent;
 use aries_session::{PromptOutcome, SharedRegistry};
-use aries_tools::question::AskUserQuestionArgs;
 use parking_lot::Mutex;
 use rig::completion::Message;
 use rig::message::ToolCall;
-use tracing::{info, instrument, warn};
+use tracing::{info, instrument};
 
-use self::elicitation::Elicitation;
 use self::message::UserMessage;
 use self::session_update::SessionUpdates;
 
@@ -41,47 +38,20 @@ pub async fn prompt(
         }
     };
 
-    let user_message = UserMessage::from(req.prompt);
-    let prompt = user_message.into();
-
     let tool_names = Mutex::new(HashMap::<String, ToolCall>::new());
-    let pending = Mutex::new(None::<AskUserQuestionArgs>);
-
-    let callback = async |event: AgentEvent| match event {
-        AgentEvent::AwaitingUserInput { args } => {
-            match serde_json::from_value::<AskUserQuestionArgs>(args.clone()) {
-                Ok(question) => *pending.lock() = Some(question),
-                Err(err) => warn!("failed to parse AskUserQuestion args: {err}"),
-            }
-        },
-        _ => {
-            SessionUpdates::new(event, &tool_names).into_iter().for_each(|u| {
-                let _ = cx.send_notification(SessionNotification::new(session_id.clone(), u));
-            });
-        },
+    let callback = async |event: AgentEvent| {
+        SessionUpdates::new(event, &tool_names).into_iter().for_each(|u| {
+            let _ = cx.send_notification(SessionNotification::new(session_id.clone(), u));
+        });
     };
 
-    let mut prompt = prompt;
-    let mut stop_reason = StopReason::EndTurn;
-    loop {
-        match session.prompt(prompt, callback).await {
-            Ok(PromptOutcome::Completed(_)) => {
-                let question = pending.lock().take();
-                match question {
-                    Some(question) => {
-                        let answer = Elicitation::new(cx.clone(), &session_id).ask(&question).await;
-                        prompt = Message::user(answer.to_input(&question));
-                    },
-                    None => break,
-                }
-            },
-            Ok(PromptOutcome::Cancelled(_)) => {
-                stop_reason = StopReason::Cancelled;
-                break;
-            },
-            Err(err) => return responder.respond_with_internal_error(err.to_string()),
-        }
-    }
+    let user_message = UserMessage::from(req.prompt);
+    let prompt: Message = user_message.into();
+    let stop_reason = match session.prompt(prompt, callback).await {
+        Ok(PromptOutcome::Completed(_)) => StopReason::EndTurn,
+        Ok(PromptOutcome::Cancelled(_)) => StopReason::Cancelled,
+        Err(err) => return responder.respond_with_internal_error(err.to_string()),
+    };
 
     let mut registry = registry.lock().await;
     registry.putback_session(session);
