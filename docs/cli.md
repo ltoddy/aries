@@ -5,7 +5,7 @@ aries 提供以下子命令：
 | 命令                                              | 说明                                       |
 |---------------------------------------------------|--------------------------------------------|
 | `aries setup`                                     | 初始化配置                                 |
-| `aries model add / rm / list / default / current` | 管理模型配置（增删查、切换默认、查看当前） |
+| `aries model add / rm / list / default` | 管理模型配置（增删查、切换默认） |
 | `aries prompt`                                    | 一次性发送 prompt                          |
 | `aries session list / resume / prune`             | 管理会话（列出、恢复、清理）               |
 | `aries acp`                                       | 启动 Agent Client Protocol (ACP) 服务      |
