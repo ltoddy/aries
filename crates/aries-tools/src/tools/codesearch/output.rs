@@ -6,6 +6,11 @@ pub struct CodeSearchOutput {
 }
 
 impl CodeSearchOutput {
+    pub fn new(results: impl Into<String>) -> Self {
+        let results = results.into();
+        Self { results }
+    }
+
     pub fn render_output(raw: serde_json::Value) -> Result<String, serde_json::Error> {
         let output: Self = serde_json::from_value(raw)?;
         Ok(output.results)

@@ -7,6 +7,10 @@ pub struct LspOutput {
 }
 
 impl LspOutput {
+    pub fn new(result: LspResult) -> Self {
+        Self { result }
+    }
+
     pub fn render_output(raw: serde_json::Value) -> Result<String, serde_json::Error> {
         let output: Self = serde_json::from_value(raw)?;
         let content = match &output.result {

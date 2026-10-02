@@ -8,6 +8,10 @@ pub struct UpdatePlanOutput {
 }
 
 impl UpdatePlanOutput {
+    pub fn new(items: Vec<PlanEntry>) -> Self {
+        Self { items }
+    }
+
     pub fn render_output(raw: serde_json::Value) -> Result<String, serde_json::Error> {
         let output: Self = serde_json::from_value(raw)?;
         if output.items.is_empty() {

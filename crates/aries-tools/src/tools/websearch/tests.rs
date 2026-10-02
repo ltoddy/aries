@@ -83,13 +83,13 @@ fn test_args_round_trip_with_domains() {
 
 #[test]
 fn test_tavily_request_serializes_domains() {
-    let request = TavilySearchRequest {
-        query: "rust".to_owned(),
-        max_results: 15,
-        include_answer: false,
-        include_domains: Some(vec!["rust-lang.org".to_owned()]),
-        exclude_domains: Some(vec!["reddit.com".to_owned()]),
-    };
+    let request = TavilySearchRequest::new(
+        "rust",
+        15,
+        false,
+        Some(vec!["rust-lang.org".to_owned()]),
+        Some(vec!["reddit.com".to_owned()]),
+    );
 
     let json = serde_json::to_value(&request).expect("test operation should succeed");
     assert_eq!(json["query"], "rust");
@@ -101,13 +101,7 @@ fn test_tavily_request_serializes_domains() {
 
 #[test]
 fn test_tavily_request_omits_empty_domains() {
-    let request = TavilySearchRequest {
-        query: "rust".to_owned(),
-        max_results: 15,
-        include_answer: false,
-        include_domains: None,
-        exclude_domains: None,
-    };
+    let request = TavilySearchRequest::new("rust", 15, false, None, None);
 
     let json = serde_json::to_value(&request).expect("test operation should succeed");
     assert!(json.get("include_domains").is_none());
