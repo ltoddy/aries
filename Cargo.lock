@@ -357,7 +357,6 @@ dependencies = [
  "jiff",
  "mimalloc",
  "nanoid",
- "parking_lot",
  "prettytable-rs",
  "rig",
  "rustyline",
@@ -403,7 +402,6 @@ name = "aries-event"
 version = "0.1.0"
 dependencies = [
  "rig",
- "serde_json",
  "tokio",
 ]
 
@@ -587,7 +585,6 @@ dependencies = [
  "aries-mode",
  "aries-preamble",
  "criterion",
- "dialoguer",
  "firecrawl",
  "futures",
  "git2",

@@ -18,7 +18,6 @@ aries-filesystem = { version = "0.1.0", path = "../aries-filesystem" }
 aries-lspclient = { version = "0.1.0", path = "../aries-lspclient" }
 aries-mode = { version = "0.1.0", path = "../aries-mode" }
 aries-preamble = { version = "0.1.0", path = "../aries-preamble" }
-dialoguer.workspace = true
 firecrawl.workspace = true
 futures.workspace = true
 git2.workspace = true

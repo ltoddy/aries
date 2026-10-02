@@ -12,7 +12,7 @@ use rig::tool::ToolSet;
 
 pub use self::tools::{
     agent, bash, batch, codesearch, edit, format_tool_output, glob, grep, lsp, monitor, multiedit,
-    question, read, skill, task_output, task_stop, update_plan, webfetch, websearch, write,
+    read, skill, task_output, task_stop, update_plan, webfetch, websearch, write,
 };
 
 pub const ALL_TOOL_NAMES: &[&str] = &[
@@ -26,7 +26,6 @@ pub const ALL_TOOL_NAMES: &[&str] = &[
     lsp::NAME,
     monitor::NAME,
     multiedit::NAME,
-    question::NAME,
     read::NAME,
     skill::NAME,
     task_output::NAME,
@@ -88,15 +87,13 @@ pub fn tool_names_from_mode(mode: Mode) -> Vec<&'static str> {
             edit::NAME,
             lsp::NAME,
             multiedit::NAME,
-            question::NAME,
             skill::NAME,
             update_plan::NAME,
             write::NAME,
             monitor::NAME,
             task_stop::NAME,
         ]),
-        Mode::Plan => tool_names.push(question::NAME),
-        Mode::Explore => {},
+        Mode::Plan | Mode::Explore => {},
     }
 
     tool_names
@@ -172,9 +169,6 @@ where
             },
             multiedit::NAME => {
                 tool_set.add_tool(multiedit::MultiEditTool::new(cwd, ctx.clone()));
-            },
-            question::NAME => {
-                tool_set.add_tool(question::AskUserQuestionTool::new());
             },
             read::NAME => {
                 tool_set.add_tool(read::ReadTool::new(cwd, ctx.clone()));

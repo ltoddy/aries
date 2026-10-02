@@ -9,7 +9,6 @@ pub mod grep;
 pub mod lsp;
 pub mod monitor;
 pub mod multiedit;
-pub mod question;
 pub mod read;
 pub mod skill;
 pub mod task_output;

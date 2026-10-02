@@ -3,21 +3,14 @@ pub mod prune;
 pub mod resume;
 pub mod run;
 
-use std::sync::Arc;
 use std::time::Instant;
 
-use aries_event::AgentEvent;
-use aries_session::{Session, resume_input};
-use aries_tools::question::{AskUserQuestionArgs, AskUserQuestionTool};
 use clap::Subcommand;
 use colored::Colorize;
-use parking_lot::Mutex;
-use tracing::warn;
 
 use self::list::ListSessionsArgs;
 use self::prune::PruneSessionsArgs;
 use self::resume::ResumeSessionsArgs;
-use crate::display::print_agent_event;
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum SessionCommand {
@@ -27,44 +20,6 @@ pub enum SessionCommand {
     Prune(PruneSessionsArgs),
     #[command(about = "Resume a previous chat session")]
     Resume(ResumeSessionsArgs),
-}
-
-pub async fn prompt_maybe_ask(
-    session: &mut Session,
-    input: impl Into<String>,
-) -> anyhow::Result<()> {
-    let mut prompt_input = input.into();
-
-    loop {
-        let question: Arc<Mutex<Option<AskUserQuestionArgs>>> = Arc::new(Mutex::new(None));
-
-        let callback = {
-            let question = question.clone();
-            move |event: AgentEvent| {
-                let question = question.clone();
-                async move {
-                    if let AgentEvent::AwaitingUserInput { args } = &event {
-                        let mut slot = question.lock();
-                        match serde_json::from_value::<AskUserQuestionArgs>(args.clone()) {
-                            Ok(args) => *slot = Some(args),
-                            Err(err) => warn!("failed to parse AskUserQuestion args: {err}"),
-                        }
-                    }
-                    print_agent_event(event);
-                }
-            }
-        };
-
-        session.prompt(prompt_input.clone(), callback).await.map_err(anyhow::Error::from)?;
-
-        match question.lock().take() {
-            Some(pending) => {
-                let answers = AskUserQuestionTool::new().ask(&pending)?;
-                prompt_input = resume_input(&pending.question, &answers.join("\n"));
-            },
-            None => return Ok(()),
-        }
-    }
 }
 
 const TERMINAL_WIDTH: usize = 80;

@@ -36,7 +36,6 @@ itertools.workspace = true
 jiff.workspace = true
 mimalloc.workspace = true
 nanoid.workspace = true
-parking_lot.workspace = true
 prettytable.workspace = true
 rig.workspace = true
 rustyline.workspace = true

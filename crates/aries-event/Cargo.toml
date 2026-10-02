@@ -13,5 +13,4 @@ categories.workspace = true
 
 [dependencies]
 rig.workspace = true
-serde_json.workspace = true
 tokio.workspace = true

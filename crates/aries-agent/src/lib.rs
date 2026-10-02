@@ -2,12 +2,10 @@ mod agent;
 mod builder;
 
 use rig::agent::StreamingError;
-use rig::completion::{CompletionError, PromptError};
+use rig::completion::CompletionError;
 
 pub use self::agent::{AGENT_LOOP_MAX_TURNS, AriesAgent};
 pub use self::builder::AgentBuilder;
-
-pub const AWAITING_USER_INPUT_REASON: &str = "awaiting user input";
 
 #[derive(Debug, thiserror::Error)]
 pub enum AriesError {
@@ -41,13 +39,6 @@ impl AriesError {
             return PATTERNS.iter().any(|p| err.contains(p));
         }
         false
-    }
-
-    pub fn is_awaiting_user_input(&self) -> bool {
-        matches!(
-            self,
-            AriesError::Streaming(StreamingError::Prompt(error)) if matches!(error.as_ref(), PromptError::PromptCancelled { reason, .. } if reason == AWAITING_USER_INPUT_REASON),
-        )
     }
 }
 

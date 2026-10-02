@@ -8,7 +8,7 @@ use agent_client_protocol::schema::v1::{
 use aries_event::AgentEvent;
 use aries_tools::{
     agent, bash, batch, codesearch, edit, format_tool_output, glob, grep, lsp, monitor, multiedit,
-    question, read, skill, task_output, task_stop, update_plan, webfetch, websearch, write,
+    read, skill, task_output, task_stop, update_plan, webfetch, websearch, write,
 };
 use itertools::Itertools;
 use parking_lot::Mutex;
@@ -73,7 +73,6 @@ impl SessionUpdates {
                     },
                 }
             },
-            AgentEvent::AwaitingUserInput { .. } => Self(Vec::new()),
             AgentEvent::SessionInfoUpdate { title, updated_at } => {
                 Self(vec![SessionUpdate::SessionInfoUpdate(
                     SessionInfoUpdate::new().title(title).updated_at(updated_at),
@@ -119,11 +118,6 @@ impl SessionUpdates {
                 )))]
             },
             StreamedAssistantContent::ToolCall { tool_call, internal_call_id, .. } => {
-                if tool_call.function.name == question::NAME {
-                    // AskUserQuestion tool 是空实现,由外部驱动
-                    return Vec::new();
-                }
-
                 tool_calls.lock().insert(internal_call_id, tool_call.clone());
 
                 let (title, content) = parse_tool_call(tool_call.clone());

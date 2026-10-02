@@ -3,7 +3,6 @@ use std::sync::Arc;
 use std::time;
 
 use aries_compact::{ContextWindow, TokenEstimator, micro_compact};
-use aries_event::Notifier;
 use aries_extension::hook::input::{
     PostToolUseFailureHookInput, PostToolUseHookInput, PreToolUseHookInput, SubagentStartHookInput,
     SubagentStopHookInput,
@@ -43,8 +42,6 @@ pub struct SessionPromptHook {
     tool_call_repo: ToolCallRepository,
     instruction_ctx: InstructionContext,
     window: ContextWindow,
-
-    notifier: Notifier,
 }
 
 impl SessionPromptHook {
@@ -58,7 +55,6 @@ impl SessionPromptHook {
         agent_type: impl Into<String>,
         db: Db,
         instruction_ctx: InstructionContext,
-        notifier: Notifier,
     ) -> Self {
         let session_id = session_id.into();
         let cwd = cwd.as_ref();
@@ -80,7 +76,6 @@ impl SessionPromptHook {
             tool_call_repo,
             instruction_ctx,
             window,
-            notifier,
         }
     }
 }
@@ -175,11 +170,6 @@ impl AgentHook for SessionPromptHook {
                 }
             },
             _ => {},
-        }
-
-        if event.tool_name == aries_tools::question::NAME {
-            self.notifier.send_awaiting_input(tool_input.clone());
-            return ToolCallAction::Stop(aries_agent::AWAITING_USER_INPUT_REASON.to_string());
         }
 
         let input = PreToolUseHookInput::new(

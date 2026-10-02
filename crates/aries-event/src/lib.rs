@@ -25,11 +25,6 @@ impl Notifier {
         let _ = self.sender.send(event);
     }
 
-    pub fn send_awaiting_input(&self, args: serde_json::Value) {
-        let event = AgentEvent::awaiting_user_input(args);
-        let _ = self.sender.send(event);
-    }
-
     pub fn send_session_info_update(
         &self,
         title: impl Into<String>,
@@ -44,7 +39,6 @@ impl Notifier {
 pub enum AgentEvent {
     Notification(String),
     StreamItem(Box<MultiTurnStreamItem>),
-    AwaitingUserInput { args: serde_json::Value },
     SessionInfoUpdate { title: String, updated_at: String },
 }
 
@@ -56,10 +50,6 @@ impl AgentEvent {
 
     pub fn stream_item(stream_item: MultiTurnStreamItem) -> Self {
         Self::StreamItem(Box::new(stream_item))
-    }
-
-    pub fn awaiting_user_input(args: serde_json::Value) -> Self {
-        Self::AwaitingUserInput { args }
     }
 
     pub fn session_info_update(title: impl Into<String>, updated_at: impl Into<String>) -> Self {

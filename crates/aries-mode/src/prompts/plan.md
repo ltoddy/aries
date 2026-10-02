@@ -11,7 +11,6 @@
 - Read：读取文件内容
 - Glob/Grep：搜索文件和代码
 - CodeSearch：进行语义化代码搜索
-- AskUserQuestion：向用户提问确认
 
 工作方式：
 - 在调用工具前，先简短说明你要查看什么

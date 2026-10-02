@@ -11,6 +11,6 @@ use tokio::sync::Mutex;
 pub use self::commands::BUILTIN_COMMANDS;
 pub use self::provider::AriesClientProvider;
 pub use self::registry::SessionRegistry;
-pub use self::session::{PromptOutcome, Session, SessionArgs, resume_input};
+pub use self::session::{PromptOutcome, Session, SessionArgs};
 
 pub type SharedRegistry = Arc<Mutex<SessionRegistry>>;
