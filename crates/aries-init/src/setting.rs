@@ -161,8 +161,6 @@ impl Setting {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum ModelConfig {
-    #[serde(rename = "anthropic")]
-    Anthropic(Anthropic),
     #[serde(rename = "azure")]
     Azure(Azure),
     #[serde(rename = "deepseek")]
@@ -172,21 +170,6 @@ pub enum ModelConfig {
 }
 
 impl ModelConfig {
-    pub fn anthropic(
-        alias: impl Into<String>,
-        model: impl Into<String>,
-        api_key: impl Into<String>,
-        base_url: impl Into<String>,
-        max_tokens: u64,
-    ) -> Self {
-        let alias = alias.into();
-        let model = model.into();
-        let api_key = api_key.into();
-        let base_url = base_url.into();
-
-        Self::Anthropic(Anthropic { alias, model, api_key, base_url, max_tokens })
-    }
-
     pub fn azure(
         alias: impl Into<String>,
         model: impl Into<String>,
@@ -233,7 +216,6 @@ impl ModelConfig {
 
     pub fn alias(&self) -> String {
         match self {
-            ModelConfig::Anthropic(Anthropic { alias, .. }) => alias.to_owned(),
             ModelConfig::Azure(Azure { alias, .. }) => alias.to_owned(),
             ModelConfig::Deepseek(Deepseek { alias, .. }) => alias.to_owned(),
             ModelConfig::OpenAI(OpenAI { alias, .. }) => alias.to_owned(),
@@ -242,7 +224,6 @@ impl ModelConfig {
 
     pub fn model(&self) -> String {
         match self {
-            ModelConfig::Anthropic(Anthropic { model, .. }) => model.to_owned(),
             ModelConfig::Azure(Azure { model, .. }) => model.to_owned(),
             ModelConfig::Deepseek(Deepseek { model, .. }) => model.to_owned(),
             ModelConfig::OpenAI(OpenAI { model, .. }) => model.to_owned(),
@@ -251,7 +232,6 @@ impl ModelConfig {
 
     pub const fn provider(&self) -> Provider {
         match self {
-            ModelConfig::Anthropic(_) => Provider::Anthropic,
             ModelConfig::Azure(_) => Provider::Azure,
             ModelConfig::Deepseek(_) => Provider::DeepSeek,
             ModelConfig::OpenAI(_) => Provider::OpenAI,
@@ -261,7 +241,6 @@ impl ModelConfig {
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 pub enum Provider {
-    Anthropic,
     Azure,
     DeepSeek,
     OpenAI,
@@ -270,7 +249,6 @@ pub enum Provider {
 impl Provider {
     pub const fn as_str(&self) -> &str {
         match self {
-            Provider::Anthropic => "Anthropic",
             Provider::Azure => "Azure",
             Provider::DeepSeek => "Deepseek",
             Provider::OpenAI => "OpenAI",
@@ -281,32 +259,10 @@ impl Provider {
 impl Display for Provider {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Provider::Anthropic => write!(f, "Anthropic"),
             Provider::Azure => write!(f, "Azure"),
             Provider::DeepSeek => write!(f, "Deepseek"),
             Provider::OpenAI => write!(f, "OpenAI"),
         }
-    }
-}
-
-#[derive(Clone, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub struct Anthropic {
-    pub alias: String,
-    pub model: String,
-    pub api_key: String,
-    pub base_url: String,
-    pub max_tokens: u64,
-}
-
-impl std::fmt::Debug for Anthropic {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Anthropic")
-            .field("alias", &self.alias)
-            .field("model", &self.model)
-            .field("base_url", &self.base_url)
-            .field("max_tokens", &self.max_tokens)
-            .finish()
     }
 }
 

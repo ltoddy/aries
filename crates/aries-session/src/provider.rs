@@ -16,14 +16,13 @@ use reqwest_retry::policies::ExponentialBackoff;
 use rig::agent::ModelHandle;
 use rig::client::CompletionClient;
 use rig::http_client;
-use rig::providers::{anthropic, azure, deepseek, openai};
+use rig::providers::{azure, deepseek, openai};
 use rig::tool::server::ToolServerHandle;
 
 use crate::middleware::RetryStrategy;
 
 #[derive(Clone)]
 pub enum AriesClientProvider {
-    Anthropic(anthropic::Client<ClientWithMiddleware>),
     Azure(azure::Client<ClientWithMiddleware>),
     Deepseek(deepseek::Client<ClientWithMiddleware>),
     OpenAI(openai::CompletionsClient<ClientWithMiddleware>),
@@ -47,14 +46,6 @@ impl AriesClientProvider {
         let httpclient = reqwest_middleware::ClientBuilder::new(http_client).with(retry).build();
 
         match config {
-            ModelConfig::Anthropic(c) => {
-                let client = anthropic::Client::builder()
-                    .api_key(&c.api_key)
-                    .base_url(&c.base_url)
-                    .http_client(httpclient)
-                    .build()?;
-                Ok(AriesClientProvider::Anthropic(client))
-            },
             ModelConfig::Azure(c) => {
                 let client = azure::Client::builder()
                     .api_key(&c.api_key)
@@ -85,9 +76,6 @@ impl AriesClientProvider {
     pub fn completion_model(&self, model: impl Into<String>) -> ModelHandle {
         let model = model.into();
         match self {
-            AriesClientProvider::Anthropic(c) => {
-                ModelHandle::new(c.completion_model(model.clone()))
-            },
             AriesClientProvider::Azure(c) => ModelHandle::new(c.completion_model(model.clone())),
             AriesClientProvider::Deepseek(c) => ModelHandle::new(c.completion_model(model.clone())),
             AriesClientProvider::OpenAI(c) => ModelHandle::new(c.completion_model(model)),
@@ -109,14 +97,6 @@ impl AriesClientProvider {
         let model = config.model();
 
         match self {
-            AriesClientProvider::Anthropic(c) => {
-                let agent = AgentBuilder::new(c.clone(), &model, mode, root_dir, gctx, notifier)
-                    .with_lsp_client(lsp_client)
-                    .with_extensions(extensions)
-                    .build(tool_server_handle)
-                    .await;
-                Ok(agent)
-            },
             AriesClientProvider::Azure(c) => {
                 let agent = AgentBuilder::new(c.clone(), &model, mode, root_dir, gctx, notifier)
                     .with_lsp_client(lsp_client)
@@ -151,9 +131,6 @@ impl AriesClientProvider {
         notifier: Notifier,
     ) -> CompactAgent {
         match self {
-            AriesClientProvider::Anthropic(c) => {
-                CompactAgent::new(c.clone(), model, transcript_path, notifier)
-            },
             AriesClientProvider::Azure(c) => {
                 CompactAgent::new(c.clone(), model, transcript_path, notifier)
             },
@@ -168,7 +145,6 @@ impl AriesClientProvider {
 
     pub fn memory_retriever(&self, model: impl Into<String>) -> MemoryRetriever {
         match self {
-            AriesClientProvider::Anthropic(c) => MemoryRetriever::new(c.clone(), model),
             AriesClientProvider::Azure(c) => MemoryRetriever::new(c.clone(), model),
             AriesClientProvider::Deepseek(c) => MemoryRetriever::new(c.clone(), model),
             AriesClientProvider::OpenAI(c) => MemoryRetriever::new(c.clone(), model),

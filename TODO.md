@@ -1,7 +1,7 @@
 ## TODO
 
 - [ ] 从错误中恢复
-  - 输出被截断 (Anthropic 的接口可以设置 max_tokens)
+  - 输出被截断
   - [x] 上下文超长 (agent loop 内发送端过滤, 详见 docs/error-recovery.md)
 - [ ] acp 协议 v2 支持 (https://agentclientprotocol.com/protocol/v2/overview 等什么时候不再是 draft 了, 立马跟进实现)
 - [ ] agent (参考 https://github.com/vercel/eve 对 agent 的目录结构设计来支持)
