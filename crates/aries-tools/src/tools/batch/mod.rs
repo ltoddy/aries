@@ -7,7 +7,8 @@ use std::path::{Path, PathBuf};
 use aries_event::Notifier;
 use aries_extension::AgentExtensions;
 use futures::future::join_all;
-use rig::client::AgentClientExt;
+use rig::Model;
+use rig::providers::openai::wire::OpenAiWire;
 use rig::tool::Tool;
 use serde_json::Value;
 
@@ -22,12 +23,8 @@ use crate::{
 
 const MAX_BATCH_CALLS: usize = 25;
 
-pub struct BatchTool<C>
-where
-    C: AgentClientExt,
-{
-    client: C,
-    model: String,
+pub struct BatchTool {
+    model: Model<OpenAiWire>,
     cwd: PathBuf,
     parent_dir: PathBuf,
     ctx: ToolContext,
@@ -35,25 +32,19 @@ where
     extensions: AgentExtensions,
 }
 
-impl<C> BatchTool<C>
-where
-    C: AgentClientExt + Clone + Sync + Send + 'static,
-{
+impl BatchTool {
     pub fn new(
-        client: C,
-        model: impl Into<String>,
+        model: Model<OpenAiWire>,
         cwd: impl AsRef<Path>,
         parent_dir: impl AsRef<Path>,
         ctx: ToolContext,
         notifier: Notifier,
         extensions: AgentExtensions,
     ) -> Self {
-        let model = model.into();
         let cwd = cwd.as_ref();
         let parent_dir = parent_dir.as_ref();
 
         Self {
-            client,
             model,
             cwd: cwd.to_owned(),
             parent_dir: parent_dir.to_owned(),
@@ -79,8 +70,7 @@ where
                     .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
                 let res = Tool::call(
                     &agent::AgentTool::new(
-                        self.client.clone(),
-                        &self.model,
+                        self.model.clone(),
                         cwd,
                         parent_dir,
                         Notifier::clone(&self.notifier),
@@ -216,10 +206,7 @@ where
     }
 }
 
-impl<C> Tool for BatchTool<C>
-where
-    C: AgentClientExt + Clone + Sync + Send + 'static,
-{
+impl Tool for BatchTool {
     const NAME: &'static str = NAME;
     type Args = BatchArgs;
     type Output = BatchOutput;

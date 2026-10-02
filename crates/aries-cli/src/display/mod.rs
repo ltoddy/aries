@@ -25,44 +25,51 @@ use aries_tools::{
 };
 use colored::Colorize;
 use rig::agent::MultiTurnStreamItem;
-use rig::streaming::StreamedAssistantContent;
+use rig::streaming::{Item, StreamEvent};
 
 pub fn print_agent_event(event: AgentEvent) {
     match event {
         AgentEvent::Notification(text) => println!("{text}"),
         AgentEvent::StreamItem(stream_item) => match *stream_item {
             MultiTurnStreamItem::StreamAssistantItem(content) => match content {
-                StreamedAssistantContent::Text(text) => {
-                    if !text.text.is_empty() {
-                        print!("{}", text.text);
+                Item::Event(event) => match event {
+                    StreamEvent::Start { part: _, kind: _ } => {},
+                    StreamEvent::Text { part: _, text } => {
+                        print!("{text}");
                         let _ = std::io::stdout().flush();
-                    }
+                    },
+                    StreamEvent::Reasoning { part: _, text } => {
+                        print!("{text}");
+                        let _ = std::io::stdout().flush();
+                    },
+                    StreamEvent::Arguments { part: _, json: _ } => {},
+                    StreamEvent::End { part: _, content: _ } => {},
                 },
-                StreamedAssistantContent::ToolCall { tool_call, .. } => {
-                    let args = tool_call.function.arguments.to_string();
-                    let (first, rest) = format_tool_call_args(&tool_call.function.name, &args);
-                    println!("\n{} {}", "•".cyan(), first);
-                    if let Some(rest) = rest {
-                        for line in rest.lines() {
-                            if let Some(content) = line.strip_prefix("- ") {
-                                println!("- {}", content.red());
-                            } else if let Some(content) = line.strip_prefix("+ ") {
-                                println!("+ {}", content.green());
-                            } else {
-                                println!("{line}");
-                            }
+                Item::Unknown(_payload) => {},
+            },
+            MultiTurnStreamItem::ToolCall { tool_call } => {
+                let args = tool_call.function.arguments.to_string();
+                let (first, rest) = format_tool_call_args(&tool_call.function.name, &args);
+                println!("\n{} {}", "•".cyan(), first);
+                if let Some(rest) = rest {
+                    for line in rest.lines() {
+                        if let Some(content) = line.strip_prefix("- ") {
+                            println!("- {}", content.red());
+                        } else if let Some(content) = line.strip_prefix("+ ") {
+                            println!("+ {}", content.green());
+                        } else {
+                            println!("{line}");
                         }
                     }
-                },
-                _ => {},
+                }
             },
+            MultiTurnStreamItem::ToolExecutionCommitted { tool_call } => {},
             MultiTurnStreamItem::StreamUserItem(_) => {},
+            MultiTurnStreamItem::CompletionCall(_) => {},
+            MultiTurnStreamItem::ModelTurnRetried { turn: _ } => {},
             MultiTurnStreamItem::FinalResponse(res) => {
                 display_token_usage(&res.usage());
             },
-            MultiTurnStreamItem::CompletionCall(_) => {},
-            MultiTurnStreamItem::ToolExecutionCommitted { .. } => {},
-            MultiTurnStreamItem::ModelTurnRetried { .. } => {},
         },
         AgentEvent::SessionInfoUpdate { .. } => {},
     }
@@ -101,13 +108,18 @@ pub fn format_tool_call_args(tool_name: &str, args: &str) -> (String, Option<Str
 }
 
 pub fn display_token_usage(usage: &rig::completion::Usage) {
+    let total_tokens = usage.total_tokens.unwrap_or_default();
+    let input_tokens = usage.input_tokens.unwrap_or_default();
+    let cached_input_tokens = usage.cached_input_tokens.unwrap_or_default();
+    let output_tokens = usage.output_tokens.unwrap_or_default();
+
     println!(
         "\n\n{} total={} input={} (cached={}) output={}",
         "Token usage:".dimmed(),
-        usage.total_tokens.to_string().dimmed(),
-        usage.input_tokens.to_string().dimmed(),
-        usage.cached_input_tokens.to_string().dimmed(),
-        usage.output_tokens.to_string().dimmed()
+        total_tokens.to_string().dimmed(),
+        input_tokens.to_string().dimmed(),
+        cached_input_tokens.to_string().dimmed(),
+        output_tokens.to_string().dimmed()
     );
 }
 

@@ -16,13 +16,15 @@ use aries_extension::hook::input::{
     PostCompactHookInput, PostCompactTrigger, PreCompactCustomInstructions, PreCompactHookInput,
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
+use rig::Model;
 use rig::completion::{Message, Usage};
+use rig::providers::openai::wire::OpenAiWire;
 
-pub use self::agent::{CompactAgent, CompactOutcome, compact_summary};
-pub use self::breaker::{AutoCompactBreaker, Decision};
-pub use self::micro_compact::{KEEP_RECENT, micro_compact};
-pub use self::tokens::TokenEstimator;
-pub use self::window::ContextWindow;
+pub use crate::agent::{CompactAgent, CompactOutcome, compact_summary};
+pub use crate::breaker::{AutoCompactBreaker, Decision};
+pub use crate::micro_compact::{KEEP_RECENT, micro_compact};
+pub use crate::tokens::TokenEstimator;
+pub use crate::window::ContextWindow;
 
 #[derive(Clone)]
 pub struct ContextCompactor {
@@ -41,7 +43,7 @@ impl ContextCompactor {
         id: impl Into<String>,
         cwd: impl AsRef<Path>,
         transcript_path: impl AsRef<Path>,
-        agent: CompactAgent,
+        model: Model<OpenAiWire>,
         chat_context: ChatContext,
         hooks_executor: Arc<HooksExecutor>,
         notifier: Notifier,
@@ -50,6 +52,7 @@ impl ContextCompactor {
         let cwd = cwd.as_ref();
         let transcript_path = transcript_path.as_ref();
         let breaker = AutoCompactBreaker::new();
+        let agent = CompactAgent::new(model, transcript_path, Notifier::clone(&notifier));
 
         Self {
             agent,
@@ -63,7 +66,9 @@ impl ContextCompactor {
         }
     }
 
-    pub fn set_agent(&mut self, agent: CompactAgent) {
+    pub fn set_model(&mut self, model: Model<OpenAiWire>) {
+        let agent =
+            CompactAgent::new(model, &self.transcript_path, Notifier::clone(&self.notifier));
         self.agent = agent;
     }
 
@@ -103,10 +108,12 @@ impl ContextCompactor {
         let window = ContextWindow::new();
         let compact_threshold = window.auto_compact_threshold();
 
-        if usage.total_tokens > compact_threshold {
+        if let Some(total_tokens) = usage.total_tokens
+            && total_tokens > compact_threshold
+        {
             let text = format!(
                 "\n实际 tokens {} 已达阈值 {compact_threshold}，触发压缩...\n",
-                usage.total_tokens,
+                total_tokens,
             );
             callback(AgentEvent::notification(text)).await;
             self.compact().await;

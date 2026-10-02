@@ -7,17 +7,14 @@ use aries_init::GlobalContext;
 use aries_lspclient::SharedLspClient;
 use aries_mode::Mode;
 use itertools::Itertools;
-use rig::client::AgentClientExt;
+use rig::Model;
+use rig::providers::openai::wire::OpenAiWire;
 use rig::tool::server::ToolServerHandle;
 
 use crate::agent::{AGENT_LOOP_MAX_TURNS, AriesAgent};
 
-pub struct AgentBuilder<C>
-where
-    C: AgentClientExt,
-{
-    client: C,
-    model: String,
+pub struct AgentBuilder {
+    model: Model<OpenAiWire>,
     mode: Mode,
     root_dir: PathBuf,
     gctx: GlobalContext,
@@ -28,23 +25,17 @@ where
     notifier: Notifier,
 }
 
-impl<C> AgentBuilder<C>
-where
-    C: AgentClientExt + Clone + Send + Sync + 'static,
-{
+impl AgentBuilder {
     pub fn new(
-        client: C,
-        model: impl Into<String>,
+        model: Model<OpenAiWire>,
         mode: Mode,
         root_dir: impl AsRef<Path>,
         gctx: GlobalContext,
         notifier: Notifier,
     ) -> Self {
         let root_dir = root_dir.as_ref();
-        let model = model.into();
 
         Self {
-            client,
             model,
             mode,
             root_dir: root_dir.to_owned(),
@@ -68,31 +59,26 @@ where
     pub async fn build(self, tool_server_handle: ToolServerHandle) -> AriesAgent {
         let mode = self.mode;
         let name = mode.name();
+        let model_name = self.model.name();
+        let current_dir = self.gctx.current_dir();
 
         let tools = aries_tools::create_tools_from_mode(
             self.mode,
-            self.client.clone(),
-            &self.model,
-            self.gctx.current_dir(),
+            self.model.clone(),
+            &current_dir,
             &self.root_dir,
             self.lsp_client.clone(),
             self.extensions.clone(),
             Notifier::clone(&self.notifier),
         );
-        tool_server_handle.append_toolset(tools).await;
+        tool_server_handle.add_tools(tools);
 
-        let sections = aries_preamble::sections(
-            self.gctx.clone(),
-            self.gctx.current_dir(),
-            &self.model,
-            &self.extensions.skills,
-        )
-        .await;
+        let sections =
+            aries_preamble::sections(self.gctx, &current_dir, model_name, &self.extensions.skills)
+                .await;
         let preamble = iter::once(mode.bare_preamble().to_owned()).chain(sections).join("\n");
 
-        let builder = self
-            .client
-            .agent(&self.model)
+        let builder = rig::agent::AgentBuilder::new(self.model)
             .name(name)
             .description(mode.description())
             .preamble(&preamble)

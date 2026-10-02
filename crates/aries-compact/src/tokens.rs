@@ -137,20 +137,23 @@ impl TokenEstimator for AssistantContent {
             AssistantContent::Text(t) => t.text.estimate_tokens(),
             AssistantContent::ToolCall(tc) => {
                 let args = serde_json::to_string(&tc.function.arguments).unwrap_or_default();
-                tc.function.name.estimate_tokens() + args.estimate_tokens()
+                tc.function.name.as_str().estimate_tokens() + args.estimate_tokens()
             },
-            AssistantContent::Reasoning(r) => {
-                let mut sum = 0u64;
-                for rc in &r.content {
-                    sum += match rc {
-                        ReasoningContent::Text { text, .. } => text.estimate_tokens(),
-                        ReasoningContent::Encrypted(s) => s.estimate_tokens(),
-                        ReasoningContent::Redacted { data } => data.estimate_tokens(),
-                        ReasoningContent::Summary(s) => s.estimate_tokens(),
-                    };
-                }
-                sum
-            },
+            AssistantContent::Reasoning(r) => r
+                .open(r.issuer())
+                .map(|reasoning| {
+                    reasoning
+                        .content
+                        .iter()
+                        .map(|rc| match rc {
+                            ReasoningContent::Text { text, .. } => text.estimate_tokens(),
+                            ReasoningContent::Encrypted(s) => s.estimate_tokens(),
+                            ReasoningContent::Redacted { data } => data.estimate_tokens(),
+                            ReasoningContent::Summary(s) => s.estimate_tokens(),
+                        })
+                        .sum()
+                })
+                .unwrap_or_default(),
             AssistantContent::Image(_) => IMAGE_MAX_TOKEN_SIZE,
         }
     }

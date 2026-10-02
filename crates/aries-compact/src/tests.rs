@@ -1,7 +1,7 @@
 use aries_context::ChatContext;
 use rig::message::{
-    AssistantContent, Document, DocumentSourceKind, Message, Reasoning, ToolResultContent,
-    UserContent,
+    AssistantContent, CallId, Document, DocumentSourceKind, Issuer, Message, ProviderCallId,
+    Reasoning, Sealed, ToolName, ToolResultContent, UserContent,
 };
 
 use crate::{TokenEstimator, micro_compact};
@@ -38,8 +38,10 @@ fn mixed_text_sums_per_character_estimates() {
 }
 
 #[test]
-fn encrypted_reasoning_does_not_count_as_prompt_tokens() {
-    let content = AssistantContent::Reasoning(Reasoning::encrypted("encrypted payload"));
+fn encrypted_reasoning_counts_as_prompt_tokens() {
+    let issuer = Issuer::from_static("name");
+    let content =
+        AssistantContent::Reasoning(Sealed::new(issuer, Reasoning::encrypted("encrypted payload")));
 
     assert_eq!(content.estimate_tokens(), 5);
 }
@@ -111,8 +113,8 @@ fn tool_result_messages(count: usize) -> Vec<Message> {
     (0..count)
         .map(|i| Message::User {
             content: vec![UserContent::tool_result(
-                format!("call-{i}"),
-                "Read",
+                CallId::Provider(ProviderCallId::new(format!("call-{i}")).unwrap()),
+                ToolName::new("Read").unwrap(),
                 vec![ToolResultContent::text(format!("full result {i}"))],
             )],
         })

@@ -1,6 +1,7 @@
 use itertools::Itertools;
-use rig::client::AgentClientExt;
-use rig::extractor::Extractor;
+use rig::Model;
+use rig::extractor::{Extractor, ExtractorBuilder};
+use rig::providers::openai::wire::OpenAiWire;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tracing::info;
@@ -21,11 +22,9 @@ pub struct MemoryRetriever {
 }
 
 impl MemoryRetriever {
-    pub fn new<C>(client: C, model: impl Into<String>) -> Self
-    where
-        C: AgentClientExt + 'static,
-    {
-        let inner = client.extractor::<RetrievedMemories>(model).preamble(PREAMBLE).build();
+    pub fn new(model: Model<OpenAiWire>) -> Self {
+        let inner =
+            ExtractorBuilder::<RetrievedMemories>::new(model).append_preamble(PREAMBLE).build();
 
         Self { inner }
     }
@@ -41,7 +40,7 @@ impl MemoryRetriever {
             .join("\n");
 
         let retrieved = match self.inner.extract(&prompt).await {
-            Ok(res) => res.file_names,
+            Ok(res) => res.output.file_names,
             Err(err) => {
                 info!("failed to retrieve relevant memories: {err}");
                 return vec![];

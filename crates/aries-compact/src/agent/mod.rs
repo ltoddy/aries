@@ -7,12 +7,11 @@ use aries_event::Notifier;
 use aries_filesystem::jsonl;
 use futures::StreamExt;
 use regex_lite::Regex;
-use rig::Agent;
 use rig::agent::{MultiTurnStreamItem, PromptResponse, StreamingError};
-use rig::client::AgentClientExt;
-use rig::completion::{CompletionError, Message};
-use rig::message::{self, AssistantContent, ReasoningContent, UserContent};
-use rig::streaming::StreamingPrompt;
+use rig::completion::Message;
+use rig::message::{AssistantContent, ReasoningContent, ToolResultContent, UserContent};
+use rig::providers::openai::wire::OpenAiWire;
+use rig::{Agent, Model};
 use tokio::pin;
 
 const PREAMBLE: &str = include_str!("preamble.md");
@@ -45,19 +44,14 @@ pub struct CompactAgent {
 impl CompactAgent {
     const COMPACTION_MAX_TURNS: usize = 1; // 强制单论,避免陷入循环
 
-    pub fn new<C>(
-        c: C,
-        model: impl Into<String>,
+    pub fn new(
+        model: Model<OpenAiWire>,
         transcript_path: impl AsRef<Path>,
         notifier: Notifier,
-    ) -> Self
-    where
-        C: AgentClientExt + 'static,
-    {
+    ) -> Self {
         let transcript_path = transcript_path.as_ref().to_owned();
 
-        let agent = c
-            .agent(model)
+        let agent = rig::agent::AgentBuilder::new(model)
             .name(NAME)
             .description(DESCRIPTION)
             .preamble(PREAMBLE)
@@ -74,7 +68,7 @@ impl CompactAgent {
         };
 
         let compressed_prompt = compress(messages);
-        let stream = self.inner.stream_prompt(compressed_prompt).await;
+        let stream = self.inner.prompt(compressed_prompt).stream();
         pin!(stream);
 
         let mut final_res = PromptResponse::empty();
@@ -87,8 +81,7 @@ impl CompactAgent {
                     }
                 },
                 Err(err) => {
-                    if let StreamingError::Completion(CompletionError::ProviderError(ref err)) = err
-                    {
+                    if let StreamingError::Completion(ref err) = err {
                         const PATTERNS: [&str; 6] = [
                             "prompt_too_long",
                             "context_length_exceeded",
@@ -97,7 +90,7 @@ impl CompactAgent {
                             "too many tokens",
                             "input is too long",
                         ];
-                        if PATTERNS.iter().any(|p| err.contains(p)) {
+                        if PATTERNS.iter().any(|p| err.report().message.contains(p)) {
                             return CompactOutcome::PromptTooLong;
                         }
                     }
@@ -165,42 +158,80 @@ fn compress(messages: &[Message]) -> String {
         match message {
             Message::User { content } => {
                 for c in content.iter() {
-                    if let UserContent::Text(t) = c {
-                        if prompt.len() > start_len {
-                            prompt.push('\n');
-                        }
-                        prompt.push_str(t.text());
+                    if prompt.len() > start_len {
+                        prompt.push('\n');
                     }
-                }
-            },
-            Message::Assistant { content, .. } => {
-                for c in content.iter() {
+
                     match c {
-                        AssistantContent::Text(t) => {
-                            if prompt.len() > start_len {
-                                prompt.push('\n');
-                            }
-                            prompt.push_str(t.text());
+                        UserContent::Text(text) => {
+                            prompt.push_str(text.text());
                         },
-                        AssistantContent::Reasoning(message::Reasoning { content, .. }) => {
-                            for rc in content {
-                                let text = match rc {
-                                    ReasoningContent::Text { text, .. } => text.as_str(),
-                                    ReasoningContent::Encrypted(s) => s.as_str(),
-                                    ReasoningContent::Redacted { data } => data.as_str(),
-                                    ReasoningContent::Summary(s) => s.as_str(),
-                                };
-                                if prompt.len() > start_len {
-                                    prompt.push('\n');
+                        UserContent::ToolResult(tool_result) => {
+                            prompt.push_str(&format!("[tool result: {}]", tool_result.name));
+                            for content in &tool_result.content {
+                                match content {
+                                    ToolResultContent::Text(text) => {
+                                        prompt.push_str(text.text());
+                                    },
+                                    ToolResultContent::Image(_) => {
+                                        prompt.push_str("[image]");
+                                    },
+                                    ToolResultContent::Json { value } => {
+                                        prompt.push_str(&value.to_string());
+                                    },
                                 }
-                                prompt.push_str(text);
                             }
                         },
-                        _ => {},
+                        UserContent::Image(_) => {
+                            prompt.push_str("[image]");
+                        },
+                        UserContent::Audio(_) => {
+                            prompt.push_str("[audio]");
+                        },
+                        UserContent::Video(_) => {
+                            prompt.push_str("[video]");
+                        },
+                        UserContent::Document(_) => {
+                            prompt.push_str("[document]");
+                        },
                     }
                 }
             },
-            _ => {},
+            Message::Assistant { id: _, content } => {
+                for c in content.iter() {
+                    if prompt.len() > start_len {
+                        prompt.push('\n');
+                    }
+
+                    match c {
+                        AssistantContent::Text(text) => {
+                            prompt.push_str(text.text());
+                        },
+                        AssistantContent::ToolCall(tool_call) => {
+                            prompt.push_str(&format!("[tool call: {}]", tool_call.function.name));
+                        },
+                        AssistantContent::Reasoning(sealed) => {
+                            if let Some(reasoning) = sealed.open(sealed.issuer()) {
+                                for rc in &reasoning.content {
+                                    let text = match rc {
+                                        ReasoningContent::Text { text, signature: _ } => {
+                                            text.as_str()
+                                        },
+                                        ReasoningContent::Encrypted(s) => s.as_str(),
+                                        ReasoningContent::Redacted { data } => data.as_str(),
+                                        ReasoningContent::Summary(s) => s.as_str(),
+                                    };
+                                    prompt.push_str(text);
+                                }
+                            }
+                        },
+                        AssistantContent::Image(_) => {
+                            prompt.push_str("[image]");
+                        },
+                    }
+                }
+            },
+            Message::System { content: _ } => {},
         }
 
         if prompt.len() > start_len {
