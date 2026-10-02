@@ -9,17 +9,16 @@ use std::time::Duration;
 
 use aries_event::Notifier;
 use jiff::Timestamp;
-use nix::sys::signal::{Signal, killpg};
-use nix::unistd::Pid;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, BufReader};
 use tokio::process::Command;
-use tokio::sync::watch;
+use tokio::sync::{oneshot, watch};
 use tokio::task::JoinHandle;
 
 const MAX_TASK_OUTPUT_BYTES: usize = 256 * 1024;
 const STOP_GRACE_PERIOD: Duration = Duration::from_secs(2);
+const SIGKILL_EXIT_CODE: i32 = 137;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -68,16 +67,10 @@ struct TaskState {
     exit_code: Option<i32>,
     started_at: Timestamp,
     finished_at: Option<Timestamp>,
-    pid: Option<u32>,
 }
 
 impl TaskState {
-    fn new(
-        kind: TaskKind,
-        command: impl Into<String>,
-        description: Option<String>,
-        pid: Option<u32>,
-    ) -> Self {
+    fn new(kind: TaskKind, command: impl Into<String>, description: Option<String>) -> Self {
         Self {
             kind,
             status: TaskStatus::Running,
@@ -88,7 +81,6 @@ impl TaskState {
             exit_code: None,
             started_at: Timestamp::now(),
             finished_at: None,
-            pid,
         }
     }
 
@@ -174,11 +166,16 @@ struct TaskRegistryInner {
 struct TaskEntry {
     state: Arc<Mutex<TaskState>>,
     receiver: watch::Receiver<TaskStatus>,
+    stop_sender: Arc<Mutex<Option<oneshot::Sender<()>>>>,
 }
 
 impl TaskEntry {
-    pub fn new(state: Arc<Mutex<TaskState>>, receiver: watch::Receiver<TaskStatus>) -> Self {
-        Self { state, receiver }
+    pub fn new(
+        state: Arc<Mutex<TaskState>>,
+        receiver: watch::Receiver<TaskStatus>,
+        stop_sender: oneshot::Sender<()>,
+    ) -> Self {
+        Self { state, receiver, stop_sender: Arc::new(Mutex::new(Some(stop_sender))) }
     }
 }
 
@@ -213,19 +210,20 @@ impl TaskRegistry {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true)
-            .process_group(0)
             .spawn()?;
 
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
-        let pid = child.id();
         let task_id = self.next_task_id(kind);
-        let state = Arc::new(Mutex::new(TaskState::new(kind, command, description, pid)));
+        let state = Arc::new(Mutex::new(TaskState::new(kind, command, description)));
         let (sender, receiver) = watch::channel(TaskStatus::Running);
+        let (stop_sender, stop_receiver) = oneshot::channel();
 
         {
             let mut registry = self.inner.lock();
-            registry.tasks.insert(task_id.clone(), TaskEntry::new(state.clone(), receiver));
+            registry
+                .tasks
+                .insert(task_id.clone(), TaskEntry::new(state.clone(), receiver, stop_sender));
         }
         let stdout_reader = pipe_output(stdout, state.clone(), OutputStream::Stdout);
         let stderr_reader = pipe_output(stderr, state.clone(), OutputStream::Stderr);
@@ -234,7 +232,17 @@ impl TaskRegistry {
         let state_for_waiter = state.clone();
         let notifier = Notifier::clone(&self.notifier);
         tokio::spawn(async move {
-            let result = child.wait().await;
+            let result = tokio::select! {
+                result = child.wait() => result,
+                _ = stop_receiver => {
+                    let kill_result = child.start_kill();
+                    if let Err(err) = kill_result {
+                        Err(err)
+                    } else {
+                        child.wait().await
+                    }
+                },
+            };
             for reader in [stdout_reader, stderr_reader] {
                 let _ = reader.await;
             }
@@ -248,10 +256,7 @@ impl TaskRegistry {
                     let code =
                         status.code().or_else(|| signal.map(|signal| 128 + signal)).unwrap_or(-1);
                     state.exit_code = Some(code);
-                    state.status = if matches!(
-                        signal,
-                        Some(signal) if signal == Signal::SIGTERM as i32 || signal == Signal::SIGKILL as i32
-                    ) {
+                    state.status = if code == SIGKILL_EXIT_CODE {
                         TaskStatus::Killed
                     } else if code == 0 {
                         TaskStatus::Completed
@@ -292,35 +297,20 @@ impl TaskRegistry {
         let state = entry.state;
         let mut receiver = entry.receiver;
 
-        let pid = {
+        let stop_sender = {
             let state = state.lock();
             if state.status != TaskStatus::Running {
                 return Err(StopTaskError::NotRunning);
             }
-            state.pid
+            entry.stop_sender.lock().take().ok_or(StopTaskError::NotRunning)?
         };
 
-        let pid = Pid::from_raw(pid.ok_or(StopTaskError::MissingPid)? as i32);
-        killpg(pid, Signal::SIGTERM).map_err(StopTaskError::Signal)?;
+        stop_sender.send(()).map_err(|_| StopTaskError::Watch)?;
 
         match tokio::time::timeout(STOP_GRACE_PERIOD, receiver.changed()).await {
             Ok(Ok(())) => {},
             Ok(Err(_)) => return Err(StopTaskError::Watch),
-            Err(_) => {
-                {
-                    let state = state.lock();
-                    if state.status != TaskStatus::Running {
-                        return Ok(TaskSnapshot::new(task_id, &state));
-                    }
-                }
-
-                killpg(pid, Signal::SIGKILL).map_err(StopTaskError::Signal)?;
-                match tokio::time::timeout(STOP_GRACE_PERIOD, receiver.changed()).await {
-                    Ok(Ok(())) => {},
-                    Ok(Err(_)) => return Err(StopTaskError::Watch),
-                    Err(_) => return Err(StopTaskError::Timeout),
-                }
-            },
+            Err(_) => return Err(StopTaskError::Timeout),
         }
 
         let state = state.lock();
@@ -362,10 +352,6 @@ pub enum StopTaskError {
     NotFound,
     #[error("task is not running")]
     NotRunning,
-    #[error("task has no process id")]
-    MissingPid,
-    #[error("failed to signal task: {0}")]
-    Signal(nix::Error),
     #[error("timed out waiting for task to stop")]
     Timeout,
     #[error("failed to watch task status")]
@@ -462,7 +448,7 @@ impl PartialOrd for OutputChunk {
 mod tests {
     use aries_event::Notifier;
 
-    use super::{BoundedOutput, TaskKind, TaskRegistry, TaskState, TaskStatus};
+    use super::{BoundedOutput, SIGKILL_EXIT_CODE, TaskKind, TaskRegistry, TaskState, TaskStatus};
 
     #[test]
     fn bounded_output_drops_oldest_chunks() {
@@ -496,12 +482,8 @@ mod tests {
 
     #[test]
     fn task_notification_uses_description_when_present() {
-        let state = TaskState::new(
-            TaskKind::Shell,
-            "sleep 1",
-            Some("run background sleep".to_owned()),
-            None,
-        );
+        let state =
+            TaskState::new(TaskKind::Shell, "sleep 1", Some("run background sleep".to_owned()));
         let state = TaskState { status: TaskStatus::Completed, ..state };
 
         let notification = state.notification("shell00000001");
@@ -514,7 +496,7 @@ mod tests {
 
     #[test]
     fn task_notification_uses_command_without_description() {
-        let state = TaskState::new(TaskKind::Monitor, "tail -f log", None, None);
+        let state = TaskState::new(TaskKind::Monitor, "tail -f log", None);
         let state = TaskState { status: TaskStatus::Killed, ..state };
 
         let notification = state.notification("monitor00000001");
@@ -524,7 +506,7 @@ mod tests {
 
     #[test]
     fn running_task_has_no_notification() {
-        let state = TaskState::new(TaskKind::Shell, "sleep 1", None, None);
+        let state = TaskState::new(TaskKind::Shell, "sleep 1", None);
 
         assert_eq!(state.notification("shell00000001"), "");
     }
@@ -551,7 +533,7 @@ mod tests {
         let snapshot = registry.stop(&task.task_id).await.expect("test operation should succeed");
 
         assert_eq!(snapshot.status, TaskStatus::Killed);
-        assert_eq!(snapshot.exit_code, Some(143));
+        assert_eq!(snapshot.exit_code, Some(SIGKILL_EXIT_CODE));
         assert!(snapshot.finished_at.is_some());
     }
 }
