@@ -2,7 +2,6 @@ mod agent;
 mod builder;
 
 use rig::agent::StreamingError;
-use rig::completion::CompletionError;
 
 pub use self::agent::{AGENT_LOOP_MAX_TURNS, AriesAgent};
 pub use self::builder::AgentBuilder;
@@ -32,11 +31,8 @@ impl AriesError {
             "input is too long",
         ];
 
-        if let AriesError::Streaming(StreamingError::Completion(CompletionError::ProviderError(
-            err,
-        ))) = self
-        {
-            return PATTERNS.iter().any(|p| err.contains(p));
+        if let AriesError::Streaming(StreamingError::Completion(err)) = self {
+            return PATTERNS.iter().any(|p| err.report().message.contains(p));
         }
         false
     }

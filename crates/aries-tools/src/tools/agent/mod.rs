@@ -7,9 +7,9 @@ use aries_event::Notifier;
 use aries_extension::{AgentDefinition, AgentExtensions};
 use aries_mode::Mode;
 use futures::StreamExt;
+use rig::Model;
 use rig::agent::{MultiTurnStreamItem, PromptResponse, StreamingError};
-use rig::client::AgentClientExt;
-use rig::streaming::StreamingPrompt;
+use rig::providers::openai::wire::OpenAiWire;
 use rig::tool::server::ToolServer;
 use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
@@ -24,42 +24,26 @@ pub const DEFAULT_MAX_TURNS: usize = 100;
 const DESCRIPTION_HEAD: &str = include_str!("description-head.md");
 const DESCRIPTION_TAIL: &str = include_str!("description-tail.md");
 
-pub struct AgentTool<C>
-where
-    C: AgentClientExt,
-{
-    client: C,
-    model: String,
+pub struct AgentTool {
+    model: Model<OpenAiWire>,
     cwd: PathBuf,
     parent_dir: PathBuf,
     notifier: Notifier,
     extensions: AgentExtensions,
 }
 
-impl<C> AgentTool<C>
-where
-    C: AgentClientExt,
-{
+impl AgentTool {
     pub fn new(
-        client: C,
-        model: impl Into<String>,
+        model: Model<OpenAiWire>,
         cwd: impl AsRef<Path>,
         parent_dir: impl AsRef<Path>,
         notifier: Notifier,
         extensions: AgentExtensions,
     ) -> Self {
-        let model = model.into();
         let cwd = cwd.as_ref();
         let parent_dir = parent_dir.as_ref();
 
-        Self {
-            client,
-            model,
-            cwd: cwd.to_owned(),
-            parent_dir: parent_dir.to_owned(),
-            notifier,
-            extensions,
-        }
+        Self { model, cwd: cwd.to_owned(), parent_dir: parent_dir.to_owned(), notifier, extensions }
     }
 
     fn find_agent(&self, mode: impl Into<String>) -> Option<&AgentDefinition> {
@@ -72,10 +56,7 @@ where
     }
 }
 
-impl<C> Tool for AgentTool<C>
-where
-    C: AgentClientExt + Clone + Send + Sync + 'static,
-{
+impl Tool for AgentTool {
     const NAME: &'static str = NAME;
     type Args = AgentArgs;
     type Output = AgentOutput;
@@ -129,7 +110,7 @@ where
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
         let task_id = nanoid::nanoid!();
-        let (name, preamble, tools, model) = match self.find_agent(&args.mode) {
+        let (name, preamble, tools) = match self.find_agent(&args.mode) {
             Some(AgentDefinition { frontmatter, body, .. }) => {
                 let name = frontmatter.name.clone();
                 let preamble = body.clone();
@@ -137,16 +118,14 @@ where
                 let tool_names = frontmatter.filter_tool_names(&universe);
                 let tools = create_tools_from_tool_names(
                     &tool_names,
-                    self.client.clone(),
-                    &self.model,
+                    self.model.clone(),
                     &self.cwd,
                     &self.parent_dir,
                     None,
                     AgentExtensions::empty(),
                     Notifier::clone(&self.notifier),
                 );
-                let model = frontmatter.model.clone().unwrap_or_else(|| self.model.clone());
-                (name, preamble, tools, model)
+                (name, preamble, tools)
             },
             None => {
                 let mode = args.mode.parse::<Mode>().unwrap_or(Mode::General);
@@ -155,33 +134,29 @@ where
                     mode.bare_preamble().to_owned(),
                     create_tools_from_mode(
                         mode,
-                        self.client.clone(),
-                        &self.model,
+                        self.model.clone(),
                         &self.cwd,
                         &self.parent_dir,
                         None,
                         AgentExtensions::empty(),
                         Notifier::clone(&self.notifier),
                     ),
-                    self.model.clone(),
                 )
             },
         };
 
         let tool_server_handle = ToolServer::new().run();
-        tool_server_handle.append_toolset(tools).await;
+        tool_server_handle.add_tools(tools);
 
-        let agent = self
-            .client
-            .agent(&model)
+        let agent = rig::agent::AgentBuilder::new(self.model.clone())
             .name(&name)
             .preamble(&preamble)
-            .append_preamble(&aries_preamble::env::section(&self.cwd, &model))
+            .append_preamble(&aries_preamble::env::section(&self.cwd, self.model.name()))
             .tool_server_handle(tool_server_handle)
             .default_max_turns(DEFAULT_MAX_TURNS)
             .build();
 
-        let mut stream = agent.stream_prompt(args.prompt).await;
+        let mut stream = agent.prompt(args.prompt).stream();
 
         let mut final_res = PromptResponse::empty();
         while let Some(chunk) = stream.next().await {

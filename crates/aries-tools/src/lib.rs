@@ -7,7 +7,8 @@ use aries_event::Notifier;
 use aries_extension::AgentExtensions;
 use aries_mode::Mode;
 use itertools::Itertools;
-use rig::client::AgentClientExt;
+use rig::Model;
+use rig::providers::openai::wire::OpenAiWire;
 use rig::tool::ToolSet;
 
 pub use self::tools::{
@@ -40,25 +41,19 @@ pub fn is_builtin_tool(tool_name: &str) -> bool {
     ALL_TOOL_NAMES.contains(&tool_name)
 }
 
-#[allow(clippy::too_many_arguments)]
-pub fn create_tools_from_mode<C>(
+pub fn create_tools_from_mode(
     mode: Mode,
-    client: C,
-    model: impl Into<String>,
+    model: Model<OpenAiWire>,
     cwd: impl AsRef<Path>,
     parent_dir: impl AsRef<Path>,
     lsp_client: Option<aries_lspclient::SharedLspClient>,
     extensions: AgentExtensions,
     notifier: Notifier,
-) -> ToolSet
-where
-    C: AgentClientExt + Clone + Send + Sync + 'static,
-{
+) -> ToolSet {
     let tool_names = tool_names_from_mode(mode);
 
     create_tools_from_tool_names(
         &tool_names,
-        client,
         model,
         cwd,
         parent_dir,
@@ -99,21 +94,15 @@ pub fn tool_names_from_mode(mode: Mode) -> Vec<&'static str> {
     tool_names
 }
 
-#[allow(clippy::too_many_arguments)]
-pub fn create_tools_from_tool_names<C>(
+pub fn create_tools_from_tool_names(
     tool_names: &[&str],
-    client: C,
-    model: impl Into<String>,
+    model: Model<OpenAiWire>,
     cwd: impl AsRef<Path>,
     parent_dir: impl AsRef<Path>,
     lsp_client: Option<aries_lspclient::SharedLspClient>,
     extensions: AgentExtensions,
     notifier: Notifier,
-) -> ToolSet
-where
-    C: AgentClientExt + Clone + Send + Sync + 'static,
-{
-    let model = model.into();
+) -> ToolSet {
     let cwd = cwd.as_ref();
     let parent_dir = parent_dir.as_ref();
     let tool_names = tool_names.iter().unique().collect_vec();
@@ -125,8 +114,7 @@ where
         match tool_name {
             agent::NAME => {
                 tool_set.add_tool(agent::AgentTool::new(
-                    client.clone(),
-                    &model,
+                    model.clone(),
                     cwd,
                     parent_dir,
                     Notifier::clone(&notifier),
@@ -138,8 +126,7 @@ where
             },
             batch::NAME => {
                 tool_set.add_tool(batch::BatchTool::new(
-                    client.clone(),
-                    &model,
+                    model.clone(),
                     cwd,
                     parent_dir,
                     ctx.clone(),

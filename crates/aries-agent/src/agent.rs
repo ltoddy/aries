@@ -1,8 +1,9 @@
 use aries_event::Notifier;
 use futures::StreamExt;
-use rig::agent::{Agent, AgentHook, ModelHandle, MultiTurnStreamItem, PromptResponse};
-use rig::completion::{CompletionModel, Message};
-use rig::streaming::StreamingPrompt;
+use rig::Model;
+use rig::agent::{Agent, AgentHook, MultiTurnStreamItem, PromptResponse};
+use rig::completion::Message;
+use rig::providers::openai::wire::OpenAiWire;
 
 use crate::{AriesError, AriesResult};
 
@@ -42,7 +43,7 @@ impl AriesAgent {
         T: Into<Message>,
         P: AgentHook + 'static,
     {
-        let stream = self.inner.stream_prompt(prompt).history(history).add_hook(hook).await;
+        let stream = self.inner.prompt(prompt).history(history).add_hook(hook).stream();
         tokio::pin!(stream);
 
         let mut final_res = PromptResponse::empty();
@@ -70,14 +71,7 @@ impl AriesAgent {
         &self.name
     }
 
-    pub fn set_model_handle(&mut self, model: ModelHandle) {
-        self.inner.set_model_handle(model);
-    }
-
-    pub fn set_model<M>(&mut self, model: M)
-    where
-        M: CompletionModel + 'static,
-    {
+    pub fn set_model(&mut self, model: Model<OpenAiWire>) {
         self.inner.set_model(model);
     }
 }

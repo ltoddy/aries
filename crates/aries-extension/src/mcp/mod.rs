@@ -30,7 +30,7 @@ const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 pub async fn connect(
     mcps: &[McpDefinition],
     tool_server_handle: ToolServerHandle,
-) -> Vec<RunningService<RoleClient, McpClientHandler>> {
+) -> Vec<RunningService<RoleClient, McpClientHandler<ToolServerHandle>>> {
     let mcp_servers = mcps.iter().flat_map(|c| &c.mcp_servers).collect::<Vec<_>>();
 
     future::join_all(mcp_servers.into_iter().map(|(server_name, server_config)| {
@@ -46,7 +46,7 @@ async fn connect_one(
     server_name: impl Into<String>,
     config: &McpServerConfig,
     tool_server_handle: ToolServerHandle,
-) -> McpConnectResult<RunningService<RoleClient, McpClientHandler>> {
+) -> McpConnectResult<RunningService<RoleClient, McpClientHandler<ToolServerHandle>>> {
     let server_name = server_name.into();
     info!(server = %server_name, "Connecting to mcp server");
 
