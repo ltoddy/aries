@@ -9,10 +9,16 @@ pub use self::builder::AgentBuilder;
 #[derive(Debug, thiserror::Error)]
 pub enum AriesError {
     #[error("{0}")]
-    Streaming(#[from] StreamingError),
+    Streaming(#[source] Box<StreamingError>),
 
     #[error("hook terminated: {0}")]
     HookTerminated(String),
+}
+
+impl From<StreamingError> for AriesError {
+    fn from(err: StreamingError) -> Self {
+        Self::Streaming(Box::new(err))
+    }
 }
 
 impl AriesError {
@@ -31,7 +37,9 @@ impl AriesError {
             "input is too long",
         ];
 
-        if let AriesError::Streaming(StreamingError::Completion(err)) = self {
+        if let AriesError::Streaming(err) = self
+            && let StreamingError::Completion(err) = err.as_ref()
+        {
             return PATTERNS.iter().any(|p| err.report().message.contains(p));
         }
         false
