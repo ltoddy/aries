@@ -61,7 +61,7 @@ reqwest = "0.13"
 reqwest-middleware = "0.5"
 reqwest-retry = "0.9"
 rig = { version = "0.43" }
-rmcp = "2.2"
+rmcp = "3.5"
 rustyline = "18.0"
 rustyline-derive = "0.12"
 schemars = "1"
