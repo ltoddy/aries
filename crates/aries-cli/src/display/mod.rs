@@ -39,7 +39,7 @@ pub fn print_agent_event(event: AgentEvent) {
                         let _ = std::io::stdout().flush();
                     },
                     StreamEvent::Reasoning { part: _, text } => {
-                        print!("{text}");
+                        print!("{}", text.dimmed());
                         let _ = std::io::stdout().flush();
                     },
                     StreamEvent::Arguments { part: _, json: _ } => {},

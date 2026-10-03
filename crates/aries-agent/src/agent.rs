@@ -5,7 +5,7 @@ use rig::agent::{Agent, AgentHook, MultiTurnStreamItem, PromptResponse};
 use rig::completion::Message;
 use rig::providers::openai::wire::OpenAiWire;
 
-use crate::{AriesError, AriesResult};
+use crate::AriesResult;
 
 // 随着上下文管理的优化,长程任务逐渐变得可能,所以不断提高 turns 的上限
 // 提高 turns 的上限可能是一个错误,也许对于长程任务,使用 handoff 的方式更好.
@@ -56,7 +56,7 @@ impl AriesAgent {
                         final_res = res;
                     }
                 },
-                Err(err) => return Err(AriesError::Streaming(err)),
+                Err(err) => return Err(err.into()),
             }
         }
 
