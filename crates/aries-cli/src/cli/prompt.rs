@@ -33,7 +33,7 @@ pub async fn execute(args: PromptArgs, gctx: GlobalContext) -> anyhow::Result<()
     let session_id = session.id();
     let _session_span = info_span!("session", session_id = %session_id).entered();
 
-    print!("\n{}: ", "Aries".magenta());
+    print!("{}: ", "Aries".magenta());
 
     let callback = async |event: AgentEvent| {
         print_agent_event(event);

@@ -48,7 +48,7 @@ pub async fn execute(gctx: GlobalContext, bare: bool) -> anyhow::Result<()> {
                     continue;
                 }
 
-                print!("\n{}: ", "Aries".magenta());
+                print!("{}: ", "Aries".magenta());
                 let start = Instant::now();
 
                 if let Err(err) = session

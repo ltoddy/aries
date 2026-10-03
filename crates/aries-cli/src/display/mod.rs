@@ -43,14 +43,14 @@ pub fn print_agent_event(event: AgentEvent) {
                         let _ = std::io::stdout().flush();
                     },
                     StreamEvent::Arguments { part: _, json: _ } => {},
-                    StreamEvent::End { part: _, content: _ } => {},
+                    StreamEvent::End { part: _, content: _ } => println!(),
                 },
                 Item::Unknown(_payload) => {},
             },
             MultiTurnStreamItem::ToolCall { tool_call } => {
                 let args = tool_call.function.arguments.to_string();
                 let (first, rest) = format_tool_call_args(&tool_call.function.name, &args);
-                println!("\n{} {}", "•".cyan(), first);
+                println!("{} {}", "•".cyan(), first);
                 if let Some(rest) = rest {
                     for line in rest.lines() {
                         if let Some(content) = line.strip_prefix("- ") {
@@ -63,9 +63,9 @@ pub fn print_agent_event(event: AgentEvent) {
                     }
                 }
             },
-            MultiTurnStreamItem::ToolExecutionCommitted { tool_call } => {},
-            MultiTurnStreamItem::StreamUserItem(_) => {},
-            MultiTurnStreamItem::CompletionCall(_) => {},
+            MultiTurnStreamItem::ToolExecutionCommitted { tool_call: _ } => {},
+            MultiTurnStreamItem::StreamUserItem(_streamed_user_content) => {},
+            MultiTurnStreamItem::CompletionCall(_completion_call) => {},
             MultiTurnStreamItem::ModelTurnRetried { turn: _ } => {},
             MultiTurnStreamItem::FinalResponse(res) => {
                 display_token_usage(&res.usage());
@@ -114,7 +114,7 @@ pub fn display_token_usage(usage: &rig::completion::Usage) {
     let output_tokens = usage.output_tokens.unwrap_or_default();
 
     println!(
-        "\n\n{} total={} input={} (cached={}) output={}",
+        "{} total={} input={} (cached={}) output={}",
         "Token usage:".dimmed(),
         total_tokens.to_string().dimmed(),
         input_tokens.to_string().dimmed(),
