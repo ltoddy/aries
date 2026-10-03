@@ -9,16 +9,18 @@ use aries_extension::hook::input::{
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
 use aries_persistence::ToolCallRepository;
-use rig::agent::hook::CompletionCall;
 use rig::agent::{
-    AgentHook, CompletionCallAction, HookContext, InvalidToolCallAction, InvalidToolCallContext,
-    ModelTurnAction, ModelTurnFinished, ObservationAction, RequestPatch, StepEventKind,
-    StreamResponseFinish, TextDelta, ToolCall, ToolCallAction, ToolCallDelta, ToolResultAction,
-    ToolResultEvent,
+    AgentHook, CompletionCallAction, CompletionCallEvent, DispatchAction, DispatchEvent,
+    HookContext, InvalidToolCallAction, InvalidToolCallContext, ModelSelection,
+    ModelSelectionAction, ModelTurnAction, ModelTurnFinished, ObservationAction, OutcomeAction,
+    OutcomeEvent, ReasoningDelta, RequestPatch, RunSettled, RunStart, RunStartAction,
+    StepEventKind, TextDelta, ToolCallDelta,
 };
+use rig::effect::{EffectKind, Outcome};
 use serde_json::Value;
 use toasty::Db;
 use tokio::sync::Mutex;
+use tracing::warn;
 
 use crate::session::instruction::InstructionContext;
 use crate::session::{system_reminder, system_reminders};
@@ -78,13 +80,63 @@ impl SessionPromptHook {
             window,
         }
     }
+
+    async fn fire_post_tool_use_failure(
+        &self,
+        name: &str,
+        args: &str,
+        call_id: String,
+        duration_ms: Option<u64>,
+        error_message: &str,
+    ) {
+        let tool_input: Value =
+            serde_json::from_str(args).unwrap_or_else(|_| Value::String(args.to_owned()));
+        let input = PostToolUseFailureHookInput::new(
+            &self.session_id,
+            &self.cwd,
+            name,
+            &tool_input,
+            call_id,
+            error_message,
+        )
+        .transcript_path(&self.transcript_path)
+        .is_interrupt(false);
+        let input = match duration_ms {
+            Some(duration_ms) => input.duration_ms(duration_ms),
+            None => input,
+        };
+
+        if let HookDecision::Continue { contexts } =
+            self.executor.fire_post_tool_use_failure(input).await
+        {
+            self.instruction_ctx.push_hook_contexts(contexts).await;
+        }
+    }
 }
 
 impl AgentHook for SessionPromptHook {
+    fn name(&self) -> Option<String> {
+        Some(String::from("AgentHook"))
+    }
+
+    async fn on_run_start(&self, _ctx: &HookContext, _event: RunStart<'_>) -> RunStartAction {
+        RunStartAction::continue_run()
+    }
+
+    async fn on_run_settled(&self, _ctx: &HookContext, _event: RunSettled<'_>) {}
+
+    fn on_model_select(
+        &self,
+        _ctx: &HookContext,
+        _event: ModelSelection<'_>,
+    ) -> ModelSelectionAction {
+        ModelSelectionAction::continue_run()
+    }
+
     async fn on_completion_call(
         &self,
         _ctx: &HookContext,
-        event: CompletionCall<'_>,
+        event: CompletionCallEvent<'_>,
     ) -> CompletionCallAction {
         let instructions = self.instruction_ctx.drain().await;
         let hook_contexts = self.instruction_ctx.drain_hook_contexts().await;
@@ -114,15 +166,7 @@ impl AgentHook for SessionPromptHook {
             patched.push(reminder);
         }
         patched.extend_from_slice(&system_reminders(hook_contexts));
-        CompletionCallAction::Patch(RequestPatch::new().history(patched))
-    }
-
-    async fn on_completion_response(
-        &self,
-        _ctx: &HookContext,
-        _event: rig::agent::hook::CompletionResponse<'_>,
-    ) -> ObservationAction {
-        ObservationAction::continue_run()
+        CompletionCallAction::patch(RequestPatch::new().history(patched))
     }
 
     async fn on_model_turn_finished(
@@ -141,14 +185,43 @@ impl AgentHook for SessionPromptHook {
         None
     }
 
-    async fn on_tool_call(&self, _ctx: &HookContext, event: ToolCall<'_>) -> ToolCallAction {
+    async fn on_text_delta(&self, _ctx: &HookContext, _event: TextDelta<'_>) -> ObservationAction {
+        ObservationAction::continue_run()
+    }
+
+    async fn on_reasoning_delta(
+        &self,
+        _ctx: &HookContext,
+        _event: ReasoningDelta<'_>,
+    ) -> ObservationAction {
+        ObservationAction::continue_run()
+    }
+
+    async fn on_tool_call_delta(
+        &self,
+        _ctx: &HookContext,
+        _event: ToolCallDelta<'_>,
+    ) -> ObservationAction {
+        ObservationAction::continue_run()
+    }
+
+    async fn on_dispatch(&self, _ctx: &HookContext, event: DispatchEvent<'_>) -> DispatchAction {
+        let EffectKind::ToolCall { name, args } = event.kind else {
+            return DispatchAction::proceed();
+        };
+        let Some(call_id) = event.call_id else {
+            return DispatchAction::proceed();
+        };
+
         let mut last_tool_call_at = self.last_tool_call_at.lock().await;
         *last_tool_call_at = Some(time::Instant::now());
+        drop(last_tool_call_at);
 
-        let tool_input: Value = serde_json::from_str(event.args)
-            .unwrap_or_else(|_| Value::String(event.args.to_owned()));
+        let mut tool_input: Value =
+            serde_json::from_str(args).unwrap_or_else(|_| Value::String(args.clone()));
+        let mut patched_tool_input = false;
 
-        match event.tool_name {
+        match name.as_str() {
             aries_tools::agent::NAME => {
                 let input = SubagentStartHookInput::new(
                     &self.session_id,
@@ -157,7 +230,29 @@ impl AgentHook for SessionPromptHook {
                     &self.agent_type,
                 )
                 .transcript_path(&self.transcript_path);
-                self.executor.fire_subagent_start(input).await;
+
+                match self.executor.fire_subagent_start(input).await {
+                    HookDecision::Continue { contexts } => {
+                        let contexts: Vec<_> = contexts.into_iter().collect();
+                        if !contexts.is_empty() {
+                            let Ok(mut args) = serde_json::from_value::<
+                                aries_tools::agent::AgentArgs,
+                            >(tool_input.clone()) else {
+                                warn!("failed to parse Agent args for SubagentStart context");
+                                return DispatchAction::proceed();
+                            };
+
+                            args.prompt.push_str("\n\n");
+                            args.prompt.push_str(&render_contexts(contexts));
+                            tool_input = serde_json::to_value(args).unwrap_or_else(|err| {
+                                warn!(%err, "failed to serialize Agent args for SubagentStart context");
+                                tool_input.clone()
+                            });
+                            patched_tool_input = true;
+                        }
+                    },
+                    HookDecision::Terminate { reason } => return DispatchAction::stop(reason),
+                }
             },
             aries_tools::read::NAME => {
                 if let Ok(args) =
@@ -175,9 +270,9 @@ impl AgentHook for SessionPromptHook {
         let input = PreToolUseHookInput::new(
             &self.session_id,
             &self.cwd,
-            event.tool_name,
-            tool_input,
-            event.internal_call_id,
+            name,
+            tool_input.clone(),
+            call_id.to_string(),
         )
         .transcript_path(&self.transcript_path)
         .agent_id(&self.agent_id)
@@ -186,129 +281,140 @@ impl AgentHook for SessionPromptHook {
         match self.executor.fire_pre_tool_use(input).await {
             HookDecision::Continue { contexts } => {
                 self.instruction_ctx.push_hook_contexts(contexts).await;
-                ToolCallAction::run()
+                if patched_tool_input {
+                    DispatchAction::rewrite_tool_args(event.kind, tool_input)
+                } else {
+                    DispatchAction::proceed()
+                }
             },
-            HookDecision::Terminate { reason } => ToolCallAction::Stop(reason),
+            HookDecision::Terminate { reason } => DispatchAction::stop(reason),
         }
     }
 
-    async fn on_tool_result(
-        &self,
-        _ctx: &HookContext,
-        event: ToolResultEvent<'_>,
-    ) -> ToolResultAction {
-        let duration_ms = self
-            .last_tool_call_at
-            .lock()
-            .await
-            .take()
-            .map(|started_at| started_at.elapsed().as_millis() as u64);
+    async fn on_outcome(&self, _ctx: &HookContext, event: OutcomeEvent<'_>) -> OutcomeAction {
+        match (event.kind, event.outcome, event.call_id) {
+            (
+                EffectKind::ToolCall { name, args },
+                Ok(Outcome::ToolResult { result }),
+                Some(call_id),
+            ) => {
+                let duration_ms = self
+                    .last_tool_call_at
+                    .lock()
+                    .await
+                    .take()
+                    .map(|started_at| started_at.elapsed().as_millis() as u64);
 
-        let tool_input: Value = serde_json::from_str(event.args)
-            .unwrap_or_else(|_| Value::String(event.args.to_owned()));
+                let tool_output = result.output();
+                let tool_input: Value =
+                    serde_json::from_str(args).unwrap_or_else(|_| Value::String(args.clone()));
 
-        let was_successful = event.raw_result.is_success();
-        let mut repo = self.tool_call_repo.clone();
-        let _ = repo
-            .create(
-                &self.session_id,
-                event.internal_call_id,
-                event.tool_name,
-                event.args,
-                duration_ms,
-                was_successful,
-            )
-            .await;
+                let was_successful = result.is_success();
+                let mut repo = self.tool_call_repo.clone();
+                let _ = repo
+                    .create(
+                        &self.session_id,
+                        call_id.to_string(),
+                        name,
+                        args,
+                        duration_ms,
+                        was_successful,
+                    )
+                    .await;
 
-        if let Some(error) = event.raw_result.error() {
-            let input = PostToolUseFailureHookInput::new(
-                &self.session_id,
-                &self.cwd,
-                event.tool_name,
-                &tool_input,
-                event.internal_call_id,
-                error.message(),
-            )
-            .transcript_path(&self.transcript_path)
-            .is_interrupt(false);
-            let input = match duration_ms {
-                Some(duration_ms) => input.duration_ms(duration_ms),
-                None => input,
-            };
+                if let Some(error) = result.error() {
+                    self.fire_post_tool_use_failure(
+                        name,
+                        args,
+                        call_id.to_string(),
+                        duration_ms,
+                        error.message(),
+                    )
+                    .await;
+                    return OutcomeAction::proceed();
+                }
 
-            if let HookDecision::Continue { contexts } =
-                self.executor.fire_post_tool_use_failure(input).await
-            {
-                self.instruction_ctx.push_hook_contexts(contexts).await;
-            }
-            return ToolResultAction::keep();
+                if name == aries_tools::agent::NAME {
+                    let input = SubagentStopHookInput::new(
+                        &self.session_id,
+                        &self.cwd,
+                        false,
+                        &self.agent_id,
+                        &self.agent_type,
+                    )
+                    .transcript_path(&self.transcript_path);
+
+                    let input = match tool_output.as_text() {
+                        Some(text) => input.last_assistant_message(text),
+                        None => input,
+                    };
+                    if let HookDecision::Continue { contexts } =
+                        self.executor.fire_subagent_stop(input).await
+                    {
+                        self.instruction_ctx.push_hook_contexts(contexts).await;
+                    }
+                }
+
+                let input = PostToolUseHookInput::new(
+                    &self.session_id,
+                    &self.cwd,
+                    name,
+                    &tool_input,
+                    tool_output.as_json().unwrap_or_default(),
+                    call_id.to_string(),
+                )
+                .transcript_path(&self.transcript_path)
+                .agent_id(&self.agent_id)
+                .agent_type(&self.agent_type);
+                let input = match duration_ms {
+                    Some(duration_ms) => input.duration_ms(duration_ms),
+                    None => input,
+                };
+
+                if let HookDecision::Continue { contexts } =
+                    self.executor.fire_post_tool_use(input).await
+                {
+                    self.instruction_ctx.push_hook_contexts(contexts).await;
+                }
+
+                OutcomeAction::proceed()
+            },
+            (EffectKind::ToolCall { name, args }, Err(err), Some(call_id)) => {
+                let duration_ms = self
+                    .last_tool_call_at
+                    .lock()
+                    .await
+                    .take()
+                    .map(|started_at| started_at.elapsed().as_millis() as u64);
+
+                let mut repo = self.tool_call_repo.clone();
+                let _ = repo
+                    .create(&self.session_id, call_id.to_string(), name, args, duration_ms, false)
+                    .await;
+
+                self.fire_post_tool_use_failure(
+                    name,
+                    args,
+                    call_id.to_string(),
+                    duration_ms,
+                    &err.message,
+                )
+                .await;
+                OutcomeAction::proceed()
+            },
+            (_, _, _) => OutcomeAction::proceed(),
         }
-
-        if event.tool_name == aries_tools::agent::NAME {
-            let input = SubagentStopHookInput::new(
-                &self.session_id,
-                &self.cwd,
-                false,
-                &self.agent_id,
-                &self.agent_type,
-            )
-            .transcript_path(&self.transcript_path);
-
-            let input = match event.raw_result.output().as_text() {
-                Some(text) => input.last_assistant_message(text),
-                None => input,
-            };
-            if let HookDecision::Continue { contexts } =
-                self.executor.fire_subagent_stop(input).await
-            {
-                self.instruction_ctx.push_hook_contexts(contexts).await;
-            }
-        }
-
-        let input = PostToolUseHookInput::new(
-            &self.session_id,
-            &self.cwd,
-            event.tool_name,
-            &tool_input,
-            event.raw_result.output().as_json().unwrap_or_default(),
-            event.internal_call_id,
-        )
-        .transcript_path(&self.transcript_path)
-        .agent_id(&self.agent_id)
-        .agent_type(&self.agent_type);
-        let input = match duration_ms {
-            Some(duration_ms) => input.duration_ms(duration_ms),
-            None => input,
-        };
-
-        if let HookDecision::Continue { contexts } = self.executor.fire_post_tool_use(input).await {
-            self.instruction_ctx.push_hook_contexts(contexts).await;
-        }
-
-        ToolResultAction::keep()
-    }
-
-    async fn on_text_delta(&self, _ctx: &HookContext, _event: TextDelta<'_>) -> ObservationAction {
-        ObservationAction::continue_run()
-    }
-
-    async fn on_tool_call_delta(
-        &self,
-        _ctx: &HookContext,
-        _event: ToolCallDelta<'_>,
-    ) -> ObservationAction {
-        ObservationAction::continue_run()
-    }
-
-    async fn on_stream_response_finish(
-        &self,
-        _ctx: &HookContext,
-        _event: StreamResponseFinish<'_>,
-    ) -> ObservationAction {
-        ObservationAction::continue_run()
     }
 
     fn observes(&self, _kind: StepEventKind) -> bool {
         true
     }
+}
+
+fn render_contexts(contexts: impl IntoIterator<Item = String>) -> String {
+    let mut rendered = Vec::new();
+    for context in contexts {
+        rendered.push(["<system-reminder>", &context, "</system-reminder>"].join("\n"));
+    }
+    rendered.join("\n\n")
 }
