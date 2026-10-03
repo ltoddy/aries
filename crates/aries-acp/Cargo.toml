@@ -21,7 +21,6 @@ aries-session = { version = "0.1.0", path = "../aries-session" }
 aries-tools = { version = "0.1.0", path = "../aries-tools" }
 base64.workspace = true
 itertools.workspace = true
-parking_lot.workspace = true
 rig.workspace = true
 serde_json.workspace = true
 tokio = { workspace = true, features = ["net", "sync"] }

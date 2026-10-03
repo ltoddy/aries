@@ -2,8 +2,6 @@ mod message;
 mod plan;
 mod session_update;
 
-use std::collections::HashMap;
-
 use agent_client_protocol::schema::v2::{
     IdleStateUpdate, PromptRequest, PromptResponse, StateUpdate, StopReason,
     UpdateSessionNotification,
@@ -11,9 +9,6 @@ use agent_client_protocol::schema::v2::{
 use agent_client_protocol::{Client, Error, Responder, V2ConnectionTo};
 use aries_event::AgentEvent;
 use aries_session::{PromptOutcome, SharedRegistry};
-use parking_lot::Mutex;
-use rig::completion::Message;
-use rig::message::ToolCall;
 use tracing::info;
 
 use self::message::UserMessage;
@@ -38,15 +33,13 @@ pub async fn prompt(
         }
     };
 
-    let tool_calls = Mutex::new(HashMap::<String, ToolCall>::new());
     let callback = async |event: AgentEvent| {
-        SessionUpdates::new(event, &tool_calls).into_iter().for_each(|u| {
+        SessionUpdates::new(event).into_iter().for_each(|u| {
             let _ = cx.send_notification(UpdateSessionNotification::new(session_id.clone(), u));
         });
     };
 
-    let user_message = UserMessage::from(req.prompt);
-    let prompt: Message = user_message.into();
+    let prompt = UserMessage::from(req.prompt);
     let result = match session.prompt(prompt, callback).await {
         Ok(result) => result,
         Err(err) => return responder.respond_with_internal_error(err.to_string()),

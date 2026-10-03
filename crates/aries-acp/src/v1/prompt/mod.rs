@@ -2,17 +2,12 @@ pub mod message;
 pub mod plan;
 pub mod session_update;
 
-use std::collections::HashMap;
-
 use agent_client_protocol::schema::v1::{
     PromptRequest, PromptResponse, SessionNotification, StopReason,
 };
 use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
 use aries_event::AgentEvent;
 use aries_session::{PromptOutcome, SharedRegistry};
-use parking_lot::Mutex;
-use rig::completion::Message;
-use rig::message::ToolCall;
 use tracing::{info, instrument};
 
 use self::message::UserMessage;
@@ -38,15 +33,13 @@ pub async fn prompt(
         }
     };
 
-    let tool_names = Mutex::new(HashMap::<String, ToolCall>::new());
     let callback = async |event: AgentEvent| {
-        SessionUpdates::new(event, &tool_names).into_iter().for_each(|u| {
+        SessionUpdates::new(event).into_iter().for_each(|u| {
             let _ = cx.send_notification(SessionNotification::new(session_id.clone(), u));
         });
     };
 
-    let user_message = UserMessage::from(req.prompt);
-    let prompt: Message = user_message.into();
+    let prompt = UserMessage::from(req.prompt);
     let stop_reason = match session.prompt(prompt, callback).await {
         Ok(PromptOutcome::Completed(_)) => StopReason::EndTurn,
         Ok(PromptOutcome::Cancelled(_)) => StopReason::Cancelled,

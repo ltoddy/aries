@@ -1,77 +1,45 @@
-use std::collections::HashMap;
-
 use agent_client_protocol::schema::v1::{
-    Content, ContentBlock, ContentChunk, Diff, MessageId, Plan, SessionInfoUpdate, SessionUpdate,
+    Content, ContentBlock, ContentChunk, Diff, Plan, SessionInfoUpdate, SessionUpdate,
     ToolCall as AcpToolCall, ToolCallContent, ToolCallId, ToolCallLocation, ToolCallStatus,
     ToolCallUpdate, ToolCallUpdateFields, ToolKind, UsageUpdate,
 };
 use aries_event::AgentEvent;
 use aries_tools::{
-    agent, bash, batch, codesearch, edit, format_tool_output, glob, grep, lsp, monitor, multiedit,
-    read, skill, task_output, task_stop, update_plan, webfetch, websearch, write,
+    agent, bash, batch, codesearch, edit, glob, grep, lsp, monitor, multiedit, read, skill,
+    task_output, task_stop, update_plan, webfetch, websearch, write,
 };
-use itertools::Itertools;
-use parking_lot::Mutex;
-use rig::agent::MultiTurnStreamItem;
-use rig::message::{ReasoningContent, ToolCall, ToolFunction, ToolResultContent};
-use rig::streaming::{StreamedAssistantContent, StreamedUserContent};
+use rig::agent::{MultiTurnStreamItem, PromptResponse};
+use rig::message::{ToolCall, ToolFunction, ToolName};
+use rig::streaming::{Item, StreamEvent, StreamedUserContent};
 
 use super::plan::PlanEntry;
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct SessionUpdates(Vec<SessionUpdate>);
 
 impl SessionUpdates {
-    pub fn new(event: AgentEvent, tool_calls: &Mutex<HashMap<String, ToolCall>>) -> Self {
+    pub fn new(event: AgentEvent) -> Self {
         match event {
             AgentEvent::Notification(text) => Self(vec![SessionUpdate::AgentMessageChunk(
                 ContentChunk::new(ContentBlock::from(text)),
             )]),
-            AgentEvent::StreamItem(stream_item) => {
-                match *stream_item {
-                    MultiTurnStreamItem::StreamAssistantItem(v) => {
-                        Self(Self::from_stream_assistant_content(v, tool_calls))
-                    },
-                    MultiTurnStreamItem::StreamUserItem(v) => {
-                        Self(Self::from_stream_user_content(v, tool_calls))
-                    },
-                    MultiTurnStreamItem::CompletionCall(_) => {
-                        // TODO
-                        Self(Vec::new())
-                    },
-                    MultiTurnStreamItem::FinalResponse(res) => {
-                        let usage = res.usage();
-                        let text = format!(
-                            "\n\nComplection({}) - This turn token usage: input tokens = {} (cached = {}), output tokens = {}, total tokens = {}, reasoning tokens = {}",
-                            res.completion_calls.len(),
-                            usage.input_tokens,
-                            usage.cached_input_tokens,
-                            usage.output_tokens,
-                            usage.total_tokens,
-                            usage.reasoning_tokens,
-                        );
-                        if let Some(completion) = res.completion_calls.last() {
-                            return Self(vec![
-                                SessionUpdate::AgentMessageChunk(ContentChunk::new(
-                                    ContentBlock::from(text),
-                                )),
-                                SessionUpdate::UsageUpdate(UsageUpdate::new(
-                                    completion.usage.total_tokens,
-                                    0,
-                                )),
-                            ]);
-                        }
-                        Self(Vec::new())
-                    },
-                    MultiTurnStreamItem::ToolExecutionCommitted { .. } => {
-                        // TODO
-                        Self(Vec::new())
-                    },
-                    MultiTurnStreamItem::ModelTurnRetried { .. } => {
-                        // TODO
-                        Self(Vec::new())
-                    },
-                }
+            AgentEvent::StreamItem(stream_item) => match *stream_item {
+                MultiTurnStreamItem::StreamAssistantItem(v) => {
+                    Self(Self::from_stream_assistant_content(v))
+                },
+                MultiTurnStreamItem::StreamUserItem(v) => Self(Self::from_stream_user_content(v)),
+                MultiTurnStreamItem::CompletionCall(_) => Default::default(),
+                MultiTurnStreamItem::FinalResponse(res) => Self(Self::from_prompt_response(res)),
+                MultiTurnStreamItem::ToolExecutionCommitted { tool_call } => {
+                    Self(vec![SessionUpdate::ToolCallUpdate(ToolCallUpdate::new(
+                        tool_call.id.to_string(),
+                        ToolCallUpdateFields::new().status(ToolCallStatus::Completed),
+                    ))]) // TODO 需要考虑工具调用失败的情况
+                },
+                MultiTurnStreamItem::ModelTurnRetried { turn: _ } => Default::default(),
+                MultiTurnStreamItem::ToolCall { tool_call } => {
+                    Self(vec![Self::from_tool_call(tool_call)])
+                },
             },
             AgentEvent::SessionInfoUpdate { title, updated_at } => {
                 Self(vec![SessionUpdate::SessionInfoUpdate(
@@ -81,122 +49,112 @@ impl SessionUpdates {
         }
     }
 
-    fn from_plan_entries(entries: Vec<update_plan::PlanEntry>) -> Vec<SessionUpdate> {
-        let entries = entries.into_iter().map(|e| PlanEntry::new(e).into()).collect();
-        vec![SessionUpdate::Plan(Plan::new(entries))]
-    }
-
-    fn from_stream_assistant_content(
-        content: StreamedAssistantContent,
-        tool_calls: &Mutex<HashMap<String, ToolCall>>,
-    ) -> Vec<SessionUpdate> {
+    fn from_stream_assistant_content(content: Item<StreamEvent>) -> Vec<SessionUpdate> {
         match content {
-            StreamedAssistantContent::Text(t) => {
-                vec![SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::from(
-                    t.text(),
-                )))]
-            },
-            StreamedAssistantContent::Reasoning { reasoning, id } => reasoning
-                .content
-                .into_iter()
-                .map(|rc| match rc {
-                    ReasoningContent::Text { text, .. } => text,
-                    ReasoningContent::Encrypted(s) => s,
-                    ReasoningContent::Redacted { data } => data,
-                    ReasoningContent::Summary(s) => s,
-                })
-                .map(|text| {
-                    SessionUpdate::AgentThoughtChunk(
-                        ContentChunk::new(ContentBlock::from(text))
-                            .message_id(MessageId::new(id.clone())),
-                    )
-                })
-                .collect(),
-            StreamedAssistantContent::ReasoningDelta { reasoning, .. } => {
-                vec![SessionUpdate::AgentThoughtChunk(ContentChunk::new(ContentBlock::from(
-                    reasoning,
-                )))]
-            },
-            StreamedAssistantContent::ToolCall { tool_call, internal_call_id, .. } => {
-                tool_calls.lock().insert(internal_call_id, tool_call.clone());
-
-                let (title, content) = parse_tool_call(tool_call.clone());
-                let locations = locations(tool_call.clone()).unwrap_or_default();
-
-                let ToolFunction { name, arguments } = tool_call.function;
-
-                let acp_tool_call = AcpToolCall::new(ToolCallId::new(tool_call.id.as_str()), title)
-                    .kind(tool_kind(&Some(name.clone())))
-                    .status(ToolCallStatus::InProgress)
-                    .content(content)
-                    .locations(locations)
-                    .raw_input(arguments);
-                vec![SessionUpdate::ToolCall(acp_tool_call)]
-            },
-            _ => Vec::new(),
-        }
-    }
-
-    fn from_stream_user_content(
-        content: StreamedUserContent,
-        tool_calls: &Mutex<HashMap<String, ToolCall>>,
-    ) -> Vec<SessionUpdate> {
-        match content {
-            StreamedUserContent::ToolResult { tool_result, internal_call_id } => {
-                let raw_output = tool_result
-                    .content
-                    .into_iter()
-                    .filter_map(|c| match c {
-                        ToolResultContent::Text(text) => Some(text.text),
-                        _ => None,
-                    })
-                    .join("\n");
-
-                let tool_call = tool_calls.lock().remove(&internal_call_id);
-                let (name, raw_input, content) = match tool_call {
-                    Some(t) => {
-                        let ToolFunction { name, arguments, .. } = t.function.clone();
-
-                        let content = match name.as_str() {
-                            edit::NAME | multiedit::NAME | write::NAME => parse_tool_call(t).1,
-                            update_plan::NAME => {
-                                // TODO: 不和谐
-                                if let Ok(output) = serde_json::from_str::<
-                                    update_plan::UpdatePlanOutput,
-                                >(&raw_output)
-                                {
-                                    return Self::from_plan_entries(output.items);
-                                }
-                                vec![]
-                            },
-                            _ => {
-                                let output = serde_json::from_str::<serde_json::Value>(&raw_output)
-                                    .unwrap_or_else(|_| {
-                                        serde_json::Value::String(raw_output.clone())
-                                    });
-                                vec![ToolCallContent::from(ContentBlock::from(format_tool_output(
-                                    &name, output,
-                                )))]
-                            },
-                        };
-                        (Some(name), Some(arguments), Some(content))
+            Item::Event(event) => match event {
+                StreamEvent::Start { part: _, kind: _ } => {},
+                StreamEvent::Text { part: _, text } => {
+                    return vec![SessionUpdate::AgentMessageChunk(ContentChunk::new(
+                        ContentBlock::from(text),
+                    ))];
+                },
+                StreamEvent::Reasoning { part: _, text } => {
+                    return vec![SessionUpdate::AgentThoughtChunk(ContentChunk::new(
+                        ContentBlock::from(text),
+                    ))];
+                },
+                StreamEvent::Arguments { part: _, json: _ } => {},
+                StreamEvent::End { part: _, content } => match content {
+                    rig::message::AssistantContent::Text(_text) => {},
+                    rig::message::AssistantContent::ToolCall(tool_call) => {
+                        return vec![Self::from_tool_call(tool_call)];
                     },
-                    None => (None, None, None),
-                };
+                    rig::message::AssistantContent::Reasoning(_reasoning) => {},
+                    rig::message::AssistantContent::Image(_image) => {},
+                },
+            },
+            Item::Unknown(_payload) => {},
+        }
+
+        vec![]
+    }
+
+    fn from_stream_user_content(content: StreamedUserContent) -> Vec<SessionUpdate> {
+        match content {
+            StreamedUserContent::ToolResult { tool_result } => {
+                let raw_output =
+                    tool_result.content.first().and_then(|content| content.as_json()).cloned();
+
+                if tool_result.name.as_str() == update_plan::NAME
+                    && let Some(output) = raw_output.clone()
+                    && let Ok(entries) =
+                        serde_json::from_value::<Vec<update_plan::PlanEntry>>(output)
+                {
+                    return vec![Self::from_plan_entries(entries)];
+                }
 
                 let fields = ToolCallUpdateFields::new()
-                    .kind(tool_kind(&name))
                     .status(ToolCallStatus::Completed)
-                    .content(content)
-                    .raw_input(raw_input)
-                    .raw_output(serde_json::Value::String(raw_output));
+                    .raw_output(raw_output);
 
-                let tool_call_update =
-                    ToolCallUpdate::new(ToolCallId::new(tool_result.call.as_str()), fields);
-                let tool_call_update = SessionUpdate::ToolCallUpdate(tool_call_update);
-                vec![tool_call_update]
+                vec![SessionUpdate::ToolCallUpdate(ToolCallUpdate::new(
+                    ToolCallId::new(tool_result.call.to_string()),
+                    fields,
+                ))]
             },
         }
+    }
+
+    fn from_plan_entries(entries: Vec<update_plan::PlanEntry>) -> SessionUpdate {
+        let entries = entries.into_iter().map(|e| PlanEntry::new(e).into()).collect();
+        let plan = Plan::new(entries);
+        SessionUpdate::Plan(plan)
+    }
+
+    fn from_prompt_response(res: PromptResponse) -> Vec<SessionUpdate> {
+        let usage = res.usage();
+
+        let completions = res.completion_calls.len();
+        let input_tokens = usage.input_tokens.unwrap_or_default();
+        let cached_input_tokens = usage.cached_input_tokens.unwrap_or_default();
+        let output_tokens = usage.output_tokens.unwrap_or_default();
+        let total_tokens = usage.total_tokens.unwrap_or_default();
+        let reasoning_tokens = usage.reasoning_tokens.unwrap_or_default();
+
+        let text = format!(
+            "\n\nCompletion({}) - This turn token usage: input tokens = {} (cached = {}), output tokens = {}, total tokens = {}, reasoning tokens = {}",
+            completions,
+            input_tokens,
+            cached_input_tokens,
+            output_tokens,
+            total_tokens,
+            reasoning_tokens,
+        );
+        let mut updates =
+            vec![SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::from(text)))];
+
+        if let Some(completion) = res.completion_calls.last() {
+            let total_tokens = completion.usage.total_tokens.unwrap_or_default();
+
+            updates.push(SessionUpdate::UsageUpdate(UsageUpdate::new(total_tokens, 0)));
+        }
+        updates
+    }
+
+    fn from_tool_call(tool_call: ToolCall) -> SessionUpdate {
+        let (title, content) = parse_tool_call(tool_call.clone());
+        let locations = locations(&tool_call.function);
+        let ToolFunction { name, arguments, .. } = tool_call.function;
+        let kind = tool_kind(&name);
+
+        let tc = AcpToolCall::new(ToolCallId::new(tool_call.id.to_string()), &title)
+            .kind(kind)
+            .status(ToolCallStatus::InProgress)
+            .content(content)
+            .locations(locations)
+            .raw_input(arguments);
+
+        SessionUpdate::ToolCall(tc)
     }
 }
 
@@ -293,42 +251,51 @@ fn parse_tool_call(t: ToolCall) -> (String, Vec<ToolCallContent>) {
     }
 }
 
-fn tool_kind(tool_name: &Option<String>) -> ToolKind {
-    match tool_name {
-        Some(tool_name) => match tool_name.as_str() {
-            glob::NAME | read::NAME | task_output::NAME => ToolKind::Read,
-            edit::NAME | multiedit::NAME | write::NAME => ToolKind::Edit,
-            grep::NAME | codesearch::NAME | lsp::NAME => ToolKind::Search,
-            bash::NAME | batch::NAME | monitor::NAME | task_stop::NAME => ToolKind::Execute,
-            webfetch::NAME | websearch::NAME => ToolKind::Fetch,
-            agent::NAME | skill::NAME | update_plan::NAME => ToolKind::Think,
-            _ => ToolKind::Other,
-        },
-        None => Default::default(),
+fn tool_kind(tool_name: &ToolName) -> ToolKind {
+    match tool_name.as_str() {
+        glob::NAME | read::NAME | task_output::NAME => ToolKind::Read,
+        edit::NAME | multiedit::NAME | write::NAME => ToolKind::Edit,
+        grep::NAME | codesearch::NAME | lsp::NAME => ToolKind::Search,
+        bash::NAME | batch::NAME | monitor::NAME | task_stop::NAME => ToolKind::Execute,
+        webfetch::NAME | websearch::NAME => ToolKind::Fetch,
+        agent::NAME | skill::NAME | update_plan::NAME => ToolKind::Think,
+        _ => ToolKind::Other,
     }
 }
 
-fn locations(t: ToolCall) -> Option<Vec<ToolCallLocation>> {
-    let name: &str = &t.function.name;
-    let arguments = t.function.arguments;
+fn locations(t: &ToolFunction) -> Vec<ToolCallLocation> {
+    let arguments = t.arguments.clone();
 
-    match name {
-        read::NAME => serde_json::from_value::<read::ReadArgs>(arguments)
-            .map(|args| vec![ToolCallLocation::new(args.location())])
-            .ok(),
-        write::NAME => serde_json::from_value::<write::WriteArgs>(arguments)
-            .map(|args| vec![ToolCallLocation::new(args.location())])
-            .ok(),
-        edit::NAME => serde_json::from_value::<edit::EditArgs>(arguments)
-            .map(|args| vec![ToolCallLocation::new(args.location())])
-            .ok(),
-        multiedit::NAME => serde_json::from_value::<multiedit::MultiEditArgs>(arguments)
-            .map(|args| vec![ToolCallLocation::new(args.location())])
-            .ok(),
-        glob::NAME => serde_json::from_value::<glob::GlobArgs>(arguments)
-            .ok()
-            .and_then(|args| args.base_dir)
-            .map(|path| vec![ToolCallLocation::new(path)]),
-        _ => None,
+    match t.name.as_str() {
+        read::NAME => {
+            if let Ok(args) = serde_json::from_value::<read::ReadArgs>(arguments) {
+                return vec![ToolCallLocation::new(args.location())];
+            }
+        },
+        write::NAME => {
+            if let Ok(args) = serde_json::from_value::<write::WriteArgs>(arguments) {
+                return vec![ToolCallLocation::new(args.location())];
+            }
+        },
+        edit::NAME => {
+            if let Ok(args) = serde_json::from_value::<edit::EditArgs>(arguments) {
+                return vec![ToolCallLocation::new(args.location())];
+            }
+        },
+        multiedit::NAME => {
+            if let Ok(args) = serde_json::from_value::<multiedit::MultiEditArgs>(arguments) {
+                return vec![ToolCallLocation::new(args.location())];
+            }
+        },
+        glob::NAME => {
+            if let Ok(args) = serde_json::from_value::<glob::GlobArgs>(arguments)
+                && let Some(base_dir) = args.base_dir
+            {
+                return vec![ToolCallLocation::new(base_dir)];
+            }
+        },
+        _ => {},
     }
+
+    vec![]
 }

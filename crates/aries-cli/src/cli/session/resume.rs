@@ -53,7 +53,7 @@ pub async fn execute(args: ResumeSessionsArgs, gctx: GlobalContext) -> anyhow::R
                     continue;
                 }
 
-                print!("\n{}: ", "Aries".magenta());
+                print!("{}: ", "Aries".magenta());
                 let start = Instant::now();
 
                 if let Err(err) = session

@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::Context;
-use aries_agent::AriesAgent;
+use aries_agent::{AgentBuilder, AriesAgent};
 use aries_compact::{self, ContextCompactor};
 use aries_context::{ChatContext, ChatHistory};
 use aries_event::{AgentEvent, Notifier};
@@ -21,14 +21,16 @@ use aries_extension::hook::{HookDecision, HooksExecutor};
 use aries_extension::{AgentExtensions, McpDefinition, SkillExecutor, SlashCommandsExecutor, mcp};
 use aries_init::{GlobalContext, ModelConfig, Setting, SettingLoader};
 use aries_lspclient::{LspServerInfo, SharedLspClient, warm_up};
-use aries_memory::MemoryStore;
+use aries_memory::{MemoryRetriever, MemoryStore};
 use aries_mode::Mode;
 use aries_persistence::SessionRepository;
 use itertools::Itertools;
 use jiff::Zoned;
+use rig::Model;
 use rig::agent::PromptResponse;
 use rig::completion::Message;
 use rig::message::UserContent;
+use rig::providers::openai::wire::OpenAiWire;
 use rig::tool::rmcp::McpClientHandler;
 use rig::tool::server::{ToolServer, ToolServerHandle};
 use rmcp::RoleClient;
@@ -43,7 +45,6 @@ pub use self::args::SessionArgs;
 use self::config::SessionConfig;
 use self::hook::SessionPromptHook;
 use self::instruction::InstructionContext;
-use crate::AriesClientProvider;
 
 pub enum PromptOutcome {
     Completed(String),
@@ -58,7 +59,7 @@ pub struct Session {
     setting: Setting,
     config: ModelConfig,
     cwd: PathBuf,
-    client: AriesClientProvider,
+    model: Model<OpenAiWire>,
     agent: AriesAgent,
     mode: Mode,
     args: SessionArgs,
@@ -85,7 +86,7 @@ pub struct Session {
 
     // 为了避免连接因为 drop 而释放
     #[allow(dead_code)]
-    mcp_clients: Arc<Vec<RunningService<RoleClient, McpClientHandler>>>,
+    mcp_clients: Arc<Vec<RunningService<RoleClient, McpClientHandler<ToolServerHandle>>>>,
     extensions: AgentExtensions,
 
     last_assistant_message: Option<String>,
@@ -159,16 +160,12 @@ impl Session {
 
         let config = self.setting.activate(&alias)?;
 
-        let client = AriesClientProvider::new(&config)?;
-        self.agent.set_model(client.completion_model(config.model()));
+        let model = crate::create_model(&config);
+        self.agent.set_model(model.clone());
 
-        self.client = client;
+        self.model = model;
         self.config = config.to_owned();
-        self.compactor.set_agent(self.client.compact_agent(
-            self.config.model(),
-            &self.transcript_path,
-            Notifier::clone(&self.notifier),
-        ));
+        self.compactor.set_model(self.model.clone());
 
         let loader = SettingLoader::new(self.gctx.root_dir());
         let _ = loader.save(&self.setting).await;
@@ -177,20 +174,17 @@ impl Session {
     }
 
     pub async fn set_mode(&mut self, mode: Mode) -> anyhow::Result<()> {
-        let agent = self
-            .client
-            .agent(
-                mode,
-                self.config.clone(),
-                &self.session_dir,
-                self.gctx.clone(),
-                self.lsp_client.clone(),
-                self.extensions.clone(),
-                self.tool_server_handle.clone(),
-                Notifier::clone(&self.notifier),
-            )
-            .await
-            .with_context(|| format!("failed to create agent for mode {mode}"))?;
+        let agent = AgentBuilder::new(
+            self.model.clone(),
+            mode,
+            &self.session_dir,
+            self.gctx.clone(),
+            Notifier::clone(&self.notifier),
+        )
+        .with_lsp_client(self.lsp_client.clone())
+        .with_extensions(self.extensions.clone())
+        .build(self.tool_server_handle.clone())
+        .await;
 
         self.agent = agent;
         self.mode = mode;
@@ -402,33 +396,32 @@ impl Session {
         let session_repo = SessionRepository::new(db.clone());
 
         let mode = Mode::default();
-        let client = AriesClientProvider::new(&config)?;
-        let agent = client
-            .agent(
-                mode,
-                config.clone(),
-                &session_dir,
-                gctx.clone(),
-                lsp_client.clone(),
-                extensions.clone(),
-                tool_server_handle.clone(),
-                Notifier::clone(&notifier),
-            )
-            .await?;
+        let model = crate::create_model(&config);
+        let agent = AgentBuilder::new(
+            model.clone(),
+            mode,
+            &session_dir,
+            gctx.clone(),
+            Notifier::clone(&notifier),
+        )
+        .with_lsp_client(lsp_client.clone())
+        .with_extensions(extensions.clone())
+        .build(tool_server_handle.clone())
+        .await;
 
         let hooks_executor = Arc::new(HooksExecutor::new(extensions.hooks.clone()));
         let compactor = ContextCompactor::new(
             &id,
             cwd,
             &transcript_path,
-            client.compact_agent(config.model(), &transcript_path, Notifier::clone(&notifier)),
+            model.clone(),
             chat_context.clone(),
             hooks_executor.clone(),
             Notifier::clone(&notifier),
         );
 
         let instruction_ctx = InstructionContext::new(cwd);
-        let input = SessionStartHookInput::new(&id, cwd, source, config.model(), mode);
+        let input = SessionStartHookInput::new(&id, cwd, source, model.name(), mode);
         if let HookDecision::Continue { contexts } = hooks_executor.fire_session_start(input).await
         {
             chat_context.append(&system_reminders(contexts)).await;
@@ -440,7 +433,7 @@ impl Session {
             setting,
             config,
             cwd: cwd.to_owned(),
-            client,
+            model,
             agent,
             mode,
             args,
@@ -499,7 +492,7 @@ impl Session {
 
     async fn recall_context(&self, query: impl Into<String>) -> Option<String> {
         let memories = self.memory_store.scan().await;
-        let retriever = self.client.memory_retriever(self.config.model());
+        let retriever = MemoryRetriever::new(self.model.clone());
         let retrieved = retriever.retrieve(query, &memories).await;
 
         let mut blocks = Vec::<String>::with_capacity(retrieved.len());
