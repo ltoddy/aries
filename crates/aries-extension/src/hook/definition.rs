@@ -23,8 +23,10 @@ pub enum HooksFileParseError {
 }
 
 impl HooksDefinition {
-    fn new(location: PathBuf, description: Option<String>, hooks: HooksSettings) -> Self {
-        Self { location, description, hooks }
+    fn new(location: impl AsRef<Path>, description: Option<String>, hooks: HooksSettings) -> Self {
+        let location = location.as_ref();
+
+        Self { location: location.to_owned(), description, hooks }
     }
 
     pub async fn parse(file_path: impl AsRef<Path>) -> Result<Self, HooksFileParseError> {
@@ -40,7 +42,7 @@ impl HooksDefinition {
         let content = tokio::fs::read_to_string(file_path).await?;
         let definition = serde_json::from_str::<Definition>(&content)?;
 
-        Ok(HooksDefinition::new(file_path.to_owned(), definition.description, definition.hooks))
+        Ok(HooksDefinition::new(file_path, definition.description, definition.hooks))
     }
 }
 
@@ -61,6 +63,15 @@ pub enum HookEvent {
 
     /// Fires after the user prompt is expanded with additional context.
     UserPromptExpansion,
+
+    /// Fires before switching to a different model.
+    PreModelSwitch,
+
+    /// Fires after switching to a different model.
+    PostModelSwitch,
+
+    /// Fires when assistant content is about to be displayed.
+    MessageDisplay,
 
     /// Fires before a tool is executed.
     ///
