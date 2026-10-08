@@ -1,7 +1,13 @@
 use std::collections::HashMap;
 
-use agent_client_protocol::schema::v1::{McpServer, McpServerHttp, McpServerSse, McpServerStdio};
+use agent_client_protocol::schema::v1::{
+    McpServer, McpServerHttp, McpServerSse, McpServerStdio, MessageMcpNotification,
+    MessageMcpRequest, MessageMcpResponse,
+};
+use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
 use aries_extension::{McpDefinition, McpServerConfig};
+use serde_json::{Map, Value};
+use tracing::info;
 
 #[derive(Debug, Clone)]
 pub struct McpServers(pub Vec<McpServer>);
@@ -33,4 +39,21 @@ impl From<McpServers> for McpDefinition {
 
         McpDefinition::new(mcp_servers)
     }
+}
+
+pub async fn message(
+    req: MessageMcpRequest,
+    responder: Responder<MessageMcpResponse>,
+    _cx: ConnectionTo<Client>,
+) -> Result<(), Error> {
+    info!("Received MCP message request (v1): {req:?}");
+    responder.respond(MessageMcpResponse::success(Value::Object(Map::new())))
+}
+
+pub async fn message_notification(
+    notif: MessageMcpNotification,
+    _cx: ConnectionTo<Client>,
+) -> Result<(), Error> {
+    info!("Received MCP message notification (v1): {notif:?}");
+    Ok(())
 }

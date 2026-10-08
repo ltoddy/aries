@@ -100,9 +100,7 @@ pub async fn run(
             },
             on_receive_request!(),
         )
-        .on_receive_request(mcp::connect, on_receive_request!())
         .on_receive_request(mcp::message, on_receive_request!())
-        .on_receive_request(mcp::disconnect, on_receive_request!())
         .on_receive_notification(cancel::cancel_request, on_receive_notification!())
         .on_receive_notification(
             {

@@ -111,10 +111,12 @@ pub async fn run(
             },
             on_receive_request!(),
         )
+        .on_receive_request(mcp::message, on_receive_request!())
         .on_receive_notification(
             async move |args, cx| cancel(args, cx, registry.clone()).await,
             on_receive_notification!(),
         )
+        .on_receive_notification(mcp::message_notification, on_receive_notification!())
         .connect_to(transport)
         .await?;
 
