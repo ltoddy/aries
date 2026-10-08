@@ -16,7 +16,7 @@ name = "aries"
 path = "src/main.rs"
 
 [dependencies]
-agent-client-protocol.workspace = true
+agent-client-protocol = { workspace = true, features = ["stdio"] }
 anyhow.workspace = true
 aries-acp = { version = "0.1.0", path = "../aries-acp" }
 aries-event = { version = "0.1.0", path = "../aries-event" }

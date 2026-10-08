@@ -1,14 +1,12 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use agent_client_protocol::schema::v2::{
-    ConnectMcpRequest, ConnectMcpResponse, DisconnectMcpRequest, DisconnectMcpResponse,
-    McpConnectionId, McpServer, McpServerHttp, McpServerStdio, MessageMcpNotification,
-    MessageMcpRequest, MessageMcpResponse,
+    McpServer, McpServerHttp, McpServerStdio, MessageMcpNotification, MessageMcpRequest,
+    MessageMcpResponse,
 };
 use agent_client_protocol::{Client, Error, Responder, V2ConnectionTo};
 use aries_extension::{McpDefinition, McpServerConfig};
-use serde_json::value::RawValue;
+use serde_json::{Map, Value};
 use tracing::info;
 
 #[derive(Debug, Clone)]
@@ -39,23 +37,13 @@ impl From<McpServers> for McpDefinition {
     }
 }
 
-pub async fn connect(
-    req: ConnectMcpRequest,
-    responder: Responder<ConnectMcpResponse>,
-    _cx: V2ConnectionTo<Client>,
-) -> Result<(), Error> {
-    info!("Received MCP connect request (v2): {req:?}");
-    responder.respond(ConnectMcpResponse::new(McpConnectionId::new(req.server_id.to_string())))
-}
-
 pub async fn message(
     req: MessageMcpRequest,
     responder: Responder<MessageMcpResponse>,
     _cx: V2ConnectionTo<Client>,
 ) -> Result<(), Error> {
     info!("Received MCP message request (v2): {req:?}");
-    let result = RawValue::from_string("{}".to_owned()).map_err(|_| Error::internal_error())?;
-    responder.respond(MessageMcpResponse::new(Arc::from(result)))
+    responder.respond(MessageMcpResponse::success(Value::Object(Map::new())))
 }
 
 pub async fn message_notification(
@@ -64,13 +52,4 @@ pub async fn message_notification(
 ) -> Result<(), Error> {
     info!("Received MCP message notification (v2): {notif:?}");
     Ok(())
-}
-
-pub async fn disconnect(
-    req: DisconnectMcpRequest,
-    responder: Responder<DisconnectMcpResponse>,
-    _cx: V2ConnectionTo<Client>,
-) -> Result<(), Error> {
-    info!("Received MCP disconnect request (v2): {req:?}");
-    responder.respond(DisconnectMcpResponse::new())
 }
