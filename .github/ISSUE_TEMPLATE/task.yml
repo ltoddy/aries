@@ -1,0 +1,74 @@
+name: 任务 / 实现计划
+description: 记录想做的事情、实现思路、改进计划或调研事项
+title: "[Task]: "
+labels: ["task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        用这个 issue 记录计划中的改动、实现思路、重构想法或需要调研的问题。
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: 目标
+      description: 你想实现什么？
+      placeholder: 描述你希望最终达成的结果。
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: 背景 / 动机
+      description: 为什么需要做这件事？
+      placeholder: 说明背景、痛点或原因。
+    validations:
+      required: false
+
+  - type: textarea
+    id: approach
+    attributes:
+      label: 实现思路
+      description: 你计划如何实现？
+      placeholder: |
+        - 修改 ...
+        - 新增 ...
+        - 重构 ...
+        - 需要考虑 ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: tasks
+    attributes:
+      label: 任务拆分
+      description: 把工作拆成可以执行的步骤。
+      placeholder: |
+        - [ ] 步骤 1
+        - [ ] 步骤 2
+        - [ ] 步骤 3
+    validations:
+      required: false
+
+  - type: textarea
+    id: risks
+    attributes:
+      label: 风险 / 待确认问题
+      description: 哪些地方还不确定，或者需要进一步思考？
+      placeholder: |
+        - 这个设计是否兼容 ...？
+        - 是否需要处理 ...？
+    validations:
+      required: false
+
+  - type: textarea
+    id: references
+    attributes:
+      label: 相关资料
+      description: 相关 issue、PR、文档、日志或笔记。
+      placeholder: |
+        - Related to #...
+        - See ...
+    validations:
+      required: false
