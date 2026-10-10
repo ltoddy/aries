@@ -9,22 +9,13 @@ body:
         用这个 issue 记录计划中的改动、实现思路、重构想法或需要调研的问题。
 
   - type: textarea
-    id: goal
-    attributes:
-      label: 目标
-      description: 你想实现什么？
-      placeholder: 描述你希望最终达成的结果。
-    validations:
-      required: true
-
-  - type: textarea
     id: motivation
     attributes:
       label: 背景 / 动机
       description: 为什么需要做这件事？
       placeholder: 说明背景、痛点或原因。
     validations:
-      required: false
+      required: true
 
   - type: textarea
     id: approach
