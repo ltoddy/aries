@@ -2,8 +2,10 @@ mod error;
 mod file_checkpoint;
 mod read_state;
 mod task;
+mod worktree;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 
 use aries_event::Notifier;
@@ -14,10 +16,13 @@ pub use self::error::GuardWriteError;
 pub use self::file_checkpoint::SharedFileCheckpoint;
 pub use self::read_state::SharedReadState;
 pub use self::task::{StopTaskError, TaskKind, TaskRegistry, TaskSnapshot, TaskStatus};
+pub use self::worktree::Worktree;
 
 #[derive(Clone)]
 pub struct ToolContext {
     lsp_client: Option<SharedLspClient>,
+    cwd: Arc<parking_lot::Mutex<PathBuf>>,
+    worktree: Arc<parking_lot::Mutex<Option<Worktree>>>,
     pub file_checkpoint: SharedFileCheckpoint,
     pub task: TaskRegistry,
     read_state: SharedReadState,
@@ -27,6 +32,7 @@ impl std::fmt::Debug for ToolContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ToolContext")
             .field("has_lsp_client", &self.lsp_client.is_some())
+            .field("cwd", &self.cwd)
             .field("file_checkpoint", &self.file_checkpoint)
             .field("task", &self.task)
             .field("read_state", &self.read_state)
@@ -35,12 +41,34 @@ impl std::fmt::Debug for ToolContext {
 }
 
 impl ToolContext {
-    pub fn new(lsp_client: Option<SharedLspClient>, notifier: Notifier) -> Self {
+    pub fn new(
+        lsp_client: Option<SharedLspClient>,
+        notifier: Notifier,
+        cwd: impl AsRef<Path>,
+    ) -> Self {
         let file_checkpoint = SharedFileCheckpoint::new();
         let task = TaskRegistry::new(notifier);
         let read_state = SharedReadState::new();
+        let cwd = std::sync::Arc::new(parking_lot::Mutex::new(cwd.as_ref().to_owned()));
+        let worktree_session = std::sync::Arc::new(parking_lot::Mutex::new(None));
 
-        Self { lsp_client, file_checkpoint, task, read_state }
+        Self { lsp_client, cwd, worktree: worktree_session, file_checkpoint, task, read_state }
+    }
+
+    pub fn cwd(&self) -> PathBuf {
+        self.cwd.lock().clone()
+    }
+
+    pub fn set_cwd(&self, cwd: impl AsRef<Path>) {
+        *self.cwd.lock() = cwd.as_ref().to_owned();
+    }
+
+    pub fn worktree(&self) -> Option<Worktree> {
+        self.worktree.lock().clone()
+    }
+
+    pub fn set_worktree(&self, worktree: Option<Worktree>) {
+        *self.worktree.lock() = worktree;
     }
 
     pub async fn on_file_read(&self, file_path: impl AsRef<Path>) {
