@@ -37,7 +37,7 @@ allowed-tools:
   - Read
   - Edit
 ";
-    let fm: Frontmatter = serde_yaml::from_str(yaml).expect("test operation should succeed");
+    let fm: Frontmatter = yaml_serde::from_str(yaml).expect("test operation should succeed");
     assert_eq!(fm.name, "fix-typo");
     assert_eq!(fm.description, "fix typos in the codebase");
     assert_eq!(fm.argument_hint.as_deref(), Some("<file>"));
@@ -51,7 +51,7 @@ name: fix-typo
 description: fix typos in the codebase
 allowed-tools: Bash(openspec:*)
 ";
-    let fm: Frontmatter = serde_yaml::from_str(yaml).expect("test operation should succeed");
+    let fm: Frontmatter = yaml_serde::from_str(yaml).expect("test operation should succeed");
     assert_eq!(fm.allowed_tools.as_slice(), &["Bash(openspec:*)".to_owned()]);
 }
 
@@ -61,7 +61,7 @@ fn deserializes_with_optional_fields_absent() {
 name: fix-typo
 description: fix typos in the codebase
 ";
-    let fm: Frontmatter = serde_yaml::from_str(yaml).expect("test operation should succeed");
+    let fm: Frontmatter = yaml_serde::from_str(yaml).expect("test operation should succeed");
     assert!(fm.argument_hint.is_none());
     assert!(fm.allowed_tools.is_empty());
 }
@@ -72,7 +72,7 @@ fn serializes_with_kebab_case_keys() {
     fm.argument_hint = Some("<file>".to_owned());
     fm.allowed_tools = vec!["Read".to_owned()].into();
 
-    let yaml = serde_yaml::to_string(&fm).expect("test operation should succeed");
+    let yaml = yaml_serde::to_string(&fm).expect("test operation should succeed");
     assert!(yaml.contains("argument-hint: <file>"));
     assert!(yaml.contains("allowed-tools:"));
     assert!(!yaml.contains("argument_hint"));

@@ -41,7 +41,7 @@ where
         let (frontmatter, body) =
             content.split_once("\n---\n").ok_or_else(|| DocumentError::wrong_format(&location))?;
 
-        let frontmatter = serde_yaml::from_str::<F>(frontmatter)
+        let frontmatter = yaml_serde::from_str::<F>(frontmatter)
             .map_err(|err| DocumentError::yaml(&location, err))?;
 
         Ok(Self::new(location, frontmatter, body))
@@ -49,7 +49,7 @@ where
 
     pub async fn write(&self) -> Result<(), DocumentError> {
         let frontmatter =
-            serde_yaml::to_string(&self.frontmatter).map_err(DocumentError::yaml_serialize)?;
+            yaml_serde::to_string(&self.frontmatter).map_err(DocumentError::yaml_serialize)?;
 
         let content = [DELIMITER, &frontmatter, DELIMITER, &self.body].join("\n");
         tokio::fs::write(&self.location, content)
@@ -71,10 +71,10 @@ pub enum DocumentError {
     Yaml {
         file_path: PathBuf,
         #[source]
-        err: serde_yaml::Error,
+        err: yaml_serde::Error,
     },
     #[error("failed to serialize frontmatter to YAML: {0}")]
-    YamlSerialize(#[source] serde_yaml::Error),
+    YamlSerialize(#[source] yaml_serde::Error),
     #[error("{}: missing YAML frontmatter — expected content wrapped in '---' delimiters", .file_path.display())]
     WrongFormat { file_path: PathBuf },
 }
@@ -85,12 +85,12 @@ impl DocumentError {
         Self::Io { file_path, err }
     }
 
-    pub fn yaml(file_path: impl AsRef<Path>, err: serde_yaml::Error) -> Self {
+    pub fn yaml(file_path: impl AsRef<Path>, err: yaml_serde::Error) -> Self {
         let file_path = file_path.as_ref().to_owned();
         Self::Yaml { file_path, err }
     }
 
-    pub fn yaml_serialize(err: serde_yaml::Error) -> Self {
+    pub fn yaml_serialize(err: yaml_serde::Error) -> Self {
         Self::YamlSerialize(err)
     }
 

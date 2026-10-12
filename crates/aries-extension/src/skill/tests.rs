@@ -41,7 +41,7 @@ allowed-tools:
   - Read
   - Edit
 ";
-    let fm: Frontmatter = serde_yaml::from_str(yaml).expect("test operation should succeed");
+    let fm: Frontmatter = yaml_serde::from_str(yaml).expect("test operation should succeed");
     assert_eq!(fm.name, "fix-typo");
     assert_eq!(fm.description, "fix typos in the codebase");
     assert_eq!(fm.license.as_deref(), Some("MIT"));
@@ -56,7 +56,7 @@ name: fix-typo
 description: fix typos in the codebase
 allowed-tools: Read, Edit
 ";
-    let fm: Frontmatter = serde_yaml::from_str(yaml).expect("test operation should succeed");
+    let fm: Frontmatter = yaml_serde::from_str(yaml).expect("test operation should succeed");
     assert_eq!(fm.allowed_tools.as_slice(), &["Read".to_owned(), "Edit".to_owned()]);
 }
 
@@ -66,7 +66,7 @@ fn deserializes_with_optional_fields_absent() {
 name: fix-typo
 description: fix typos in the codebase
 ";
-    let fm: Frontmatter = serde_yaml::from_str(yaml).expect("test operation should succeed");
+    let fm: Frontmatter = yaml_serde::from_str(yaml).expect("test operation should succeed");
     assert!(fm.license.is_none());
     assert!(fm.compatibility.is_none());
     assert!(fm.metadata.is_none());
@@ -82,7 +82,7 @@ metadata:
   tags: [rust, cli]
   license: MIT
 ";
-    let fm: Frontmatter = serde_yaml::from_str(yaml).expect("test operation should succeed");
+    let fm: Frontmatter = yaml_serde::from_str(yaml).expect("test operation should succeed");
     let metadata = fm.metadata.expect("metadata should be parsed");
     assert_eq!(metadata["tags"].as_sequence().expect("test operation should succeed").len(), 2);
     assert_eq!(metadata["license"].as_str(), Some("MIT"));
