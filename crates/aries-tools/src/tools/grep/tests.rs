@@ -1,8 +1,15 @@
 // This file contains tests generated with AI assistance.
 
+use std::path::Path;
+
 use tokio::process::Command as Bash;
 
 use super::*;
+
+fn tool(cwd: impl AsRef<Path>) -> GrepTool {
+    let (notifier, _) = aries_event::Notifier::channel();
+    GrepTool::new(crate::context::ToolContext::new(None, notifier, cwd))
+}
 
 /// 构造带默认值的 GrepArgs，减少各用例的样板。
 fn grep_args(pattern: &str) -> GrepArgs {
@@ -54,7 +61,7 @@ async fn test_grep_finds_pattern() {
         .expect("test operation should succeed");
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path());
+    let tool = tool(tmp.path());
     let mut args = grep_args("println");
     args.output_mode = OutputMode::Content;
     let result = tool.call(&mut context, args).await.expect("test operation should succeed");
@@ -72,7 +79,7 @@ async fn test_grep_case_insensitive() {
         .expect("test operation should succeed");
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path());
+    let tool = tool(tmp.path());
 
     // 默认区分大小写：小写 pattern 不命中。
     let mut sensitive = grep_args("hello");
@@ -107,7 +114,7 @@ async fn test_grep_no_line_numbers() {
         .expect("test operation should succeed");
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path());
+    let tool = tool(tmp.path());
     let mut args = grep_args("target");
     args.output_mode = OutputMode::Content;
     args.show_line_numbers = false;
@@ -126,7 +133,7 @@ async fn test_grep_context_lines() {
         .expect("test operation should succeed");
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path());
+    let tool = tool(tmp.path());
     let mut args = grep_args("MATCH");
     args.output_mode = OutputMode::Content;
     args.context = Some(1);
@@ -154,7 +161,7 @@ async fn test_grep_files_with_matches_sorted_by_mtime() {
         .expect("test operation should succeed");
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path());
+    let tool = tool(tmp.path());
     // 默认 output_mode 即 files_with_matches。
     let result =
         tool.call(&mut context, grep_args("needle")).await.expect("test operation should succeed");
@@ -173,7 +180,7 @@ async fn test_grep_files_with_matches_applies_limit_without_collecting_all_resul
         .expect("test operation should succeed");
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path());
+    let tool = tool(tmp.path());
     let mut args = grep_args("needle");
     args.limit = 1;
     let result = tool.call(&mut context, args).await.expect("test operation should succeed");
@@ -189,7 +196,7 @@ async fn test_grep_count_mode() {
         .expect("test operation should succeed");
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path());
+    let tool = tool(tmp.path());
     let mut args = grep_args("hit");
     args.output_mode = OutputMode::Count;
     let result = tool.call(&mut context, args).await.expect("test operation should succeed");
@@ -207,7 +214,7 @@ async fn test_grep_context_at_file_boundary() {
         .expect("test operation should succeed");
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path());
+    let tool = tool(tmp.path());
     let mut args = grep_args("MATCH");
     args.output_mode = OutputMode::Content;
     args.context_after = Some(5);
@@ -226,7 +233,7 @@ async fn test_grep_context_saturates_no_overflow() {
         .expect("test operation should succeed");
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path());
+    let tool = tool(tmp.path());
     let mut args = grep_args("MATCH");
     args.output_mode = OutputMode::Content;
     args.context = Some(usize::MAX);
@@ -245,7 +252,7 @@ async fn test_grep_limit_truncates_match_groups() {
     }
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path());
+    let tool = tool(tmp.path());
     let mut args = grep_args("needle");
     args.output_mode = OutputMode::Content;
     args.limit = 3;
@@ -263,7 +270,7 @@ async fn test_grep_no_matches_found() {
         .expect("test operation should succeed");
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path());
+    let tool = tool(tmp.path());
     let result = tool
         .call(&mut context, grep_args("absent_pattern"))
         .await
@@ -300,7 +307,7 @@ async fn test_grep_respects_gitignore_by_default() {
         .expect("test operation should succeed");
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path());
+    let tool = tool(tmp.path());
     let result =
         tool.call(&mut context, grep_args("needle")).await.expect("test operation should succeed");
 
@@ -328,7 +335,7 @@ async fn test_grep_can_disable_gitignore_filtering() {
         .expect("test operation should succeed");
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path());
+    let tool = tool(tmp.path());
     let mut args = grep_args("needle");
     args.respect_ignore = false;
     let result = tool.call(&mut context, args).await.expect("test operation should succeed");
@@ -352,7 +359,7 @@ async fn test_grep_include_filters_files() {
         .expect("test operation should succeed");
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path());
+    let tool = tool(tmp.path());
     let mut args = grep_args("needle");
     args.include = Some("src/**/*.rs".to_string());
     let result = tool.call(&mut context, args).await.expect("test operation should succeed");
@@ -377,7 +384,7 @@ async fn test_grep_include_keeps_nested_target_subtree() {
         .expect("test operation should succeed");
 
     let mut context = ToolContext::new();
-    let tool = GrepTool::new(tmp.path());
+    let tool = tool(tmp.path());
     let mut args = grep_args("needle");
     args.include = Some("src/**/*.rs".to_string());
     let result = tool.call(&mut context, args).await.expect("test operation should succeed");

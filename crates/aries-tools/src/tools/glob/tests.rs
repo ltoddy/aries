@@ -1,6 +1,13 @@
 // This file contains tests generated with AI assistance.
 
+use std::path::{Path, PathBuf};
+
 use super::*;
+
+fn tool(cwd: impl AsRef<Path>) -> GlobTool {
+    let (notifier, _) = aries_event::Notifier::channel();
+    GlobTool::new(crate::context::ToolContext::new(None, notifier, cwd))
+}
 
 fn glob_args(pattern: &str) -> GlobArgs {
     GlobArgs {
@@ -36,7 +43,7 @@ async fn test_glob_finds_files() {
     tokio::fs::write(tmp.path().join("sub/b.rs"), "").await.expect("test operation should succeed");
 
     let mut context = ToolContext::new();
-    let tool = GlobTool::new(tmp.path());
+    let tool = tool(tmp.path());
     let result =
         tool.call(&mut context, glob_args("*.rs")).await.expect("test operation should succeed");
     assert!(result.files.contains(&PathBuf::from("a.rs")));
@@ -49,7 +56,7 @@ async fn test_glob_recursive() {
     tokio::fs::write(tmp.path().join("sub/b.rs"), "").await.expect("test operation should succeed");
 
     let mut context = ToolContext::new();
-    let tool = GlobTool::new(tmp.path());
+    let tool = tool(tmp.path());
     let result =
         tool.call(&mut context, glob_args("**/*.rs")).await.expect("test operation should succeed");
     assert_eq!(result.files, vec![PathBuf::from("sub/b.rs")]);
@@ -65,7 +72,7 @@ async fn test_glob_sorts_by_mtime_newest_first() {
     tokio::fs::write(tmp.path().join("new.rs"), "").await.expect("test operation should succeed");
 
     let mut context = ToolContext::new();
-    let tool = GlobTool::new(tmp.path());
+    let tool = tool(tmp.path());
     let result =
         tool.call(&mut context, glob_args("*.rs")).await.expect("test operation should succeed");
 
@@ -83,7 +90,7 @@ async fn test_glob_truncates_over_limit() {
     }
 
     let mut context = ToolContext::new();
-    let tool = GlobTool::new(tmp.path());
+    let tool = tool(tmp.path());
     let result =
         tool.call(&mut context, glob_args("*.rs")).await.expect("test operation should succeed");
 
@@ -103,7 +110,7 @@ async fn test_glob_limit_keeps_newest_files() {
     args.limit = 2;
 
     let mut context = ToolContext::new();
-    let tool = GlobTool::new(tmp.path());
+    let tool = tool(tmp.path());
     let result = tool.call(&mut context, args).await.expect("test operation should succeed");
 
     assert_eq!(result.files, vec![PathBuf::from("new.rs"), PathBuf::from("middle.rs")]);
@@ -116,7 +123,7 @@ async fn test_glob_no_files_found() {
     tokio::fs::write(tmp.path().join("a.txt"), "").await.expect("test operation should succeed");
 
     let mut context = ToolContext::new();
-    let tool = GlobTool::new(tmp.path());
+    let tool = tool(tmp.path());
     let result =
         tool.call(&mut context, glob_args("*.rs")).await.expect("test operation should succeed");
     assert!(result.files.is_empty());
@@ -137,7 +144,7 @@ async fn test_glob_hidden_files() {
         .expect("test operation should succeed");
 
     let mut context = ToolContext::new();
-    let tool = GlobTool::new(tmp.path());
+    let tool = tool(tmp.path());
 
     // 默认跳过隐藏文件。
     let default_result =

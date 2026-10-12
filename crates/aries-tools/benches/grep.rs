@@ -1,6 +1,7 @@
 use std::hint::black_box;
 use std::path::{Path, PathBuf};
 
+use aries_tools::ToolContext as AriesToolContext;
 use aries_tools::grep::{GrepArgs, GrepTool, OutputMode};
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use rig::tool::{Tool, ToolContext};
@@ -81,7 +82,8 @@ fn run_grep(tool: &GrepTool, args: GrepArgs) {
 
 fn bench_grep(c: &mut Criterion) {
     let repo = BenchRepo::new(180, 240);
-    let tool = GrepTool::new(&repo.root);
+    let (notifier, _) = aries_event::Notifier::channel();
+    let tool = GrepTool::new(AriesToolContext::new(None, notifier, &repo.root));
 
     let scenarios = [
         ("files_with_matches", {

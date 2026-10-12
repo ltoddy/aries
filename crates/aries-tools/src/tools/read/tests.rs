@@ -16,13 +16,14 @@ async fn test_read_file() {
     fs::write(&file_path, "line1\nline2\nline3").expect("test operation should succeed");
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = ReadTool::new(
-        dir.path(),
-        ToolContext::new(None, {
+    let tool = ReadTool::new(ToolContext::new(
+        None,
+        {
             let (notifier, _) = aries_event::Notifier::channel();
             notifier
-        }),
-    );
+        },
+        std::env::temp_dir(),
+    ));
     let result = tool
         .call(&mut context, ReadArgs { file_path, offset: None, limit: None })
         .await
@@ -39,13 +40,14 @@ async fn test_read_file_with_offset() {
     fs::write(&file_path, "line1\nline2\nline3").expect("test operation should succeed");
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = ReadTool::new(
-        dir.path(),
-        ToolContext::new(None, {
+    let tool = ReadTool::new(ToolContext::new(
+        None,
+        {
             let (notifier, _) = aries_event::Notifier::channel();
             notifier
-        }),
-    );
+        },
+        std::env::temp_dir(),
+    ));
     let result = tool
         .call(&mut context, ReadArgs { file_path, offset: Some(2), limit: None })
         .await
@@ -62,13 +64,14 @@ async fn test_read_file_with_limit() {
     fs::write(&file_path, "line1\nline2\nline3\nline4").expect("test operation should succeed");
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = ReadTool::new(
-        dir.path(),
-        ToolContext::new(None, {
+    let tool = ReadTool::new(ToolContext::new(
+        None,
+        {
             let (notifier, _) = aries_event::Notifier::channel();
             notifier
-        }),
-    );
+        },
+        std::env::temp_dir(),
+    ));
     let result = tool
         .call(&mut context, ReadArgs { file_path, offset: Some(2), limit: Some(2) })
         .await
@@ -86,13 +89,14 @@ async fn test_read_file_respects_default_line_cap() {
     fs::write(&file_path, content).expect("test operation should succeed");
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = ReadTool::new(
-        dir.path(),
-        ToolContext::new(None, {
+    let tool = ReadTool::new(ToolContext::new(
+        None,
+        {
             let (notifier, _) = aries_event::Notifier::channel();
             notifier
-        }),
-    );
+        },
+        std::env::temp_dir(),
+    ));
     let result = tool
         .call(&mut context, ReadArgs { file_path, offset: None, limit: None })
         .await
@@ -112,13 +116,14 @@ async fn test_read_file_rejects_zero_limit() {
     fs::write(&file_path, "line1").expect("test operation should succeed");
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = ReadTool::new(
-        dir.path(),
-        ToolContext::new(None, {
+    let tool = ReadTool::new(ToolContext::new(
+        None,
+        {
             let (notifier, _) = aries_event::Notifier::channel();
             notifier
-        }),
-    );
+        },
+        std::env::temp_dir(),
+    ));
     let result =
         tool.call(&mut context, ReadArgs { file_path, offset: None, limit: Some(0) }).await;
 
@@ -132,13 +137,14 @@ async fn test_read_empty_file() {
     fs::write(&file_path, "").expect("test operation should succeed");
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = ReadTool::new(
-        dir.path(),
-        ToolContext::new(None, {
+    let tool = ReadTool::new(ToolContext::new(
+        None,
+        {
             let (notifier, _) = aries_event::Notifier::channel();
             notifier
-        }),
-    );
+        },
+        std::env::temp_dir(),
+    ));
     let result = tool
         .call(&mut context, ReadArgs { file_path, offset: None, limit: None })
         .await
@@ -152,13 +158,14 @@ async fn test_read_directory_is_rejected() {
     let dir = TempDir::new().expect("test operation should succeed");
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = ReadTool::new(
-        dir.path(),
-        ToolContext::new(None, {
+    let tool = ReadTool::new(ToolContext::new(
+        None,
+        {
             let (notifier, _) = aries_event::Notifier::channel();
             notifier
-        }),
-    );
+        },
+        std::env::temp_dir(),
+    ));
     let result = tool
         .call(
             &mut context,
@@ -172,13 +179,14 @@ async fn test_read_directory_is_rejected() {
 #[tokio::test]
 async fn test_read_file_not_found() {
     let mut context = rig::tool::ToolContext::new();
-    let tool = ReadTool::new(
-        ".",
-        ToolContext::new(None, {
+    let tool = ReadTool::new(ToolContext::new(
+        None,
+        {
             let (notifier, _) = aries_event::Notifier::channel();
             notifier
-        }),
-    );
+        },
+        std::env::temp_dir(),
+    ));
     let result = tool
         .call(
             &mut context,
@@ -202,13 +210,14 @@ async fn test_read_file_marks_truncation() {
     fs::write(&file_path, "line1\nline2\nline3\nline4").expect("test operation should succeed");
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = ReadTool::new(
-        dir.path(),
-        ToolContext::new(None, {
+    let tool = ReadTool::new(ToolContext::new(
+        None,
+        {
             let (notifier, _) = aries_event::Notifier::channel();
             notifier
-        }),
-    );
+        },
+        std::env::temp_dir(),
+    ));
     let result = tool
         .call(&mut context, ReadArgs { file_path, offset: None, limit: Some(3) })
         .await
@@ -225,13 +234,14 @@ async fn test_read_file_not_truncated_at_exact_limit() {
     fs::write(&file_path, "line1\nline2\nline3").expect("test operation should succeed");
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = ReadTool::new(
-        dir.path(),
-        ToolContext::new(None, {
+    let tool = ReadTool::new(ToolContext::new(
+        None,
+        {
             let (notifier, _) = aries_event::Notifier::channel();
             notifier
-        }),
-    );
+        },
+        std::env::temp_dir(),
+    ));
     let result = tool
         .call(&mut context, ReadArgs { file_path, offset: None, limit: Some(3) })
         .await
@@ -265,13 +275,14 @@ async fn test_read_file_rejects_binary() {
     fs::write(&file_path, b"foo\x00bar").expect("test operation should succeed");
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = ReadTool::new(
-        dir.path(),
-        ToolContext::new(None, {
+    let tool = ReadTool::new(ToolContext::new(
+        None,
+        {
             let (notifier, _) = aries_event::Notifier::channel();
             notifier
-        }),
-    );
+        },
+        std::env::temp_dir(),
+    ));
     let result = tool.call(&mut context, ReadArgs { file_path, offset: None, limit: None }).await;
 
     assert!(matches!(result, Err(ReadError::BinaryFile(_))));

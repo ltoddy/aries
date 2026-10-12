@@ -10,13 +10,14 @@ fn bash_args(command: &str) -> BashArgs {
 }
 
 fn tool(cwd: impl AsRef<std::path::Path>) -> BashTool {
-    BashTool::new(
-        cwd,
-        crate::context::ToolContext::new(None, {
+    BashTool::new(crate::context::ToolContext::new(
+        None,
+        {
             let (notifier, _) = aries_event::Notifier::channel();
             notifier
-        }),
-    )
+        },
+        cwd,
+    ))
 }
 
 #[tokio::test]
@@ -73,11 +74,15 @@ async fn test_bash_runs_in_cwd() {
 #[tokio::test]
 async fn test_bash_background() {
     let mut context = ToolContext::new();
-    let ctx = crate::context::ToolContext::new(None, {
-        let (notifier, _) = aries_event::Notifier::channel();
-        notifier
-    });
-    let tool = BashTool::new(std::env::temp_dir(), ctx.clone());
+    let ctx = crate::context::ToolContext::new(
+        None,
+        {
+            let (notifier, _) = aries_event::Notifier::channel();
+            notifier
+        },
+        std::env::temp_dir(),
+    );
+    let tool = BashTool::new(ctx.clone());
     let mut args = bash_args("printf hello");
     args.background = true;
     let result = tool.call(&mut context, args).await.expect("test operation should succeed");

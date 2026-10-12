@@ -15,14 +15,18 @@ async fn test_write_empty_existing_file() {
     let file_path = tmp.path().join("hello.txt");
     fs::write(&file_path, "").expect("test operation should succeed");
 
-    let ctx = ToolContext::new(None, {
-        let (notifier, _) = aries_event::Notifier::channel();
-        notifier
-    });
+    let ctx = ToolContext::new(
+        None,
+        {
+            let (notifier, _) = aries_event::Notifier::channel();
+            notifier
+        },
+        std::env::temp_dir(),
+    );
     ctx.on_file_read(&file_path).await;
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = WriteTool::new(tmp.path(), ctx);
+    let tool = WriteTool::new(ctx);
     let result = tool
         .call(
             &mut context,
@@ -45,13 +49,14 @@ async fn test_write_new_file() {
     let file_path = tmp.path().join("missing.txt");
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = WriteTool::new(
-        tmp.path(),
-        ToolContext::new(None, {
+    let tool = WriteTool::new(ToolContext::new(
+        None,
+        {
             let (notifier, _) = aries_event::Notifier::channel();
             notifier
-        }),
-    );
+        },
+        tmp.path(),
+    ));
     let result = tool
         .call(
             &mut context,
@@ -70,13 +75,17 @@ async fn test_write_rejects_unread_empty_file() {
     let file_path = tmp.path().join("empty.txt");
     fs::write(&file_path, "").expect("test operation should succeed");
 
-    let ctx = ToolContext::new(None, {
-        let (notifier, _) = aries_event::Notifier::channel();
-        notifier
-    });
+    let ctx = ToolContext::new(
+        None,
+        {
+            let (notifier, _) = aries_event::Notifier::channel();
+            notifier
+        },
+        std::env::temp_dir(),
+    );
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = WriteTool::new(tmp.path(), ctx);
+    let tool = WriteTool::new(ctx);
     let result = tool
         .call(
             &mut context,
@@ -95,13 +104,17 @@ async fn test_write_rejects_non_empty_existing_file() {
     let file_path = tmp.path().join("data.txt");
     fs::write(&file_path, "line1\nline2\nline3\n").expect("test operation should succeed");
 
-    let ctx = ToolContext::new(None, {
-        let (notifier, _) = aries_event::Notifier::channel();
-        notifier
-    });
+    let ctx = ToolContext::new(
+        None,
+        {
+            let (notifier, _) = aries_event::Notifier::channel();
+            notifier
+        },
+        std::env::temp_dir(),
+    );
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = WriteTool::new(tmp.path(), ctx);
+    let tool = WriteTool::new(ctx);
     let result = tool
         .call(
             &mut context,
@@ -126,14 +139,18 @@ async fn test_write_empty_content() {
     let file_path = tmp.path().join("empty.txt");
     fs::write(&file_path, "").expect("test operation should succeed");
 
-    let ctx = ToolContext::new(None, {
-        let (notifier, _) = aries_event::Notifier::channel();
-        notifier
-    });
+    let ctx = ToolContext::new(
+        None,
+        {
+            let (notifier, _) = aries_event::Notifier::channel();
+            notifier
+        },
+        std::env::temp_dir(),
+    );
     ctx.on_file_read(&file_path).await;
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = WriteTool::new(tmp.path(), ctx);
+    let tool = WriteTool::new(ctx);
     tool.call(&mut context, WriteArgs { file_path: file_path.clone(), content: String::new() })
         .await
         .expect("test operation should succeed");
@@ -148,13 +165,14 @@ async fn test_write_resolves_relative_path_against_cwd() {
     let file_path = tmp.path().join("sub/rel.txt");
 
     let mut context = rig::tool::ToolContext::new();
-    let tool = WriteTool::new(
-        tmp.path(),
-        ToolContext::new(None, {
+    let tool = WriteTool::new(ToolContext::new(
+        None,
+        {
             let (notifier, _) = aries_event::Notifier::channel();
             notifier
-        }),
-    );
+        },
+        tmp.path(),
+    ));
     let result = tool
         .call(
             &mut context,

@@ -1,6 +1,7 @@
 use std::hint::black_box;
 use std::path::{Path, PathBuf};
 
+use aries_tools::ToolContext as AriesToolContext;
 use aries_tools::glob::{GlobArgs, GlobTool};
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use rig::tool::{Tool, ToolContext};
@@ -93,7 +94,8 @@ fn run_glob(tool: &GlobTool, args: GlobArgs) {
 
 fn bench_glob(c: &mut Criterion) {
     let repo = BenchRepo::new(2_000, 32);
-    let tool = GlobTool::new(&repo.root);
+    let (notifier, _) = aries_event::Notifier::channel();
+    let tool = GlobTool::new(AriesToolContext::new(None, notifier, &repo.root));
 
     let scenarios = [
         ("flat_rs", glob_args("src/*.rs")),
