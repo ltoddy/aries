@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use aries_event::Notifier;
 use aries_extension::AgentExtensions;
+use aries_init::GlobalContext;
 use futures::future::join_all;
 use rig::Model;
 use rig::providers::openai::wire::OpenAiWire;
@@ -24,34 +25,26 @@ use crate::{
 const MAX_BATCH_CALLS: usize = 25;
 
 pub struct BatchTool {
-    model: Model<OpenAiWire>,
-    cwd: PathBuf,
-    parent_dir: PathBuf,
+    gctx: GlobalContext,
     ctx: ToolContext,
+    model: Model<OpenAiWire>,
+    parent_dir: PathBuf,
     notifier: Notifier,
     extensions: AgentExtensions,
 }
 
 impl BatchTool {
     pub fn new(
-        model: Model<OpenAiWire>,
-        cwd: impl AsRef<Path>,
-        parent_dir: impl AsRef<Path>,
+        gctx: GlobalContext,
         ctx: ToolContext,
+        model: Model<OpenAiWire>,
+        parent_dir: impl AsRef<Path>,
         notifier: Notifier,
         extensions: AgentExtensions,
     ) -> Self {
-        let cwd = cwd.as_ref();
         let parent_dir = parent_dir.as_ref();
 
-        Self {
-            model,
-            cwd: cwd.to_owned(),
-            parent_dir: parent_dir.to_owned(),
-            ctx,
-            notifier,
-            extensions,
-        }
+        Self { gctx, model, parent_dir: parent_dir.to_owned(), ctx, notifier, extensions }
     }
 
     async fn dispatch(
@@ -60,7 +53,6 @@ impl BatchTool {
         params: Value,
         context: &mut rig::tool::ToolContext,
     ) -> Result<Value, BatchError> {
-        let cwd = &self.cwd;
         let parent_dir = &self.parent_dir;
         let ctx = self.ctx.clone();
 
@@ -70,8 +62,9 @@ impl BatchTool {
                     .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
                 let res = Tool::call(
                     &agent::AgentTool::new(
+                        self.gctx.clone(),
+                        self.ctx.clone(),
                         self.model.clone(),
-                        cwd,
                         parent_dir,
                         Notifier::clone(&self.notifier),
                         self.extensions.clone(),
@@ -87,7 +80,7 @@ impl BatchTool {
             bash::NAME => {
                 let args = serde_json::from_value::<bash::BashArgs>(params)
                     .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
-                let res = Tool::call(&bash::BashTool::new(cwd, ctx), context, args)
+                let res = Tool::call(&bash::BashTool::new(ctx), context, args)
                     .await
                     .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
                 serde_json::to_value(res)
@@ -96,7 +89,7 @@ impl BatchTool {
             read::NAME => {
                 let args = serde_json::from_value::<read::ReadArgs>(params)
                     .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
-                let res = Tool::call(&read::ReadTool::new(cwd, ctx), context, args)
+                let res = Tool::call(&read::ReadTool::new(ctx), context, args)
                     .await
                     .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
                 serde_json::to_value(res)
@@ -105,7 +98,7 @@ impl BatchTool {
             write::NAME => {
                 let args = serde_json::from_value::<write::WriteArgs>(params)
                     .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
-                let res = Tool::call(&write::WriteTool::new(cwd, ctx), context, args)
+                let res = Tool::call(&write::WriteTool::new(ctx), context, args)
                     .await
                     .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
                 serde_json::to_value(res)
@@ -114,7 +107,7 @@ impl BatchTool {
             glob::NAME => {
                 let args = serde_json::from_value::<glob::GlobArgs>(params)
                     .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
-                let res = Tool::call(&glob::GlobTool::new(cwd), context, args)
+                let res = Tool::call(&glob::GlobTool::new(ctx), context, args)
                     .await
                     .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
                 serde_json::to_value(res)
@@ -123,7 +116,7 @@ impl BatchTool {
             grep::NAME => {
                 let args = serde_json::from_value::<grep::GrepArgs>(params)
                     .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
-                let res = Tool::call(&grep::GrepTool::new(cwd), context, args)
+                let res = Tool::call(&grep::GrepTool::new(ctx), context, args)
                     .await
                     .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
                 serde_json::to_value(res)
@@ -132,7 +125,7 @@ impl BatchTool {
             monitor::NAME => {
                 let args = serde_json::from_value::<monitor::MonitorArgs>(params)
                     .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
-                let res = Tool::call(&monitor::MonitorTool::new(cwd, ctx), context, args)
+                let res = Tool::call(&monitor::MonitorTool::new(ctx), context, args)
                     .await
                     .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
                 serde_json::to_value(res)
@@ -141,7 +134,7 @@ impl BatchTool {
             multiedit::NAME => {
                 let args = serde_json::from_value::<multiedit::MultiEditArgs>(params)
                     .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
-                let res = Tool::call(&multiedit::MultiEditTool::new(cwd, ctx), context, args)
+                let res = Tool::call(&multiedit::MultiEditTool::new(ctx), context, args)
                     .await
                     .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
                 serde_json::to_value(res)
@@ -150,7 +143,7 @@ impl BatchTool {
             edit::NAME => {
                 let args = serde_json::from_value::<edit::EditArgs>(params)
                     .map_err(|e| BatchError::invalid_parameters(tool_name.clone(), e))?;
-                let res = Tool::call(&edit::EditTool::new(cwd, ctx), context, args)
+                let res = Tool::call(&edit::EditTool::new(ctx), context, args)
                     .await
                     .map_err(|e| BatchError::tool_execution(tool_name.clone(), e))?;
                 serde_json::to_value(res)

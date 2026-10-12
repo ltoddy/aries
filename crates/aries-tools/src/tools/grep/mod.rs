@@ -5,7 +5,6 @@ mod output;
 #[cfg(test)]
 mod tests;
 
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use driver::{Collector, Query, StopState, walk_parallel};
@@ -20,13 +19,12 @@ pub use self::output::GrepOutput;
 pub const NAME: &str = "Grep";
 
 pub struct GrepTool {
-    cwd: PathBuf,
+    ctx: crate::context::ToolContext,
 }
 
 impl GrepTool {
-    pub fn new(cwd: impl AsRef<Path>) -> Self {
-        let cwd = cwd.as_ref().to_owned();
-        Self { cwd }
+    pub fn new(ctx: crate::context::ToolContext) -> Self {
+        Self { ctx }
     }
 }
 
@@ -107,7 +105,11 @@ impl Tool for GrepTool {
 
         let query = Query::from(args);
 
-        walk_parallel(&self.cwd, query, matcher, collector.clone())?;
+        let cwd = self
+            .ctx
+            .worktree()
+            .map_or_else(|| self.ctx.cwd(), |worktree| worktree.path().to_owned());
+        walk_parallel(&cwd, query, matcher, collector.clone())?;
         let collector = Arc::into_inner(collector).ok_or(GrepError::CollectorStillShared)?;
         let (matches, truncated) = collector.finish();
 

@@ -16,14 +16,12 @@ pub const NAME: &str = "Lsp";
 
 pub struct LspTool {
     client: SharedLspClient,
-    cwd: PathBuf,
+    ctx: crate::context::ToolContext,
 }
 
 impl LspTool {
-    pub fn new(client: SharedLspClient, cwd: impl AsRef<Path>) -> Self {
-        let cwd = cwd.as_ref();
-
-        Self { client, cwd: cwd.to_owned() }
+    pub fn new(client: SharedLspClient, ctx: crate::context::ToolContext) -> Self {
+        Self { client, ctx }
     }
 
     fn extract_position_args(
@@ -108,21 +106,24 @@ impl Tool for LspTool {
     ) -> Result<Self::Output, Self::Error> {
         if let Some(file_path) = &args.file_path {
             let file_path =
-                if file_path.is_absolute() { file_path } else { &self.cwd.join(file_path) };
+                if file_path.is_absolute() { file_path } else { &self.ctx.cwd().join(file_path) };
             self.client.did_open(file_path).await?;
         }
 
         let result = match args.operation {
             LspOperation::GoToDefinition => {
-                let (file_path, line, character) = Self::extract_position_args(&args, &self.cwd)?;
+                let (file_path, line, character) =
+                    Self::extract_position_args(&args, self.ctx.cwd())?;
                 self.client.goto_definition(file_path, line, character).await
             },
             LspOperation::FindReferences => {
-                let (file_path, line, character) = Self::extract_position_args(&args, &self.cwd)?;
+                let (file_path, line, character) =
+                    Self::extract_position_args(&args, self.ctx.cwd())?;
                 self.client.find_references(file_path, line, character).await
             },
             LspOperation::Hover => {
-                let (file_path, line, character) = Self::extract_position_args(&args, &self.cwd)?;
+                let (file_path, line, character) =
+                    Self::extract_position_args(&args, self.ctx.cwd())?;
                 self.client.hover(file_path, line, character).await
             },
             LspOperation::DocumentSymbol => {
@@ -132,7 +133,7 @@ impl Tool for LspTool {
                 let abs_path = if file_path.is_absolute() {
                     file_path.clone()
                 } else {
-                    self.cwd.join(file_path)
+                    self.ctx.cwd().join(file_path)
                 };
                 self.client.document_symbol(abs_path).await
             },
@@ -141,15 +142,18 @@ impl Tool for LspTool {
                 self.client.workspace_symbol(query).await
             },
             LspOperation::GoToImplementation => {
-                let (file_path, line, character) = Self::extract_position_args(&args, &self.cwd)?;
+                let (file_path, line, character) =
+                    Self::extract_position_args(&args, self.ctx.cwd())?;
                 self.client.goto_implementation(file_path, line, character).await
             },
             LspOperation::PrepareCallHierarchy => {
-                let (file_path, line, character) = Self::extract_position_args(&args, &self.cwd)?;
+                let (file_path, line, character) =
+                    Self::extract_position_args(&args, self.ctx.cwd())?;
                 self.client.prepare_call_hierarchy(file_path, line, character).await
             },
             LspOperation::IncomingCalls => {
-                let (file_path, line, character) = Self::extract_position_args(&args, &self.cwd)?;
+                let (file_path, line, character) =
+                    Self::extract_position_args(&args, self.ctx.cwd())?;
                 let items = self
                     .client
                     .prepare_call_hierarchy(file_path, line, character)
@@ -169,7 +173,8 @@ impl Tool for LspTool {
                 self.client.incoming_calls(item).await
             },
             LspOperation::OutgoingCalls => {
-                let (file_path, line, character) = Self::extract_position_args(&args, &self.cwd)?;
+                let (file_path, line, character) =
+                    Self::extract_position_args(&args, self.ctx.cwd())?;
                 let items = self
                     .client
                     .prepare_call_hierarchy(file_path, line, character)

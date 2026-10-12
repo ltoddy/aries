@@ -5,15 +5,19 @@ use std::path::Path;
 
 use aries_event::Notifier;
 use aries_extension::AgentExtensions;
+use aries_init::GlobalContext;
 use aries_mode::Mode;
+use git2::Repository;
 use itertools::Itertools;
 use rig::Model;
 use rig::providers::openai::wire::OpenAiWire;
 use rig::tool::ToolSet;
 
+pub use self::context::ToolContext;
 pub use self::tools::{
-    agent, bash, batch, codesearch, edit, format_tool_output, glob, grep, lsp, monitor, multiedit,
-    read, skill, task_output, task_stop, update_plan, webfetch, websearch, write,
+    agent, bash, batch, codesearch, edit, enter_worktree, exit_worktree, format_tool_output, glob,
+    grep, lsp, monitor, multiedit, read, skill, task_output, task_stop, update_plan, webfetch,
+    websearch, write,
 };
 
 pub const ALL_TOOL_NAMES: &[&str] = &[
@@ -22,6 +26,8 @@ pub const ALL_TOOL_NAMES: &[&str] = &[
     batch::NAME,
     codesearch::NAME,
     edit::NAME,
+    enter_worktree::NAME,
+    exit_worktree::NAME,
     glob::NAME,
     grep::NAME,
     lsp::NAME,
@@ -42,9 +48,9 @@ pub fn is_builtin_tool(tool_name: &str) -> bool {
 }
 
 pub fn create_tools_from_mode(
+    gctx: GlobalContext,
     mode: Mode,
     model: Model<OpenAiWire>,
-    cwd: impl AsRef<Path>,
     parent_dir: impl AsRef<Path>,
     lsp_client: Option<aries_lspclient::SharedLspClient>,
     extensions: AgentExtensions,
@@ -53,9 +59,9 @@ pub fn create_tools_from_mode(
     let tool_names = tool_names_from_mode(mode);
 
     create_tools_from_tool_names(
+        gctx,
         &tool_names,
         model,
-        cwd,
         parent_dir,
         lsp_client,
         extensions,
@@ -80,6 +86,8 @@ pub fn tool_names_from_mode(mode: Mode) -> Vec<&'static str> {
             bash::NAME,
             batch::NAME,
             edit::NAME,
+            enter_worktree::NAME,
+            exit_worktree::NAME,
             lsp::NAME,
             multiedit::NAME,
             skill::NAME,
@@ -95,41 +103,45 @@ pub fn tool_names_from_mode(mode: Mode) -> Vec<&'static str> {
 }
 
 pub fn create_tools_from_tool_names(
+    gctx: GlobalContext,
     tool_names: &[&str],
     model: Model<OpenAiWire>,
-    cwd: impl AsRef<Path>,
     parent_dir: impl AsRef<Path>,
     lsp_client: Option<aries_lspclient::SharedLspClient>,
     extensions: AgentExtensions,
     notifier: Notifier,
 ) -> ToolSet {
-    let cwd = cwd.as_ref();
     let parent_dir = parent_dir.as_ref();
     let tool_names = tool_names.iter().unique().collect_vec();
     let mut tool_set = ToolSet::default();
 
-    let ctx = context::ToolContext::new(lsp_client.clone(), Notifier::clone(&notifier));
+    let ctx = context::ToolContext::new(
+        lsp_client.clone(),
+        Notifier::clone(&notifier),
+        gctx.current_dir(),
+    );
 
     for &tool_name in tool_names {
         match tool_name {
             agent::NAME => {
                 tool_set.add_tool(agent::AgentTool::new(
+                    gctx.clone(),
+                    ctx.clone(),
                     model.clone(),
-                    cwd,
                     parent_dir,
                     Notifier::clone(&notifier),
                     extensions.clone(),
                 ));
             },
             bash::NAME => {
-                tool_set.add_tool(bash::BashTool::new(cwd, ctx.clone()));
+                tool_set.add_tool(bash::BashTool::new(ctx.clone()));
             },
             batch::NAME => {
                 tool_set.add_tool(batch::BatchTool::new(
-                    model.clone(),
-                    cwd,
-                    parent_dir,
+                    gctx.clone(),
                     ctx.clone(),
+                    model.clone(),
+                    parent_dir,
                     Notifier::clone(&notifier),
                     extensions.clone(),
                 ));
@@ -138,27 +150,48 @@ pub fn create_tools_from_tool_names(
                 tool_set.add_tool(codesearch::CodeSearchTool::new());
             },
             edit::NAME => {
-                tool_set.add_tool(edit::EditTool::new(cwd, ctx.clone()));
+                tool_set.add_tool(edit::EditTool::new(ctx.clone()));
+            },
+            enter_worktree::NAME => {
+                if let Some(repository) = Repository::discover(gctx.current_dir())
+                    .ok()
+                    .filter(|repo| repo.workdir().is_some())
+                {
+                    tool_set.add_tool(enter_worktree::EnterGitWorktreeTool::new(
+                        ctx.clone(),
+                        repository,
+                        gctx.worktree_dir(),
+                    ));
+                }
+            },
+            exit_worktree::NAME => {
+                if let Some(repository) = Repository::discover(gctx.current_dir())
+                    .ok()
+                    .filter(|repo| repo.workdir().is_some())
+                {
+                    tool_set
+                        .add_tool(exit_worktree::ExitGitWorktreeTool::new(ctx.clone(), repository));
+                }
             },
             glob::NAME => {
-                tool_set.add_tool(glob::GlobTool::new(cwd));
+                tool_set.add_tool(glob::GlobTool::new(ctx.clone()));
             },
             grep::NAME => {
-                tool_set.add_tool(grep::GrepTool::new(cwd));
+                tool_set.add_tool(grep::GrepTool::new(ctx.clone()));
             },
             lsp::NAME => {
                 if let Some(lsp_client) = lsp_client.clone() {
-                    tool_set.add_tool(lsp::LspTool::new(lsp_client, cwd));
+                    tool_set.add_tool(lsp::LspTool::new(lsp_client, ctx.clone()));
                 }
             },
             monitor::NAME => {
-                tool_set.add_tool(monitor::MonitorTool::new(cwd, ctx.clone()));
+                tool_set.add_tool(monitor::MonitorTool::new(ctx.clone()));
             },
             multiedit::NAME => {
-                tool_set.add_tool(multiedit::MultiEditTool::new(cwd, ctx.clone()));
+                tool_set.add_tool(multiedit::MultiEditTool::new(ctx.clone()));
             },
             read::NAME => {
-                tool_set.add_tool(read::ReadTool::new(cwd, ctx.clone()));
+                tool_set.add_tool(read::ReadTool::new(ctx.clone()));
             },
             skill::NAME => {
                 if extensions.skills.is_empty() {
@@ -182,7 +215,7 @@ pub fn create_tools_from_tool_names(
                 tool_set.add_tool(websearch::WebSearchTool::new());
             },
             write::NAME => {
-                tool_set.add_tool(write::WriteTool::new(cwd, ctx.clone()));
+                tool_set.add_tool(write::WriteTool::new(ctx.clone()));
             },
             _ => {},
         };

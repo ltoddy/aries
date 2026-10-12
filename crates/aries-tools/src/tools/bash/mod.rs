@@ -4,7 +4,6 @@ mod output;
 #[cfg(test)]
 mod tests;
 
-use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
 use rig::tool::{Tool, ToolContext};
@@ -20,17 +19,15 @@ use crate::context::{self, TaskKind};
 pub const NAME: &str = "Bash";
 
 pub struct BashTool {
-    cwd: PathBuf,
     ctx: context::ToolContext,
     language: Language,
 }
 
 impl BashTool {
-    pub fn new(cwd: impl AsRef<Path>, ctx: context::ToolContext) -> Self {
-        let cwd = cwd.as_ref();
+    pub fn new(ctx: context::ToolContext) -> Self {
         let language = tree_sitter_bash::LANGUAGE.into();
 
-        Self { cwd: cwd.to_owned(), ctx, language }
+        Self { ctx, language }
     }
 
     #[allow(dead_code)]
@@ -54,7 +51,7 @@ impl Tool for BashTool {
     type Error = BashError;
 
     fn description(&self) -> String {
-        let Ok(_) = git2::Repository::discover(&self.cwd) else {
+        let Ok(_) = git2::Repository::discover(self.ctx.cwd()) else {
             return include_str!("description.md").to_owned();
         };
 
@@ -90,10 +87,13 @@ impl Tool for BashTool {
         // attempt_rewrite_last_command 有边缘 case, 逐步修复它
         // let arg = self.attempt_rewrite_last_command(&args.command).unwrap_or(args.command);
         let arg = args.command;
+        let cwd = self
+            .ctx
+            .worktree()
+            .map_or_else(|| self.ctx.cwd(), |worktree| worktree.path().to_owned());
 
         if args.background {
-            let task =
-                self.ctx.task.spawn(TaskKind::Shell, &self.cwd, arg, args.description).await?;
+            let task = self.ctx.task.spawn(TaskKind::Shell, &cwd, arg, args.description).await?;
             return Ok(BashOutput::background(task.task_id));
         }
 
@@ -102,7 +102,7 @@ impl Tool for BashTool {
         command
             .arg("-c")
             .arg(arg)
-            .current_dir(&self.cwd)
+            .current_dir(&cwd)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
