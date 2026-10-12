@@ -63,9 +63,9 @@ impl AgentBuilder {
         let current_dir = self.gctx.current_dir();
 
         let tools = aries_tools::create_tools_from_mode(
+            self.gctx.clone(),
             self.mode,
             self.model.clone(),
-            &current_dir,
             &self.root_dir,
             self.lsp_client.clone(),
             self.extensions.clone(),
