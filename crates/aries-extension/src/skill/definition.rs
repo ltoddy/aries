@@ -31,7 +31,7 @@ pub struct Frontmatter {
     pub description: String,
     pub license: Option<String>,
     pub compatibility: Option<String>,
-    pub metadata: Option<HashMap<String, serde_yaml::Value>>,
+    pub metadata: Option<HashMap<String, yaml_serde::Value>>,
     #[serde(rename = "allowed-tools", default)]
     pub allowed_tools: ToolList,
 }

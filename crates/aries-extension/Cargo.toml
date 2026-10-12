@@ -22,12 +22,12 @@ rig = { workspace = true, features = ["rmcp"] }
 rmcp = { workspace = true, features = ["client", "transport-child-process", "transport-streamable-http-client", "transport-streamable-http-client-reqwest"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
-serde_yaml.workspace = true
 shell-words.workspace = true
 shellexpand.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["fs", "process", "time", "io-util"] }
 tracing.workspace = true
+yaml_serde.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

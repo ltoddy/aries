@@ -38,8 +38,8 @@ serde_json.workspace = true
 similar.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["fs", "process", "sync", "time", "io-util"] }
-tree-sitter.workspace = true
 tree-sitter-bash.workspace = true
+tree-sitter.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
