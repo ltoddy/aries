@@ -5,7 +5,7 @@ mod output;
 #[cfg(test)]
 mod tests;
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use driver::{Collector, walk_parallel};
@@ -19,14 +19,12 @@ pub use self::output::GlobOutput;
 pub const NAME: &str = "Glob";
 
 pub struct GlobTool {
-    cwd: PathBuf,
+    ctx: crate::context::ToolContext,
 }
 
 impl GlobTool {
-    pub fn new(cwd: impl AsRef<Path>) -> Self {
-        let cwd = cwd.as_ref().to_owned();
-
-        Self { cwd }
+    pub fn new(ctx: crate::context::ToolContext) -> Self {
+        Self { ctx }
     }
 }
 
@@ -74,7 +72,11 @@ impl Tool for GlobTool {
         _context: &mut ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
-        let base_dir = args.base_dir.unwrap_or_else(|| self.cwd.clone());
+        let base_dir = args.base_dir.unwrap_or_else(|| {
+            self.ctx
+                .worktree()
+                .map_or_else(|| self.ctx.cwd(), |worktree| worktree.path().to_owned())
+        });
 
         let pattern = if Path::new(&args.pattern).is_absolute() {
             match Path::new(&args.pattern).strip_prefix(&base_dir) {

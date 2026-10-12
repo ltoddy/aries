@@ -4,8 +4,6 @@ mod output;
 #[cfg(test)]
 mod tests;
 
-use std::path::{Path, PathBuf};
-
 use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
 use tokio::fs;
@@ -16,15 +14,12 @@ pub use self::output::WriteOutput;
 pub const NAME: &str = "Write";
 
 pub struct WriteTool {
-    cwd: PathBuf,
     ctx: crate::context::ToolContext,
 }
 
 impl WriteTool {
-    pub fn new(cwd: impl AsRef<Path>, ctx: crate::context::ToolContext) -> Self {
-        let cwd = cwd.as_ref();
-
-        Self { cwd: cwd.to_owned(), ctx }
+    pub fn new(ctx: crate::context::ToolContext) -> Self {
+        Self { ctx }
     }
 }
 
@@ -60,11 +55,12 @@ impl Tool for WriteTool {
         _context: &mut ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
-        let file_path = if args.file_path.is_relative() {
-            self.cwd.join(&args.file_path)
-        } else {
-            args.file_path
-        };
+        let cwd = self
+            .ctx
+            .worktree()
+            .map_or_else(|| self.ctx.cwd(), |worktree| worktree.path().to_owned());
+        let file_path =
+            if args.file_path.is_relative() { cwd.join(&args.file_path) } else { args.file_path };
 
         match fs::metadata(&file_path).await {
             Ok(metadata) if metadata.len() > 0 => {

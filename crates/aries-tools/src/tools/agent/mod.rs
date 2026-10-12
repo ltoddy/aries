@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use aries_event::Notifier;
 use aries_extension::{AgentDefinition, AgentExtensions};
+use aries_init::GlobalContext;
 use aries_mode::Mode;
 use futures::StreamExt;
 use rig::Model;
@@ -25,8 +26,9 @@ const DESCRIPTION_HEAD: &str = include_str!("description-head.md");
 const DESCRIPTION_TAIL: &str = include_str!("description-tail.md");
 
 pub struct AgentTool {
+    gctx: GlobalContext,
+    ctx: crate::context::ToolContext,
     model: Model<OpenAiWire>,
-    cwd: PathBuf,
     parent_dir: PathBuf,
     notifier: Notifier,
     extensions: AgentExtensions,
@@ -34,16 +36,16 @@ pub struct AgentTool {
 
 impl AgentTool {
     pub fn new(
+        gctx: GlobalContext,
+        ctx: crate::context::ToolContext,
         model: Model<OpenAiWire>,
-        cwd: impl AsRef<Path>,
         parent_dir: impl AsRef<Path>,
         notifier: Notifier,
         extensions: AgentExtensions,
     ) -> Self {
-        let cwd = cwd.as_ref();
         let parent_dir = parent_dir.as_ref();
 
-        Self { model, cwd: cwd.to_owned(), parent_dir: parent_dir.to_owned(), notifier, extensions }
+        Self { gctx, ctx, model, parent_dir: parent_dir.to_owned(), notifier, extensions }
     }
 
     fn find_agent(&self, mode: impl Into<String>) -> Option<&AgentDefinition> {
@@ -117,9 +119,9 @@ impl Tool for AgentTool {
                 let universe = tool_names_from_mode(Mode::General);
                 let tool_names = frontmatter.filter_tool_names(&universe);
                 let tools = create_tools_from_tool_names(
+                    self.gctx.clone(),
                     &tool_names,
                     self.model.clone(),
-                    &self.cwd,
                     &self.parent_dir,
                     None,
                     AgentExtensions::empty(),
@@ -133,9 +135,9 @@ impl Tool for AgentTool {
                     mode.name().to_owned(),
                     mode.bare_preamble().to_owned(),
                     create_tools_from_mode(
+                        self.gctx.clone(),
                         mode,
                         self.model.clone(),
-                        &self.cwd,
                         &self.parent_dir,
                         None,
                         AgentExtensions::empty(),
@@ -148,10 +150,14 @@ impl Tool for AgentTool {
         let tool_server_handle = ToolServer::new().run();
         tool_server_handle.add_tools(tools);
 
+        let cwd = self
+            .ctx
+            .worktree()
+            .map_or_else(|| self.ctx.cwd(), |worktree| worktree.path().to_owned());
         let agent = rig::agent::AgentBuilder::new(self.model.clone())
             .name(&name)
             .preamble(&preamble)
-            .append_preamble(&aries_preamble::env::section(&self.cwd, self.model.name()))
+            .append_preamble(&aries_preamble::env::section(cwd, self.model.name()))
             .tool_server_handle(tool_server_handle)
             .default_max_turns(DEFAULT_MAX_TURNS)
             .build();

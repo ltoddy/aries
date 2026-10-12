@@ -572,6 +572,7 @@ dependencies = [
  "aries-event",
  "aries-extension",
  "aries-filesystem",
+ "aries-init",
  "aries-lspclient",
  "aries-mode",
  "aries-preamble",

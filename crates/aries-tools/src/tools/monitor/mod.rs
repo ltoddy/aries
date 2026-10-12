@@ -2,8 +2,6 @@ mod args;
 mod error;
 mod output;
 
-use std::path::{Path, PathBuf};
-
 use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
 
@@ -15,15 +13,12 @@ use crate::context::{TaskKind, ToolContext as AriesToolContext};
 pub const NAME: &str = "Monitor";
 
 pub struct MonitorTool {
-    cwd: PathBuf,
     ctx: AriesToolContext,
 }
 
 impl MonitorTool {
-    pub fn new(cwd: impl AsRef<Path>, ctx: AriesToolContext) -> Self {
-        let cwd = cwd.as_ref();
-
-        Self { cwd: cwd.to_owned(), ctx }
+    pub fn new(ctx: AriesToolContext) -> Self {
+        Self { ctx }
     }
 }
 
@@ -59,11 +54,12 @@ impl Tool for MonitorTool {
         _context: &mut ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
-        let task = self
+        let cwd = self
             .ctx
-            .task
-            .spawn(TaskKind::Monitor, self.cwd.clone(), args.command, args.description)
-            .await?;
+            .worktree()
+            .map_or_else(|| self.ctx.cwd(), |worktree| worktree.path().to_owned());
+        let task =
+            self.ctx.task.spawn(TaskKind::Monitor, cwd, args.command, args.description).await?;
 
         let task_id = task.task_id;
         let message = "Monitor started. Use TaskOutput to read output and TaskStop to stop it.";

@@ -13,6 +13,7 @@ struct Inner {
     home_dir: Arc<Path>,
     root_dir: Arc<Path>,
     memory_root_dir: Arc<Path>,
+    worktree_dir: PathBuf,
     user: Arc<str>,
     current_dir: PathBuf,
 }
@@ -25,6 +26,7 @@ impl GlobalContext {
         tokio::fs::create_dir_all(&root_dir).await.expect("failed to create Aries root directory");
 
         let memory_root_dir = root_dir.join("projects");
+        let worktree_dir = root_dir.join("worktrees");
 
         let user = whoami::realname().unwrap_or_default();
 
@@ -34,6 +36,7 @@ impl GlobalContext {
             home_dir: Arc::from(home_dir),
             root_dir: Arc::from(root_dir),
             memory_root_dir: Arc::from(memory_root_dir),
+            worktree_dir,
             user: Arc::from(user),
             current_dir,
         };
@@ -51,6 +54,10 @@ impl GlobalContext {
 
     pub fn memory_root_dir(&self) -> Arc<Path> {
         Arc::clone(&self.inner.read().memory_root_dir)
+    }
+
+    pub fn worktree_dir(&self) -> PathBuf {
+        self.inner.read().worktree_dir.clone()
     }
 
     pub fn user(&self) -> Arc<str> {

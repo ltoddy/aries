@@ -4,6 +4,8 @@ pub mod batch;
 pub mod codesearch;
 mod diff;
 pub mod edit;
+pub mod enter_worktree;
+pub mod exit_worktree;
 pub mod glob;
 pub mod grep;
 pub mod lsp;
@@ -23,6 +25,8 @@ use self::bash::BashOutput;
 use self::batch::BatchOutput;
 use self::codesearch::CodeSearchOutput;
 use self::edit::EditOutput;
+use self::enter_worktree::EnterGitWorktreeOutput;
+use self::exit_worktree::ExitGitWorktreeOutput;
 use self::glob::GlobOutput;
 use self::grep::GrepOutput;
 use self::lsp::LspOutput;
@@ -44,6 +48,8 @@ pub fn format_tool_output(tool_name: &str, raw_json: serde_json::Value) -> Strin
         batch::NAME => BatchOutput::render_output(raw_json),
         codesearch::NAME => CodeSearchOutput::render_output(raw_json),
         edit::NAME => EditOutput::render_output(raw_json),
+        enter_worktree::NAME => EnterGitWorktreeOutput::render_output(raw_json),
+        exit_worktree::NAME => ExitGitWorktreeOutput::render_output(raw_json),
         glob::NAME => GlobOutput::render_output(raw_json),
         grep::NAME => GrepOutput::render_output(raw_json),
         lsp::NAME => LspOutput::render_output(raw_json),

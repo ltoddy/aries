@@ -10,17 +10,16 @@ use serde_json::Value;
 pub use self::args::{ExitGitWorktreeAction, ExitGitWorktreeArgs};
 pub use self::error::ExitGitWorktreeError;
 pub use self::output::ExitGitWorktreeOutput;
-use crate::context::{ToolContext as AriesToolContext, Worktree};
 
 pub const NAME: &str = "ExitGitWorktree";
 
 pub struct ExitGitWorktreeTool {
-    ctx: AriesToolContext,
+    ctx: crate::context::ToolContext,
     repository: Mutex<Repository>,
 }
 
 impl ExitGitWorktreeTool {
-    pub fn new(ctx: AriesToolContext, repository: Repository) -> Self {
+    pub fn new(ctx: crate::context::ToolContext, repository: Repository) -> Self {
         Self { ctx, repository: Mutex::new(repository) }
     }
 }

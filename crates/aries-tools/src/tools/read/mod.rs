@@ -6,7 +6,6 @@ mod output;
 mod tests;
 
 use std::io::SeekFrom;
-use std::path::{Path, PathBuf};
 
 use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
@@ -25,15 +24,12 @@ const EMPTY_FILE_NOTICE: &str =
 const SEPARATOR: char = '→';
 
 pub struct ReadTool {
-    cwd: PathBuf,
     ctx: crate::context::ToolContext,
 }
 
 impl ReadTool {
-    pub fn new(cwd: impl AsRef<Path>, ctx: crate::context::ToolContext) -> Self {
-        let cwd = cwd.as_ref().to_owned();
-
-        Self { cwd, ctx }
+    pub fn new(ctx: crate::context::ToolContext) -> Self {
+        Self { ctx }
     }
 }
 
@@ -73,11 +69,12 @@ impl Tool for ReadTool {
         _context: &mut ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
-        let file_path = if args.file_path.is_relative() {
-            self.cwd.join(&args.file_path)
-        } else {
-            args.file_path
-        };
+        let cwd = self
+            .ctx
+            .worktree()
+            .map_or_else(|| self.ctx.cwd(), |worktree| worktree.path().to_owned());
+        let file_path =
+            if args.file_path.is_relative() { cwd.join(&args.file_path) } else { args.file_path };
 
         if file_path.is_dir() {
             return Err(ReadError::is_a_directory(file_path));
