@@ -9,7 +9,7 @@ use serde_json::Value;
 use tokio::fs;
 
 pub use self::args::{EditOperation, MultiEditArgs};
-pub use self::error::MultiEditError;
+pub use self::error::{MultiEditError, MultiEditIoOperation};
 pub use self::output::{MultiEditOutput, WriteKind};
 use crate::tools::diff;
 
@@ -83,7 +83,9 @@ impl Tool for MultiEditTool {
 
         let original_content = if file_path.exists() {
             self.ctx.guard_write(&file_path).await?;
-            let content = fs::read_to_string(&file_path).await?;
+            let content = fs::read_to_string(&file_path).await.map_err(|err| {
+                MultiEditError::io(MultiEditIoOperation::ReadFile, &file_path, err)
+            })?;
             Some(content)
         } else {
             None
@@ -120,9 +122,13 @@ impl Tool for MultiEditTool {
         }
 
         if let Some(parent) = file_path.parent() {
-            fs::create_dir_all(parent).await?;
+            fs::create_dir_all(parent).await.map_err(|err| {
+                MultiEditError::io(MultiEditIoOperation::CreateParentDirectory, &file_path, err)
+            })?;
         }
-        fs::write(&file_path, &content).await?;
+        fs::write(&file_path, &content)
+            .await
+            .map_err(|err| MultiEditError::io(MultiEditIoOperation::WriteFile, &file_path, err))?;
         self.ctx.on_file_written(&file_path, &content).await;
 
         match original_content {

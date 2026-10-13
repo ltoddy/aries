@@ -33,14 +33,21 @@ impl BatchError {
     }
 
     pub fn invalid_parameters(tool: impl Into<String>, source: serde_json::Error) -> Self {
-        Self::InvalidParameters { tool: tool.into(), source }
+        let tool = tool.into();
+
+        Self::InvalidParameters { tool, source }
     }
 
     pub fn serialize_output(tool: impl Into<String>, source: serde_json::Error) -> Self {
-        Self::SerializeOutput { tool: tool.into(), source }
+        let tool = tool.into();
+
+        Self::SerializeOutput { tool, source }
     }
 
     pub fn tool_execution(tool: impl Into<String>, source: impl ToString) -> Self {
-        Self::ToolExecution { tool: tool.into(), message: source.to_string() }
+        let tool = tool.into();
+        let message = source.to_string();
+
+        Self::ToolExecution { tool, message }
     }
 }

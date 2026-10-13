@@ -118,19 +118,16 @@ impl Tool for CodeSearchTool {
             .json(&req)
             .send()
             .await
-            .map_err(|e| CodeSearchError::SearchError(e.to_string()))?;
+            .map_err(|e| CodeSearchError::request(args.query.clone(), e))?;
 
         if !response.status().is_success() {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            return Err(CodeSearchError::SearchError(format!(
-                "Code search error ({}): {}",
-                status, text
-            )));
+            return Err(CodeSearchError::status(args.query.clone(), status, text));
         }
 
         let response_text =
-            response.text().await.map_err(|e| CodeSearchError::SearchError(e.to_string()))?;
+            response.text().await.map_err(|e| CodeSearchError::read_body(args.query.clone(), e))?;
 
         for line in response_text.lines() {
             if let Some(stripped) = line.strip_prefix("data: ")

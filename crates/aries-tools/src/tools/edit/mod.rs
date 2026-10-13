@@ -9,7 +9,7 @@ use serde_json::Value;
 use tokio::fs;
 
 pub use self::args::EditArgs;
-pub use self::error::EditError;
+pub use self::error::{EditError, EditIoOperation};
 pub use self::output::EditOutput;
 use crate::tools::diff;
 
@@ -81,7 +81,9 @@ impl Tool for EditTool {
 
         self.ctx.guard_write(&file_path).await?;
 
-        let content = fs::read_to_string(&file_path).await?;
+        let content = fs::read_to_string(&file_path)
+            .await
+            .map_err(|err| EditError::io(EditIoOperation::ReadFile, &file_path, err))?;
         if !content.contains(&args.old_text) {
             return Err(EditError::old_text_not_found());
         }
@@ -98,7 +100,9 @@ impl Tool for EditTool {
         };
 
         let _ = self.ctx.file_checkpoint.push(&file_path, &content).await;
-        fs::write(&file_path, &new_content).await?;
+        fs::write(&file_path, &new_content)
+            .await
+            .map_err(|err| EditError::io(EditIoOperation::WriteFile, &file_path, err))?;
 
         self.ctx.on_file_written(&file_path, &new_content).await;
 

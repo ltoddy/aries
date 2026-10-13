@@ -149,14 +149,20 @@ impl IncludeFilter {
         let include = include.as_ref();
 
         let mut file_builder = GlobSetBuilder::new();
-        file_builder.add(Glob::new(include)?);
+        file_builder.add(Glob::new(include).map_err(|err| GrepError::include_glob(include, err))?);
 
         let mut directory_builder = GlobSetBuilder::new();
         for prefix in directory_prefix_patterns(include) {
-            directory_builder.add(Glob::new(&prefix)?);
+            directory_builder
+                .add(Glob::new(&prefix).map_err(|err| GrepError::include_glob(prefix, err))?);
         }
 
-        Ok(Self { files: file_builder.build()?, directories: directory_builder.build()? })
+        Ok(Self {
+            files: file_builder.build().map_err(|err| GrepError::include_globset(include, err))?,
+            directories: directory_builder
+                .build()
+                .map_err(|err| GrepError::include_globset(include, err))?,
+        })
     }
 
     fn matches_file(&self, path: &Path) -> bool {

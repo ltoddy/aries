@@ -40,9 +40,10 @@ impl LspTool {
 
                 Ok((file_path, *line, *character))
             },
-            _ => Err(LspError::InvalidInput(format!(
-                "file_path, line, character is all required for {operation}"
-            ))),
+            _ => Err(LspError::invalid_input(
+                *operation,
+                format!("file_path, line, character is all required for {operation}"),
+            )),
         }
     }
 }
@@ -107,7 +108,10 @@ impl Tool for LspTool {
         if let Some(file_path) = &args.file_path {
             let file_path =
                 if file_path.is_absolute() { file_path } else { &self.ctx.cwd().join(file_path) };
-            self.client.did_open(file_path).await?;
+            self.client
+                .did_open(file_path)
+                .await
+                .map_err(|err| LspError::did_open(file_path.clone(), err))?;
         }
 
         let result = match args.operation {
@@ -128,7 +132,10 @@ impl Tool for LspTool {
             },
             LspOperation::DocumentSymbol => {
                 let file_path = args.file_path.ok_or_else(|| {
-                    LspError::InvalidInput("file_path is required for documentSymbol".to_owned())
+                    LspError::invalid_input(
+                        LspOperation::DocumentSymbol,
+                        "file_path is required for documentSymbol",
+                    )
                 })?;
                 let abs_path = if file_path.is_absolute() {
                     file_path.clone()
@@ -154,16 +161,19 @@ impl Tool for LspTool {
             LspOperation::IncomingCalls => {
                 let (file_path, line, character) =
                     Self::extract_position_args(&args, self.ctx.cwd())?;
-                let items = self
-                    .client
-                    .prepare_call_hierarchy(file_path, line, character)
-                    .await
-                    .map_err(|e| LspError::OperationFailed(e.to_string()))?;
+                let items =
+                    self.client.prepare_call_hierarchy(file_path, line, character).await.map_err(
+                        |e| LspError::operation_failed(LspOperation::IncomingCalls, e.to_string()),
+                    )?;
                 let item = match items {
                     LspResult::PrepareCallHierarchy(items) => {
                         if let Some(first_item) = items.first() {
-                            serde_json::to_value(first_item)
-                                .map_err(|e| LspError::OperationFailed(e.to_string()))?
+                            serde_json::to_value(first_item).map_err(|e| {
+                                LspError::serialize_call_hierarchy_item(
+                                    LspOperation::IncomingCalls,
+                                    e,
+                                )
+                            })?
                         } else {
                             return Ok(LspOutput::new(LspResult::IncomingCalls(vec![])));
                         }
@@ -175,16 +185,19 @@ impl Tool for LspTool {
             LspOperation::OutgoingCalls => {
                 let (file_path, line, character) =
                     Self::extract_position_args(&args, self.ctx.cwd())?;
-                let items = self
-                    .client
-                    .prepare_call_hierarchy(file_path, line, character)
-                    .await
-                    .map_err(|e| LspError::OperationFailed(e.to_string()))?;
+                let items =
+                    self.client.prepare_call_hierarchy(file_path, line, character).await.map_err(
+                        |e| LspError::operation_failed(LspOperation::OutgoingCalls, e.to_string()),
+                    )?;
                 let item = match items {
                     LspResult::PrepareCallHierarchy(items) => {
                         if let Some(first_item) = items.first() {
-                            serde_json::to_value(first_item)
-                                .map_err(|e| LspError::OperationFailed(e.to_string()))?
+                            serde_json::to_value(first_item).map_err(|e| {
+                                LspError::serialize_call_hierarchy_item(
+                                    LspOperation::OutgoingCalls,
+                                    e,
+                                )
+                            })?
                         } else {
                             return Ok(LspOutput::new(LspResult::OutgoingCalls(vec![])));
                         }
@@ -195,7 +208,8 @@ impl Tool for LspTool {
             },
         };
 
-        let lsp_result = result.map_err(|e| LspError::OperationFailed(e.to_string()))?;
+        let lsp_result =
+            result.map_err(|e| LspError::operation_failed(args.operation, e.to_string()))?;
         Ok(LspOutput::new(lsp_result))
     }
 }

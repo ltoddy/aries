@@ -87,8 +87,12 @@ impl Tool for GlobTool {
             args.pattern
         };
 
-        let pattern = globset::Glob::new(&pattern)?;
-        let set = globset::GlobSetBuilder::new().add(pattern).build()?;
+        let glob =
+            globset::Glob::new(&pattern).map_err(|err| GlobError::pattern(pattern.clone(), err))?;
+        let set = globset::GlobSetBuilder::new()
+            .add(glob)
+            .build()
+            .map_err(|err| GlobError::glob_set(pattern.clone(), err))?;
         let collector = Arc::new(Collector::new(args.limit));
 
         walk_parallel(&base_dir, args.hidden, args.respect_ignore, set, collector.clone())?;

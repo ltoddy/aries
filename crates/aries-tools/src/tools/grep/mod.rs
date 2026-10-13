@@ -99,7 +99,8 @@ impl Tool for GrepTool {
     ) -> Result<Self::Output, Self::Error> {
         let matcher = RegexMatcherBuilder::new()
             .case_insensitive(args.case_insensitive)
-            .build(&args.pattern)?;
+            .build(&args.pattern)
+            .map_err(|err| GrepError::regex(args.pattern.clone(), err))?;
         let stop = Arc::new(StopState::new(args.limit));
         let collector = Arc::new(Collector::new(args.output_mode, stop));
 

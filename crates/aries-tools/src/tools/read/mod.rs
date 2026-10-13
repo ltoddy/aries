@@ -13,7 +13,7 @@ use tokio::fs;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, BufReader};
 
 pub use self::args::ReadArgs;
-pub use self::error::ReadError;
+pub use self::error::{ReadError, ReadOperation};
 pub use self::output::ReadOutput;
 
 pub const NAME: &str = "Read";
@@ -80,19 +80,29 @@ impl Tool for ReadTool {
             return Err(ReadError::is_a_directory(file_path));
         }
 
-        let mut file = fs::File::open(&file_path).await?;
-        let metadata = file.metadata().await?;
+        let mut file = fs::File::open(&file_path)
+            .await
+            .map_err(|err| ReadError::io(ReadOperation::OpenFile, file_path.clone(), err))?;
+        let metadata = file
+            .metadata()
+            .await
+            .map_err(|err| ReadError::io(ReadOperation::ReadMetadata, file_path.clone(), err))?;
         if metadata.len() == 0 {
             self.ctx.on_file_read(&file_path).await;
             return Ok(ReadOutput::new(EMPTY_FILE_NOTICE, false));
         }
 
         let mut probe = vec![0u8; inspector::MAX_SCAN_SIZE];
-        let sniffed = file.read(&mut probe).await?;
+        let sniffed = file
+            .read(&mut probe)
+            .await
+            .map_err(|err| ReadError::io(ReadOperation::InspectFileType, file_path.clone(), err))?;
         if inspector::inspect(&probe[..sniffed]).is_binary() {
             return Err(ReadError::binary_file(file_path));
         }
-        file.seek(SeekFrom::Start(0)).await?;
+        file.seek(SeekFrom::Start(0))
+            .await
+            .map_err(|err| ReadError::io(ReadOperation::SeekToStart, file_path.clone(), err))?;
 
         let reader = BufReader::new(file);
 
@@ -106,7 +116,11 @@ impl Tool for ReadTool {
         let mut lines = reader.lines();
         let mut content_lines = Vec::<String>::new();
         let mut line_no: usize = 0;
-        while let Some(line) = lines.next_line().await? {
+        while let Some(line) = lines
+            .next_line()
+            .await
+            .map_err(|err| ReadError::io(ReadOperation::ReadLine, file_path.clone(), err))?
+        {
             line_no += 1;
             if line_no <= skip {
                 continue;
@@ -117,7 +131,11 @@ impl Tool for ReadTool {
             }
         }
 
-        let truncated = lines.next_line().await?.is_some();
+        let truncated = lines
+            .next_line()
+            .await
+            .map_err(|err| ReadError::io(ReadOperation::CheckTruncated, file_path.clone(), err))?
+            .is_some();
         let content = content_lines.join("\n");
         self.ctx.on_file_read(&file_path).await;
 

@@ -1,11 +1,29 @@
+use std::fmt;
 use std::path::PathBuf;
 
 use crate::context::GuardWriteError;
 
+#[derive(Debug, Clone, Copy)]
+pub enum EditIoOperation {
+    ReadFile,
+    WriteFile,
+}
+
+impl fmt::Display for EditIoOperation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let operation = match self {
+            Self::ReadFile => "read file",
+            Self::WriteFile => "write file",
+        };
+
+        f.write_str(operation)
+    }
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum EditError {
-    #[error("failed to edit file: {0}")]
-    Io(#[from] std::io::Error),
+    #[error("failed to {operation} {path}: {source}")]
+    Io { operation: EditIoOperation, path: PathBuf, source: std::io::Error },
 
     #[error("file does not exist: {0}. use the write tool to create new files")]
     FileNotFound(PathBuf),
@@ -26,6 +44,16 @@ pub enum EditError {
 }
 
 impl EditError {
+    pub fn io(
+        operation: EditIoOperation,
+        path: impl Into<PathBuf>,
+        source: std::io::Error,
+    ) -> Self {
+        let path = path.into();
+
+        Self::Io { operation, path, source }
+    }
+
     pub fn file_not_found(path: impl Into<PathBuf>) -> Self {
         Self::FileNotFound(path.into())
     }

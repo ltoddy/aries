@@ -4,8 +4,8 @@ use super::tavily::TavilyError;
 pub enum WebSearchError {
     #[error("websearch tool is not configured: environment variable TAVILY_API_KEY is not set")]
     NotConfigured,
-    #[error("failed to perform web search: {0}")]
-    SearchError(#[from] TavilyError),
+    #[error("failed to perform web search for query {query:?}: {source}")]
+    SearchError { query: String, source: TavilyError },
 }
 
 impl WebSearchError {
@@ -13,7 +13,9 @@ impl WebSearchError {
         Self::NotConfigured
     }
 
-    pub fn search_error(err: TavilyError) -> Self {
-        Self::SearchError(err)
+    pub fn search_error(query: impl Into<String>, source: TavilyError) -> Self {
+        let query = query.into();
+
+        Self::SearchError { query, source }
     }
 }

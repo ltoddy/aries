@@ -1,7 +1,7 @@
 use std::collections::{BinaryHeap, HashMap};
 use std::fmt::{Display, Formatter};
 use std::os::unix::process::ExitStatusExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -200,17 +200,19 @@ impl TaskRegistry {
         cwd: impl AsRef<Path>,
         command: impl AsRef<str>,
         description: Option<String>,
-    ) -> Result<TaskSnapshot, std::io::Error> {
+    ) -> Result<TaskSnapshot, SpawnTaskError> {
+        let cwd = cwd.as_ref();
         let command = command.as_ref();
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "bash".to_owned());
-        let mut child = Command::new(shell)
+        let mut child = Command::new(&shell)
             .arg("-c")
             .arg(command)
             .current_dir(cwd)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true)
-            .spawn()?;
+            .spawn()
+            .map_err(|source| SpawnTaskError::new(kind, &shell, cwd, command, source))?;
 
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
@@ -343,6 +345,31 @@ impl TaskRegistry {
                 return Some(TaskSnapshot::new(task_id, &state));
             }
         }
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+#[error(
+    "failed to start {kind} task using shell '{shell}' in {cwd} for command {command:?}: {source}"
+)]
+pub struct SpawnTaskError {
+    kind: TaskKind,
+    shell: String,
+    cwd: PathBuf,
+    command: String,
+    source: std::io::Error,
+}
+
+impl SpawnTaskError {
+    fn new(
+        kind: TaskKind,
+        shell: impl Into<String>,
+        cwd: impl AsRef<Path>,
+        command: impl Into<String>,
+        source: std::io::Error,
+    ) -> Self {
+        let cwd = cwd.as_ref();
+        Self { kind, shell: shell.into(), cwd: cwd.to_owned(), command: command.into(), source }
     }
 }
 

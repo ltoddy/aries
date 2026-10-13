@@ -93,21 +93,21 @@ impl Tool for BashTool {
             .map_or_else(|| self.ctx.cwd(), |worktree| worktree.path().to_owned());
 
         if args.background {
-            let task = self.ctx.task.spawn(TaskKind::Shell, &cwd, arg, args.description).await?;
+            let task = self.ctx.task.spawn(TaskKind::Shell, &cwd, &arg, args.description).await?;
             return Ok(BashOutput::background(task.task_id));
         }
 
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "bash".to_owned());
-        let mut command = Command::new(shell);
+        let mut command = Command::new(&shell);
         command
             .arg("-c")
-            .arg(arg)
+            .arg(&arg)
             .current_dir(&cwd)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
 
-        let output = command.output().await.map_err(BashError::io)?;
+        let output = command.output().await.map_err(|err| BashError::io(&shell, cwd, arg, err))?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);

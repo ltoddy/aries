@@ -15,7 +15,9 @@ use tokio::fs;
 pub use self::error::GuardWriteError;
 pub use self::file_checkpoint::SharedFileCheckpoint;
 pub use self::read_state::SharedReadState;
-pub use self::task::{StopTaskError, TaskKind, TaskRegistry, TaskSnapshot, TaskStatus};
+pub use self::task::{
+    SpawnTaskError, StopTaskError, TaskKind, TaskRegistry, TaskSnapshot, TaskStatus,
+};
 pub use self::worktree::Worktree;
 
 #[derive(Clone)]
