@@ -31,7 +31,7 @@ impl EnterGitWorktreeTool {
         worktree_dir: impl AsRef<Path>,
     ) -> Self {
         let worktree_dir = worktree_dir.as_ref();
-        let worktree_name_regex = Regex::new(r"^[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$")
+        let worktree_name_regex = Regex::new(r"^[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*$")
             .expect("worktree name regex should be valid");
 
         Self {
@@ -59,7 +59,7 @@ impl Tool for EnterGitWorktreeTool {
             "properties": {
                 "name": {
                     "type": "string",
-                    "description": "Optional name for the worktree. Each segment may contain only letters, digits, dots, underscores, and dashes. A random name is generated if not provided."
+                    "description": "Optional name for the worktree. Each segment may contain only letters, digits, underscores, and dashes. A random name is generated if not provided."
                 }
             }
         })
@@ -77,7 +77,7 @@ impl Tool for EnterGitWorktreeTool {
         let name = args.name.unwrap_or_else(|| nanoid::nanoid!(10));
         if !self.worktree_name_regex.is_match(&name) {
             return Err(EnterGitWorktreeError::invalid_name(
-                "use letters, digits, dots, underscores, dashes, and slashes",
+                "use letters, digits, underscores, dashes, and slashes",
             ));
         }
 
@@ -115,9 +115,17 @@ impl Tool for EnterGitWorktreeTool {
 
             let mut options = WorktreeAddOptions::new();
             options.reference(Some(branch.get()));
-            repository
-                .worktree(&worktree_branch, &worktree_path, Some(&options))
-                .map_err(|err| EnterGitWorktreeError::add_worktree(err.message()))?;
+            if let Err(err) = repository.worktree(&worktree_branch, &worktree_path, Some(&options))
+            {
+                let mut branch = repository
+                    .find_branch(&worktree_branch, git2::BranchType::Local)
+                    .map_err(|err| EnterGitWorktreeError::rollback_branch(err.message()))?;
+                branch
+                    .delete()
+                    .map_err(|err| EnterGitWorktreeError::rollback_branch(err.message()))?;
+
+                return Err(EnterGitWorktreeError::add_worktree(err.message()));
+            }
         }
 
         let worktree = Worktree::new(

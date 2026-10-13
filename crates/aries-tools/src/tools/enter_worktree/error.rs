@@ -16,6 +16,8 @@ pub enum EnterGitWorktreeError {
     CreateBranch(String),
     #[error("cannot add worktree: {0}; try another name or prune stale worktrees")]
     AddWorktree(String),
+    #[error("cannot roll back branch after worktree creation failed: {0}")]
+    RollbackBranch(String),
 }
 
 impl EnterGitWorktreeError {
@@ -46,5 +48,9 @@ impl EnterGitWorktreeError {
 
     pub fn add_worktree(message: impl Into<String>) -> Self {
         Self::AddWorktree(message.into())
+    }
+
+    pub fn rollback_branch(message: impl Into<String>) -> Self {
+        Self::RollbackBranch(message.into())
     }
 }

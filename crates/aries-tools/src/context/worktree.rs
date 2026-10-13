@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 pub struct Worktree {
     origin_cwd: PathBuf,
     path: PathBuf,
-    name: String,
+    worktree_name: String,
     branch: String,
     head_commit: String,
 }
@@ -13,17 +13,23 @@ impl Worktree {
     pub fn new(
         origin_cwd: impl AsRef<Path>,
         path: impl AsRef<Path>,
-        name: impl Into<String>,
+        worktree_name: impl Into<String>,
         branch: impl Into<String>,
         head_commit: impl Into<String>,
     ) -> Self {
         let origin_cwd = origin_cwd.as_ref();
         let path = path.as_ref();
-        let name = name.into();
+        let worktree_name = worktree_name.into();
         let branch = branch.into();
         let head_commit = head_commit.into();
 
-        Self { origin_cwd: origin_cwd.to_owned(), path: path.to_owned(), name, branch, head_commit }
+        Self {
+            origin_cwd: origin_cwd.to_owned(),
+            path: path.to_owned(),
+            worktree_name,
+            branch,
+            head_commit,
+        }
     }
 
     pub fn origin_cwd(&self) -> &Path {
@@ -34,8 +40,8 @@ impl Worktree {
         &self.path
     }
 
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn worktree_name(&self) -> &str {
+        &self.worktree_name
     }
 
     pub fn branch(&self) -> &str {
