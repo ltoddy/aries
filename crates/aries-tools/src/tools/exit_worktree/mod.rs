@@ -67,13 +67,10 @@ impl Tool for ExitGitWorktreeTool {
                 ))
             },
             ExitGitWorktreeAction::Remove => {
-                self.ctx.set_cwd(session.origin_cwd());
-                self.ctx.set_worktree(None);
-
                 {
                     let repository = self.repository.lock();
                     let worktree = repository
-                        .find_worktree(session.name())
+                        .find_worktree(session.worktree_name())
                         .map_err(|err| ExitGitWorktreeError::find_worktree(err.message()))?;
 
                     let mut options = WorktreePruneOptions::new();
@@ -89,6 +86,9 @@ impl Tool for ExitGitWorktreeTool {
                         .delete()
                         .map_err(|err| ExitGitWorktreeError::delete_branch(err.message()))?;
                 }
+
+                self.ctx.set_cwd(session.origin_cwd());
+                self.ctx.set_worktree(None);
 
                 Ok(ExitGitWorktreeOutput::remove(
                     session.origin_cwd(),
