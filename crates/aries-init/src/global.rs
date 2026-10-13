@@ -13,7 +13,7 @@ struct Inner {
     home_dir: Arc<Path>,
     root_dir: Arc<Path>,
     memory_root_dir: Arc<Path>,
-    worktree_dir: PathBuf,
+    worktree_dir: Arc<Path>,
     user: Arc<str>,
     current_dir: PathBuf,
 }
@@ -36,7 +36,7 @@ impl GlobalContext {
             home_dir: Arc::from(home_dir),
             root_dir: Arc::from(root_dir),
             memory_root_dir: Arc::from(memory_root_dir),
-            worktree_dir,
+            worktree_dir: Arc::from(worktree_dir),
             user: Arc::from(user),
             current_dir,
         };
@@ -56,8 +56,8 @@ impl GlobalContext {
         Arc::clone(&self.inner.read().memory_root_dir)
     }
 
-    pub fn worktree_dir(&self) -> PathBuf {
-        self.inner.read().worktree_dir.clone()
+    pub fn worktree_dir(&self) -> Arc<Path> {
+        Arc::clone(&self.inner.read().worktree_dir)
     }
 
     pub fn user(&self) -> Arc<str> {
