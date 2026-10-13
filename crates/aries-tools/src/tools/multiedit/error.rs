@@ -1,9 +1,31 @@
+use std::fmt;
+use std::path::PathBuf;
+
 use crate::context::GuardWriteError;
+
+#[derive(Debug, Clone, Copy)]
+pub enum MultiEditIoOperation {
+    ReadFile,
+    CreateParentDirectory,
+    WriteFile,
+}
+
+impl fmt::Display for MultiEditIoOperation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let operation = match self {
+            Self::ReadFile => "read file",
+            Self::CreateParentDirectory => "create parent directory for",
+            Self::WriteFile => "write file",
+        };
+
+        f.write_str(operation)
+    }
+}
 
 #[derive(thiserror::Error, Debug)]
 pub enum MultiEditError {
-    #[error("failed to edit file: {0}")]
-    Io(#[from] std::io::Error),
+    #[error("failed to {operation} {path}: {source}")]
+    Io { operation: MultiEditIoOperation, path: PathBuf, source: std::io::Error },
 
     #[error("old_text and new_text cannot be identical")]
     IdenticalText,
@@ -19,6 +41,16 @@ pub enum MultiEditError {
 }
 
 impl MultiEditError {
+    pub fn io(
+        operation: MultiEditIoOperation,
+        path: impl Into<PathBuf>,
+        source: std::io::Error,
+    ) -> Self {
+        let path = path.into();
+
+        Self::Io { operation, path, source }
+    }
+
     pub fn identical_text() -> Self {
         MultiEditError::IdenticalText
     }

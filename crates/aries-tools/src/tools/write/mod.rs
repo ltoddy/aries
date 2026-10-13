@@ -9,7 +9,7 @@ use serde_json::Value;
 use tokio::fs;
 
 pub use self::args::WriteArgs;
-pub use self::error::WriteError;
+pub use self::error::{WriteError, WriteOperation};
 pub use self::output::WriteOutput;
 pub const NAME: &str = "Write";
 
@@ -64,7 +64,7 @@ impl Tool for WriteTool {
 
         match fs::metadata(&file_path).await {
             Ok(metadata) if metadata.len() > 0 => {
-                return Err(WriteError::file_not_empty(&file_path));
+                return Err(WriteError::file_not_empty(file_path.clone()));
             },
             Ok(_) => {
                 self.ctx.guard_write(&file_path).await?;
@@ -72,13 +72,23 @@ impl Tool for WriteTool {
             },
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
                 if let Some(parent) = file_path.parent() {
-                    fs::create_dir_all(parent).await?;
+                    fs::create_dir_all(parent).await.map_err(|err| {
+                        WriteError::io(
+                            WriteOperation::CreateParentDirectory,
+                            file_path.clone(),
+                            err,
+                        )
+                    })?;
                 }
             },
-            Err(err) => return Err(err.into()),
+            Err(err) => {
+                return Err(WriteError::io(WriteOperation::ReadMetadata, file_path.clone(), err));
+            },
         }
 
-        fs::write(&file_path, &args.content).await?;
+        fs::write(&file_path, &args.content)
+            .await
+            .map_err(|err| WriteError::io(WriteOperation::WriteFile, file_path.clone(), err))?;
         self.ctx.on_file_written(&file_path, &args.content).await;
 
         let additions = args.content.lines().count();

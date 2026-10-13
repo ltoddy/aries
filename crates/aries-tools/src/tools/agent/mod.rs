@@ -1,4 +1,5 @@
 mod args;
+mod error;
 mod output;
 
 use std::path::{Path, PathBuf};
@@ -9,13 +10,14 @@ use aries_init::GlobalContext;
 use aries_mode::Mode;
 use futures::StreamExt;
 use rig::Model;
-use rig::agent::{MultiTurnStreamItem, PromptResponse, StreamingError};
+use rig::agent::{MultiTurnStreamItem, PromptResponse};
 use rig::providers::openai::wire::OpenAiWire;
 use rig::tool::server::ToolServer;
 use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
 
 pub use self::args::AgentArgs;
+pub use self::error::AgentError;
 pub use self::output::AgentOutput;
 use crate::{create_tools_from_mode, create_tools_from_tool_names, tool_names_from_mode};
 
@@ -62,7 +64,7 @@ impl Tool for AgentTool {
     const NAME: &'static str = NAME;
     type Args = AgentArgs;
     type Output = AgentOutput;
-    type Error = StreamingError;
+    type Error = AgentError;
 
     fn description(&self) -> String {
         let mut description = vec![DESCRIPTION_HEAD.to_owned()];
@@ -166,7 +168,7 @@ impl Tool for AgentTool {
 
         let mut final_res = PromptResponse::empty();
         while let Some(chunk) = stream.next().await {
-            let chunk = chunk?;
+            let chunk = chunk.map_err(AgentError::streaming)?;
             self.notifier.send_stream_item(chunk.clone());
 
             if let MultiTurnStreamItem::FinalResponse(res) = chunk {

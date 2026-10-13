@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[derive(thiserror::Error, Debug)]
 pub enum EnterGitWorktreeError {
@@ -37,9 +37,10 @@ impl EnterGitWorktreeError {
         Self::ReadHead(message.into())
     }
 
-    pub fn create_worktree_parent_dir(path: impl AsRef<Path>, source: std::io::Error) -> Self {
-        let path = path.as_ref();
-        Self::CreateWorktreeParentDir { path: path.to_owned(), source }
+    pub fn create_worktree_parent_dir(path: impl Into<PathBuf>, source: std::io::Error) -> Self {
+        let path = path.into();
+
+        Self::CreateWorktreeParentDir { path, source }
     }
 
     pub fn create_branch(message: impl Into<String>) -> Self {

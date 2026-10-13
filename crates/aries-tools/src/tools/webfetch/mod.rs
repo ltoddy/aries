@@ -64,15 +64,18 @@ impl Tool for WebFetchTool {
             env::var("FIRECRAWL_API_URL").unwrap_or_else(|_| DEFAULT_FIRECRAWL_API_URL.to_owned());
         let api_key = env::var("FIRECRAWL_API_KEY").ok();
 
-        let client = firecrawl::Client::new_selfhosted(api_url, api_key)
-            .map_err(WebFetchError::missing_api_key)?;
+        let client = firecrawl::Client::new_selfhosted(api_url.clone(), api_key)
+            .map_err(|err| WebFetchError::create_client(api_url, err))?;
 
         let options = firecrawl::ScrapeOptions {
             origin: Some("aries".to_owned()),
             formats: Some(vec![firecrawl::Format::Markdown]),
             ..Default::default()
         };
-        let document = client.scrape(args.url, options).await.map_err(WebFetchError::firecrawl)?;
+        let document = client
+            .scrape(args.url.clone(), options)
+            .await
+            .map_err(|err| WebFetchError::firecrawl(args.url, err))?;
         let output = WebFetchOutput::new(document.markdown.unwrap_or_default());
         Ok(output)
     }
