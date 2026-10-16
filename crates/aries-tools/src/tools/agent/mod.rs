@@ -168,7 +168,7 @@ impl Tool for AgentTool {
 
         let mut final_res = PromptResponse::empty();
         while let Some(chunk) = stream.next().await {
-            let chunk = chunk.map_err(AgentError::streaming)?;
+            let chunk = chunk.map_err(AgentError::execution)?;
             self.notifier.send_stream_item(chunk.clone());
 
             if let MultiTurnStreamItem::FinalResponse(res) = chunk {
@@ -177,14 +177,13 @@ impl Tool for AgentTool {
         }
 
         let mut file_path = self.parent_dir.join("subagent").join(&task_id);
-        if let Some(messages) = final_res.messages() {
-            if let Some(parent) = file_path.parent() {
-                _ = tokio::fs::create_dir_all(parent).await;
-            }
-            file_path.set_extension("jsonl");
-            let _ = aries_filesystem::jsonl::write(&file_path, messages).await;
+        let messages = final_res.messages();
+        if let Some(parent) = file_path.parent() {
+            _ = tokio::fs::create_dir_all(parent).await;
         }
+        file_path.set_extension("jsonl");
+        let _ = aries_filesystem::jsonl::write(&file_path, messages).await;
 
-        Ok(AgentOutput::new(task_id, final_res.output, file_path))
+        Ok(AgentOutput::new(task_id, final_res.output(), file_path))
     }
 }

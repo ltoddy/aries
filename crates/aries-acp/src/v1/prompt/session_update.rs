@@ -10,7 +10,7 @@ use aries_tools::{
 };
 use rig::agent::{MultiTurnStreamItem, PromptResponse};
 use rig::message::{ToolCall, ToolFunction, ToolName};
-use rig::streaming::{Item, StreamEvent, StreamedUserContent};
+use rig::streaming::{Item, StreamEvent};
 
 use super::plan::PlanEntry;
 
@@ -27,7 +27,9 @@ impl SessionUpdates {
                 MultiTurnStreamItem::StreamAssistantItem(v) => {
                     Self(Self::from_stream_assistant_content(v))
                 },
-                MultiTurnStreamItem::StreamUserItem(v) => Self(Self::from_stream_user_content(v)),
+                MultiTurnStreamItem::ToolResult { tool_result } => {
+                    Self(Self::from_tool_result(tool_result))
+                },
                 MultiTurnStreamItem::CompletionCall(_) => Default::default(),
                 MultiTurnStreamItem::FinalResponse(res) => Self(Self::from_prompt_response(res)),
                 MultiTurnStreamItem::ToolExecutionCommitted { tool_call } => {
@@ -40,6 +42,7 @@ impl SessionUpdates {
                 MultiTurnStreamItem::ToolCall { tool_call } => {
                     Self(vec![Self::from_tool_call(tool_call)])
                 },
+                _ => Default::default(),
             },
             AgentEvent::SessionInfoUpdate { title, updated_at } => {
                 Self(vec![SessionUpdate::SessionInfoUpdate(
@@ -52,7 +55,7 @@ impl SessionUpdates {
     fn from_stream_assistant_content(content: Item<StreamEvent>) -> Vec<SessionUpdate> {
         match content {
             Item::Event(event) => match event {
-                StreamEvent::Start { part: _, kind: _ } => {},
+                StreamEvent::Start { part: _, kind: _, name: _ } => {},
                 StreamEvent::Text { part: _, text } => {
                     return vec![SessionUpdate::AgentMessageChunk(ContentChunk::new(
                         ContentBlock::from(text),
@@ -71,6 +74,8 @@ impl SessionUpdates {
                     },
                     rig::message::AssistantContent::Reasoning(_reasoning) => {},
                     rig::message::AssistantContent::Image(_image) => {},
+                    rig::message::AssistantContent::Opaque(_) => {},
+                    _ => {},
                 },
             },
             Item::Unknown(_payload) => {},
@@ -79,30 +84,23 @@ impl SessionUpdates {
         vec![]
     }
 
-    fn from_stream_user_content(content: StreamedUserContent) -> Vec<SessionUpdate> {
-        match content {
-            StreamedUserContent::ToolResult { tool_result } => {
-                let raw_output =
-                    tool_result.content.first().and_then(|content| content.as_json()).cloned();
+    fn from_tool_result(tool_result: rig::message::ToolResult) -> Vec<SessionUpdate> {
+        let raw_output = tool_result.content.first().and_then(|content| content.as_json()).cloned();
 
-                if tool_result.name.as_str() == update_plan::NAME
-                    && let Some(output) = raw_output.clone()
-                    && let Ok(entries) =
-                        serde_json::from_value::<Vec<update_plan::PlanEntry>>(output)
-                {
-                    return vec![Self::from_plan_entries(entries)];
-                }
-
-                let fields = ToolCallUpdateFields::new()
-                    .status(ToolCallStatus::Completed)
-                    .raw_output(raw_output);
-
-                vec![SessionUpdate::ToolCallUpdate(ToolCallUpdate::new(
-                    ToolCallId::new(tool_result.call.to_string()),
-                    fields,
-                ))]
-            },
+        if tool_result.name.as_str() == update_plan::NAME
+            && let Some(output) = raw_output.clone()
+            && let Ok(entries) = serde_json::from_value::<Vec<update_plan::PlanEntry>>(output)
+        {
+            return vec![Self::from_plan_entries(entries)];
         }
+
+        let fields =
+            ToolCallUpdateFields::new().status(ToolCallStatus::Completed).raw_output(raw_output);
+
+        vec![SessionUpdate::ToolCallUpdate(ToolCallUpdate::new(
+            ToolCallId::new(tool_result.call.to_string()),
+            fields,
+        ))]
     }
 
     fn from_plan_entries(entries: Vec<update_plan::PlanEntry>) -> SessionUpdate {
@@ -144,7 +142,8 @@ impl SessionUpdates {
     fn from_tool_call(tool_call: ToolCall) -> SessionUpdate {
         let (title, content) = parse_tool_call(tool_call.clone());
         let locations = locations(&tool_call.function);
-        let ToolFunction { name, arguments, .. } = tool_call.function;
+        let ToolFunction { name, arguments, invalid_arguments: _ } = tool_call.function;
+        let arguments = serde_json::Value::Object(arguments);
         let kind = tool_kind(&name);
 
         let tc = AcpToolCall::new(ToolCallId::new(tool_call.id.to_string()), &title)
@@ -169,6 +168,7 @@ impl IntoIterator for SessionUpdates {
 
 fn parse_tool_call(t: ToolCall) -> (String, Vec<ToolCallContent>) {
     let ToolFunction { name, arguments, .. } = t.function;
+    let arguments = serde_json::Value::Object(arguments);
 
     let default_title = format!("{name}: {arguments}");
     match name.as_str() {
@@ -264,7 +264,7 @@ fn tool_kind(tool_name: &ToolName) -> ToolKind {
 }
 
 fn locations(t: &ToolFunction) -> Vec<ToolCallLocation> {
-    let arguments = t.arguments.clone();
+    let arguments = serde_json::Value::Object(t.arguments.clone());
 
     match t.name.as_str() {
         read::NAME => {

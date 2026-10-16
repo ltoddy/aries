@@ -7,11 +7,11 @@ use aries_event::Notifier;
 use aries_filesystem::jsonl;
 use futures::StreamExt;
 use regex_lite::Regex;
-use rig::agent::{MultiTurnStreamItem, PromptResponse, StreamingError};
-use rig::completion::Message;
-use rig::message::{AssistantContent, ReasoningContent, ToolResultContent, UserContent};
+use rig::agent::{MultiTurnStreamItem, PromptResponse};
+use rig::completion::{Message, PromptError};
+use rig::message::{AssistantContent, ToolResultContent, UserContent};
 use rig::providers::openai::wire::OpenAiWire;
-use rig::{Agent, Model};
+use rig::{Agent, Model, ProviderError};
 use tokio::pin;
 
 const PREAMBLE: &str = include_str!("preamble.md");
@@ -81,7 +81,10 @@ impl CompactAgent {
                     }
                 },
                 Err(err) => {
-                    if let StreamingError::Completion(ref err) = err {
+                    if let PromptError::Provider(
+                        ProviderError::Provider(ref message) | ProviderError::Response(ref message),
+                    ) = err
+                    {
                         const PATTERNS: [&str; 6] = [
                             "prompt_too_long",
                             "context_length_exceeded",
@@ -90,7 +93,7 @@ impl CompactAgent {
                             "too many tokens",
                             "input is too long",
                         ];
-                        if PATTERNS.iter().any(|p| err.report().message.contains(p)) {
+                        if PATTERNS.iter().any(|p| message.contains(p)) {
                             return CompactOutcome::PromptTooLong;
                         }
                     }
@@ -99,7 +102,8 @@ impl CompactAgent {
             }
         }
 
-        let summary = final_res.output().trim();
+        let output = final_res.output();
+        let summary = output.trim();
         if summary.is_empty() {
             return CompactOutcome::Empty;
         }
@@ -197,8 +201,8 @@ fn compress(messages: &[Message]) -> String {
                     }
                 }
             },
-            Message::Assistant { id: _, content } => {
-                for c in content.iter() {
+            Message::Assistant(message) => {
+                for c in message.content.iter() {
                     if prompt.len() > start_len {
                         prompt.push('\n');
                     }
@@ -210,24 +214,14 @@ fn compress(messages: &[Message]) -> String {
                         AssistantContent::ToolCall(tool_call) => {
                             prompt.push_str(&format!("[tool call: {}]", tool_call.function.name));
                         },
-                        AssistantContent::Reasoning(sealed) => {
-                            if let Some(reasoning) = sealed.open(sealed.issuer()) {
-                                for rc in &reasoning.content {
-                                    let text = match rc {
-                                        ReasoningContent::Text { text, signature: _ } => {
-                                            text.as_str()
-                                        },
-                                        ReasoningContent::Encrypted(s) => s.as_str(),
-                                        ReasoningContent::Redacted { data } => data.as_str(),
-                                        ReasoningContent::Summary(s) => s.as_str(),
-                                    };
-                                    prompt.push_str(text);
-                                }
-                            }
+                        AssistantContent::Reasoning(reasoning) => {
+                            prompt.push_str(&reasoning.text);
                         },
                         AssistantContent::Image(_) => {
                             prompt.push_str("[image]");
                         },
+                        AssistantContent::Opaque(_) => {},
+                        _ => {},
                     }
                 }
             },

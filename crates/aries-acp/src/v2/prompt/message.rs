@@ -19,7 +19,7 @@ impl From<Vec<ContentBlock>> for UserMessage {
                     Some(UserContent::image_base64(i.data, image_media_type(i.mime_type), None))
                 },
                 ContentBlock::Audio(a) => {
-                    Some(UserContent::audio(a.data, audio_media_type(a.mime_type)))
+                    Some(UserContent::audio_base64(a.data, audio_media_type(a.mime_type)))
                 },
                 ContentBlock::ResourceLink(link) => {
                     let media_type = link.mime_type.and_then(document_media_type);
@@ -27,13 +27,15 @@ impl From<Vec<ContentBlock>> for UserMessage {
                         Some(desc) => format!("[{}]({}): {}", link.name, link.uri, desc),
                         None => format!("[{}]({})", link.name, link.uri),
                     };
-                    Some(UserContent::document(content, media_type))
+                    Some(UserContent::document_text(content, media_type))
                 },
                 ContentBlock::Resource(resource) => Some(match resource.resource {
-                    EmbeddedResourceResource::TextResourceContents(text) => UserContent::document(
-                        text.text,
-                        text.mime_type.and_then(document_media_type),
-                    ),
+                    EmbeddedResourceResource::TextResourceContents(text) => {
+                        UserContent::document_text(
+                            text.text,
+                            text.mime_type.and_then(document_media_type),
+                        )
+                    },
                     EmbeddedResourceResource::BlobResourceContents(blob) => {
                         let media_type = blob.mime_type.and_then(document_media_type);
 
@@ -46,7 +48,7 @@ impl From<Vec<ContentBlock>> for UserMessage {
                             _ => match STANDARD.decode(&blob.blob) {
                                 Ok(bytes) => {
                                     let text = String::from_utf8_lossy(&bytes).into_owned();
-                                    UserContent::document(text, media_type)
+                                    UserContent::document_text(text, media_type)
                                 },
                                 Err(_) => UserContent::Document(Document {
                                     data: DocumentSourceKind::Base64(blob.blob),
