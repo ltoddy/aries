@@ -1,6 +1,5 @@
 use rig::message::{
-    AssistantContent, Document, DocumentSourceKind, Message, ReasoningContent, ToolResultContent,
-    UserContent,
+    AssistantContent, Document, DocumentSourceKind, Message, ToolResultContent, UserContent,
 };
 
 pub trait TokenEstimator {
@@ -82,7 +81,7 @@ impl TokenEstimator for Message {
         match self {
             Message::System { content } => content.estimate_tokens(),
             Message::User { content } => content.estimate_tokens(),
-            Message::Assistant { content, .. } => content.estimate_tokens(),
+            Message::Assistant(message) => message.content.estimate_tokens(),
         }
     }
 }
@@ -139,22 +138,10 @@ impl TokenEstimator for AssistantContent {
                 let args = serde_json::to_string(&tc.function.arguments).unwrap_or_default();
                 tc.function.name.as_str().estimate_tokens() + args.estimate_tokens()
             },
-            AssistantContent::Reasoning(r) => r
-                .open(r.issuer())
-                .map(|reasoning| {
-                    reasoning
-                        .content
-                        .iter()
-                        .map(|rc| match rc {
-                            ReasoningContent::Text { text, .. } => text.estimate_tokens(),
-                            ReasoningContent::Encrypted(s) => s.estimate_tokens(),
-                            ReasoningContent::Redacted { data } => data.estimate_tokens(),
-                            ReasoningContent::Summary(s) => s.estimate_tokens(),
-                        })
-                        .sum()
-                })
-                .unwrap_or_default(),
+            AssistantContent::Reasoning(r) => r.text.estimate_tokens(),
             AssistantContent::Image(_) => IMAGE_MAX_TOKEN_SIZE,
+            AssistantContent::Opaque(_) => 0,
+            _ => 0,
         }
     }
 }

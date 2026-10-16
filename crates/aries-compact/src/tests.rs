@@ -1,7 +1,7 @@
 use aries_context::ChatContext;
 use rig::message::{
-    AssistantContent, CallId, Document, DocumentSourceKind, Issuer, Message, ProviderCallId,
-    Reasoning, Sealed, ToolName, ToolResultContent, UserContent,
+    AssistantContent, CallId, Document, DocumentSourceKind, Message, ProviderCallId, Reasoning,
+    ToolName, ToolResultContent, UserContent,
 };
 
 use crate::{TokenEstimator, micro_compact};
@@ -38,12 +38,10 @@ fn mixed_text_sums_per_character_estimates() {
 }
 
 #[test]
-fn encrypted_reasoning_counts_as_prompt_tokens() {
-    let issuer = Issuer::from_static("name");
-    let content =
-        AssistantContent::Reasoning(Sealed::new(issuer, Reasoning::encrypted("encrypted payload")));
+fn redacted_reasoning_counts_as_zero_tokens() {
+    let content = AssistantContent::Reasoning(Reasoning { redacted: true, ..Default::default() });
 
-    assert_eq!(content.estimate_tokens(), 5);
+    assert_eq!(content.estimate_tokens(), 0);
 }
 
 #[test]

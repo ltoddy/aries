@@ -275,11 +275,11 @@ impl Session {
             }
         };
 
-        self.last_assistant_message = Some(final_res.output().to_owned());
-        if let Some(messages) = final_res.messages() {
-            self.append_messages(messages).await;
-        }
-        self.fire_stop(final_res.output()).await;
+        let output = final_res.output();
+        self.last_assistant_message = Some(output.clone());
+        let messages = final_res.messages();
+        self.append_messages(messages).await;
+        self.fire_stop(&output).await;
         if let Some(completion) = final_res.completion_calls.last() {
             self.compactor.post_compact(completion.usage, callback).await;
         }

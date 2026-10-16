@@ -1,7 +1,8 @@
 mod agent;
 mod builder;
 
-use rig::agent::StreamingError;
+use rig::ProviderError;
+use rig::completion::PromptError;
 
 pub use self::agent::{AGENT_LOOP_MAX_TURNS, AriesAgent};
 pub use self::builder::AgentBuilder;
@@ -9,14 +10,14 @@ pub use self::builder::AgentBuilder;
 #[derive(Debug, thiserror::Error)]
 pub enum AriesError {
     #[error("{0}")]
-    Streaming(#[source] Box<StreamingError>),
+    Streaming(#[source] Box<PromptError>),
 
     #[error("hook terminated: {0}")]
     HookTerminated(String),
 }
 
-impl From<StreamingError> for AriesError {
-    fn from(err: StreamingError) -> Self {
+impl From<PromptError> for AriesError {
+    fn from(err: PromptError) -> Self {
         Self::Streaming(Box::new(err))
     }
 }
@@ -38,9 +39,11 @@ impl AriesError {
         ];
 
         if let AriesError::Streaming(err) = self
-            && let StreamingError::Completion(err) = err.as_ref()
+            && let PromptError::Provider(
+                ProviderError::Provider(message) | ProviderError::Response(message),
+            ) = err.as_ref()
         {
-            return PATTERNS.iter().any(|p| err.report().message.contains(p));
+            return PATTERNS.iter().any(|p| message.contains(p));
         }
         false
     }

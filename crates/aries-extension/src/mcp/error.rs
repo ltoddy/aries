@@ -25,7 +25,7 @@ pub enum McpConnectError {
     #[error("MCP connection timed out after {0:?}")]
     Timeout(std::time::Duration),
     #[error("MCP client error: {0}")]
-    Client(#[from] McpClientError),
+    Client(Box<McpClientError>),
 }
 
 impl McpConnectError {
@@ -38,6 +38,6 @@ impl McpConnectError {
     }
 
     pub fn client(err: McpClientError) -> Self {
-        Self::Client(err)
+        Self::Client(Box::new(err))
     }
 }

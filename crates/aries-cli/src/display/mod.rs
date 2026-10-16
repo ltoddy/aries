@@ -33,7 +33,7 @@ pub fn print_agent_event(event: AgentEvent) {
         AgentEvent::StreamItem(stream_item) => match *stream_item {
             MultiTurnStreamItem::StreamAssistantItem(content) => match content {
                 Item::Event(event) => match event {
-                    StreamEvent::Start { part: _, kind: _ } => {},
+                    StreamEvent::Start { part: _, kind: _, name: _ } => {},
                     StreamEvent::Text { part: _, text } => {
                         print!("{text}");
                         let _ = std::io::stdout().flush();
@@ -48,7 +48,7 @@ pub fn print_agent_event(event: AgentEvent) {
                 Item::Unknown(_payload) => {},
             },
             MultiTurnStreamItem::ToolCall { tool_call } => {
-                let args = tool_call.function.arguments.to_string();
+                let args = serde_json::Value::Object(tool_call.function.arguments).to_string();
                 let (first, rest) = format_tool_call_args(&tool_call.function.name, &args);
                 println!("{} {}", "•".cyan(), first);
                 if let Some(rest) = rest {
@@ -64,12 +64,13 @@ pub fn print_agent_event(event: AgentEvent) {
                 }
             },
             MultiTurnStreamItem::ToolExecutionCommitted { tool_call: _ } => {},
-            MultiTurnStreamItem::StreamUserItem(_streamed_user_content) => {},
+            MultiTurnStreamItem::ToolResult { tool_result: _ } => {},
             MultiTurnStreamItem::CompletionCall(_completion_call) => {},
             MultiTurnStreamItem::ModelTurnRetried { turn: _ } => {},
             MultiTurnStreamItem::FinalResponse(res) => {
                 display_token_usage(&res.usage());
             },
+            _ => {},
         },
         AgentEvent::SessionInfoUpdate { .. } => {},
     }

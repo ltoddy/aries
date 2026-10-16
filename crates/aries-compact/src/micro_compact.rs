@@ -52,7 +52,7 @@ pub fn micro_compact(messages: &mut [Message], keep_recent: usize) -> bool {
     let compactable: Vec<CallId> = messages
         .iter()
         .filter_map(|m| {
-            if let Message::Assistant { content, .. } = m { Some(content.iter()) } else { None }
+            if let Message::Assistant(message) = m { Some(message.content.iter()) } else { None }
         })
         .flatten()
         .filter_map(|c| if let AssistantContent::ToolCall(tc) = c { Some(tc) } else { None })
@@ -63,8 +63,8 @@ pub fn micro_compact(messages: &mut [Message], keep_recent: usize) -> bool {
     let clears: HashSet<CallId> = compactable.into_iter().rev().skip(keep_recent).collect();
 
     for message in messages.iter_mut() {
-        if let Message::Assistant { content, .. } = message {
-            for item in content.iter_mut() {
+        if let Message::Assistant(message) = message {
+            for item in message.content.iter_mut() {
                 if let AssistantContent::ToolCall(tc) = item
                     && clears.contains(&tc.id)
                 {
