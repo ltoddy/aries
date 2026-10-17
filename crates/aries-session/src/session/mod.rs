@@ -229,7 +229,7 @@ impl Session {
         self.notifier.send_session_info_update(&title, now.to_string());
 
         let hook_context = self.fire_user_prompt_submit(&title).await?;
-        self.compactor.pre_compact(&prompt, callback.clone()).await;
+        self.compactor.pre_compact(&prompt).await;
 
         let context = self.recall_context(&title).await;
         let mut history = self.chat_context.history().await.to_vec();
@@ -287,7 +287,7 @@ impl Session {
         self.append_messages(messages).await;
         self.fire_stop(&output).await;
         if let Some(completion) = final_res.completion_calls.last() {
-            self.compactor.post_compact(completion.usage, callback).await;
+            self.compactor.post_compact(completion.usage).await;
         }
 
         Ok(PromptOutcome::Completed(message_id))

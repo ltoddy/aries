@@ -370,11 +370,13 @@ dependencies = [
  "aries-filesystem",
  "aries-tools",
  "futures",
+ "nanoid",
  "parking_lot",
  "regex-lite",
  "rig",
  "serde_json",
  "tempfile",
+ "thiserror 2.0.21",
  "tokio",
 ]
 
