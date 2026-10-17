@@ -33,8 +33,9 @@ impl HooksExecutor {
         let mut hooks = HashMap::<HookEvent, Vec<HookMatcher>>::new();
 
         for preset in presets {
-            let settings = preset.hooks.0;
-            hooks.extend(settings);
+            for (event, matchers) in preset.hooks.0 {
+                hooks.entry(event).or_default().extend(matchers);
+            }
         }
 
         Self { hooks }
@@ -426,6 +427,7 @@ impl HooksExecutor {
         hook_event_name: &str,
     ) -> HookDecision {
         let payload = input.into();
+        let mut contexts = VecDeque::new();
 
         for hook in hooks {
             match hook {
@@ -436,7 +438,7 @@ impl HooksExecutor {
                                 return HookDecision::terminate(reason);
                             },
                             BashHookOutput::Continue { context: Some(context) } => {
-                                return HookDecision::r#continue([context]);
+                                contexts.push_back(context);
                             },
                             BashHookOutput::Continue { context: None } => {},
                         },
@@ -459,12 +461,12 @@ impl HooksExecutor {
                                 return HookDecision::terminate(reason);
                             }
                             if let Some(context) = json.additional_context(hook_event_name) {
-                                return HookDecision::r#continue([context]);
+                                contexts.push_back(context);
                             }
                         },
                         HttpHookOutcome::Text(text) => {
                             info!(event = hook_event_name, %text, "http hook receive plain text");
-                            return HookDecision::r#continue([text]);
+                            contexts.push_back(text);
                         },
                         HttpHookOutcome::Empty => {},
                     },
@@ -475,6 +477,6 @@ impl HooksExecutor {
             }
         }
 
-        HookDecision::r#continue([])
+        HookDecision::r#continue(contexts)
     }
 }
