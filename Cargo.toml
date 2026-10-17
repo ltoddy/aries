@@ -30,7 +30,6 @@ keywords = ["ai", "agent", "terminal", "acp", "cli"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/ltoddy/aries"
-rust-version = "1.95"
 
 [workspace.dependencies]
 agent-client-protocol = "3.4"
