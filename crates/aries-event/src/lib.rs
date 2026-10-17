@@ -1,3 +1,5 @@
+use std::fmt;
+
 use rig::agent::MultiTurnStreamItem;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
@@ -25,6 +27,16 @@ impl Notifier {
         let _ = self.sender.send(event);
     }
 
+    pub fn send_compaction(
+        &self,
+        id: impl Into<String>,
+        status: CompactionStatus,
+        summary: impl Into<String>,
+    ) {
+        let event = AgentEvent::compaction(id, status, summary);
+        let _ = self.sender.send(event);
+    }
+
     pub fn send_session_info_update(
         &self,
         title: impl Into<String>,
@@ -39,7 +51,39 @@ impl Notifier {
 pub enum AgentEvent {
     Notification(String),
     StreamItem(Box<MultiTurnStreamItem>),
+    Compaction(Compection),
     SessionInfoUpdate { title: String, updated_at: String },
+}
+
+#[derive(Debug, Clone)]
+pub struct Compection {
+    pub id: String,
+    pub status: CompactionStatus,
+    pub summary: String,
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub enum CompactionStatus {
+    #[default]
+    InProgress,
+    Completed,
+    Failed,
+}
+
+impl fmt::Display for Compection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Compaction {}: {}", self.status, self.summary)
+    }
+}
+
+impl fmt::Display for CompactionStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InProgress => f.write_str("in progress"),
+            Self::Completed => f.write_str("completed"),
+            Self::Failed => f.write_str("failed"),
+        }
+    }
 }
 
 impl AgentEvent {
@@ -50,6 +94,17 @@ impl AgentEvent {
 
     pub fn stream_item(stream_item: MultiTurnStreamItem) -> Self {
         Self::StreamItem(Box::new(stream_item))
+    }
+
+    pub fn compaction(
+        id: impl Into<String>,
+        status: CompactionStatus,
+        summary: impl Into<String>,
+    ) -> Self {
+        let id = id.into();
+        let summary = summary.into();
+        let compaction = Compection { id, status, summary };
+        Self::Compaction(compaction)
     }
 
     pub fn session_info_update(title: impl Into<String>, updated_at: impl Into<String>) -> Self {

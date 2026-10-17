@@ -1,7 +1,7 @@
 use agent_client_protocol::schema::v2::{
-    ContentBlock, ContentChunk, PlanUpdate, PlanUpdateContent, SessionInfoUpdate, SessionUpdate,
-    ToolCallContent, ToolCallId, ToolCallLocation, ToolCallStatus, ToolCallUpdate, ToolKind,
-    UsageUpdate,
+    CompactionStatus, CompactionUpdate, ContentBlock, ContentChunk, PlanUpdate, PlanUpdateContent,
+    SessionInfoUpdate, SessionUpdate, ToolCallContent, ToolCallId, ToolCallLocation,
+    ToolCallStatus, ToolCallUpdate, ToolKind, UsageUpdate,
 };
 use aries_event::AgentEvent;
 use aries_tools::{
@@ -44,6 +44,7 @@ impl SessionUpdates {
                 },
                 _ => Default::default(),
             },
+            AgentEvent::Compaction(compaction) => Self(vec![Self::from_compaction(compaction)]),
             AgentEvent::SessionInfoUpdate { title, updated_at } => {
                 Self(vec![SessionUpdate::SessionInfoUpdate(
                     SessionInfoUpdate::new().title(title).updated_at(updated_at),
@@ -154,6 +155,19 @@ impl SessionUpdates {
     fn from_plan_entries(entries: Vec<update_plan::PlanEntry>) -> Vec<SessionUpdate> {
         let entries = entries.into_iter().map(|e| PlanEntry::new(e).into()).collect();
         vec![SessionUpdate::PlanUpdate(PlanUpdate::new(PlanUpdateContent::items("main", entries)))]
+    }
+
+    fn from_compaction(compaction: aries_event::Compection) -> SessionUpdate {
+        let status = match compaction.status {
+            aries_event::CompactionStatus::InProgress => CompactionStatus::InProgress,
+            aries_event::CompactionStatus::Completed => CompactionStatus::Completed,
+            aries_event::CompactionStatus::Failed => CompactionStatus::Failed,
+        };
+
+        SessionUpdate::CompactionUpdate(
+            CompactionUpdate::new(compaction.id, status)
+                .summary(vec![ContentBlock::from(compaction.summary)]),
+        )
     }
 }
 
