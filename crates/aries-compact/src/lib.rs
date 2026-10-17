@@ -1,27 +1,29 @@
 mod agent;
 mod breaker;
+mod error;
 mod micro_compact;
 #[cfg(test)]
 mod tests;
 mod tokens;
 mod window;
 
-use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use aries_context::ChatContext;
-use aries_event::{AgentEvent, Notifier};
+use aries_event::{CompactionStatus, Notifier};
 use aries_extension::hook::input::{
     PostCompactHookInput, PostCompactTrigger, PreCompactCustomInstructions, PreCompactHookInput,
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
+use nanoid::nanoid;
 use rig::Model;
 use rig::completion::{Message, Usage};
 use rig::providers::openai::wire::OpenAiWire;
 
 pub use crate::agent::{CompactAgent, CompactOutcome, compact_summary};
 pub use crate::breaker::{AutoCompactBreaker, Decision};
+pub use crate::error::CompactionError;
 pub use crate::micro_compact::{KEEP_RECENT, micro_compact};
 pub use crate::tokens::TokenEstimator;
 pub use crate::window::ContextWindow;
@@ -52,7 +54,7 @@ impl ContextCompactor {
         let cwd = cwd.as_ref();
         let transcript_path = transcript_path.as_ref();
         let breaker = AutoCompactBreaker::new();
-        let agent = CompactAgent::new(model, transcript_path, Notifier::clone(&notifier));
+        let agent = CompactAgent::new(model, transcript_path);
 
         Self {
             agent,
@@ -67,16 +69,10 @@ impl ContextCompactor {
     }
 
     pub fn set_model(&mut self, model: Model<OpenAiWire>) {
-        let agent =
-            CompactAgent::new(model, &self.transcript_path, Notifier::clone(&self.notifier));
-        self.agent = agent;
+        self.agent.set_model(model);
     }
 
-    pub async fn pre_compact<F, Fut>(&mut self, prompt: &Message, mut callback: F)
-    where
-        F: FnMut(AgentEvent) -> Fut,
-        Fut: Future<Output = ()>,
-    {
+    pub async fn pre_compact(&mut self, prompt: &Message) {
         let mut history = self.chat_context.history().await.clone();
         if micro_compact(&mut history, KEEP_RECENT) {
             self.chat_context.overwrite(history).await;
@@ -91,32 +87,34 @@ impl ContextCompactor {
         };
 
         if estimated_tokens >= compact_threshold {
+            let compaction_id = format!("micra-compression-{}", nanoid!());
+            self.notifier.send_compaction(&compaction_id, CompactionStatus::InProgress, "");
+
             let text = format!(
                 "\n预估 tokens {estimated_tokens} 已达阈值 {compact_threshold}（上下文窗口 {}），提前触发压缩...\n",
                 window.total
             );
-            callback(AgentEvent::notification(text)).await;
             self.compact().await;
+            self.notifier.send_compaction(&compaction_id, CompactionStatus::InProgress, text);
         }
     }
 
-    pub async fn post_compact<F, Fut>(&mut self, usage: Usage, mut callback: F)
-    where
-        F: FnMut(AgentEvent) -> Fut,
-        Fut: Future<Output = ()>,
-    {
+    pub async fn post_compact(&mut self, usage: Usage) {
         let window = ContextWindow::new();
         let compact_threshold = window.auto_compact_threshold();
 
         if let Some(total_tokens) = usage.total_tokens
             && total_tokens > compact_threshold
         {
+            let compaction_id = format!("abstract-compression-{}", nanoid!());
+
             let text = format!(
                 "\n实际 tokens {} 已达阈值 {compact_threshold}，触发压缩...\n",
                 total_tokens,
             );
-            callback(AgentEvent::notification(text)).await;
+            self.notifier.send_compaction(&compaction_id, CompactionStatus::InProgress, text);
             self.compact().await;
+            self.notifier.send_compaction(&compaction_id, CompactionStatus::Completed, "");
         }
     }
 

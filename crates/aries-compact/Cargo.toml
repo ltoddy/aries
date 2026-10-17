@@ -18,10 +18,12 @@ aries-extension = { version = "0.1.0", path = "../aries-extension" }
 aries-filesystem = { version = "0.1.0", path = "../aries-filesystem" }
 aries-tools = { version = "0.1.0", path = "../aries-tools" }
 futures.workspace = true
+nanoid.workspace = true
 parking_lot.workspace = true
 regex-lite.workspace = true
 rig = { workspace = true, features = ["reqwest-middleware"] }
 serde_json.workspace = true
+thiserror.workspace = true
 tokio = { workspace = true, features = ["fs"] }
 
 [dev-dependencies]

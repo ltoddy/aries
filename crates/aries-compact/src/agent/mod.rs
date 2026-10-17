@@ -3,7 +3,6 @@ use std::sync::LazyLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Context;
-use aries_event::Notifier;
 use aries_filesystem::jsonl;
 use futures::StreamExt;
 use regex_lite::Regex;
@@ -38,17 +37,12 @@ pub enum CompactOutcome {
 pub struct CompactAgent {
     inner: Agent,
     transcript_path: PathBuf,
-    notifier: Notifier,
 }
 
 impl CompactAgent {
     const COMPACTION_MAX_TURNS: usize = 1; // 强制单论,避免陷入循环
 
-    pub fn new(
-        model: Model<OpenAiWire>,
-        transcript_path: impl AsRef<Path>,
-        notifier: Notifier,
-    ) -> Self {
+    pub fn new(model: Model<OpenAiWire>, transcript_path: impl AsRef<Path>) -> Self {
         let transcript_path = transcript_path.as_ref().to_owned();
 
         let agent = rig::agent::AgentBuilder::new(model)
@@ -58,7 +52,11 @@ impl CompactAgent {
             .default_max_turns(Self::COMPACTION_MAX_TURNS)
             .build();
 
-        Self { inner: agent, transcript_path, notifier }
+        Self { inner: agent, transcript_path }
+    }
+
+    pub fn set_model(&mut self, model: Model<OpenAiWire>) {
+        self.inner.set_model(model);
     }
 
     pub async fn compact(&mut self, messages: &[Message]) -> CompactOutcome {
@@ -74,12 +72,8 @@ impl CompactAgent {
         let mut final_res = PromptResponse::empty();
         while let Some(chunk) = stream.next().await {
             match chunk {
-                Ok(chunk) => {
-                    self.notifier.send_stream_item(chunk.clone());
-                    if let MultiTurnStreamItem::FinalResponse(res) = chunk {
-                        final_res = res;
-                    }
-                },
+                Ok(MultiTurnStreamItem::FinalResponse(res)) => final_res = res,
+                Ok(_) => {},
                 Err(err) => {
                     if let PromptError::Provider(
                         ProviderError::Provider(ref message) | ProviderError::Response(ref message),
