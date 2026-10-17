@@ -68,6 +68,7 @@ pub enum CompactionStatus {
     InProgress,
     Completed,
     Failed,
+    Cancelled,
 }
 
 impl fmt::Display for Compection {
@@ -82,6 +83,7 @@ impl fmt::Display for CompactionStatus {
             Self::InProgress => f.write_str("in progress"),
             Self::Completed => f.write_str("completed"),
             Self::Failed => f.write_str("failed"),
+            Self::Cancelled => f.write_str("cancelled"),
         }
     }
 }

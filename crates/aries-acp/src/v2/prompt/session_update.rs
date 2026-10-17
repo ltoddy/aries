@@ -162,6 +162,7 @@ impl SessionUpdates {
             aries_event::CompactionStatus::InProgress => CompactionStatus::InProgress,
             aries_event::CompactionStatus::Completed => CompactionStatus::Completed,
             aries_event::CompactionStatus::Failed => CompactionStatus::Failed,
+            aries_event::CompactionStatus::Cancelled => CompactionStatus::Failed,
         };
 
         SessionUpdate::CompactionUpdate(

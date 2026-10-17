@@ -88,14 +88,34 @@ impl ContextCompactor {
 
         if estimated_tokens >= compact_threshold {
             let compaction_id = format!("micra-compression-{}", nanoid!());
-            self.notifier.send_compaction(&compaction_id, CompactionStatus::InProgress, "");
-
             let text = format!(
-                "\n预估 tokens {estimated_tokens} 已达阈值 {compact_threshold}（上下文窗口 {}），提前触发压缩...\n",
+                "预估 tokens {estimated_tokens} 已达到摘要压缩阈值 {compact_threshold}（上下文窗口 {}），开始自动摘要压缩。",
                 window.total
             );
-            self.compact().await;
             self.notifier.send_compaction(&compaction_id, CompactionStatus::InProgress, text);
+            match self.compact().await {
+                Ok(Some(_)) => {
+                    self.notifier.send_compaction(
+                        &compaction_id,
+                        CompactionStatus::Completed,
+                        "上下文摘要压缩已完成。",
+                    );
+                },
+                Ok(None) => {
+                    self.notifier.send_compaction(
+                        &compaction_id,
+                        CompactionStatus::Cancelled,
+                        "上下文摘要压缩被 hook 阻止，已跳过本次压缩。",
+                    );
+                },
+                Err(err) => {
+                    self.notifier.send_compaction(
+                        &compaction_id,
+                        CompactionStatus::Failed,
+                        err.to_string(),
+                    );
+                },
+            }
         }
     }
 
@@ -109,25 +129,40 @@ impl ContextCompactor {
             let compaction_id = format!("abstract-compression-{}", nanoid!());
 
             let text = format!(
-                "\n实际 tokens {} 已达阈值 {compact_threshold}，触发压缩...\n",
-                total_tokens,
+                "实际 tokens {total_tokens} 已超过摘要压缩阈值 {compact_threshold}，开始自动摘要压缩。",
             );
             self.notifier.send_compaction(&compaction_id, CompactionStatus::InProgress, text);
-            self.compact().await;
-            self.notifier.send_compaction(&compaction_id, CompactionStatus::Completed, "");
+            match self.compact().await {
+                Ok(Some(_)) => {
+                    self.notifier.send_compaction(
+                        &compaction_id,
+                        CompactionStatus::Completed,
+                        "上下文摘要压缩已完成。",
+                    );
+                },
+                Ok(None) => {
+                    self.notifier.send_compaction(
+                        &compaction_id,
+                        CompactionStatus::Cancelled,
+                        "上下文摘要压缩被 hook 阻止，已跳过本次压缩。",
+                    );
+                },
+                Err(err) => {
+                    self.notifier.send_compaction(
+                        &compaction_id,
+                        CompactionStatus::Failed,
+                        err.to_string(),
+                    );
+                },
+            }
         }
     }
 
-    pub async fn compact(&mut self) {
+    pub async fn compact(&mut self) -> Result<Option<String>, CompactionError> {
         match self.breaker.decide() {
-            Decision::Allow { half_open } => {
-                if half_open {
-                    self.notifier.notify("冷却结束，尝试恢复压缩...");
-                }
-            },
+            Decision::Allow { half_open: _ } => {},
             Decision::Skip { wait, consecutive_failures } => {
-                self.notifier.notify(format!("压缩处于冷却期（已连续失败 {consecutive_failures} 次），约 {wait:?} 后重试，本次跳过。"));
-                return;
+                return Err(CompactionError::cooldown(wait, consecutive_failures));
             },
         }
 
@@ -139,7 +174,7 @@ impl ContextCompactor {
         )
         .transcript_path(&self.transcript_path);
         if let HookDecision::Terminate { .. } = self.hooks_executor.fire_pre_compact(input).await {
-            return;
+            return Ok(None);
         }
 
         let outcome = {
@@ -156,27 +191,27 @@ impl ContextCompactor {
                     &self.id,
                     &self.cwd,
                     PostCompactTrigger::Auto,
-                    summary,
+                    &summary,
                 )
                 .transcript_path(&self.transcript_path);
                 self.hooks_executor.fire_post_compact(input).await;
+                Ok(Some(summary))
             },
             CompactOutcome::PromptTooLong => {
-                self.notifier.notify("上下文过长，压缩请求被拒，进入冷却以避免反复重试。");
                 self.breaker.trip();
+                Err(CompactionError::prompt_too_long())
             },
-            CompactOutcome::Transient(err) => {
-                self.notifier.notify(format!("压缩遇到临时错误（不计入失败）：{err}"));
-            },
+            CompactOutcome::Transient(err) => Err(CompactionError::transient(err)),
             CompactOutcome::Empty => {
                 self.breaker.on_failure();
                 let failures = self.breaker.consecutive_failures();
                 if failures >= AutoCompactBreaker::MAX_CONSECUTIVE_AUTOCOMPACT_FAILURES {
-                    self.notifier.notify(format!(
-                        "连续 {failures} 次压缩失败，进入 {} 分钟冷却。",
+                    return Err(CompactionError::too_many_failures(
+                        failures,
                         AutoCompactBreaker::AUTOCOMPACT_FAILURE_COOLDOWN.as_secs() / 60,
                     ));
                 }
+                Err(CompactionError::empty())
             },
         }
     }
