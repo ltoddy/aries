@@ -4,6 +4,7 @@ mod output;
 
 use std::path::{Path, PathBuf};
 
+use aries_init::GlobalContext;
 use git2::{Repository, WorktreeAddOptions};
 use parking_lot::Mutex;
 use regex_lite::Regex;
@@ -18,6 +19,7 @@ use crate::context::{ToolContext as AriesToolContext, Worktree};
 pub const NAME: &str = "EnterGitWorktree";
 
 pub struct EnterGitWorktreeTool {
+    gctx: GlobalContext,
     ctx: AriesToolContext,
     repository: Mutex<Repository>,
     worktree_dir: PathBuf,
@@ -26,6 +28,7 @@ pub struct EnterGitWorktreeTool {
 
 impl EnterGitWorktreeTool {
     pub fn new(
+        gctx: GlobalContext,
         ctx: AriesToolContext,
         repository: Repository,
         worktree_dir: impl AsRef<Path>,
@@ -35,6 +38,7 @@ impl EnterGitWorktreeTool {
             .expect("worktree name regex should be valid");
 
         Self {
+            gctx,
             ctx,
             repository: Mutex::new(repository),
             worktree_dir: worktree_dir.to_owned(),
@@ -137,6 +141,7 @@ impl Tool for EnterGitWorktreeTool {
         );
         self.ctx.set_worktree(Some(worktree));
         self.ctx.set_cwd(&worktree_path);
+        self.gctx.set_current_dir(&worktree_path);
 
         Ok(EnterGitWorktreeOutput::new(worktree_path, worktree_branch))
     }
