@@ -29,20 +29,30 @@ pub async fn execute_bash_command_hook(
         .spawn()
         .map_err(BashHookError::Spawn)?;
 
-    if !stdin_payload.is_empty() {
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin.write_all(stdin_payload.as_bytes()).await.map_err(BashHookError::Stdin)?;
-            stdin.shutdown().await.map_err(BashHookError::Stdin)?;
-        }
-    } else {
-        drop(child.stdin.take());
-    }
-
+    let stdin = child.stdin.take();
+    let stdin_payload = stdin_payload.into_bytes();
     let timeout_duration =
         Duration::from_secs_f64(hook.timeout.unwrap_or(DEFAULT_HOOK_TIMEOUT_SECS).max(0.0));
 
-    let output = match tokio::time::timeout(timeout_duration, child.wait_with_output()).await {
-        Ok(res) => res.map_err(BashHookError::Wait)?,
+    let output = match tokio::time::timeout(timeout_duration, async move {
+        let write_stdin = async move {
+            if let Some(mut stdin) = stdin {
+                if !stdin_payload.is_empty() {
+                    stdin.write_all(&stdin_payload).await.map_err(BashHookError::Stdin)?;
+                }
+                stdin.shutdown().await.map_err(BashHookError::Stdin)?;
+            }
+            Ok::<_, BashHookError>(())
+        };
+        let wait_output =
+            async move { child.wait_with_output().await.map_err(BashHookError::Wait) };
+
+        let ((), output) = tokio::try_join!(write_stdin, wait_output)?;
+        Ok::<_, BashHookError>(output)
+    })
+    .await
+    {
+        Ok(res) => res?,
         Err(elapsed) => {
             return Err(BashHookError::Timeout { timeout: timeout_duration, source: elapsed });
         },

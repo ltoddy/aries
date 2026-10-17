@@ -177,6 +177,21 @@ async fn executor_continues_when_no_hooks_registered() {
 }
 
 #[tokio::test]
+async fn executor_combines_same_event_matchers_from_multiple_presets() {
+    let executor = HooksExecutor::new(vec![
+        hooks_definition(HookEvent::PreToolUse, vec![command_hook("exit 2")]),
+        hooks_definition(HookEvent::PreToolUse, vec![command_hook("true")]),
+    ]);
+
+    let decision = executor.fire_pre_tool_use(pre_tool_use_input("Write")).await;
+
+    match decision {
+        HookDecision::Terminate { reason } => assert!(reason.contains("exit code 2")),
+        HookDecision::Continue { .. } => panic!("expected earlier preset hook to be preserved"),
+    }
+}
+
+#[tokio::test]
 async fn executor_blocks_pre_tool_use_when_hook_exits_two() {
     let preset = HooksDefinition {
         location: PathBuf::new(),
@@ -268,6 +283,28 @@ async fn executor_adds_plain_stdout_for_session_start() {
             assert_eq!(contexts.into_iter().collect_vec(), ["startup-context"])
         },
         decision => panic!("expected context, got {decision:?}"),
+    }
+}
+
+#[tokio::test]
+async fn executor_runs_blocking_hook_after_context_hook_in_same_matcher() {
+    let executor = HooksExecutor::new(vec![hooks_definition(
+        HookEvent::PreToolUse,
+        vec![
+            command_hook(
+                r#"printf '%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"from hook"}}'"#,
+            ),
+            command_hook("exit 2"),
+        ],
+    )]);
+
+    let decision = executor.fire_pre_tool_use(pre_tool_use_input("Write")).await;
+
+    match decision {
+        HookDecision::Terminate { reason } => assert!(reason.contains("exit code 2")),
+        HookDecision::Continue { contexts } => {
+            panic!("expected hook to be blocked, got contexts {contexts:?}")
+        },
     }
 }
 
