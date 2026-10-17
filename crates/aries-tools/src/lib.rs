@@ -52,6 +52,7 @@ pub fn create_tools_from_mode(
     mode: Mode,
     model: Model<OpenAiWire>,
     parent_dir: impl AsRef<Path>,
+    cwd: impl AsRef<Path>,
     lsp_client: Option<aries_lspclient::SharedLspClient>,
     extensions: AgentExtensions,
     notifier: Notifier,
@@ -63,6 +64,7 @@ pub fn create_tools_from_mode(
         &tool_names,
         model,
         parent_dir,
+        cwd,
         lsp_client,
         extensions,
         notifier,
@@ -107,19 +109,17 @@ pub fn create_tools_from_tool_names(
     tool_names: &[&str],
     model: Model<OpenAiWire>,
     parent_dir: impl AsRef<Path>,
+    cwd: impl AsRef<Path>,
     lsp_client: Option<aries_lspclient::SharedLspClient>,
     extensions: AgentExtensions,
     notifier: Notifier,
 ) -> ToolSet {
     let parent_dir = parent_dir.as_ref();
+    let cwd = cwd.as_ref();
     let tool_names = tool_names.iter().unique().collect_vec();
     let mut tool_set = ToolSet::default();
 
-    let ctx = context::ToolContext::new(
-        lsp_client.clone(),
-        Notifier::clone(&notifier),
-        gctx.current_dir(),
-    );
+    let ctx = context::ToolContext::new(lsp_client.clone(), Notifier::clone(&notifier), cwd);
 
     for &tool_name in tool_names {
         match tool_name {
@@ -153,12 +153,10 @@ pub fn create_tools_from_tool_names(
                 tool_set.add_tool(edit::EditTool::new(ctx.clone()));
             },
             enter_worktree::NAME => {
-                if let Some(repository) = Repository::discover(gctx.current_dir())
-                    .ok()
-                    .filter(|repo| repo.workdir().is_some())
+                if let Some(repository) =
+                    Repository::discover(cwd).ok().filter(|repo| repo.workdir().is_some())
                 {
                     tool_set.add_tool(enter_worktree::EnterGitWorktreeTool::new(
-                        gctx.clone(),
                         ctx.clone(),
                         repository,
                         gctx.worktree_dir(),
@@ -166,15 +164,11 @@ pub fn create_tools_from_tool_names(
                 }
             },
             exit_worktree::NAME => {
-                if let Some(repository) = Repository::discover(gctx.current_dir())
-                    .ok()
-                    .filter(|repo| repo.workdir().is_some())
+                if let Some(repository) =
+                    Repository::discover(cwd).ok().filter(|repo| repo.workdir().is_some())
                 {
-                    tool_set.add_tool(exit_worktree::ExitGitWorktreeTool::new(
-                        gctx.clone(),
-                        ctx.clone(),
-                        repository,
-                    ));
+                    tool_set
+                        .add_tool(exit_worktree::ExitGitWorktreeTool::new(ctx.clone(), repository));
                 }
             },
             glob::NAME => {

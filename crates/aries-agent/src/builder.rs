@@ -17,6 +17,7 @@ pub struct AgentBuilder {
     model: Model<OpenAiWire>,
     mode: Mode,
     root_dir: PathBuf,
+    cwd: PathBuf,
     gctx: GlobalContext,
     lsp_client: Option<SharedLspClient>,
 
@@ -30,15 +31,18 @@ impl AgentBuilder {
         model: Model<OpenAiWire>,
         mode: Mode,
         root_dir: impl AsRef<Path>,
+        cwd: impl AsRef<Path>,
         gctx: GlobalContext,
         notifier: Notifier,
     ) -> Self {
         let root_dir = root_dir.as_ref();
+        let cwd = cwd.as_ref();
 
         Self {
             model,
             mode,
             root_dir: root_dir.to_owned(),
+            cwd: cwd.to_owned(),
             gctx,
             lsp_client: None,
             extensions: AgentExtensions::empty(),
@@ -60,13 +64,14 @@ impl AgentBuilder {
         let mode = self.mode;
         let name = mode.name();
         let model_name = self.model.name();
-        let current_dir = self.gctx.current_dir();
+        let current_dir = self.cwd;
 
         let tools = aries_tools::create_tools_from_mode(
             self.gctx.clone(),
             self.mode,
             self.model.clone(),
             &self.root_dir,
+            &current_dir,
             self.lsp_client.clone(),
             self.extensions.clone(),
             Notifier::clone(&self.notifier),
