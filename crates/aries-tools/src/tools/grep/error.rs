@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 #[derive(thiserror::Error, Debug)]
 pub enum GrepError {
     #[error("invalid regex pattern {pattern:?}: {source}")]
@@ -6,32 +8,34 @@ pub enum GrepError {
     #[error("invalid include glob pattern {pattern:?}: {source}")]
     IncludeGlob { pattern: String, source: globset::Error },
 
-    #[error("failed to build include globset for pattern {pattern:?}: {source}")]
-    IncludeGlobSet { pattern: String, source: globset::Error },
+    #[error("failed to search {}: {source}", path.display())]
+    Search { path: PathBuf, source: std::io::Error },
 
-    #[error("search error: {0}")]
-    Search(#[from] std::io::Error),
+    #[error("failed to walk search directory: {0}")]
+    Walk(#[from] ignore::Error),
 
-    #[error("internal error: result collector still has outstanding references")]
-    CollectorStillShared,
+    #[error("search task failed: {0}")]
+    Task(#[from] tokio::task::JoinError),
 }
 
 impl GrepError {
     pub fn regex(pattern: impl Into<String>, source: grep_regex::Error) -> Self {
-        let pattern = pattern.into();
-
-        Self::Regex { pattern, source }
+        Self::Regex { pattern: pattern.into(), source }
     }
 
     pub fn include_glob(pattern: impl Into<String>, source: globset::Error) -> Self {
-        let pattern = pattern.into();
-
-        Self::IncludeGlob { pattern, source }
+        Self::IncludeGlob { pattern: pattern.into(), source }
     }
 
-    pub fn include_globset(pattern: impl Into<String>, source: globset::Error) -> Self {
-        let pattern = pattern.into();
+    pub fn search(path: impl Into<PathBuf>, source: std::io::Error) -> Self {
+        Self::Search { path: path.into(), source }
+    }
 
-        Self::IncludeGlobSet { pattern, source }
+    pub fn walk(source: ignore::Error) -> Self {
+        Self::Walk(source)
+    }
+
+    pub fn task(source: tokio::task::JoinError) -> Self {
+        Self::Task(source)
     }
 }

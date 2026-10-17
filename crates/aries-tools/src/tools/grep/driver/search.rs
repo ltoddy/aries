@@ -1,204 +1,186 @@
+use std::io;
 use std::path::Path;
-use std::sync::Arc;
-use std::time::SystemTime;
 
 use grep_regex::RegexMatcher;
 use grep_searcher::{
     BinaryDetection, Searcher, SearcherBuilder, Sink, SinkContext, SinkContextKind, SinkMatch,
+    sinks,
 };
 
-use crate::grep::OutputMode;
-use crate::tools::grep::driver::collector::FileMatch;
-use crate::tools::grep::driver::{Query, StopState};
+use super::collector::FileMatch;
+use super::state::ResultLimit;
+use crate::grep::{GrepArgs, OutputMode};
 
-struct ContentSink {
+struct ContentSink<'a> {
     path_display: String,
-    show_line_numbers: bool,
-    stop: Arc<StopState>,
+    args: &'a GrepArgs,
+    limit: &'a ResultLimit,
     lines: Vec<String>,
     pending_context: Vec<String>,
-    active_match: bool,
+    after_context_end: u64,
 }
 
-impl ContentSink {
-    fn new(path_display: impl Into<String>, show_line_numbers: bool, stop: Arc<StopState>) -> Self {
-        Self {
-            path_display: path_display.into(),
-            show_line_numbers,
-            stop,
-            lines: Vec::new(),
-            pending_context: Vec::new(),
-            active_match: false,
-        }
-    }
-
+impl ContentSink<'_> {
     fn render_line(&self, line_number: u64, bytes: &[u8], is_match: bool) -> String {
         let text = String::from_utf8_lossy(bytes);
         let text = text.strip_suffix('\n').unwrap_or(&text);
         let text = text.strip_suffix('\r').unwrap_or(text);
         let sep = if is_match { ':' } else { '-' };
-        if self.show_line_numbers {
+        if self.args.show_line_numbers {
             format!("{}{sep}{}{sep}{}", self.path_display, line_number, text)
         } else {
             format!("{}{sep}{}", self.path_display, text)
         }
     }
-
-    fn push_line(&mut self, line_number: u64, bytes: &[u8], is_match: bool) {
-        let rendered = self.render_line(line_number, bytes, is_match);
-        self.lines.push(rendered);
-    }
-
-    fn push_pending_context(&mut self, line_number: u64, bytes: &[u8]) {
-        let rendered = self.render_line(line_number, bytes, false);
-        self.pending_context.push(rendered);
-    }
 }
 
-impl Sink for ContentSink {
-    type Error = std::io::Error;
+impl Sink for ContentSink<'_> {
+    type Error = io::Error;
 
-    fn matched(&mut self, _searcher: &Searcher, mat: &SinkMatch<'_>) -> Result<bool, Self::Error> {
-        self.active_match = self.stop.grant(1) > 0;
-        if !self.active_match {
+    fn matched(&mut self, _searcher: &Searcher, mat: &SinkMatch<'_>) -> io::Result<bool> {
+        let line_number = mat.line_number().expect("line numbers are enabled");
+        if !self.limit.try_acquire() {
+            if line_number > self.after_context_end {
+                return Ok(false);
+            }
+            self.lines.push(self.render_line(line_number, mat.bytes(), false));
+            return Ok(line_number < self.after_context_end);
+        }
+
+        self.after_context_end = line_number.saturating_add(self.args.context as u64);
+        self.lines.append(&mut self.pending_context);
+        self.lines.push(self.render_line(line_number, mat.bytes(), true));
+        Ok(true)
+    }
+
+    fn context(&mut self, _searcher: &Searcher, ctx: &SinkContext<'_>) -> io::Result<bool> {
+        let line_number = ctx.line_number().expect("line numbers are enabled");
+        if self.limit.truncated() && line_number > self.after_context_end {
             return Ok(false);
         }
-
-        self.lines.append(&mut self.pending_context);
-        self.push_line(mat.line_number().unwrap_or(1), mat.bytes(), true);
-        Ok(true)
-    }
-
-    fn context(
-        &mut self,
-        _searcher: &Searcher,
-        ctx: &SinkContext<'_>,
-    ) -> Result<bool, Self::Error> {
         match ctx.kind() {
-            SinkContextKind::Before if self.active_match => {
-                self.push_line(ctx.line_number().unwrap_or(1), ctx.bytes(), false);
-            },
             SinkContextKind::Before => {
-                self.push_pending_context(ctx.line_number().unwrap_or(1), ctx.bytes());
+                self.pending_context.push(self.render_line(line_number, ctx.bytes(), false));
             },
-            SinkContextKind::After if self.active_match => {
-                self.push_line(ctx.line_number().unwrap_or(1), ctx.bytes(), false);
+            SinkContextKind::After => {
+                self.lines.push(self.render_line(line_number, ctx.bytes(), false));
             },
-            SinkContextKind::After => {},
-            SinkContextKind::Other => {
-                self.active_match = false;
-                self.pending_context.clear();
-            },
+            SinkContextKind::Other => {},
         }
         Ok(true)
     }
 }
 
-struct MatchFoundSink {
-    found: bool,
-}
-
-impl MatchFoundSink {
-    fn new() -> Self {
-        Self { found: false }
+pub fn build_searcher(args: &GrepArgs) -> Searcher {
+    let mut builder = SearcherBuilder::new();
+    builder.line_number(true).binary_detection(BinaryDetection::quit(b'\x00'));
+    if args.output_mode == OutputMode::Content {
+        builder
+            .before_context(args.context)
+            .after_context(args.context)
+            .heap_limit(Some(10 * 1024 * 1024));
     }
-}
-
-impl Sink for MatchFoundSink {
-    type Error = std::io::Error;
-
-    fn matched(&mut self, _searcher: &Searcher, _mat: &SinkMatch<'_>) -> Result<bool, Self::Error> {
-        self.found = true;
-        Ok(false)
-    }
-}
-
-struct CountSink {
-    count: usize,
-}
-
-impl CountSink {
-    fn new() -> Self {
-        Self { count: 0 }
-    }
-}
-
-impl Sink for CountSink {
-    type Error = std::io::Error;
-
-    fn matched(&mut self, _searcher: &Searcher, _mat: &SinkMatch<'_>) -> Result<bool, Self::Error> {
-        self.count += 1;
-        Ok(true)
-    }
+    builder.build()
 }
 
 pub fn search_file(
-    cwd: impl AsRef<Path>,
-    query: &Query,
+    cwd: &Path,
+    args: &GrepArgs,
     matcher: &RegexMatcher,
-    path: impl AsRef<Path>,
-    stop: Arc<StopState>,
-) -> Option<FileMatch> {
-    let path = path.as_ref();
+    searcher: &mut Searcher,
+    path: &Path,
+    limit: &ResultLimit,
+) -> io::Result<Option<FileMatch>> {
     let relative_path = path.strip_prefix(cwd).unwrap_or(path);
-    let path_display = relative_path.display().to_string();
+    if args.output_mode == OutputMode::Content {
+        let mut sink = ContentSink {
+            path_display: relative_path.display().to_string(),
+            args,
+            limit,
+            lines: Vec::new(),
+            pending_context: Vec::new(),
+            after_context_end: 0,
+        };
+        searcher.search_path(matcher, path, &mut sink)?;
+        return Ok((!sink.lines.is_empty()).then_some(FileMatch::Content(sink.lines)));
+    }
 
-    match query.output_mode {
-        OutputMode::Content => {
-            let mut builder = SearcherBuilder::new();
-            builder
-                .line_number(true)
-                .before_context(query.context_before())
-                .after_context(query.context_after())
-                .binary_detection(BinaryDetection::quit(b'\x00'))
-                .memory_map(query.mmap_choice())
-                .heap_limit(query.heap_limit());
-            let mut searcher = builder.build();
-            let mut sink = ContentSink::new(path_display, query.show_line_numbers, stop);
-            if searcher.search_path(matcher, path, &mut sink).is_err() {
-                return None;
+    let mut count = 0usize;
+    searcher.search_path(
+        matcher,
+        path,
+        sinks::Bytes(|_, _| {
+            count += 1;
+            Ok(args.output_mode == OutputMode::Count)
+        }),
+    )?;
+    if count == 0 {
+        return Ok(None);
+    }
+    if args.output_mode == OutputMode::Count {
+        Ok(Some(FileMatch::Count(format!("{}:{count}", relative_path.display()))))
+    } else {
+        Ok(Some(FileMatch::Path {
+            path: relative_path.to_owned(),
+            modified: path.metadata()?.modified()?,
+        }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn content_is_the_union_of_context_windows_around_retained_matches() {
+        let matcher = RegexMatcher::new("hit").expect("valid regex");
+        for mask in 0..64 {
+            let lines: Vec<_> =
+                (0..6).map(|line| if mask & (1 << line) != 0 { "hit" } else { "miss" }).collect();
+            let body = format!("{}\n", lines.join("\n"));
+            let matching: Vec<_> = (0..lines.len()).filter(|&line| lines[line] == "hit").collect();
+            for limit in [0, 1, 2, 6] {
+                let retained = &matching
+                    [..if limit == 0 { matching.len() } else { limit.min(matching.len()) }];
+                for context in 0..=2 {
+                    let args: GrepArgs = serde_json::from_value(serde_json::json!({
+                        "pattern": "hit", "output_mode": "content", "limit": limit,
+                        "context": context,
+                    }))
+                    .expect("valid arguments");
+                    let quota = ResultLimit::new(limit);
+                    let mut sink = ContentSink {
+                        path_display: "a.rs".to_owned(),
+                        args: &args,
+                        limit: &quota,
+                        lines: Vec::new(),
+                        pending_context: Vec::new(),
+                        after_context_end: 0,
+                    };
+                    build_searcher(&args)
+                        .search_slice(&matcher, body.as_bytes(), &mut sink)
+                        .expect("search should succeed");
+
+                    let expected: Vec<_> = lines
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(line, text)| {
+                            if !retained.iter().any(|&hit| {
+                                (hit.saturating_sub(context)..=hit + context).contains(&line)
+                            }) {
+                                return None;
+                            }
+                            let sep = if retained.contains(&line) { ':' } else { '-' };
+                            Some(format!("a.rs{sep}{}{sep}{text}", line + 1))
+                        })
+                        .collect();
+                    assert_eq!(
+                        sink.lines, expected,
+                        "mask={mask}, limit={limit}, context={context}"
+                    );
+                    assert_eq!(quota.truncated(), limit != 0 && matching.len() > limit);
+                }
             }
-            if sink.lines.is_empty() { None } else { Some(FileMatch::content(sink.lines)) }
-        },
-        OutputMode::FilesWithMatches => {
-            let mut builder = SearcherBuilder::new();
-            builder
-                .line_number(true)
-                .binary_detection(BinaryDetection::quit(b'\x00'))
-                .memory_map(query.mmap_choice())
-                .heap_limit(query.heap_limit());
-            let mut searcher = builder.build();
-            let mut sink = MatchFoundSink::new();
-            if searcher.search_path(matcher, path, &mut sink).is_err() {
-                return None;
-            }
-            if !sink.found {
-                return None;
-            }
-            let modified = path
-                .metadata()
-                .ok()
-                .and_then(|metadata| metadata.modified().ok())
-                .unwrap_or(SystemTime::UNIX_EPOCH);
-            Some(FileMatch::path(relative_path, modified))
-        },
-        OutputMode::Count => {
-            let mut builder = SearcherBuilder::new();
-            builder
-                .line_number(true)
-                .binary_detection(BinaryDetection::quit(b'\x00'))
-                .memory_map(query.mmap_choice())
-                .heap_limit(query.heap_limit());
-            let mut searcher = builder.build();
-            let mut sink = CountSink::new();
-            if searcher.search_path(matcher, path, &mut sink).is_err() {
-                return None;
-            }
-            if sink.count == 0 {
-                None
-            } else {
-                Some(FileMatch::count(format!("{path_display}:{}", sink.count)))
-            }
-        },
+        }
     }
 }

@@ -11,17 +11,16 @@ pub struct GrepArgs {
     #[serde(default)]
     pub case_insensitive: bool,
 
-    #[serde(default = "default_show_line_numbers")]
+    #[serde(default = "default_true")]
     pub show_line_numbers: bool,
 
-    pub context_before: Option<usize>,
-    pub context_after: Option<usize>,
-    pub context: Option<usize>,
+    #[serde(default)]
+    pub context: usize,
 
     #[serde(default)]
     pub hidden: bool,
 
-    #[serde(default = "default_respect_ignore")]
+    #[serde(default = "default_true")]
     pub respect_ignore: bool,
 
     #[serde(default = "default_limit")]
@@ -35,9 +34,7 @@ impl GrepArgs {
             None => format!("Search for {} in files", self.pattern),
         }
     }
-}
 
-impl GrepArgs {
     pub fn render_args(raw: &str) -> Result<(String, Option<String>), serde_json::Error> {
         let args: Self = serde_json::from_str(raw)?;
 
@@ -59,11 +56,7 @@ pub enum OutputMode {
     Count,
 }
 
-fn default_show_line_numbers() -> bool {
-    true
-}
-
-fn default_respect_ignore() -> bool {
+fn default_true() -> bool {
     true
 }
 
