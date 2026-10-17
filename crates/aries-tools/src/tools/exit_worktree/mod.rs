@@ -2,6 +2,7 @@ mod args;
 mod error;
 mod output;
 
+use aries_init::GlobalContext;
 use git2::{BranchType, Repository, WorktreePruneOptions};
 use parking_lot::Mutex;
 use rig::tool::{Tool, ToolContext};
@@ -14,13 +15,18 @@ pub use self::output::ExitGitWorktreeOutput;
 pub const NAME: &str = "ExitGitWorktree";
 
 pub struct ExitGitWorktreeTool {
+    gctx: GlobalContext,
     ctx: crate::context::ToolContext,
     repository: Mutex<Repository>,
 }
 
 impl ExitGitWorktreeTool {
-    pub fn new(ctx: crate::context::ToolContext, repository: Repository) -> Self {
-        Self { ctx, repository: Mutex::new(repository) }
+    pub fn new(
+        gctx: GlobalContext,
+        ctx: crate::context::ToolContext,
+        repository: Repository,
+    ) -> Self {
+        Self { gctx, ctx, repository: Mutex::new(repository) }
     }
 }
 
@@ -58,6 +64,7 @@ impl Tool for ExitGitWorktreeTool {
         match args.action {
             ExitGitWorktreeAction::Keep => {
                 self.ctx.set_cwd(session.origin_cwd());
+                self.gctx.set_current_dir(session.origin_cwd());
                 self.ctx.set_worktree(None);
 
                 Ok(ExitGitWorktreeOutput::keep(
@@ -88,6 +95,7 @@ impl Tool for ExitGitWorktreeTool {
                 }
 
                 self.ctx.set_cwd(session.origin_cwd());
+                self.gctx.set_current_dir(session.origin_cwd());
                 self.ctx.set_worktree(None);
 
                 Ok(ExitGitWorktreeOutput::remove(

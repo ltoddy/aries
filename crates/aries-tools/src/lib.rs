@@ -158,6 +158,7 @@ pub fn create_tools_from_tool_names(
                     .filter(|repo| repo.workdir().is_some())
                 {
                     tool_set.add_tool(enter_worktree::EnterGitWorktreeTool::new(
+                        gctx.clone(),
                         ctx.clone(),
                         repository,
                         gctx.worktree_dir(),
@@ -169,8 +170,11 @@ pub fn create_tools_from_tool_names(
                     .ok()
                     .filter(|repo| repo.workdir().is_some())
                 {
-                    tool_set
-                        .add_tool(exit_worktree::ExitGitWorktreeTool::new(ctx.clone(), repository));
+                    tool_set.add_tool(exit_worktree::ExitGitWorktreeTool::new(
+                        gctx.clone(),
+                        ctx.clone(),
+                        repository,
+                    ));
                 }
             },
             glob::NAME => {

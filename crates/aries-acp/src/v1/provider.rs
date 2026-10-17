@@ -16,11 +16,11 @@ pub async fn list_providers(
 }
 
 pub async fn set_provider(
-    req: SetProviderRequest,
+    _req: SetProviderRequest,
     responder: Responder<SetProviderResponse>,
     _: ConnectionTo<Client>,
 ) -> Result<(), Error> {
-    info!("Received set provider request: {req:?}");
+    info!("Received set provider request");
     responder.respond(SetProviderResponse::new())
 }
 
