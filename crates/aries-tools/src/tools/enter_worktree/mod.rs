@@ -4,7 +4,6 @@ mod output;
 
 use std::path::{Path, PathBuf};
 
-use aries_init::GlobalContext;
 use git2::{Repository, WorktreeAddOptions};
 use parking_lot::Mutex;
 use regex_lite::Regex;
@@ -19,7 +18,6 @@ use crate::context::{ToolContext as AriesToolContext, Worktree};
 pub const NAME: &str = "EnterGitWorktree";
 
 pub struct EnterGitWorktreeTool {
-    gctx: GlobalContext,
     ctx: AriesToolContext,
     repository: Mutex<Repository>,
     worktree_dir: PathBuf,
@@ -28,7 +26,6 @@ pub struct EnterGitWorktreeTool {
 
 impl EnterGitWorktreeTool {
     pub fn new(
-        gctx: GlobalContext,
         ctx: AriesToolContext,
         repository: Repository,
         worktree_dir: impl AsRef<Path>,
@@ -38,7 +35,6 @@ impl EnterGitWorktreeTool {
             .expect("worktree name regex should be valid");
 
         Self {
-            gctx,
             ctx,
             repository: Mutex::new(repository),
             worktree_dir: worktree_dir.to_owned(),
@@ -96,7 +92,8 @@ impl Tool for EnterGitWorktreeTool {
                 .map_err(|err| EnterGitWorktreeError::read_head(err.message()))?
         };
 
-        let worktree_branch = format!("worktree-{name}");
+        let worktree_name = format!("worktree-{name}");
+        let worktree_branch = worktree_name.clone();
         let worktree_path = self.worktree_dir.join(&name);
 
         if let Some(parent) = worktree_path.parent() {
@@ -119,8 +116,7 @@ impl Tool for EnterGitWorktreeTool {
 
             let mut options = WorktreeAddOptions::new();
             options.reference(Some(branch.get()));
-            if let Err(err) = repository.worktree(&worktree_branch, &worktree_path, Some(&options))
-            {
+            if let Err(err) = repository.worktree(&worktree_name, &worktree_path, Some(&options)) {
                 let mut branch = repository
                     .find_branch(&worktree_branch, git2::BranchType::Local)
                     .map_err(|err| EnterGitWorktreeError::rollback_branch(err.message()))?;
@@ -135,13 +131,12 @@ impl Tool for EnterGitWorktreeTool {
         let worktree = Worktree::new(
             &original_cwd,
             &worktree_path,
-            name,
+            &worktree_name,
             &worktree_branch,
             original_head_commit,
         );
         self.ctx.set_worktree(Some(worktree));
         self.ctx.set_cwd(&worktree_path);
-        self.gctx.set_current_dir(&worktree_path);
 
         Ok(EnterGitWorktreeOutput::new(worktree_path, worktree_branch))
     }

@@ -120,11 +120,13 @@ impl Tool for AgentTool {
                 let preamble = body.clone();
                 let universe = tool_names_from_mode(Mode::General);
                 let tool_names = frontmatter.filter_tool_names(&universe);
+                let cwd = self.ctx.cwd();
                 let tools = create_tools_from_tool_names(
                     self.gctx.clone(),
                     &tool_names,
                     self.model.clone(),
                     &self.parent_dir,
+                    &cwd,
                     None,
                     AgentExtensions::empty(),
                     Notifier::clone(&self.notifier),
@@ -141,6 +143,7 @@ impl Tool for AgentTool {
                         mode,
                         self.model.clone(),
                         &self.parent_dir,
+                        self.ctx.cwd(),
                         None,
                         AgentExtensions::empty(),
                         Notifier::clone(&self.notifier),

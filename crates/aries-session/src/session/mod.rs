@@ -178,6 +178,7 @@ impl Session {
             self.model.clone(),
             mode,
             &self.session_dir,
+            &self.cwd,
             self.gctx.clone(),
             Notifier::clone(&self.notifier),
         )
@@ -401,6 +402,7 @@ impl Session {
             model.clone(),
             mode,
             &session_dir,
+            cwd,
             gctx.clone(),
             Notifier::clone(&notifier),
         )
