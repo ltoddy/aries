@@ -1,8 +1,8 @@
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::schema::v1::{
     AgentCapabilities, Implementation, InitializeRequest, InitializeResponse, McpCapabilities,
-    PromptCapabilities, SessionAdditionalDirectoriesCapabilities, SessionCapabilities,
-    SessionListCapabilities,
+    PromptCapabilities, ProvidersCapabilities, SessionAdditionalDirectoriesCapabilities,
+    SessionCapabilities, SessionListCapabilities,
 };
 use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
 use tracing::info;
@@ -21,6 +21,7 @@ pub async fn initialize(
             PromptCapabilities::new().image(true).audio(true).embedded_context(true),
         )
         .mcp_capabilities(McpCapabilities::new().http(true).sse(true))
+        .providers(ProvidersCapabilities::new())
         .session_capabilities(
             SessionCapabilities::new()
                 .list(SessionListCapabilities::new())

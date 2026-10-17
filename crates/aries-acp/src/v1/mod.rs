@@ -4,6 +4,7 @@ pub mod initialize;
 pub mod logout;
 pub mod mcp;
 pub mod prompt;
+pub mod provider;
 pub mod session;
 
 use std::sync::Arc;
@@ -18,6 +19,7 @@ use self::cancel::cancel;
 use self::initialize::initialize;
 use self::logout::logout;
 use self::prompt::prompt;
+use self::provider::{disable_provider, list_providers, set_provider};
 use self::session::{
     close_session, delete_session, fork_session, list_session, load_session, new_session,
     resume_session, set_session_config_option, set_session_mode,
@@ -37,6 +39,9 @@ pub async fn run(
         .name("aries")
         .on_receive_request(initialize, on_receive_request!())
         .on_receive_request(authenticate, on_receive_request!())
+        .on_receive_request(list_providers, on_receive_request!())
+        .on_receive_request(set_provider, on_receive_request!())
+        .on_receive_request(disable_provider, on_receive_request!())
         .on_receive_request(
             {
                 let register = registry.clone();
