@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::sync::Arc;
 use std::time::SystemTime;
 
 use grep_regex::RegexMatcher;
@@ -7,31 +8,50 @@ use grep_searcher::{
 };
 
 use crate::grep::OutputMode;
-use crate::tools::grep::driver::Query;
 use crate::tools::grep::driver::collector::FileMatch;
+use crate::tools::grep::driver::{Query, StopState};
 
 struct ContentSink {
     path_display: String,
     show_line_numbers: bool,
+    stop: Arc<StopState>,
     lines: Vec<String>,
+    pending_context: Vec<String>,
+    active_match: bool,
 }
 
 impl ContentSink {
-    fn new(path_display: impl Into<String>, show_line_numbers: bool) -> Self {
-        Self { path_display: path_display.into(), show_line_numbers, lines: Vec::new() }
+    fn new(path_display: impl Into<String>, show_line_numbers: bool, stop: Arc<StopState>) -> Self {
+        Self {
+            path_display: path_display.into(),
+            show_line_numbers,
+            stop,
+            lines: Vec::new(),
+            pending_context: Vec::new(),
+            active_match: false,
+        }
     }
 
-    fn push_line(&mut self, line_number: u64, bytes: &[u8], is_match: bool) {
+    fn render_line(&self, line_number: u64, bytes: &[u8], is_match: bool) -> String {
         let text = String::from_utf8_lossy(bytes);
         let text = text.strip_suffix('\n').unwrap_or(&text);
         let text = text.strip_suffix('\r').unwrap_or(text);
         let sep = if is_match { ':' } else { '-' };
-        let rendered = if self.show_line_numbers {
+        if self.show_line_numbers {
             format!("{}{sep}{}{sep}{}", self.path_display, line_number, text)
         } else {
             format!("{}{sep}{}", self.path_display, text)
-        };
+        }
+    }
+
+    fn push_line(&mut self, line_number: u64, bytes: &[u8], is_match: bool) {
+        let rendered = self.render_line(line_number, bytes, is_match);
         self.lines.push(rendered);
+    }
+
+    fn push_pending_context(&mut self, line_number: u64, bytes: &[u8]) {
+        let rendered = self.render_line(line_number, bytes, false);
+        self.pending_context.push(rendered);
     }
 }
 
@@ -39,6 +59,12 @@ impl Sink for ContentSink {
     type Error = std::io::Error;
 
     fn matched(&mut self, _searcher: &Searcher, mat: &SinkMatch<'_>) -> Result<bool, Self::Error> {
+        self.active_match = self.stop.grant(1) > 0;
+        if !self.active_match {
+            return Ok(false);
+        }
+
+        self.lines.append(&mut self.pending_context);
         self.push_line(mat.line_number().unwrap_or(1), mat.bytes(), true);
         Ok(true)
     }
@@ -49,10 +75,20 @@ impl Sink for ContentSink {
         ctx: &SinkContext<'_>,
     ) -> Result<bool, Self::Error> {
         match ctx.kind() {
-            SinkContextKind::Before | SinkContextKind::After => {
+            SinkContextKind::Before if self.active_match => {
                 self.push_line(ctx.line_number().unwrap_or(1), ctx.bytes(), false);
             },
-            SinkContextKind::Other => {},
+            SinkContextKind::Before => {
+                self.push_pending_context(ctx.line_number().unwrap_or(1), ctx.bytes());
+            },
+            SinkContextKind::After if self.active_match => {
+                self.push_line(ctx.line_number().unwrap_or(1), ctx.bytes(), false);
+            },
+            SinkContextKind::After => {},
+            SinkContextKind::Other => {
+                self.active_match = false;
+                self.pending_context.clear();
+            },
         }
         Ok(true)
     }
@@ -101,6 +137,7 @@ pub fn search_file(
     query: &Query,
     matcher: &RegexMatcher,
     path: impl AsRef<Path>,
+    stop: Arc<StopState>,
 ) -> Option<FileMatch> {
     let path = path.as_ref();
     let relative_path = path.strip_prefix(cwd).unwrap_or(path);
@@ -117,7 +154,7 @@ pub fn search_file(
                 .memory_map(query.mmap_choice())
                 .heap_limit(query.heap_limit());
             let mut searcher = builder.build();
-            let mut sink = ContentSink::new(path_display, query.show_line_numbers);
+            let mut sink = ContentSink::new(path_display, query.show_line_numbers, stop);
             if searcher.search_path(matcher, path, &mut sink).is_err() {
                 return None;
             }

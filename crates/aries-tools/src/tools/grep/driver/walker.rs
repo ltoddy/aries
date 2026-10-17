@@ -66,7 +66,9 @@ impl SearchWorker {
             return WalkState::Continue;
         }
 
-        if let Some(result) = search_file(&self.cwd, &self.query, &self.matcher, entry.path()) {
+        if let Some(result) =
+            search_file(&self.cwd, &self.query, &self.matcher, entry.path(), self.collector.stop())
+        {
             self.batch.push(result);
         }
 
