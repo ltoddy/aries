@@ -118,6 +118,26 @@ async fn test_glob_limit_keeps_newest_files() {
 }
 
 #[tokio::test]
+async fn test_glob_relative_base_dir_resolves_against_tool_cwd() {
+    let tmp = tempfile::TempDir::new().expect("test operation should succeed");
+    tokio::fs::create_dir(tmp.path().join("only_in_session"))
+        .await
+        .expect("test operation should succeed");
+    tokio::fs::write(tmp.path().join("only_in_session/marker.rs"), "")
+        .await
+        .expect("test operation should succeed");
+
+    let mut args = glob_args("*.rs");
+    args.base_dir = Some(PathBuf::from("only_in_session"));
+
+    let mut context = ToolContext::new();
+    let tool = tool(tmp.path());
+    let result = tool.call(&mut context, args).await.expect("test operation should succeed");
+
+    assert_eq!(result.files, vec![PathBuf::from("marker.rs")]);
+}
+
+#[tokio::test]
 async fn test_glob_no_files_found() {
     let tmp = tempfile::TempDir::new().expect("test operation should succeed");
     tokio::fs::write(tmp.path().join("a.txt"), "").await.expect("test operation should succeed");

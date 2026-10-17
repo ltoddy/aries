@@ -72,11 +72,15 @@ impl Tool for GlobTool {
         _context: &mut ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
-        let base_dir = args.base_dir.unwrap_or_else(|| {
-            self.ctx
-                .worktree()
-                .map_or_else(|| self.ctx.cwd(), |worktree| worktree.path().to_owned())
-        });
+        let current_dir = self
+            .ctx
+            .worktree()
+            .map_or_else(|| self.ctx.cwd(), |worktree| worktree.path().to_owned());
+        let base_dir = match args.base_dir {
+            Some(base_dir) if base_dir.is_absolute() => base_dir,
+            Some(base_dir) => current_dir.join(base_dir),
+            None => current_dir,
+        };
 
         let pattern = if Path::new(&args.pattern).is_absolute() {
             match Path::new(&args.pattern).strip_prefix(&base_dir) {
