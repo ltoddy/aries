@@ -1,59 +1,38 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-#[derive(Default)]
-pub struct StopState {
+pub struct ResultLimit {
     limit: usize,
     emitted: AtomicUsize,
     truncated: AtomicBool,
 }
 
-impl StopState {
+impl ResultLimit {
     pub fn new(limit: usize) -> Self {
-        let emitted = AtomicUsize::new(0);
-        let truncated = AtomicBool::new(false);
-
-        Self { limit, emitted, truncated }
+        Self { limit, emitted: AtomicUsize::new(0), truncated: AtomicBool::new(false) }
     }
 
-    pub fn grant(&self, amount: usize) -> usize {
+    pub fn try_acquire(&self) -> bool {
         if self.limit == 0 {
-            self.emitted.fetch_add(amount, Ordering::Relaxed);
-            return amount;
+            return true;
         }
-
-        loop {
-            let current = self.emitted.load(Ordering::Relaxed);
-            if current >= self.limit {
-                self.truncated.store(true, Ordering::Relaxed);
-                return 0;
-            }
-            let remaining = self.limit - current;
-            let granted = remaining.min(amount);
-            let next = current + granted;
-
-            if self
-                .emitted
-                .compare_exchange(current, next, Ordering::Relaxed, Ordering::Relaxed)
-                .is_ok()
-            {
-                if granted < amount {
-                    self.truncated.store(true, Ordering::Relaxed);
-                }
-                return granted;
-            }
+        let granted = self
+            .emitted
+            .try_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+                (current < self.limit).then(|| current + 1)
+            })
+            .is_ok();
+        if !granted {
+            self.mark_truncated();
         }
-    }
-
-    pub fn should_stop(&self) -> bool {
-        self.limit > 0 && self.emitted.load(Ordering::Relaxed) >= self.limit
-    }
-
-    pub fn mark_truncated(&self) {
-        self.truncated.store(true, Ordering::Relaxed);
+        granted
     }
 
     pub fn limit(&self) -> usize {
         self.limit
+    }
+
+    pub fn mark_truncated(&self) {
+        self.truncated.store(true, Ordering::Relaxed);
     }
 
     pub fn truncated(&self) -> bool {

@@ -5,10 +5,6 @@ mod output;
 #[cfg(test)]
 mod tests;
 
-use std::sync::Arc;
-
-use driver::{Collector, Query, StopState, walk_parallel};
-use grep_regex::RegexMatcherBuilder;
 use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
 
@@ -44,7 +40,7 @@ impl Tool for GrepTool {
             "properties": {
                 "pattern": {
                     "type": "string",
-                    "description": "The regular expression to search for"
+                    "description": "The regular expression to search for, matched one line at a time. Multiline patterns are not supported."
                 },
                 "include": {
                     "type": "string",
@@ -53,7 +49,7 @@ impl Tool for GrepTool {
                 "output_mode": {
                     "type": "string",
                     "enum": ["content", "files_with_matches", "count"],
-                    "description": "Output mode: \"content\" shows matching lines (supports show_line_numbers and context_before/context_after/context), \"files_with_matches\" shows file paths sorted by mtime (default), \"count\" shows per-file match counts."
+                    "description": "Output mode: \"content\" shows matching lines (supports show_line_numbers and context), \"files_with_matches\" shows file paths sorted by mtime (default), \"count\" shows per-file matching line counts."
                 },
                 "case_insensitive": {
                     "type": "boolean",
@@ -63,17 +59,11 @@ impl Tool for GrepTool {
                     "type": "boolean",
                     "description": "Show line numbers in content output (rg -n). Only applies to output_mode \"content\". Defaults to true."
                 },
-                "context_before": {
-                    "type": "integer",
-                    "description": "Number of lines to show before each match (rg -B). Only applies to output_mode \"content\"."
-                },
-                "context_after": {
-                    "type": "integer",
-                    "description": "Number of lines to show after each match (rg -A). Only applies to output_mode \"content\"."
-                },
                 "context": {
                     "type": "integer",
-                    "description": "Number of lines to show before and after each match (rg -C). Takes precedence over context_before/context_after. Only applies to output_mode \"content\"."
+                    "minimum": 0,
+                    "default": 0,
+                    "description": "Number of lines to show on each side of a match (rg -C). Only applies to output_mode \"content\". Defaults to 0."
                 },
                 "hidden": {
                     "type": "boolean",
@@ -85,7 +75,7 @@ impl Tool for GrepTool {
                 },
                 "limit": {
                     "type": "integer",
-                    "description": "Limit output to the first N match groups in \"content\" mode, or the first N entries in \"files_with_matches\" and \"count\" modes. Defaults to 250. Pass 0 for unlimited."
+                    "description": "Limit output to N matching lines across all files in \"content\" mode (context lines do not count), the N newest matching files in \"files_with_matches\" mode, or N files in \"count\" mode. Content and count results follow parallel traversal order. Defaults to 250. Pass 0 for unlimited."
                 }
             },
             "required": ["pattern"]
@@ -97,23 +87,12 @@ impl Tool for GrepTool {
         _context: &mut ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
-        let matcher = RegexMatcherBuilder::new()
-            .case_insensitive(args.case_insensitive)
-            .build(&args.pattern)
-            .map_err(|err| GrepError::regex(args.pattern.clone(), err))?;
-        let stop = Arc::new(StopState::new(args.limit));
-        let collector = Arc::new(Collector::new(args.output_mode, stop));
-
-        let query = Query::from(args);
-
         let cwd = self
             .ctx
             .worktree()
             .map_or_else(|| self.ctx.cwd(), |worktree| worktree.path().to_owned());
-        walk_parallel(&cwd, query, matcher, collector.clone())?;
-        let collector = Arc::into_inner(collector).ok_or(GrepError::CollectorStillShared)?;
-        let (matches, truncated) = collector.finish();
-
-        Ok(GrepOutput::new(matches, truncated))
+        tokio::task::spawn_blocking(move || driver::run(&cwd, &args))
+            .await
+            .map_err(GrepError::task)?
     }
 }
