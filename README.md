@@ -1,7 +1,7 @@
 # Aries
 
 [![CI](https://github.com/ltoddy/aries/actions/workflows/ci.yml/badge.svg)](https://github.com/ltoddy/aries/actions/workflows/ci.yml)
-![MSRV](https://img.shields.io/badge/MSRV-1.95-blue)
+![Rust](https://img.shields.io/badge/rust-nightly-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Rust](https://img.shields.io/badge/rust-2024-orange)
 
@@ -11,9 +11,9 @@
 
 ![terminal](docs/assets/terminal.png)
 
-## MSRV
+## Rust toolchain
 
-本项目最低支持的 Rust 版本（MSRV）为 **1.95.0**（Rust 2024 edition）。
+本项目使用 **nightly** 工具链（Rust 2024 edition）。
 
 ## 安装
 
