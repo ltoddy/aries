@@ -57,11 +57,6 @@ impl SessionRegistry {
         if let Some(removed) = self.active_sessions.remove(&session_id) {
             removed.close().await;
         };
-
-        if let Ok(session) = self.session_repo.find_last_by_session_id(&session_id).await {
-            let _ = self.session_repo.delete_by_session_id(&session_id).await;
-            let _ = tokio::fs::remove_dir_all(&session.root_dir).await;
-        }
     }
 
     pub async fn delete_session(&mut self, session_id: impl Into<String>) -> anyhow::Result<()> {
