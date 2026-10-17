@@ -42,6 +42,10 @@ impl Collector {
         self.stop.mark_truncated();
     }
 
+    pub fn stop(&self) -> Arc<StopState> {
+        self.stop.clone()
+    }
+
     pub fn finish(self) -> (Vec<String>, bool) {
         let matches = match self.mode {
             OutputMode::Content => self.content_groups.into_inner().into_iter().flatten().collect(),
@@ -58,21 +62,12 @@ impl Collector {
     }
 
     fn on_content(&self, batch: Vec<FileMatch>) {
-        let mut groups = batch
-            .into_iter()
-            .filter_map(
-                |result| {
-                    if let FileMatch::Content(lines) = result { Some(lines) } else { None }
-                },
-            )
-            .collect::<Vec<_>>();
-
-        let granted = self.stop.grant(groups.len());
-        if granted == 0 {
-            return;
+        let mut groups = self.content_groups.lock();
+        for result in batch {
+            if let FileMatch::Content(lines) = result {
+                groups.push(lines);
+            }
         }
-        groups.truncate(granted);
-        self.content_groups.lock().extend(groups);
     }
 
     fn on_files_with_matches(&self, batch: Vec<FileMatch>) {

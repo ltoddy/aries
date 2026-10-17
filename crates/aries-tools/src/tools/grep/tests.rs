@@ -263,6 +263,26 @@ async fn test_grep_limit_truncates_match_groups() {
 }
 
 #[tokio::test]
+async fn test_grep_content_limit_applies_within_single_file() {
+    let tmp = tempfile::TempDir::new().expect("test operation should succeed");
+    let mut body = String::new();
+    for i in 0..1000 {
+        body.push_str(&format!("needle-{i}\nother\n"));
+    }
+    tokio::fs::write(tmp.path().join("a.rs"), body).await.expect("test operation should succeed");
+
+    let mut context = ToolContext::new();
+    let tool = tool(tmp.path());
+    let mut args = grep_args("needle");
+    args.output_mode = OutputMode::Content;
+    args.limit = 3;
+    let result = tool.call(&mut context, args).await.expect("test operation should succeed");
+
+    assert_eq!(result.matches.len(), 3);
+    assert!(result.truncated);
+}
+
+#[tokio::test]
 async fn test_grep_no_matches_found() {
     let tmp = tempfile::TempDir::new().expect("test operation should succeed");
     tokio::fs::write(tmp.path().join("a.rs"), "nothing here\n")
