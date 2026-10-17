@@ -2,7 +2,8 @@
 
 use aries_agent::AriesAgent;
 use aries_compact::ContextCompactor;
-use aries_event::Notifier;
+use aries_event::{CompactionStatus, Notifier};
+use nanoid::nanoid;
 use tokio::process::Command;
 
 const EXIT: &str = "exit";
@@ -54,7 +55,37 @@ impl<'a> BuiltinCommandsExecutor<'a> {
     }
 
     async fn compact(&mut self) {
-        self.compactor.compact().await
+        let compaction_id = format!("compression-{}", nanoid!());
+
+        self.notifier.send_compaction(
+            &compaction_id,
+            CompactionStatus::InProgress,
+            "手动触发上下文摘要压缩，开始压缩。",
+        );
+
+        match self.compactor.compact().await {
+            Ok(Some(_)) => {
+                self.notifier.send_compaction(
+                    &compaction_id,
+                    CompactionStatus::Completed,
+                    "上下文摘要压缩已完成。",
+                );
+            },
+            Ok(None) => {
+                self.notifier.send_compaction(
+                    &compaction_id,
+                    CompactionStatus::Cancelled,
+                    "上下文摘要压缩被 hook 阻止，已跳过本次压缩。",
+                );
+            },
+            Err(err) => {
+                self.notifier.send_compaction(
+                    &compaction_id,
+                    CompactionStatus::Failed,
+                    err.to_string(),
+                );
+            },
+        }
     }
 
     fn exit(&self) {
