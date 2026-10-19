@@ -86,7 +86,7 @@ impl SessionUpdates {
     fn from_stream_assistant_content(content: Item<StreamEvent>) -> Vec<SessionUpdate> {
         match content {
             Item::Event(event) => match event {
-                StreamEvent::Start { .. } => {},
+                StreamEvent::Start { part: _, kind: _, name: _ } => {},
                 StreamEvent::Text { part: _, text } => {
                     return vec![SessionUpdate::AgentMessageChunk(ContentChunk::new(
                         ContentBlock::from(text),
@@ -119,7 +119,7 @@ impl SessionUpdates {
     fn from_tool_call(tool_call: ToolCall) -> SessionUpdate {
         let (title, content) = parse_tool_call(tool_call.clone());
         let locations = locations(&tool_call.function);
-        let ToolFunction { name, arguments, .. } = tool_call.function;
+        let ToolFunction { name, arguments, invalid_arguments: _ } = tool_call.function;
         let arguments = serde_json::Value::Object(arguments);
 
         let mut update = ToolCallUpdate::new(ToolCallId::new(tool_call.id.to_string()))
@@ -182,7 +182,7 @@ impl IntoIterator for SessionUpdates {
 }
 
 fn parse_tool_call(t: ToolCall) -> (String, Vec<ToolCallContent>) {
-    let ToolFunction { name, arguments, .. } = t.function;
+    let ToolFunction { name, arguments, invalid_arguments: _ } = t.function;
     let arguments = serde_json::Value::Object(arguments);
     let default_title = format!("{name}: {arguments}");
 

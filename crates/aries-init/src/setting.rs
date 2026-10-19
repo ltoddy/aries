@@ -216,17 +216,37 @@ impl ModelConfig {
 
     pub fn alias(&self) -> String {
         match self {
-            ModelConfig::Azure(Azure { alias, .. }) => alias.to_owned(),
-            ModelConfig::Deepseek(Deepseek { alias, .. }) => alias.to_owned(),
-            ModelConfig::OpenAI(OpenAI { alias, .. }) => alias.to_owned(),
+            ModelConfig::Azure(Azure {
+                alias,
+                model: _,
+                api_key: _,
+                azure_endpoint: _,
+                api_version: _,
+            }) => alias.to_owned(),
+            ModelConfig::Deepseek(Deepseek { alias, model: _, api_key: _, base_url: _ }) => {
+                alias.to_owned()
+            },
+            ModelConfig::OpenAI(OpenAI { alias, model: _, api_key: _, base_url: _ }) => {
+                alias.to_owned()
+            },
         }
     }
 
     pub fn model(&self) -> String {
         match self {
-            ModelConfig::Azure(Azure { model, .. }) => model.to_owned(),
-            ModelConfig::Deepseek(Deepseek { model, .. }) => model.to_owned(),
-            ModelConfig::OpenAI(OpenAI { model, .. }) => model.to_owned(),
+            ModelConfig::Azure(Azure {
+                alias: _,
+                model,
+                api_key: _,
+                azure_endpoint: _,
+                api_version: _,
+            }) => model.to_owned(),
+            ModelConfig::Deepseek(Deepseek { alias: _, model, api_key: _, base_url: _ }) => {
+                model.to_owned()
+            },
+            ModelConfig::OpenAI(OpenAI { alias: _, model, api_key: _, base_url: _ }) => {
+                model.to_owned()
+            },
         }
     }
 

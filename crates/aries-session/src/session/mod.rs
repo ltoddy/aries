@@ -5,6 +5,7 @@ mod instruction;
 
 use std::collections::VecDeque;
 use std::future::Future;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -311,6 +312,10 @@ impl Session {
 
     pub async fn context(&self) -> Vec<Message> {
         self.chat_context.history().await.to_vec()
+    }
+
+    pub async fn history(&self) -> io::Result<Vec<Message>> {
+        self.chat_history.messages().await
     }
 
     pub async fn overwrite_context(&self, messages: Vec<Message>) {

@@ -186,7 +186,7 @@ async fn rejects_frontmatter_not_at_start_of_file() {
 
     let result = FrontmatterDocument::<Value>::read(&file_path).await;
 
-    assert!(matches!(result, Err(DocumentError::WrongFormat { .. })));
+    assert!(matches!(result, Err(DocumentError::WrongFormat { file_path: _ })));
 }
 
 #[tokio::test]
@@ -195,7 +195,7 @@ async fn rejects_missing_closing_delimiter() {
 
     let result = FrontmatterDocument::<Value>::read(&file_path).await;
 
-    assert!(matches!(result, Err(DocumentError::WrongFormat { .. })));
+    assert!(matches!(result, Err(DocumentError::WrongFormat { file_path: _ })));
 }
 
 #[tokio::test]
@@ -204,7 +204,7 @@ async fn rejects_invalid_yaml_frontmatter() {
 
     let result = FrontmatterDocument::<Value>::read(&file_path).await;
 
-    assert!(matches!(result, Err(DocumentError::Yaml { .. })));
+    assert!(matches!(result, Err(DocumentError::Yaml { file_path: _, err: _ })));
 }
 
 #[tokio::test]

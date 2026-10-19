@@ -23,7 +23,7 @@ pub async fn execute(_args: ListSkillArgs, gctx: GlobalContext) -> anyhow::Resul
 
     let mut table = Table::new();
     table.add_row(row!["Name", "Description", "Location"]);
-    for SkillDefinition { location, frontmatter, .. } in skills {
+    for SkillDefinition { location, frontmatter, body: _ } in skills {
         table.add_row(Row::new(vec![
             Cell::new(&frontmatter.name),
             Cell::new(&text::wrap(&frontmatter.description, 30)),

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AgentDefinition {
-    location: PathBuf,
+    pub location: PathBuf,
     pub frontmatter: Frontmatter,
     pub body: String,
 }
@@ -20,10 +20,6 @@ impl AgentDefinition {
         let location = location.as_ref();
         let body = body.into();
         Self { location: location.to_owned(), frontmatter, body }
-    }
-
-    pub fn location(&self) -> &Path {
-        &self.location
     }
 }
 

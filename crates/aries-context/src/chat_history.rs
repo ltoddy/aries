@@ -33,4 +33,8 @@ impl ChatHistory {
         }
         let _ = self.file.flush().await;
     }
+
+    pub async fn messages(&self) -> io::Result<Vec<Message>> {
+        aries_filesystem::jsonl::read(self.file.file_path()).await
+    }
 }

@@ -48,7 +48,7 @@ async fn test_call_rejects_unknown_skill() {
     let tool = SkillTool::new(vec![skill]);
 
     let err = tool.call(&mut context, SkillArgs { name: "nope".to_owned() }).await.unwrap_err();
-    assert!(matches!(err, SkillError::NotAllowed { .. }));
+    assert!(matches!(err, SkillError::NotAllowed { name: _, available: _ }));
 }
 
 #[tokio::test]

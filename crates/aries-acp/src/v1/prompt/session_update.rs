@@ -9,7 +9,8 @@ use aries_tools::{
     task_output, task_stop, update_plan, webfetch, websearch, write,
 };
 use rig::agent::{MultiTurnStreamItem, PromptResponse};
-use rig::message::{ToolCall, ToolFunction, ToolName};
+use rig::completion::Message;
+use rig::message::{AssistantContent, ToolCall, ToolFunction, ToolName, ToolResult, UserContent};
 use rig::streaming::{Item, StreamEvent};
 
 use super::plan::PlanEntry;
@@ -53,6 +54,61 @@ impl SessionUpdates {
         }
     }
 
+    pub fn from_history(messages: Vec<Message>) -> Self {
+        let updates = messages.into_iter().flat_map(Self::from_message).collect();
+        Self(updates)
+    }
+
+    fn from_message(message: Message) -> Vec<SessionUpdate> {
+        match message {
+            Message::System { content: _ } => vec![],
+            Message::User { content } => {
+                content.into_iter().flat_map(Self::from_user_content).collect()
+            },
+            Message::Assistant(message) => {
+                message.content.into_iter().flat_map(Self::from_assistant_content).collect()
+            },
+        }
+    }
+
+    fn from_user_content(content: UserContent) -> Vec<SessionUpdate> {
+        match content {
+            UserContent::Text(text) => vec![SessionUpdate::UserMessageChunk(ContentChunk::new(
+                ContentBlock::from(text.text),
+            ))],
+            UserContent::ToolResult(tool_result) => Self::from_tool_result(tool_result),
+            UserContent::Image(_) => vec![SessionUpdate::UserMessageChunk(ContentChunk::new(
+                ContentBlock::from("[image]"),
+            ))],
+            UserContent::Audio(_) => vec![SessionUpdate::UserMessageChunk(ContentChunk::new(
+                ContentBlock::from("[audio]"),
+            ))],
+            UserContent::Video(_) => vec![SessionUpdate::UserMessageChunk(ContentChunk::new(
+                ContentBlock::from("[video]"),
+            ))],
+            UserContent::Document(document) => vec![SessionUpdate::UserMessageChunk(
+                ContentChunk::new(ContentBlock::from(format!("[document: {}]", document.data))),
+            )],
+        }
+    }
+
+    fn from_assistant_content(content: AssistantContent) -> Vec<SessionUpdate> {
+        match content {
+            AssistantContent::Text(text) => vec![SessionUpdate::AgentMessageChunk(
+                ContentChunk::new(ContentBlock::from(text.text)),
+            )],
+            AssistantContent::ToolCall(tool_call) => vec![Self::from_tool_call(tool_call)],
+            AssistantContent::Reasoning(reasoning) => vec![SessionUpdate::AgentThoughtChunk(
+                ContentChunk::new(ContentBlock::from(reasoning.text)),
+            )],
+            AssistantContent::Image(_) => vec![SessionUpdate::AgentMessageChunk(
+                ContentChunk::new(ContentBlock::from("[image]")),
+            )],
+            AssistantContent::Opaque(_) => vec![],
+            _ => vec![],
+        }
+    }
+
     fn from_stream_assistant_content(content: Item<StreamEvent>) -> Vec<SessionUpdate> {
         match content {
             Item::Event(event) => match event {
@@ -85,7 +141,7 @@ impl SessionUpdates {
         vec![]
     }
 
-    fn from_tool_result(tool_result: rig::message::ToolResult) -> Vec<SessionUpdate> {
+    fn from_tool_result(tool_result: ToolResult) -> Vec<SessionUpdate> {
         let raw_output = tool_result.content.first().and_then(|content| content.as_json()).cloned();
 
         if tool_result.name.as_str() == update_plan::NAME
@@ -182,7 +238,7 @@ impl IntoIterator for SessionUpdates {
 }
 
 fn parse_tool_call(t: ToolCall) -> (String, Vec<ToolCallContent>) {
-    let ToolFunction { name, arguments, .. } = t.function;
+    let ToolFunction { name, arguments, invalid_arguments: _ } = t.function;
     let arguments = serde_json::Value::Object(arguments);
 
     let default_title = format!("{name}: {arguments}");

@@ -28,7 +28,7 @@ impl LspTool {
         args: &LspArgs,
         project_dir: impl AsRef<Path>,
     ) -> Result<(PathBuf, u32, u32), LspError> {
-        let LspArgs { file_path, line, character, operation, .. } = args;
+        let LspArgs { operation, file_path, line, character, query: _ } = args;
 
         match (file_path, line, character) {
             (Some(file_path), Some(line), Some(character)) => {

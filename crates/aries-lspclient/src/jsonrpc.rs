@@ -53,7 +53,7 @@ pub enum Response {
 impl Response {
     pub fn id(&self) -> &RequestId {
         match self {
-            Self::Result { id, .. } | Self::Error { id, .. } => id,
+            Self::Result { id, result: _ } | Self::Error { id, error: _ } => id,
         }
     }
 

@@ -29,7 +29,7 @@ pub async fn execute(_args: ListAgentArgs, gctx: GlobalContext) -> anyhow::Resul
             Cell::new(&agent.frontmatter.name),
             Cell::new(&text::wrap(&agent.frontmatter.description, 50)),
             Cell::new(model),
-            Cell::new(&agent.location().display().to_string()),
+            Cell::new(&agent.location.display().to_string()),
         ]));
     }
 
