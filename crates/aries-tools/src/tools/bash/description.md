@@ -6,11 +6,11 @@ stdout/stderr 超过 30000 字符时会被截断，并在末尾提示被截断�
 
 重要：避免使用本工具执行 `find`、`grep`、`cat`、`head`、`tail`、`sed`、`awk`、`echo` 等命令，除非用户明确要求，或你已确认专用工具无法完成任务。请优先使用对应的专用工具，这会带来更好的体验：
 
- - 文件搜索：使用 Glob（不是 find 或 ls）
- - 内容搜索：使用 Grep（不是 grep 或 rg）
- - 读取文件：使用 Read（不是 cat/head/tail）
- - 编辑文件：使用 Edit（不是 sed/awk）
- - 创建文件：使用 Write（不是 echo >/cat <<EOF）
+ - 文件搜索：使用 Glob 工具（不是 find 或 ls）
+ - 内容搜索：使用 Grep 工具（不是 grep 或 rg）
+ - 读取文件：使用 Read 工具（不是 cat/head/tail）
+ - 编辑文件：使用 Edit 工具（不是 sed/awk）
+ - 创建文件：使用 Write 工具（不是 echo >/cat <<EOF）
  - 输出内容：直接输出文本（不是 echo/printf）
 
 虽然 Bash 工具也能做类似的事，但优先使用内置专用工具会带来更好的体验，也更便于审查工具调用与授予权限。

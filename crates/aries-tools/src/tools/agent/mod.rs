@@ -72,7 +72,7 @@ impl Tool for AgentTool {
         if !self.extensions.agents.is_empty() {
             description.push("\n可用的自定义子智能体（把名字填入 `mode`）：\n".to_owned());
 
-            for AgentDefinition { frontmatter, .. } in &self.extensions.agents {
+            for AgentDefinition { location: _, frontmatter, body: _ } in &self.extensions.agents {
                 let desc = format!(
                     "- {}: {} (Tools: {})\n",
                     frontmatter.name,
@@ -115,7 +115,7 @@ impl Tool for AgentTool {
     ) -> Result<Self::Output, Self::Error> {
         let task_id = nanoid::nanoid!();
         let (name, preamble, tools) = match self.find_agent(&args.mode) {
-            Some(AgentDefinition { frontmatter, body, .. }) => {
+            Some(AgentDefinition { location: _, frontmatter, body }) => {
                 let name = frontmatter.name.clone();
                 let preamble = body.clone();
                 let universe = tool_names_from_mode(Mode::General);

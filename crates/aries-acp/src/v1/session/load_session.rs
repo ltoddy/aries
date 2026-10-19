@@ -10,6 +10,7 @@ use tracing::{info, instrument};
 
 use super::config::config_options;
 use crate::v1::mcp::McpServers;
+use crate::v1::prompt::session_update::SessionUpdates;
 
 #[instrument(name = "acp.load_session", skip_all, fields(session_id = %req.session_id))]
 pub async fn load_session(
@@ -29,6 +30,14 @@ pub async fn load_session(
         Ok(session) => session,
         Err(err) => return responder.respond_with_internal_error(err.to_string()),
     };
+    drop(registry);
+
+    let session_id = session.id();
+    if let Ok(messages) = session.history().await {
+        SessionUpdates::from_history(messages).into_iter().for_each(|update| {
+            let _ = cx.send_notification(SessionNotification::new(session_id.clone(), update));
+        });
+    }
 
     let setting = session.setting();
     let greeting = if setting.nickname.is_empty() {
@@ -38,7 +47,7 @@ pub async fn load_session(
     };
 
     let _ = cx.send_notification(SessionNotification::new(
-        session.id(),
+        session_id.clone(),
         SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::from(greeting))),
     ));
 
@@ -52,7 +61,7 @@ pub async fn load_session(
         })
         .collect_vec();
     let _ = cx.send_notification(SessionNotification::new(
-        session.id(),
+        session_id,
         SessionUpdate::AvailableCommandsUpdate(AvailableCommandsUpdate::new(available_commands)),
     ));
 

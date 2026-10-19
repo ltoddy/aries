@@ -39,7 +39,10 @@ async fn bash_hook_timeout_covers_stdin_write() {
     .await;
 
     assert!(result.is_ok(), "hook execution should not hang while writing stdin");
-    assert!(matches!(result.expect("timeout checked"), Err(BashHookError::Timeout { .. })));
+    assert!(matches!(
+        result.expect("timeout checked"),
+        Err(BashHookError::Timeout { timeout: _, source: _ })
+    ));
 }
 
 #[tokio::test]

@@ -173,7 +173,9 @@ impl ContextCompactor {
             PreCompactCustomInstructions::Auto,
         )
         .transcript_path(&self.transcript_path);
-        if let HookDecision::Terminate { .. } = self.hooks_executor.fire_pre_compact(input).await {
+        if let HookDecision::Terminate { reason: _ } =
+            self.hooks_executor.fire_pre_compact(input).await
+        {
             return Ok(None);
         }
 

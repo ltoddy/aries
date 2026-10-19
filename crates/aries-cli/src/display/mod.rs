@@ -73,7 +73,7 @@ pub fn print_agent_event(event: AgentEvent) {
             _ => {},
         },
         AgentEvent::Compaction(compaction) => println!("{}", compaction.to_string().dimmed()),
-        AgentEvent::SessionInfoUpdate { .. } => {},
+        AgentEvent::SessionInfoUpdate { title: _, updated_at: _ } => {},
     }
 }
 

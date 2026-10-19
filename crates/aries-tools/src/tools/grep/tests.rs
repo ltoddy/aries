@@ -589,7 +589,7 @@ async fn test_grep_rejects_multiline_patterns() {
         .await
         .expect("test operation should succeed");
     let result = tool(tmp.path()).call(&mut ToolContext::new(), grep_args(r"first\nsecond")).await;
-    assert!(matches!(result, Err(GrepError::Regex { .. })));
+    assert!(matches!(result, Err(GrepError::Regex { pattern: _, source: _ })));
 }
 
 #[tokio::test]
@@ -690,11 +690,11 @@ async fn test_grep_counts_matching_lines_not_occurrences() {
 async fn test_grep_reports_invalid_patterns() {
     let tmp = tempfile::TempDir::new().expect("test operation should succeed");
     let result = tool(tmp.path()).call(&mut ToolContext::new(), grep_args("(")).await;
-    assert!(matches!(result, Err(GrepError::Regex { .. })));
+    assert!(matches!(result, Err(GrepError::Regex { pattern: _, source: _ })));
     let mut args = grep_args("needle");
     args.include = Some("[".to_owned());
     let result = tool(tmp.path()).call(&mut ToolContext::new(), args).await;
-    assert!(matches!(result, Err(GrepError::IncludeGlob { .. })));
+    assert!(matches!(result, Err(GrepError::IncludeGlob { pattern: _, source: _ })));
 }
 
 #[tokio::test]

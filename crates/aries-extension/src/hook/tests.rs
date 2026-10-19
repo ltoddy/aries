@@ -125,7 +125,10 @@ fn matcher_anchors_alternation() {
 #[test]
 fn matcher_rejects_invalid_regex() {
     let matcher = HookMatcher { matcher: Some("(unclosed".to_owned()), hooks: vec![] };
-    assert!(matches!(matcher.matches("Write"), Err(HookMatcherError::InvalidRegex { .. })));
+    assert!(matches!(
+        matcher.matches("Write"),
+        Err(HookMatcherError::InvalidRegex { pattern: _, source: _ })
+    ));
 }
 
 #[test]
@@ -173,7 +176,7 @@ fn pre_tool_use_input(tool_name: &str) -> PreToolUseHookInput<String> {
 async fn executor_continues_when_no_hooks_registered() {
     let executor = HooksExecutor::new(vec![]);
     let decision = executor.fire_pre_tool_use(pre_tool_use_input("Write")).await;
-    assert!(matches!(decision, HookDecision::Continue { .. }));
+    assert!(matches!(decision, HookDecision::Continue { contexts: _ }));
 }
 
 #[tokio::test]
@@ -187,7 +190,9 @@ async fn executor_combines_same_event_matchers_from_multiple_presets() {
 
     match decision {
         HookDecision::Terminate { reason } => assert!(reason.contains("exit code 2")),
-        HookDecision::Continue { .. } => panic!("expected earlier preset hook to be preserved"),
+        HookDecision::Continue { contexts: _ } => {
+            panic!("expected earlier preset hook to be preserved")
+        },
     }
 }
 
@@ -209,7 +214,7 @@ async fn executor_blocks_pre_tool_use_when_hook_exits_two() {
     let decision = executor.fire_pre_tool_use(pre_tool_use_input("Write")).await;
     match decision {
         HookDecision::Terminate { reason } => assert!(reason.contains("exit code 2")),
-        HookDecision::Continue { .. } => panic!("expected hook to be blocked"),
+        HookDecision::Continue { contexts: _ } => panic!("expected hook to be blocked"),
     }
 }
 
@@ -229,7 +234,7 @@ async fn executor_skips_hook_when_matcher_does_not_match() {
     let executor = HooksExecutor::new(vec![preset]);
 
     let decision = executor.fire_pre_tool_use(pre_tool_use_input("Write")).await;
-    assert!(matches!(decision, HookDecision::Continue { .. }));
+    assert!(matches!(decision, HookDecision::Continue { contexts: _ }));
 }
 
 #[tokio::test]
