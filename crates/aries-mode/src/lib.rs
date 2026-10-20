@@ -62,7 +62,7 @@ impl Mode {
         match self {
             Self::Build => include_str!("prompts/build.md"),
             Self::Plan => include_str!("prompts/plan.md"),
-            Self::General => include_str!("prompts/generate.md"),
+            Self::General => include_str!("prompts/general.md"),
             Self::Explore => include_str!("prompts/explore.md"),
         }
     }
