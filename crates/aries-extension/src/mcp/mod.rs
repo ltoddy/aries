@@ -9,11 +9,9 @@ use std::collections::HashMap;
 
 use futures::future;
 use http::{HeaderName, HeaderValue};
-use rig::tool::rmcp::McpClientHandler;
+use rig::tool::rmcp::{McpClientHandler, McpConnection};
 use rig::tool::server::ToolServerHandle;
-use rmcp::RoleClient;
-use rmcp::model::{ClientCapabilities, ClientInfo, Implementation};
-use rmcp::service::RunningService;
+use rmcp::model::{ClientCapabilities, ClientConfig, Implementation};
 use rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig;
 use rmcp::transport::{ConfigureCommandExt, StreamableHttpClientTransport, TokioChildProcess};
 use tracing::{info, warn};
@@ -30,7 +28,7 @@ const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 pub async fn connect(
     mcps: &[McpDefinition],
     tool_server_handle: ToolServerHandle,
-) -> Vec<RunningService<RoleClient, McpClientHandler<ToolServerHandle>>> {
+) -> Vec<McpConnection> {
     let mcp_servers = mcps.iter().flat_map(|c| &c.mcp_servers).collect::<Vec<_>>();
 
     future::join_all(mcp_servers.into_iter().map(|(server_name, server_config)| {
@@ -46,12 +44,12 @@ async fn connect_one(
     server_name: impl Into<String>,
     config: &McpServerConfig,
     tool_server_handle: ToolServerHandle,
-) -> McpConnectResult<RunningService<RoleClient, McpClientHandler<ToolServerHandle>>> {
+) -> McpConnectResult<McpConnection> {
     let server_name = server_name.into();
     info!(server = %server_name, "Connecting to mcp server");
 
-    let client_info = ClientInfo::new(ClientCapabilities::default(), Implementation::default());
-    let handler = McpClientHandler::new(client_info.clone(), tool_server_handle);
+    let client_config = ClientConfig::new(ClientCapabilities::default(), Implementation::default());
+    let handler = McpClientHandler::new(client_config, tool_server_handle);
 
     let service = match config {
         McpServerConfig::Stdio(Stdio { command, args, env }) => {
@@ -81,7 +79,7 @@ async fn connect_one(
 
     match service {
         Ok(service) => {
-            info!("Connected to mcp server: {:?}", service.peer_info());
+            info!("Connected to mcp server: {:?}", service.peer().peer_info());
             Ok(service)
         },
         Err(err) => {

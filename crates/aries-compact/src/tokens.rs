@@ -1,5 +1,8 @@
+use std::sync::Arc;
+
 use rig::message::{
-    AssistantContent, Document, DocumentSourceKind, Message, ToolResultContent, UserContent,
+    AssistantContent, Document, DocumentData, DocumentSourceKind, Message, ToolResultContent,
+    UserContent,
 };
 
 pub trait TokenEstimator {
@@ -56,7 +59,13 @@ fn is_cjk(c: char) -> bool {
     )
 }
 
-impl TokenEstimator for &[Message] {
+impl TokenEstimator for Arc<Message> {
+    fn estimate_tokens(&self) -> u64 {
+        self.as_ref().estimate_tokens()
+    }
+}
+
+impl TokenEstimator for [Arc<Message>] {
     fn estimate_tokens(&self) -> u64 {
         self.iter()
             .map(|m| m.estimate_tokens())
@@ -111,13 +120,21 @@ impl TokenEstimator for Document {
     }
 }
 
+impl TokenEstimator for DocumentData {
+    fn estimate_tokens(&self) -> u64 {
+        match self {
+            DocumentData::Text(text) => text.estimate_tokens(),
+            DocumentData::File(source) => source.estimate_tokens(),
+        }
+    }
+}
+
 impl TokenEstimator for DocumentSourceKind {
     fn estimate_tokens(&self) -> u64 {
         match self {
             DocumentSourceKind::Url(source)
             | DocumentSourceKind::Base64(source)
-            | DocumentSourceKind::FileId(source)
-            | DocumentSourceKind::String(source) => source.estimate_tokens(),
+            | DocumentSourceKind::FileId(source) => source.estimate_tokens(),
             DocumentSourceKind::Raw(bytes) => bytes.len().div_ceil(4) as u64,
             DocumentSourceKind::Unknown => 0,
         }

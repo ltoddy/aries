@@ -1,7 +1,7 @@
 use aries_context::ChatContext;
 use rig::message::{
-    AssistantContent, CallId, Document, DocumentSourceKind, Message, ProviderCallId, Reasoning,
-    ToolName, ToolResultContent, UserContent,
+    AssistantContent, CallId, Document, DocumentData, Message, ProviderCallId, Reasoning, ToolName,
+    ToolResultContent, UserContent,
 };
 
 use crate::{TokenEstimator, micro_compact};
@@ -54,7 +54,7 @@ fn tool_result_json_estimates_from_serialized_value() {
 #[test]
 fn string_document_estimates_from_actual_content() {
     let content = UserContent::Document(Document {
-        data: DocumentSourceKind::String("opened file metadata".to_owned()),
+        data: DocumentData::Text("opened file metadata".to_owned()),
         media_type: None,
         additional_params: None,
     });
@@ -63,12 +63,11 @@ fn string_document_estimates_from_actual_content() {
 }
 
 #[test]
-fn message_slice_applies_conservative_multiplier() {
+fn message_list_applies_conservative_multiplier() {
     let messages = vec![Message::user("abcd"), Message::user("efgh")];
 
     assert_eq!(messages[0].estimate_tokens(), 1);
     assert_eq!(messages[1].estimate_tokens(), 1);
-    assert_eq!(messages.as_slice().estimate_tokens(), 3);
     assert_eq!(messages.estimate_tokens(), 3);
 }
 

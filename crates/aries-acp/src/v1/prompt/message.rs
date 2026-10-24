@@ -36,7 +36,7 @@ impl From<Vec<ContentBlock>> for UserMessage {
                         // PDF 需要保持 base64 encode之后的形式, 其他类型需要使用明文来让 AI 模型阅读
                         match media_type {
                             Some(DocumentMediaType::PDF) => UserContent::Document(Document {
-                                data: DocumentSourceKind::Base64(blob.blob),
+                                data: DocumentSourceKind::Base64(blob.blob).into(),
                                 media_type,
                                 additional_params: None,
                             }),
@@ -46,7 +46,7 @@ impl From<Vec<ContentBlock>> for UserMessage {
                                     UserContent::document_text(text, media_type)
                                 },
                                 Err(_) => UserContent::Document(Document {
-                                    data: DocumentSourceKind::Base64(blob.blob),
+                                    data: DocumentSourceKind::Base64(blob.blob).into(),
                                     media_type,
                                     additional_params: None,
                                 }),

@@ -10,7 +10,9 @@ use aries_tools::{
 };
 use rig::agent::{MultiTurnStreamItem, PromptResponse};
 use rig::completion::Message;
-use rig::message::{AssistantContent, ToolCall, ToolFunction, ToolName, ToolResult, UserContent};
+use rig::message::{
+    AssistantContent, DocumentData, ToolCall, ToolFunction, ToolName, ToolResult, UserContent,
+};
 use rig::streaming::{Item, StreamEvent};
 
 use super::plan::PlanEntry;
@@ -86,9 +88,17 @@ impl SessionUpdates {
             UserContent::Video(_) => vec![SessionUpdate::UserMessageChunk(ContentChunk::new(
                 ContentBlock::from("[video]"),
             ))],
-            UserContent::Document(document) => vec![SessionUpdate::UserMessageChunk(
-                ContentChunk::new(ContentBlock::from(format!("[document: {}]", document.data))),
-            )],
+            UserContent::Document(document) => {
+                vec![SessionUpdate::UserMessageChunk(ContentChunk::new(ContentBlock::from(
+                    format!(
+                        "[document: {}]",
+                        match document.data {
+                            DocumentData::Text(s) => s,
+                            DocumentData::File(r) => r.to_string(),
+                        }
+                    ),
+                )))]
+            },
         }
     }
 
