@@ -68,7 +68,6 @@ impl Tool for WriteTool {
             },
             Ok(_) => {
                 self.ctx.guard_write(&file_path).await?;
-                let _ = self.ctx.file_checkpoint.push(&file_path, "").await;
             },
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
                 if let Some(parent) = file_path.parent() {
