@@ -117,10 +117,6 @@ impl Tool for MultiEditTool {
             }
         }
 
-        if let Some(ref original_content) = original_content {
-            let _ = self.ctx.file_checkpoint.push(&file_path, original_content).await;
-        }
-
         if let Some(parent) = file_path.parent() {
             fs::create_dir_all(parent).await.map_err(|err| {
                 MultiEditError::io(MultiEditIoOperation::CreateParentDirectory, &file_path, err)

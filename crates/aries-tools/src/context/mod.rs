@@ -1,5 +1,4 @@
 mod error;
-mod file_checkpoint;
 mod queue;
 mod read_state;
 mod task;
@@ -14,7 +13,6 @@ use aries_lspclient::SharedLspClient;
 use tokio::fs;
 
 pub use self::error::GuardWriteError;
-pub use self::file_checkpoint::SharedFileCheckpoint;
 pub use self::read_state::SharedReadState;
 pub use self::task::{
     SpawnTaskError, StopTaskError, TaskKind, TaskRegistry, TaskSnapshot, TaskStatus,
@@ -26,7 +24,6 @@ pub struct ToolContext {
     lsp_client: Option<SharedLspClient>,
     cwd: Arc<parking_lot::Mutex<PathBuf>>,
     worktree: Arc<parking_lot::Mutex<Option<Worktree>>>,
-    pub file_checkpoint: SharedFileCheckpoint,
     pub task: TaskRegistry,
     read_state: SharedReadState,
 }
@@ -36,7 +33,6 @@ impl std::fmt::Debug for ToolContext {
         f.debug_struct("ToolContext")
             .field("has_lsp_client", &self.lsp_client.is_some())
             .field("cwd", &self.cwd)
-            .field("file_checkpoint", &self.file_checkpoint)
             .field("task", &self.task)
             .field("read_state", &self.read_state)
             .finish()
@@ -49,13 +45,12 @@ impl ToolContext {
         notifier: Notifier,
         cwd: impl AsRef<Path>,
     ) -> Self {
-        let file_checkpoint = SharedFileCheckpoint::new();
         let task = TaskRegistry::new(notifier);
         let read_state = SharedReadState::new();
         let cwd = std::sync::Arc::new(parking_lot::Mutex::new(cwd.as_ref().to_owned()));
         let worktree_session = std::sync::Arc::new(parking_lot::Mutex::new(None));
 
-        Self { lsp_client, cwd, worktree: worktree_session, file_checkpoint, task, read_state }
+        Self { lsp_client, cwd, worktree: worktree_session, task, read_state }
     }
 
     pub fn cwd(&self) -> PathBuf {

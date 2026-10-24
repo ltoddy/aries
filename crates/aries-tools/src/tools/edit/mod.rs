@@ -99,7 +99,6 @@ impl Tool for EditTool {
             content.replacen(&args.old_text, &args.new_text, 1)
         };
 
-        let _ = self.ctx.file_checkpoint.push(&file_path, &content).await;
         fs::write(&file_path, &new_content)
             .await
             .map_err(|err| EditError::io(EditIoOperation::WriteFile, &file_path, err))?;
