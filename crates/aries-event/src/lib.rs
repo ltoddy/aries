@@ -51,12 +51,12 @@ impl Notifier {
 pub enum AgentEvent {
     Notification(String),
     StreamItem(Box<MultiTurnStreamItem>),
-    Compaction(Compection),
+    Compaction(Compaction),
     SessionInfoUpdate { title: String, updated_at: String },
 }
 
 #[derive(Debug, Clone)]
-pub struct Compection {
+pub struct Compaction {
     pub id: String,
     pub status: CompactionStatus,
     pub summary: String,
@@ -71,7 +71,7 @@ pub enum CompactionStatus {
     Cancelled,
 }
 
-impl fmt::Display for Compection {
+impl fmt::Display for Compaction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Compaction {}: {}", self.status, self.summary)
     }
@@ -105,7 +105,7 @@ impl AgentEvent {
     ) -> Self {
         let id = id.into();
         let summary = summary.into();
-        let compaction = Compection { id, status, summary };
+        let compaction = Compaction { id, status, summary };
         Self::Compaction(compaction)
     }
 

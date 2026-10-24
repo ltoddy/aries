@@ -73,6 +73,7 @@ impl SessionRepository {
         session_id: impl IntoExpr<String>,
     ) -> toasty::Result<Session> {
         Session::filter(Session::fields().session_id().eq(session_id))
+            .order_by((Session::fields().created_at().desc(), Session::fields().id().desc()))
             .one()
             .exec(&mut self.db)
             .await

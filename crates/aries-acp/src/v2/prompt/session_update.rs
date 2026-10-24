@@ -157,7 +157,7 @@ impl SessionUpdates {
         vec![SessionUpdate::PlanUpdate(PlanUpdate::new(PlanUpdateContent::items("main", entries)))]
     }
 
-    fn from_compaction(compaction: aries_event::Compection) -> SessionUpdate {
+    fn from_compaction(compaction: aries_event::Compaction) -> SessionUpdate {
         let status = match compaction.status {
             aries_event::CompactionStatus::InProgress => CompactionStatus::InProgress,
             aries_event::CompactionStatus::Completed => CompactionStatus::Completed,
