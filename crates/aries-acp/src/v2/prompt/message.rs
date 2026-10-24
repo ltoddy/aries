@@ -41,7 +41,7 @@ impl From<Vec<ContentBlock>> for UserMessage {
 
                         match media_type {
                             Some(DocumentMediaType::PDF) => UserContent::Document(Document {
-                                data: DocumentSourceKind::Base64(blob.blob),
+                                data: DocumentSourceKind::Base64(blob.blob).into(),
                                 media_type,
                                 additional_params: None,
                             }),
@@ -51,7 +51,7 @@ impl From<Vec<ContentBlock>> for UserMessage {
                                     UserContent::document_text(text, media_type)
                                 },
                                 Err(_) => UserContent::Document(Document {
-                                    data: DocumentSourceKind::Base64(blob.blob),
+                                    data: DocumentSourceKind::Base64(blob.blob).into(),
                                     media_type,
                                     additional_params: None,
                                 }),

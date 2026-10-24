@@ -16,7 +16,7 @@ use rig::agent::{
     OutcomeEvent, ReasoningDelta, RequestPatch, RunSettled, RunStart, RunStartAction,
     StepEventKind, TextDelta, ToolCallDelta,
 };
-use rig::effect::{EffectKind, Outcome};
+use rig::effect::{Answered, EffectKind};
 use serde_json::Value;
 use toasty::Db;
 use tokio::sync::Mutex;
@@ -147,7 +147,8 @@ impl AgentHook for SessionPromptHook {
             return CompletionCallAction::continue_run();
         }
 
-        let mut patched = event.history.to_vec();
+        let mut patched: Vec<_> =
+            event.history.iter().map(|message| message.as_ref().clone()).collect();
 
         if estimate_tokens > self.window.eighty_percent_threshold() {
             micro_compact(&mut patched, MICRO_COMPACT_KEEP_MESSAGES_AT_80_PERCENT);
@@ -165,7 +166,7 @@ impl AgentHook for SessionPromptHook {
             let reminder = system_reminder(instruction.render());
             patched.push(reminder);
         }
-        patched.extend_from_slice(&system_reminders(hook_contexts));
+        patched.extend(system_reminders(hook_contexts));
         CompletionCallAction::patch(RequestPatch::new().history(patched))
     }
 
@@ -295,7 +296,7 @@ impl AgentHook for SessionPromptHook {
         match (event.kind, event.outcome, event.call_id) {
             (
                 EffectKind::ToolCall { name, args },
-                Ok(Outcome::ToolResult { result }),
+                Ok(Answered::ToolResult { result }),
                 Some(call_id),
             ) => {
                 let duration_ms = self

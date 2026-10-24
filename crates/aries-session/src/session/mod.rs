@@ -32,10 +32,8 @@ use rig::agent::PromptResponse;
 use rig::completion::Message;
 use rig::message::UserContent;
 use rig::providers::openai::wire::OpenAiWire;
-use rig::tool::rmcp::McpClientHandler;
+use rig::tool::rmcp::McpConnection;
 use rig::tool::server::{ToolServer, ToolServerHandle};
-use rmcp::RoleClient;
-use rmcp::service::RunningService;
 use toasty::Db;
 use tokio::pin;
 use tokio::sync::Mutex;
@@ -87,7 +85,7 @@ pub struct Session {
 
     // 为了避免连接因为 drop 而释放
     #[allow(dead_code)]
-    mcp_clients: Arc<Vec<RunningService<RoleClient, McpClientHandler<ToolServerHandle>>>>,
+    mcp_clients: Arc<Vec<McpConnection>>,
     extensions: AgentExtensions,
 
     last_assistant_message: Option<String>,
