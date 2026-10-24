@@ -1,5 +1,6 @@
 mod error;
 mod file_checkpoint;
+mod queue;
 mod read_state;
 mod task;
 mod worktree;

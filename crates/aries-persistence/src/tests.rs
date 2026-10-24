@@ -76,6 +76,19 @@ async fn session_repository_uses_memory_database() {
 }
 
 #[tokio::test]
+async fn find_last_by_session_id_returns_latest_created_session() {
+    let db = memory_db().await.unwrap();
+    let mut repo = SessionRepository::new(db);
+
+    repo.create("session-1", "/workspace", "/first", "/tmp/first.jsonl").await.unwrap();
+    repo.create("session-1", "/workspace", "/second", "/tmp/second.jsonl").await.unwrap();
+
+    let session = repo.find_last_by_session_id("session-1").await.unwrap();
+
+    assert_eq!(session.transcript_path, "/tmp/second.jsonl");
+}
+
+#[tokio::test]
 async fn tool_call_repository_uses_memory_database() {
     let db = memory_db().await.unwrap();
     let mut repo = ToolCallRepository::new(db);

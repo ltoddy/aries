@@ -16,7 +16,10 @@ use tokio::process::Command;
 use tokio::sync::{oneshot, watch};
 use tokio::task::JoinHandle;
 
+use super::queue::BoundedQueue;
+
 const MAX_TASK_OUTPUT_BYTES: usize = 256 * 1024;
+const MAX_FINISHED_TASKS: usize = 50;
 const STOP_GRACE_PERIOD: Duration = Duration::from_secs(2);
 const SIGKILL_EXIT_CODE: i32 = 137;
 
@@ -160,6 +163,7 @@ impl std::fmt::Debug for TaskRegistry {
 
 struct TaskRegistryInner {
     tasks: HashMap<String, TaskEntry>,
+    finished_tasks: BoundedQueue<String>,
 }
 
 #[derive(Clone)]
@@ -181,7 +185,13 @@ impl TaskEntry {
 
 impl TaskRegistryInner {
     fn new() -> Self {
-        Self { tasks: HashMap::new() }
+        Self { tasks: HashMap::new(), finished_tasks: BoundedQueue::new(MAX_FINISHED_TASKS) }
+    }
+
+    fn record_finished(&mut self, task_id: String) {
+        if let Some(old_task_id) = self.finished_tasks.push(task_id) {
+            self.tasks.remove(&old_task_id);
+        }
     }
 }
 
@@ -233,6 +243,7 @@ impl TaskRegistry {
         let task_id_for_waiter = task_id.clone();
         let state_for_waiter = state.clone();
         let notifier = Notifier::clone(&self.notifier);
+        let registry = Arc::clone(&self.inner);
         tokio::spawn(async move {
             let result = tokio::select! {
                 result = child.wait() => result,
@@ -277,6 +288,7 @@ impl TaskRegistry {
             notifier.notify(state.notification(&task_id_for_waiter));
             drop(state);
             let _ = sender.send(final_status);
+            registry.lock().record_finished(task_id_for_waiter);
         });
 
         Ok(TaskSnapshot::new(&task_id, &state.lock()))
@@ -473,9 +485,16 @@ impl PartialOrd for OutputChunk {
 
 #[cfg(test)]
 mod tests {
-    use aries_event::Notifier;
+    use std::sync::Arc;
 
-    use super::{BoundedOutput, SIGKILL_EXIT_CODE, TaskKind, TaskRegistry, TaskState, TaskStatus};
+    use aries_event::Notifier;
+    use parking_lot::Mutex;
+    use tokio::sync::{oneshot, watch};
+
+    use super::{
+        BoundedOutput, MAX_FINISHED_TASKS, SIGKILL_EXIT_CODE, TaskEntry, TaskKind, TaskRegistry,
+        TaskRegistryInner, TaskState, TaskStatus,
+    };
 
     #[test]
     fn bounded_output_drops_oldest_chunks() {
@@ -536,6 +555,25 @@ mod tests {
         let state = TaskState::new(TaskKind::Shell, "sleep 1", None);
 
         assert_eq!(state.notification("shell00000001"), "");
+    }
+
+    #[test]
+    fn registry_keeps_only_recent_finished_tasks() {
+        let mut registry = TaskRegistryInner::new();
+
+        for index in 0..(MAX_FINISHED_TASKS + 2) {
+            let task_id = format!("shell{index:08}");
+            let state = Arc::new(Mutex::new(TaskState::new(TaskKind::Shell, "true", None)));
+            let (_sender, receiver) = watch::channel(TaskStatus::Running);
+            let (stop_sender, _stop_receiver) = oneshot::channel();
+            registry.tasks.insert(task_id.clone(), TaskEntry::new(state, receiver, stop_sender));
+            registry.record_finished(task_id);
+        }
+
+        assert_eq!(registry.tasks.len(), MAX_FINISHED_TASKS);
+        assert!(!registry.tasks.contains_key("shell00000000"));
+        assert!(!registry.tasks.contains_key("shell00000001"));
+        assert!(registry.tasks.contains_key("shell00000002"));
     }
 
     #[test]
