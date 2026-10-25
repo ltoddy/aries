@@ -1,6 +1,7 @@
+use std::time::Duration;
+
 use gpui_kit::assets::IconName;
 use gpui_kit::component::Icon;
-use gpui_kit::component::scroll::{Scrollbar, ScrollbarMode};
 use gpui_kit::component::text::{TextView, TextViewState, TextViewStyle};
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::prelude::*;
@@ -69,7 +70,6 @@ impl ChatView {
         let error = self.chat.error().map(str::to_owned);
         let view = cx.weak_entity();
         let timeline = self.timeline.clone();
-        let scrollbar = timeline.clone();
         div()
             .id("timeline")
             .flex_1()
@@ -110,11 +110,6 @@ impl ChatView {
                     .w_full()
                     .h_full(),
                 ),
-            )
-            .child(
-                Scrollbar::vertical(&scrollbar)
-                    .id("timeline-scrollbar")
-                    .mode(ScrollbarMode::Always),
             )
             .child(self.render_user_anchors(p, cx))
             .child(self.render_scroll_controls(p, cx))
@@ -225,6 +220,7 @@ impl ChatView {
                     .items_center()
                     .justify_center()
                     .cursor_pointer()
+                    .tooltip_show_delay(Duration::ZERO)
                     .tooltip(move |window, cx| {
                         let preview = preview.clone();
                         Tooltip::element(move |_, _| {

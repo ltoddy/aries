@@ -79,8 +79,9 @@ impl ChatView {
                     )
                     .child(
                         Button::new("refresh-sessions")
-                            .label("刷新")
+                            .icon(Icon::new(IconName::RefreshCw).size(px(14.)))
                             .tooltip("重新获取会话列表")
+                            .accessibility_label("刷新会话列表")
                             .ghost()
                             .small()
                             .disabled(
