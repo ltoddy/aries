@@ -53,7 +53,7 @@ itertools = "0.15"
 jiff = "0.2"
 mimalloc = "0.1"
 nanoid = "0.5"
-parking_lot = "0.12"
+parking_lot = "0.13"
 prettytable = { package = "prettytable-rs", version = "0.10" }
 regex-lite = "0.1"
 reqwest = "0.13"
