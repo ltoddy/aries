@@ -62,7 +62,7 @@ reqwest-retry = "0.9"
 rig = { version = "0.45" }
 rmcp = "3.7"
 rustyline = "19.0"
-rustyline-derive = "0.12"
+rustyline-derive = "0.13"
 schemars = "1"
 serde = "1"
 serde_json = "1.0"
