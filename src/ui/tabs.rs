@@ -217,8 +217,8 @@ impl TabsView {
                     .flex()
                     .items_center()
                     .gap_1()
-                    .cursor_pointer()
                     .bg(if active { p.background() } else { p.input() })
+                    .aria_label(format!("切换到标签 {title}"))
                     .hover(move |style| style.bg(if active { p.background() } else { p.muted() }))
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.active = index;
@@ -241,6 +241,7 @@ impl TabsView {
                                 .size(px(18.))
                                 .flex_shrink_0()
                                 .rounded_full()
+                                .aria_label("关闭标签")
                                 .flex()
                                 .items_center()
                                 .justify_center()
@@ -263,7 +264,7 @@ impl TabsView {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .cursor_pointer()
+                    .aria_label("新建标签")
                     .hover(move |style| style.bg(p.muted()))
                     .on_click(cx.listener(|this, _, window, cx| this.new_tab(window, cx)))
                     .child(Icon::new(IconName::Plus).size(px(14.)).text_color(p.foreground())),

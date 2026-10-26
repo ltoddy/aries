@@ -168,7 +168,7 @@ impl ChatView {
             .flex()
             .items_center()
             .justify_center()
-            .cursor_pointer()
+            .aria_label(label)
             .hover(|style| style.bg(p.muted()))
             .tooltip(move |window, cx| {
                 Tooltip::element(move |_, _| div().child(label)).build(window, cx)
@@ -198,14 +198,14 @@ impl ChatView {
             .left(px(4.))
             .top_0()
             .bottom_0()
-            .w(px(12.))
+            .w(px(16.))
             .py_3()
             .flex()
             .flex_col()
             .items_center()
             .gap_1()
             .overflow_y_scroll()
-            .children(anchors.into_iter().map(|(index, text)| {
+            .children(anchors.into_iter().enumerate().map(|(anchor_index, (index, text))| {
                 let timeline = timeline.clone();
                 let view = view.clone();
                 let preview = text.chars().take(300).collect::<String>();
@@ -213,13 +213,13 @@ impl ChatView {
                 div()
                     .id(("user-anchor", index))
                     .group(group.clone())
-                    .w(px(12.))
-                    .h(px(8.))
+                    .w(px(16.))
+                    .h(px(10.))
                     .flex_shrink_0()
                     .flex()
                     .items_center()
                     .justify_center()
-                    .cursor_pointer()
+                    .aria_label(format!("跳转到第 {} 条用户消息", anchor_index + 1))
                     .tooltip_show_delay(Duration::ZERO)
                     .tooltip(move |window, cx| {
                         let preview = preview.clone();
@@ -238,7 +238,7 @@ impl ChatView {
                     })
                     .child(
                         div()
-                            .w(px(10.))
+                            .w(px(12.))
                             .h(px(2.))
                             .rounded_full()
                             .bg(p.border())

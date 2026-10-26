@@ -34,8 +34,8 @@ impl ChatView {
                         .flex()
                         .items_center()
                         .justify_center()
-                        .cursor_pointer()
-                        .opacity(0.)
+                        .aria_label("复制用户消息")
+                        .opacity(0.45)
                         .group_hover("user-message", |this| this.opacity(1.))
                         .on_click(move |_, _, cx| {
                             cx.write_to_clipboard(ClipboardItem::new_string(text.clone()));
