@@ -60,7 +60,12 @@ impl ChatView {
                 if !self.stopping && self.creating_session.is_none() {
                     self.status = if self.chat.is_busy() { "思考中…" } else { "就绪" }.into();
                 }
-                self.refresh_sessions(cx);
+                if let Some(session) = self.queued_session_load.take() {
+                    self.load_session(session, cx);
+                }
+                if self.render_mode != crate::ui::ChatRenderMode::Main {
+                    self.refresh_sessions(cx);
+                }
             }
             Event::Sessions(result) => {
                 self.session_list.receive(result);
@@ -86,7 +91,7 @@ impl ChatView {
                 if let Some(options) = response.config_options {
                     self.chat.set_config_options(options);
                 }
-                if action.is_some() {
+                if action.is_some() && self.render_mode != crate::ui::ChatRenderMode::Main {
                     self.refresh_sessions(cx);
                 }
                 if matches!(action, Some(NewChatAction::SendPrompt)) {
@@ -130,7 +135,9 @@ impl ChatView {
                 }
                 .into();
                 self.chat.finish(result.err().map(|error| error.to_string()));
-                self.refresh_sessions(cx);
+                if self.render_mode != crate::ui::ChatRenderMode::Main {
+                    self.refresh_sessions(cx);
+                }
             }
             Event::Disconnected(error) => {
                 self.dismiss_permissions();

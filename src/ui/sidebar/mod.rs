@@ -66,7 +66,15 @@ impl ChatView {
                         .h(px(38.))
                         .rounded(px(12.))
                         .disabled(!self.can_start_new_chat())
-                        .on_click(cx.listener(|this, _, window, cx| this.new_chat(window, cx))),
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            if this.render_mode == crate::ui::ChatRenderMode::Sidebar
+                                && this.tab_host.is_some()
+                            {
+                                this.request_new_tab(cx);
+                            } else {
+                                this.new_chat(window, cx);
+                            }
+                        })),
                 ),
             )
             .child(self.render_sessions(p, cx))

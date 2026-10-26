@@ -10,7 +10,7 @@ use gpui_kit::*;
 
 use crate::acp::aries_config;
 use crate::preferences::Preferences;
-use crate::ui::ChatView;
+use crate::ui::TabsView;
 
 gpui_kit::actions!(orbit, [Quit]);
 
@@ -38,7 +38,7 @@ fn main() -> anyhow::Result<()> {
                 cx.quit();
                 false
             });
-            cx.new(|cx| ChatView::new(cwd, Preferences::path(), aries_config(), window, cx))
+            cx.new(|cx| TabsView::new(cwd, Preferences::path(), aries_config(), window, cx))
         }) {
             eprintln!("无法创建窗口：{error:#}");
             cx.quit();

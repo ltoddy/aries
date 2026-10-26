@@ -69,6 +69,7 @@ impl ChatView {
         let action_label = format!("会话 {title} 的更多操作");
         let delete_anchor = format!("session:{}", delete_id);
         let load_session = session.clone();
+        let can_open_session = self.tab_host.is_some() || self.can_load_sessions();
         let view = cx.weak_entity();
         div()
             .id(SharedString::from(format!("session:{id}")))
@@ -91,7 +92,7 @@ impl ChatView {
                             .px_0()
                             .flex_1()
                             .min_w_0()
-                            .disabled(!self.can_load_sessions())
+                            .disabled(!can_open_session)
                             .accessibility_label(format!("打开会话 {title}"))
                             .child(
                                 div()
@@ -102,8 +103,13 @@ impl ChatView {
                                     .font_weight(FontWeight::MEDIUM)
                                     .child(display_title),
                             )
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                this.load_session(load_session.clone(), cx);
+                            .on_click(cx.listener(move |this, _, _window, cx| {
+                                let session = load_session.clone();
+                                if this.tab_host.is_some() {
+                                    this.request_session_tab(session, cx);
+                                } else {
+                                    this.load_session(session, cx);
+                                }
                             })),
                     )
                     .child(

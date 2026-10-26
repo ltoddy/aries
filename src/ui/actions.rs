@@ -95,6 +95,7 @@ impl ChatView {
         self.attachment_images.clear();
         self.markdown.clear();
         self.session_id = None;
+        self.queued_session_load = None;
         self.pending_updates.clear();
         self.session_directory_selected = false;
         self.loading_session = None;

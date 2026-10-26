@@ -12,6 +12,7 @@ mod session_actions;
 mod session_config;
 mod session_list;
 mod sidebar;
+mod tabs;
 mod theme;
 mod thought_message;
 mod timeline;
@@ -25,13 +26,17 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use agent_client_protocol::AcpAgentConfig;
-use agent_client_protocol::schema::v1::{SessionConfigId, SessionId, SessionNotification};
+use agent_client_protocol::schema::v1::{
+    SessionConfigId, SessionId, SessionInfo, SessionNotification,
+};
+use gpui_kit::component::ActiveTheme;
 use gpui_kit::component::diff::DiffState;
 use gpui_kit::component::input::{InputEvent, TextareaState};
 use gpui_kit::component::text::TextViewState;
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
+pub(crate) use self::tabs::TabsView;
 use crate::acp::{Bridge, Permission};
 use crate::preferences::{Appearance, Preferences};
 use crate::session::chat::Chat;
@@ -43,6 +48,13 @@ use crate::ui::new_chat::NewChatAction;
 
 pub(crate) fn single_line(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ChatRenderMode {
+    Full,
+    Sidebar,
+    Main,
 }
 
 pub struct ChatView {
@@ -58,6 +70,11 @@ pub struct ChatView {
     bridge: Option<Bridge>,
     receiver: Option<Task<()>>,
     session_id: Option<SessionId>,
+    tab_host: Option<WeakEntity<TabsView>>,
+    render_mode: ChatRenderMode,
+    queued_session_load: Option<SessionInfo>,
+    tab_session_request: Option<SessionInfo>,
+    tab_new_request: bool,
     pending_updates: Vec<SessionNotification>,
     drafts: HashMap<SessionId, String>,
     loading_session: Option<SessionLoad>,
@@ -171,6 +188,11 @@ impl ChatView {
             bridge: None,
             receiver: None,
             session_id: None,
+            tab_host: None,
+            render_mode: ChatRenderMode::Full,
+            queued_session_load: None,
+            tab_session_request: None,
+            tab_new_request: false,
             pending_updates: Vec::new(),
             drafts: HashMap::new(),
             loading_session: None,
@@ -203,6 +225,11 @@ impl ChatView {
 
 impl Render for ChatView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        self.render_layout(cx)
+        let p = palette::Palette::new(cx.theme().mode);
+        match self.render_mode {
+            ChatRenderMode::Full => self.render_layout(cx).into_any_element(),
+            ChatRenderMode::Sidebar => self.sidebar(p, cx).into_any_element(),
+            ChatRenderMode::Main => self.render_main_area(p, cx).into_any_element(),
+        }
     }
 }
