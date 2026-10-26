@@ -23,41 +23,6 @@ impl ChatView {
             .flex_col()
             .bg(p.sidebar())
             .child(
-                div()
-                    .h(px(56.))
-                    .flex_shrink_0()
-                    .px_4()
-                    .flex()
-                    .items_center()
-                    .gap_3()
-                    .border_b_1()
-                    .border_color(p.border())
-                    .child(
-                        div()
-                            .size(px(32.))
-                            .rounded(px(12.))
-                            .bg(p.foreground())
-                            .text_color(p.sidebar())
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .child(Icon::new(IconName::Bot).size(px(17.))),
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap(px(2.))
-                            .child(div().font_weight(FontWeight::SEMIBOLD).child("Aries Orbit"))
-                            .child(
-                                div()
-                                    .text_size(px(12.))
-                                    .text_color(p.muted())
-                                    .child("与你的 Agent 一起工作"),
-                            ),
-                    ),
-            )
-            .child(
                 div().p_3().child(
                     Button::new("new-chat")
                         .label("新建对话")
