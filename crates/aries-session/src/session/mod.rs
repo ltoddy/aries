@@ -188,7 +188,7 @@ impl Session {
         )
         .with_lsp_client(self.lsp_client.clone())
         .with_extensions(self.extensions.clone())
-        .build(self.tool_server_handle.clone())
+        .build(&self.id, self.tool_server_handle.clone())
         .await;
 
         self.agent = agent;
@@ -416,7 +416,7 @@ impl Session {
         )
         .with_lsp_client(lsp_client.clone())
         .with_extensions(extensions.clone())
-        .build(tool_server_handle.clone())
+        .build(&id, tool_server_handle.clone())
         .await;
 
         let hooks_executor = Arc::new(HooksExecutor::new(extensions.hooks.clone()));

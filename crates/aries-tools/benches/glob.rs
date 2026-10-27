@@ -95,7 +95,7 @@ fn run_glob(tool: &GlobTool, args: GlobArgs) {
 fn bench_glob(c: &mut Criterion) {
     let repo = BenchRepo::new(2_000, 32);
     let (notifier, _) = aries_event::Notifier::channel();
-    let tool = GlobTool::new(AriesToolContext::new(None, notifier, &repo.root));
+    let tool = GlobTool::new(AriesToolContext::new("bench", None, notifier, &repo.root));
 
     let scenarios = [
         ("flat_rs", glob_args("src/*.rs")),
