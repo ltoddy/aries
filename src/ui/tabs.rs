@@ -56,24 +56,15 @@ impl TabsView {
             cx,
         );
         let sidebar_subscription = Self::observe_tab(&sidebar, window, cx);
-        let view = Self::create_chat_view(
-            &cwd,
-            preferences_path.clone(),
-            &agent,
-            ChatRenderMode::Main,
-            window,
-            cx,
-        );
-        let subscription = Self::observe_tab(&view, window, cx);
         Self {
             cwd,
             preferences_path,
             agent,
             sidebar,
             _sidebar_subscription: sidebar_subscription,
-            tabs: vec![ChatTab { id: 0, view, _subscription: subscription }],
+            tabs: Vec::new(),
             active: 0,
-            next_id: 1,
+            next_id: 0,
         }
     }
 
@@ -174,14 +165,13 @@ impl TabsView {
     }
 
     fn close_tab(&mut self, id: usize, cx: &mut Context<Self>) {
-        if self.tabs.len() <= 1 {
-            return;
-        }
         let Some(index) = self.tabs.iter().position(|tab| tab.id == id) else {
             return;
         };
         self.tabs.remove(index);
-        if self.active >= self.tabs.len() {
+        if self.tabs.is_empty() {
+            self.active = 0;
+        } else if self.active >= self.tabs.len() {
             self.active = self.tabs.len() - 1;
         } else if index < self.active {
             self.active -= 1;
@@ -190,7 +180,7 @@ impl TabsView {
     }
 
     fn render_tab_bar(&self, p: Palette, cx: &mut Context<Self>) -> AnyElement {
-        let can_close = self.tabs.len() > 1;
+        let can_close = !self.tabs.is_empty();
         div()
             .id("tab-bar")
             .h_9()
@@ -216,6 +206,33 @@ impl TabsView {
                     .tooltip("新建标签")
                     .accessibility_label("新建标签")
                     .on_click(cx.listener(|this, _, window, cx| this.new_tab(window, cx))),
+            )
+            .into_any_element()
+    }
+
+    fn render_empty_main(&self, p: Palette) -> AnyElement {
+        div()
+            .flex_1()
+            .min_h_0()
+            .flex()
+            .items_center()
+            .justify_center()
+            .child(
+                div()
+                    .max_w(px(360.))
+                    .flex()
+                    .flex_col()
+                    .items_center()
+                    .gap_2()
+                    .text_center()
+                    .child(div().text_sm().text_color(p.foreground()).child("没有打开的会话"))
+                    .child(
+                        div()
+                            .text_xs()
+                            .line_height(rems(1.25))
+                            .text_color(p.muted())
+                            .child("从左侧选择一个会话，或点击上方 + 新建标签。"),
+                    ),
             )
             .into_any_element()
     }
@@ -374,8 +391,11 @@ impl Render for TabsView {
                                 .flex()
                                 .flex_col()
                                 .child(self.render_tab_bar(p, cx))
-                                .when_some(active, |root, view| {
-                                    root.child(div().flex_1().min_h_0().child(view))
+                                .child(match active {
+                                    Some(view) => {
+                                        div().flex_1().min_h_0().child(view).into_any_element()
+                                    }
+                                    None => self.render_empty_main(p),
                                 }),
                         ),
                     ),
