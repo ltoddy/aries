@@ -31,7 +31,7 @@ impl ChatView {
             .mb_1()
             .bg(p.hover())
             .child(div().truncate().font_weight(FontWeight::MEDIUM).child(display_title))
-            .child(div().mt_1().text_size(px(12.)).text_color(p.muted()).child("发送消息开始对话"))
+            .child(div().mt_1().text_xs().text_color(p.muted()).child("发送消息开始对话"))
             .into_any_element()
     }
 

@@ -118,7 +118,7 @@ impl ChatView {
         let icon = info.icon;
         let preview = match self.attachment_images.get(&(message_index, attachment_index)) {
             Some(image) => img(image.clone())
-                .size(px(40.))
+                .size_10()
                 .rounded(px(6.))
                 .object_fit(ObjectFit::Contain)
                 .with_fallback(move || Icon::new(icon).size(px(24.)).into_any_element())
@@ -149,7 +149,7 @@ impl ChatView {
             })
             .child(
                 div()
-                    .size(px(40.))
+                    .size_10()
                     .flex_shrink_0()
                     .flex()
                     .items_center()
@@ -167,14 +167,7 @@ impl ChatView {
                             .font_weight(FontWeight::MEDIUM)
                             .child(info.name.to_owned()),
                     )
-                    .child(
-                        div()
-                            .mt_1()
-                            .truncate()
-                            .text_size(px(12.))
-                            .text_color(p.muted())
-                            .child(subtitle),
-                    ),
+                    .child(div().mt_1().truncate().text_xs().text_color(p.muted()).child(subtitle)),
             )
             .into_any_element()
     }

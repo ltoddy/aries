@@ -14,7 +14,7 @@ impl ChatView {
             .bg(p.background())
             .text_color(p.foreground())
             .font_family(".SystemUIFont")
-            .text_size(px(14.))
+            .text_sm()
             .child(
                 h_resizable("layout")
                     .child(

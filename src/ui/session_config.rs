@@ -34,7 +34,7 @@ impl ChatView {
                 },
             ))
             .when_some(self.config_error.clone(), |view, error| {
-                view.child(div().px_2().text_size(px(12.)).text_color(p.danger()).child(error))
+                view.child(div().px_2().text_xs().text_color(p.danger()).child(error))
             })
     }
 
@@ -86,7 +86,7 @@ impl ChatView {
                     .items_center()
                     .gap_1()
                     .min_w_0()
-                    .text_size(px(12.))
+                    .text_xs()
                     .child(Icon::new(icon).size(px(13.)).flex_shrink_0())
                     .child(div().min_w_0().truncate().child(value))
                     .child(Icon::new(IconName::ChevronDown).size(px(12.)).flex_shrink_0()),

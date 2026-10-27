@@ -36,9 +36,8 @@ impl ChatView {
                     .ghost()
                     .xsmall()
                     .w_full()
-                    .h(px(24.))
+                    .h_6()
                     .px_0()
-                    .cursor_pointer()
                     .text_color(p.muted())
                     .accessibility_label(if expanded {
                         "收起思考过程"
@@ -51,7 +50,7 @@ impl ChatView {
                             .flex()
                             .items_center()
                             .gap_2()
-                            .text_size(px(12.))
+                            .text_xs()
                             .text_left()
                             .child(
                                 Icon::new(if expanded {
@@ -84,8 +83,8 @@ impl ChatView {
                             .selectable(true)
                             .scrollable(false)
                             .w_full()
-                            .text_size(px(12.))
-                            .line_height(px(18.))
+                            .text_xs()
+                            .line_height(rems(1.125))
                             .text_color(p.muted()),
                     ),
                 )

@@ -136,12 +136,10 @@ impl ChatView {
         div()
             .flex_shrink_0()
             .when(actions.is_deleting(), |panel| {
-                panel.child(
-                    div().p_2().text_size(px(12.)).text_color(p.muted()).child("正在删除会话…"),
-                )
+                panel.child(div().p_2().text_xs().text_color(p.muted()).child("正在删除会话…"))
             })
             .when_some(actions.notice().map(str::to_owned), |panel, notice| {
-                panel.child(div().p_2().text_size(px(12.)).text_color(p.muted()).child(notice))
+                panel.child(div().p_2().text_xs().text_color(p.muted()).child(notice))
             })
             .when_some(actions.error().map(str::to_owned), |panel, error| {
                 panel.child(
@@ -150,7 +148,7 @@ impl ChatView {
                         .max_h(px(120.))
                         .overflow_y_scroll()
                         .p_2()
-                        .text_size(px(12.))
+                        .text_xs()
                         .text_color(p.danger())
                         .child(error),
                 )

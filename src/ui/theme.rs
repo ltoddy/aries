@@ -23,7 +23,7 @@ impl ChatView {
         Button::new("theme-toggle")
             .ghost()
             .icon(Icon::new(icon).size(px(18.)))
-            .size(px(32.))
+            .size_8()
             .text_color(if self.preference_error.is_some() { p.danger() } else { p.muted() })
             .tooltip(tooltip)
             .accessibility_label(label)

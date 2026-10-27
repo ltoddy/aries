@@ -36,18 +36,14 @@ impl ChatView {
                     }))
                     .when(list.is_loading(), |list| {
                         list.child(
-                            div()
-                                .p_3()
-                                .text_size(px(12.))
-                                .text_color(p.muted())
-                                .child("正在加载会话…"),
+                            div().p_3().text_xs().text_color(p.muted()).child("正在加载会话…"),
                         )
                     })
                     .when(list.is_unsupported(), |list| {
                         list.child(
                             div()
                                 .p_3()
-                                .text_size(px(12.))
+                                .text_xs()
                                 .text_color(p.muted())
                                 .child("Agent 不支持会话列表"),
                         )
@@ -59,18 +55,12 @@ impl ChatView {
                             && list.entries().is_empty(),
                         |list| {
                             list.child(
-                                div()
-                                    .p_3()
-                                    .text_size(px(12.))
-                                    .text_color(p.muted())
-                                    .child("暂无历史会话"),
+                                div().p_3().text_xs().text_color(p.muted()).child("暂无历史会话"),
                             )
                         },
                     )
                     .when_some(list.error().map(str::to_owned), |list, error| {
-                        list.child(
-                            div().p_3().text_size(px(12.)).text_color(p.danger()).child(error),
-                        )
+                        list.child(div().p_3().text_xs().text_color(p.danger()).child(error))
                     }),
             )
     }

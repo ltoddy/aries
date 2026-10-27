@@ -33,7 +33,7 @@ impl ChatView {
             .flex_shrink_0()
             .pl_2()
             .mb_2()
-            .text_size(px(12.))
+            .text_xs()
             .text_color(p.muted())
             .child("对话")
             .child(

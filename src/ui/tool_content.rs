@@ -111,7 +111,7 @@ impl ChatView {
             .flex_col()
             .items_start()
             .gap_1()
-            .text_size(px(12.))
+            .text_xs()
             .text_color(p.muted())
             .children(call.content.iter().enumerate().filter_map(|(content_index, content)| {
                 let ToolCallContent::Diff(diff) = content else {

@@ -29,7 +29,7 @@ impl ChatView {
                     div()
                         .id(("copy-message", index))
                         .w(px(24.))
-                        .h(px(24.))
+                        .h_6()
                         .flex_shrink_0()
                         .flex()
                         .items_center()
@@ -47,8 +47,8 @@ impl ChatView {
                 div()
                     .min_w_0()
                     .max_w(relative(0.72))
-                    .px(px(8.))
-                    .py(px(4.))
+                    .px_2()
+                    .py_1()
                     .rounded(px(16.))
                     .bg(p.bubble())
                     .flex()
@@ -61,7 +61,7 @@ impl ChatView {
                         bubble.child(
                             div()
                                 .whitespace_normal()
-                                .line_height(px(24.))
+                                .line_height(rems(1.5))
                                 .child(message.text().to_owned()),
                         )
                     }),

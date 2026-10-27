@@ -78,7 +78,7 @@ impl ChatView {
                                     .flex()
                                     .justify_end()
                                     .px_2()
-                                    .text_size(px(12.))
+                                    .text_xs()
                                     .text_color(p.muted())
                                     .child(format!("{tokens} tokens")),
                             )
@@ -88,13 +88,13 @@ impl ChatView {
                                 .flex()
                                 .items_end()
                                 .gap_2()
-                                .p(px(4.))
+                                .p_1()
                                 .rounded(px(14.))
                                 .border_1()
                                 .border_color(p.border())
                                 .bg(p.input())
                                 .child(
-                                    div().id("composer-input").flex_1().min_w_0().px(px(4.)).child(
+                                    div().id("composer-input").flex_1().min_w_0().px_1().child(
                                         Textarea::new(&self.input)
                                             .appearance(false)
                                             .bordered(false)
@@ -118,7 +118,7 @@ impl ChatView {
                                         } else {
                                             "发送消息"
                                         })
-                                        .size(px(40.))
+                                        .size_10()
                                         .rounded(px(12.))
                                         .disabled(if self.chat.is_busy() {
                                             self.stopping
@@ -149,7 +149,7 @@ impl ChatView {
                                 .flex_shrink_0()
                                 .px_2()
                                 .py_1()
-                                .text_size(px(11.))
+                                .text_size(rems(0.6875))
                                 .text_color(p.muted())
                                 .child("Enter 发送，Shift + Enter 换行"),
                         ),

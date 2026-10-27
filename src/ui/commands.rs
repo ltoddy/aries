@@ -145,9 +145,7 @@ impl ChatView {
                 .bg(p.input())
                 .shadow_lg()
                 .occlude()
-                .child(
-                    div().px_3().py_2().text_size(px(12.)).text_color(p.muted()).child("可用命令"),
-                )
+                .child(div().px_3().py_2().text_xs().text_color(p.muted()).child("可用命令"))
                 .child(
                     div()
                         .id("slash-command-list")
@@ -191,7 +189,6 @@ impl ChatView {
                                 .px_3()
                                 .py_2()
                                 .rounded(px(8.))
-                                .cursor_pointer()
                                 .when(index == self.command_menu.selected, |row| row.bg(p.hover()))
                                 .hover(|row| row.bg(p.hover()))
                                 .aria_label(format!("/{}：{}", command.name, command.description))
@@ -221,7 +218,7 @@ impl ChatView {
                                         .min_w_0()
                                         .truncate()
                                         .line_clamp(1)
-                                        .text_size(px(12.))
+                                        .text_xs()
                                         .text_color(p.muted())
                                         .child(command.description.clone()),
                                 )
@@ -241,7 +238,7 @@ impl ChatView {
                         .py_2()
                         .border_t_1()
                         .border_color(p.border())
-                        .text_size(px(11.))
+                        .text_size(rems(0.6875))
                         .text_color(p.muted())
                         .child("↑ ↓ 选择，Enter / Tab 填入，Esc 关闭"),
                 )

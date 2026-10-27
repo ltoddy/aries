@@ -4,7 +4,8 @@ use std::path::{Path, PathBuf};
 use agent_client_protocol::AcpAgentConfig;
 use agent_client_protocol::schema::v1::{SessionId, SessionInfo};
 use gpui_kit::assets::IconName;
-use gpui_kit::component::{ActiveTheme, Icon, h_resizable, resizable_panel};
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::{ActiveTheme, Icon, Sizable, h_resizable, resizable_panel};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -192,7 +193,7 @@ impl TabsView {
         let can_close = self.tabs.len() > 1;
         div()
             .id("tab-bar")
-            .h(px(36.))
+            .h_9()
             .flex_shrink_0()
             .px_2()
             .gap_1()
@@ -201,25 +202,59 @@ impl TabsView {
             .bg(p.input())
             .border_b_1()
             .border_color(p.border())
-            .children(self.tabs.iter().enumerate().map(|(index, tab)| {
-                let id = tab.id;
-                let active = index == self.active;
-                let title = tab.view.read(cx).tab_title();
-                div()
-                    .id(("tab", id))
-                    .h(px(28.))
-                    .max_w(px(180.))
-                    .min_w(px(84.))
-                    .px_2()
-                    .rounded(px(8.))
-                    .border_1()
-                    .border_color(if active { p.foreground() } else { p.border() })
-                    .flex()
-                    .items_center()
-                    .gap_1()
-                    .bg(if active { p.background() } else { p.input() })
-                    .aria_label(format!("切换到标签 {title}"))
-                    .hover(move |style| style.bg(if active { p.background() } else { p.muted() }))
+            .children(
+                self.tabs
+                    .iter()
+                    .enumerate()
+                    .map(|(index, tab)| self.render_tab(index, tab, can_close, p, cx)),
+            )
+            .child(
+                Button::new("new-tab")
+                    .icon(Icon::new(IconName::Plus).size(px(14.)))
+                    .ghost()
+                    .small()
+                    .tooltip("新建标签")
+                    .accessibility_label("新建标签")
+                    .on_click(cx.listener(|this, _, window, cx| this.new_tab(window, cx))),
+            )
+            .into_any_element()
+    }
+
+    fn render_tab(
+        &self,
+        index: usize,
+        tab: &ChatTab,
+        can_close: bool,
+        p: Palette,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let id = tab.id;
+        let active = index == self.active;
+        let title = tab.view.read(cx).tab_title();
+        let tab_label = format!("切换到标签 {title}");
+        div()
+            .id(("tab", id))
+            .h_7()
+            .max_w(px(180.))
+            .min_w(px(84.))
+            .px_1()
+            .rounded(px(8.))
+            .border_1()
+            .border_color(if active { p.foreground() } else { p.border() })
+            .flex()
+            .items_center()
+            .gap_1()
+            .bg(if active { p.background() } else { p.input() })
+            .hover(move |style| style.bg(if active { p.background() } else { p.muted() }))
+            .child(
+                Button::new(("tab-button", id))
+                    .ghost()
+                    .small()
+                    .h_full()
+                    .px_0()
+                    .flex_1()
+                    .min_w_0()
+                    .accessibility_label(tab_label)
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.active = index;
                         cx.notify();
@@ -230,45 +265,26 @@ impl TabsView {
                             .flex_1()
                             .truncate()
                             .line_clamp(1)
-                            .text_size(px(12.))
+                            .text_left()
+                            .text_xs()
                             .text_color(if active { p.foreground() } else { p.muted() })
                             .child(title),
-                    )
-                    .when(can_close, |tab| {
-                        tab.child(
-                            div()
-                                .id(("close-tab", id))
-                                .size(px(18.))
-                                .flex_shrink_0()
-                                .rounded_full()
-                                .aria_label("关闭标签")
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .hover(move |style| style.bg(p.border()))
-                                .on_click(cx.listener(move |this, _, _, cx| {
-                                    cx.stop_propagation();
-                                    this.close_tab(id, cx);
-                                }))
-                                .child(Icon::new(IconName::X).size(px(11.)).text_color(p.muted())),
-                        )
-                    })
-                    .into_any_element()
-            }))
-            .child(
-                div()
-                    .id("new-tab")
-                    .size(px(28.))
-                    .rounded(px(8.))
-                    .flex_shrink_0()
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .aria_label("新建标签")
-                    .hover(move |style| style.bg(p.muted()))
-                    .on_click(cx.listener(|this, _, window, cx| this.new_tab(window, cx)))
-                    .child(Icon::new(IconName::Plus).size(px(14.)).text_color(p.foreground())),
+                    ),
             )
+            .when(can_close, |tab| {
+                tab.child(
+                    Button::new(("close-tab", id))
+                        .icon(Icon::new(IconName::X).size(px(11.)))
+                        .ghost()
+                        .small()
+                        .tooltip("关闭标签")
+                        .accessibility_label("关闭标签")
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            cx.stop_propagation();
+                            this.close_tab(id, cx);
+                        })),
+                )
+            })
             .into_any_element()
     }
 }
@@ -340,7 +356,7 @@ impl Render for TabsView {
             .bg(p.background())
             .text_color(p.foreground())
             .font_family(".SystemUIFont")
-            .text_size(px(14.))
+            .text_sm()
             .child(
                 h_resizable("layout")
                     .child(

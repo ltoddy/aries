@@ -51,14 +51,14 @@ impl ChatView {
                         .child(
                             div()
                                 .mt_1()
-                                .text_size(px(22.))
+                                .text_size(rems(1.375))
                                 .font_weight(FontWeight::SEMIBOLD)
                                 .child("开始与 Aries 对话"),
                         )
                         .child(
                             div()
-                                .text_size(px(14.))
-                                .line_height(px(24.))
+                                .text_sm()
+                                .line_height(rems(1.5))
                                 .text_color(p.muted())
                                 .child("聊聊你的想法，或让 Aries 帮你完成项目中的任务。"),
                         ),
@@ -160,7 +160,7 @@ impl ChatView {
     ) -> AnyElement {
         div()
             .id(id)
-            .size(px(32.))
+            .size_8()
             .rounded_full()
             .border_1()
             .border_color(p.border())
@@ -227,7 +227,7 @@ impl ChatView {
                             div()
                                 .max_w(px(360.))
                                 .whitespace_normal()
-                                .line_height(px(20.))
+                                .line_height(rems(1.25))
                                 .child(preview.clone())
                         })
                         .build(window, cx)
@@ -311,7 +311,7 @@ impl ChatView {
                         .flex()
                         .items_center()
                         .gap_2()
-                        .text_size(px(12.))
+                        .text_xs()
                         .text_color(p.muted())
                         .when(card, |header| {
                             header.child(Icon::new(IconName::Activity).size(px(14.)))
@@ -325,8 +325,8 @@ impl ChatView {
                     .selectable(true)
                     .scrollable(false)
                     .w_full()
-                    .text_size(px(14.))
-                    .line_height(px(22.))
+                    .text_sm()
+                    .line_height(rems(1.375))
                     .into_any_element(),
             )
             .when_some(self.images.get(&index), |body, images| {
