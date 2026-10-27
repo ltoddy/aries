@@ -4,7 +4,7 @@ mod output;
 
 use std::path::{Path, PathBuf};
 
-use aries_event::Notifier;
+use aries_event::{Notifier, SubagentUpdate};
 use aries_extension::{AgentDefinition, AgentExtensions};
 use aries_init::GlobalContext;
 use aries_mode::Mode;
@@ -122,6 +122,7 @@ impl Tool for AgentTool {
                 let tool_names = frontmatter.filter_tool_names(&universe);
                 let cwd = self.ctx.cwd();
                 let tools = create_tools_from_tool_names(
+                    self.ctx.session_id.clone(),
                     self.gctx.clone(),
                     &tool_names,
                     self.model.clone(),
@@ -139,6 +140,7 @@ impl Tool for AgentTool {
                     mode.name().to_owned(),
                     mode.bare_preamble().to_owned(),
                     create_tools_from_mode(
+                        self.ctx.session_id.clone(),
                         self.gctx.clone(),
                         mode,
                         self.model.clone(),
@@ -166,6 +168,10 @@ impl Tool for AgentTool {
             .tool_server_handle(tool_server_handle)
             .default_max_turns(DEFAULT_MAX_TURNS)
             .build();
+
+        let subagent_update =
+            SubagentUpdate::new("").title(args.title()).description(args.description);
+        self.notifier.send_subagent_update(subagent_update);
 
         let mut stream = agent.prompt(args.prompt).stream();
 

@@ -50,6 +50,10 @@ impl SessionUpdates {
                     SessionInfoUpdate::new().title(title).updated_at(updated_at),
                 )])
             },
+            _ => {
+                // TODO
+                Default::default()
+            },
         }
     }
 

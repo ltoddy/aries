@@ -1,7 +1,8 @@
 use agent_client_protocol::schema::v1::{
     CompactionStatus, CompactionUpdate, Content, ContentBlock, ContentChunk, Diff, Plan,
-    SessionInfoUpdate, SessionUpdate, ToolCall as AcpToolCall, ToolCallContent, ToolCallId,
-    ToolCallLocation, ToolCallStatus, ToolCallUpdate, ToolCallUpdateFields, ToolKind, UsageUpdate,
+    SessionInfoUpdate, SessionUpdate, SubagentUpdate, ToolCall as AcpToolCall, ToolCallContent,
+    ToolCallId, ToolCallLocation, ToolCallStatus, ToolCallUpdate, ToolCallUpdateFields, ToolKind,
+    UsageUpdate,
 };
 use aries_event::AgentEvent;
 use aries_tools::{
@@ -52,6 +53,9 @@ impl SessionUpdates {
                 Self(vec![SessionUpdate::SessionInfoUpdate(
                     SessionInfoUpdate::new().title(title).updated_at(updated_at),
                 )])
+            },
+            AgentEvent::SubagentUpdate(subagent_update) => {
+                Self(vec![Self::from_subagent_update(subagent_update)])
             },
         }
     }
@@ -234,6 +238,14 @@ impl SessionUpdates {
         SessionUpdate::CompactionUpdate(
             CompactionUpdate::new(compaction.id, status)
                 .summary(vec![ContentBlock::from(compaction.summary)]),
+        )
+    }
+
+    fn from_subagent_update(subagent_update: aries_event::SubagentUpdate) -> SessionUpdate {
+        SessionUpdate::SubagentUpdate(
+            SubagentUpdate::new(subagent_update.session_id)
+                .title(subagent_update.title)
+                .description(subagent_update.description),
         )
     }
 }

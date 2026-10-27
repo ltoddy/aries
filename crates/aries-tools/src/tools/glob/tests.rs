@@ -6,7 +6,7 @@ use super::*;
 
 fn tool(cwd: impl AsRef<Path>) -> GlobTool {
     let (notifier, _) = aries_event::Notifier::channel();
-    GlobTool::new(crate::context::ToolContext::new(None, notifier, cwd))
+    GlobTool::new(crate::context::ToolContext::new("test", None, notifier, cwd))
 }
 
 fn glob_args(pattern: &str) -> GlobArgs {
