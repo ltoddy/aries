@@ -37,15 +37,10 @@ impl Notifier {
     pub fn send_session_message_chunk(
         &self,
         message_id: impl Into<String>,
-        sender_session_id: impl Into<String>,
-        recipient_session_id: impl Into<String>,
         content: MultiTurnStreamItem,
     ) {
         let event = AgentEvent::SessionMessageChunk(Box::new(SessionMessageChunk::new(
-            message_id,
-            sender_session_id,
-            recipient_session_id,
-            content,
+            message_id, content,
         )));
         let _ = self.sender.send(event);
     }

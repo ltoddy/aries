@@ -1,6 +1,6 @@
 use agent_client_protocol::schema::v2::{
-    AvailableCommand, AvailableCommandInput, AvailableCommandsUpdate, ContentBlock, ContentChunk,
-    ResumeSessionRequest, ResumeSessionResponse, SessionUpdate, TextCommandInput,
+    AvailableCommand, AvailableCommandInput, AvailableCommandsUpdate, Command, ContentBlock,
+    ContentChunk, ResumeSessionRequest, ResumeSessionResponse, SessionUpdate, TextCommandInput,
     UpdateSessionNotification,
 };
 use agent_client_protocol::{Client, Error, Responder, V2ConnectionTo};
@@ -46,9 +46,11 @@ pub async fn resume_session(
         .list_available_commands()
         .into_iter()
         .map(|c| {
-            AvailableCommand::new(c.name, c.description).input(
-                c.argument_hint
-                    .map(|hint| AvailableCommandInput::Text(TextCommandInput::new(hint))),
+            AvailableCommand::Command(
+                Command::new(c.name, c.description).input(
+                    c.argument_hint
+                        .map(|hint| AvailableCommandInput::Text(TextCommandInput::new(hint))),
+                ),
             )
         })
         .collect_vec();

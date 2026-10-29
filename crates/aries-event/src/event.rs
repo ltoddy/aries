@@ -22,23 +22,14 @@ pub struct SubagentUpdate {
 #[derive(Debug, Clone)]
 pub struct SessionMessageChunk {
     pub message_id: String,
-    pub sender_session_id: String,
-    pub recipient_session_id: String,
     pub content: MultiTurnStreamItem,
 }
 
 impl SessionMessageChunk {
-    pub fn new(
-        message_id: impl Into<String>,
-        sender_session_id: impl Into<String>,
-        recipient_session_id: impl Into<String>,
-        content: MultiTurnStreamItem,
-    ) -> Self {
+    pub fn new(message_id: impl Into<String>, content: MultiTurnStreamItem) -> Self {
         let message_id = message_id.into();
-        let sender_session_id = sender_session_id.into();
-        let recipient_session_id = recipient_session_id.into();
 
-        Self { message_id, sender_session_id, recipient_session_id, content }
+        Self { message_id, content }
     }
 }
 
