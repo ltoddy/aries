@@ -344,3 +344,34 @@ impl std::fmt::Debug for OpenAI {
             .finish()
     }
 }
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ProviderConfig {
+    pub id: String,
+    pub protocol: ProviderProtocol,
+    pub base_url: String,
+}
+
+impl ProviderConfig {
+    pub fn new(
+        id: impl Into<String>,
+        protocol: ProviderProtocol,
+        base_url: impl Into<String>,
+    ) -> Self {
+        let id = id.into();
+        let base_url = base_url.into();
+
+        Self { id, protocol, base_url }
+    }
+}
+
+#[derive(Clone, Copy, Deserialize, Serialize)]
+pub enum ProviderProtocol {
+    #[serde(rename = "azure")]
+    Azure,
+    #[serde(rename = "deepseek")]
+    Deepseek,
+    #[serde(rename = "openai")]
+    OpenAI,
+}

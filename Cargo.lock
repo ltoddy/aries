@@ -227,12 +227,13 @@ dependencies = [
  "aries-session",
  "aries-tools",
  "base64 0.23.1",
+ "http",
  "itertools 0.15.0",
  "rig",
  "serde_json",
  "tokio",
- "tokio-util",
  "tracing",
+ "url",
 ]
 
 [[package]]
@@ -5834,7 +5835,6 @@ checksum = "e464cf451ba96ebfc6f9b6542f17ee8b8956e33f1e40d9690624e59d7a7f8a4b"
 dependencies = [
  "bytes",
  "futures-core",
- "futures-io",
  "futures-sink",
  "libc",
  "pin-project-lite",
