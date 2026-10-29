@@ -7,6 +7,7 @@ pub enum AgentEvent {
     Notification(String),
     StreamItem(Box<MultiTurnStreamItem>),
     SubagentUpdate(SubagentUpdate),
+    SessionMessageChunk(Box<SessionMessageChunk>),
     Compaction(Compaction),
     SessionInfoUpdate { title: String, updated_at: String },
 }
@@ -16,6 +17,29 @@ pub struct SubagentUpdate {
     pub session_id: String,
     pub title: Option<String>,
     pub description: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SessionMessageChunk {
+    pub message_id: String,
+    pub sender_session_id: String,
+    pub recipient_session_id: String,
+    pub content: MultiTurnStreamItem,
+}
+
+impl SessionMessageChunk {
+    pub fn new(
+        message_id: impl Into<String>,
+        sender_session_id: impl Into<String>,
+        recipient_session_id: impl Into<String>,
+        content: MultiTurnStreamItem,
+    ) -> Self {
+        let message_id = message_id.into();
+        let sender_session_id = sender_session_id.into();
+        let recipient_session_id = recipient_session_id.into();
+
+        Self { message_id, sender_session_id, recipient_session_id, content }
+    }
 }
 
 impl SubagentUpdate {
@@ -45,6 +69,19 @@ pub struct Compaction {
     pub summary: String,
 }
 
+impl Compaction {
+    pub fn new(
+        id: impl Into<String>,
+        status: CompactionStatus,
+        summary: impl Into<String>,
+    ) -> Self {
+        let id = id.into();
+        let summary = summary.into();
+
+        Self { id, status, summary }
+    }
+}
+
 #[derive(Debug, Default, Clone, Copy)]
 pub enum CompactionStatus {
     #[default]
@@ -68,37 +105,5 @@ impl fmt::Display for CompactionStatus {
             Self::Failed => f.write_str("failed"),
             Self::Cancelled => f.write_str("cancelled"),
         }
-    }
-}
-
-impl AgentEvent {
-    pub fn notification(text: impl Into<String>) -> Self {
-        let text = text.into();
-        Self::Notification(text)
-    }
-
-    pub fn stream_item(stream_item: MultiTurnStreamItem) -> Self {
-        Self::StreamItem(Box::new(stream_item))
-    }
-
-    pub fn subagent_update(subagent_update: SubagentUpdate) -> Self {
-        Self::SubagentUpdate(subagent_update)
-    }
-
-    pub fn compaction(
-        id: impl Into<String>,
-        status: CompactionStatus,
-        summary: impl Into<String>,
-    ) -> Self {
-        let id = id.into();
-        let summary = summary.into();
-        let compaction = Compaction { id, status, summary };
-        Self::Compaction(compaction)
-    }
-
-    pub fn session_info_update(title: impl Into<String>, updated_at: impl Into<String>) -> Self {
-        let title = title.into();
-        let updated_at = updated_at.into();
-        Self::SessionInfoUpdate { title, updated_at }
     }
 }

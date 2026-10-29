@@ -60,18 +60,13 @@ impl AgentBuilder {
         self
     }
 
-    pub async fn build(
-        self,
-        session_id: impl Into<String>,
-        tool_server_handle: ToolServerHandle,
-    ) -> AriesAgent {
+    pub async fn build(self, tool_server_handle: ToolServerHandle) -> AriesAgent {
         let mode = self.mode;
         let name = mode.name();
         let model_name = self.model.name();
         let current_dir = self.cwd;
 
         let tools = aries_tools::create_tools_from_mode(
-            session_id,
             self.gctx.clone(),
             self.mode,
             self.model.clone(),

@@ -4266,9 +4266,9 @@ dependencies = [
 
 [[package]]
 name = "rig"
-version = "0.45.0"
+version = "0.46.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0da31655a3f369efc03c54799b7306d399d50712fbf09d2229f20e745cf64510"
+checksum = "2eb4f49e266022cc918e254975ab746858c94a80273ff816aa7060ce25bfe4ef"
 dependencies = [
  "rig-agent",
  "rig-cassette",
@@ -4281,9 +4281,9 @@ dependencies = [
 
 [[package]]
 name = "rig-agent"
-version = "0.45.0"
+version = "0.46.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "856f21ab95b8b887df997fb34356aeb1ad5677504461f009c58cd7d48274ef74"
+checksum = "2888789ba6da87577b0f797a9ce65133b47c11f5de62a0c495a49a9bf61bb423"
 dependencies = [
  "async-stream",
  "futures",
@@ -4301,9 +4301,9 @@ dependencies = [
 
 [[package]]
 name = "rig-cassette"
-version = "0.45.0"
+version = "0.46.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee092a5c4462f99f718b1c874f0a14f8b71598cb239044f6461c5db190f9933f"
+checksum = "aeff8e38398fa7e96e22283d09cb329e8207b3f9e32378a3cfadf55bf307f8ed"
 dependencies = [
  "base64 0.22.1",
  "futures",
@@ -4315,9 +4315,9 @@ dependencies = [
 
 [[package]]
 name = "rig-core"
-version = "0.45.0"
+version = "0.46.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d07ae8e85415d83f620eb4f519d03126227178ac67971b08368c087ce8f9052"
+checksum = "d937af84018dc326cee1aaee0e724baa3a13625789a2ba0618956b47b5b32604"
 dependencies = [
  "async-stream",
  "base64 0.22.1",
@@ -4347,15 +4347,15 @@ dependencies = [
 
 [[package]]
 name = "rig-harness-protocol"
-version = "0.45.0"
+version = "0.46.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d0865c3dc6e8aafb550df9b224e5b2b3727c615ebde121642c240f6b6f1c56d"
+checksum = "d7df9292b25e9df92539f1c4fe00c8513e91cb0de018f159e68372f89df02d34"
 
 [[package]]
 name = "rig-http"
-version = "0.45.0"
+version = "0.46.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "817c761f9949151fd099ec78e2fbacf7174f24c066ced84c9d28807a6b9d4cee"
+checksum = "60a04e7a7df7e5bddb4b22ad5c8438bc78fbe292d1b978311a93da9cc4145117"
 dependencies = [
  "bytes",
  "futures",
@@ -4369,9 +4369,9 @@ dependencies = [
 
 [[package]]
 name = "rig-memory"
-version = "0.45.0"
+version = "0.46.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d25fcf3f3a478d3ac1c0329aca68fdcb94c87cc32e6f2161463fae65270d58ec"
+checksum = "d305b4c44b40261a29c5c151ec9215a9cfc4610c39dfa4a79a11f5c8c85c1e45"
 dependencies = [
  "base64 0.22.1",
  "memchr",
@@ -4384,9 +4384,9 @@ dependencies = [
 
 [[package]]
 name = "rig-reqwest"
-version = "0.45.0"
+version = "0.46.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9f13e51c8cbe597ab4ed79f4a1211dab83ac3d9ceaa3826d69b5c770274b9fa"
+checksum = "567498634a02f426e45ee7d5315da13fccfe1ed9522676338ea7fa338d49ab7f"
 dependencies = [
  "bytes",
  "futures",
@@ -4402,9 +4402,9 @@ dependencies = [
 
 [[package]]
 name = "rig-rmcp"
-version = "0.45.0"
+version = "0.46.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "702da9362743f29076bc0e50ef0182983a13c3c049e8ecde0af24c895b71e61b"
+checksum = "ef01d389b5e336fb6e4bb7f54d7b770675e048129fca3222abb0877bf29a329b"
 dependencies = [
  "futures",
  "rig-core",
@@ -4417,9 +4417,9 @@ dependencies = [
 
 [[package]]
 name = "rig-typesafeai"
-version = "0.45.0"
+version = "0.46.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a133d334a2b498355a9bc4e640beb9fc8c6a7f2da057484dc0ab3c98dc19e92"
+checksum = "4c55bc5910e5f20563a4df65900b6295b33cdfc598e05e1a37fd7cc520db645c"
 dependencies = [
  "http",
  "rig-core",

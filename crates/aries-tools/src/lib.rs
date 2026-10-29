@@ -49,7 +49,6 @@ pub fn is_builtin_tool(tool_name: &str) -> bool {
 
 #[allow(clippy::too_many_arguments)]
 pub fn create_tools_from_mode(
-    session_id: impl Into<String>,
     gctx: GlobalContext,
     mode: Mode,
     model: Model<OpenAiWire>,
@@ -62,7 +61,6 @@ pub fn create_tools_from_mode(
     let tool_names = tool_names_from_mode(mode);
 
     create_tools_from_tool_names(
-        session_id,
         gctx,
         &tool_names,
         model,
@@ -109,7 +107,6 @@ pub fn tool_names_from_mode(mode: Mode) -> Vec<&'static str> {
 
 #[allow(clippy::too_many_arguments)]
 pub fn create_tools_from_tool_names(
-    session_id: impl Into<String>,
     gctx: GlobalContext,
     tool_names: &[&str],
     model: Model<OpenAiWire>,
@@ -124,7 +121,7 @@ pub fn create_tools_from_tool_names(
     let tool_names = tool_names.iter().unique().collect_vec();
     let mut tool_set = ToolSet::default();
 
-    let ctx = ToolContext::new(session_id, lsp_client.clone(), Notifier::clone(&notifier), cwd);
+    let ctx = ToolContext::new(lsp_client.clone(), Notifier::clone(&notifier), cwd);
 
     for &tool_name in tool_names {
         match tool_name {
