@@ -2,7 +2,9 @@ use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::schema::v1::{
     AgentCapabilities, Implementation, InitializeRequest, InitializeResponse, McpCapabilities,
     PromptCapabilities, ProvidersCapabilities, SessionAdditionalDirectoriesCapabilities,
-    SessionCapabilities, SessionListCapabilities,
+    SessionCapabilities, SessionCloseCapabilities, SessionDeleteCapabilities,
+    SessionForkCapabilities, SessionListCapabilities, SessionResumeCapabilities,
+    SessionSystemPromptCapabilities,
 };
 use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
 use tracing::info;
@@ -25,7 +27,12 @@ pub async fn initialize(
         .session_capabilities(
             SessionCapabilities::new()
                 .list(SessionListCapabilities::new())
-                .additional_directories(SessionAdditionalDirectoriesCapabilities::new()),
+                .delete(SessionDeleteCapabilities::new())
+                .additional_directories(SessionAdditionalDirectoriesCapabilities::new())
+                .system_prompt(SessionSystemPromptCapabilities::new())
+                .fork(SessionForkCapabilities::new())
+                .resume(SessionResumeCapabilities::new())
+                .close(SessionCloseCapabilities::new()),
         );
 
     let resp = InitializeResponse::new(ProtocolVersion::V1)

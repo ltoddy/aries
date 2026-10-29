@@ -1,8 +1,8 @@
 use agent_client_protocol::schema::v1::{
-    CompactionStatus, CompactionUpdate, Content, ContentBlock, ContentChunk, Diff, Plan,
-    SessionInfoUpdate, SessionUpdate, SubagentUpdate, ToolCall as AcpToolCall, ToolCallContent,
-    ToolCallId, ToolCallLocation, ToolCallStatus, ToolCallUpdate, ToolCallUpdateFields, ToolKind,
-    UsageUpdate,
+    CompactionStatus, CompactionUpdate, Content, ContentBlock, ContentChunk, Diff, Plan, SessionId,
+    SessionInfoUpdate, SessionMessageChunk, SessionUpdate, SubagentUpdate, TextContent,
+    ToolCall as AcpToolCall, ToolCallContent, ToolCallId, ToolCallLocation, ToolCallStatus,
+    ToolCallUpdate, ToolCallUpdateFields, ToolKind, UsageUpdate,
 };
 use aries_event::AgentEvent;
 use aries_tools::{
@@ -56,6 +56,9 @@ impl SessionUpdates {
             },
             AgentEvent::SubagentUpdate(subagent_update) => {
                 Self(vec![Self::from_subagent_update(subagent_update)])
+            },
+            AgentEvent::SessionMessageChunk(chunk) => {
+                Self(vec![Self::from_session_message_chunk(*chunk)])
             },
         }
     }
@@ -246,6 +249,25 @@ impl SessionUpdates {
             SubagentUpdate::new(subagent_update.session_id)
                 .title(subagent_update.title)
                 .description(subagent_update.description),
+        )
+    }
+
+    fn from_session_message_chunk(chunk: aries_event::SessionMessageChunk) -> SessionUpdate {
+        let content: ContentBlock =
+            if let MultiTurnStreamItem::StreamAssistantItem(Item::Event(StreamEvent::Text {
+                part: _,
+                text,
+            })) = chunk.content
+            {
+                ContentBlock::Text(TextContent::new(text))
+            } else {
+                ContentBlock::Text(TextContent::new(""))
+            };
+
+        SessionUpdate::SessionMessageChunk(
+            SessionMessageChunk::new(chunk.message_id, content)
+                .sender_session_id(SessionId::new(chunk.sender_session_id))
+                .recipient_session_id(SessionId::new(chunk.recipient_session_id)),
         )
     }
 }

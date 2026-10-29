@@ -81,7 +81,7 @@ fn run_grep(tool: &GrepTool, args: GrepArgs) {
 fn bench_grep(c: &mut Criterion) {
     let repo = BenchRepo::new(180, 240);
     let (notifier, _) = aries_event::Notifier::channel();
-    let tool = GrepTool::new(AriesToolContext::new("bench", None, notifier, &repo.root));
+    let tool = GrepTool::new(AriesToolContext::new(None, notifier, &repo.root));
 
     let scenarios = [
         ("files_with_matches", {

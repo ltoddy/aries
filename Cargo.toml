@@ -59,7 +59,9 @@ regex-lite = "0.1"
 reqwest = "0.13"
 reqwest-middleware = "0.5"
 reqwest-retry = "0.9"
-rig = { version = "0.45", default-features = false, features = ["agent"] }
+rig = { version = "0.46.0-rc.1", default-features = false, features = [
+    "agent",
+] }
 rmcp = "3.7"
 rustyline = "19.0"
 rustyline-derive = "0.13"

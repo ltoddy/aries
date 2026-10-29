@@ -21,7 +21,6 @@ pub use self::worktree::Worktree;
 
 #[derive(Clone)]
 pub struct ToolContext {
-    pub session_id: String,
     lsp_client: Option<SharedLspClient>,
     cwd: Arc<parking_lot::Mutex<PathBuf>>,
     worktree: Arc<parking_lot::Mutex<Option<Worktree>>>,
@@ -42,18 +41,16 @@ impl std::fmt::Debug for ToolContext {
 
 impl ToolContext {
     pub fn new(
-        session_id: impl Into<String>,
         lsp_client: Option<SharedLspClient>,
         notifier: Notifier,
         cwd: impl AsRef<Path>,
     ) -> Self {
-        let session_id = session_id.into();
         let task = TaskRegistry::new(notifier);
         let read_state = SharedReadState::new();
         let cwd = std::sync::Arc::new(parking_lot::Mutex::new(cwd.as_ref().to_owned()));
         let worktree_session = std::sync::Arc::new(parking_lot::Mutex::new(None));
 
-        Self { session_id, lsp_client, cwd, worktree: worktree_session, task, read_state }
+        Self { lsp_client, cwd, worktree: worktree_session, task, read_state }
     }
 
     pub fn cwd(&self) -> PathBuf {
