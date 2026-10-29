@@ -1,6 +1,5 @@
 use std::collections::{BinaryHeap, HashMap};
 use std::fmt::{Display, Formatter};
-use std::os::unix::process::ExitStatusExt;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
@@ -21,7 +20,6 @@ use super::queue::BoundedQueue;
 const MAX_TASK_OUTPUT_BYTES: usize = 256 * 1024;
 const MAX_FINISHED_TASKS: usize = 50;
 const STOP_GRACE_PERIOD: Duration = Duration::from_secs(2);
-const SIGKILL_EXIT_CODE: i32 = 137;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -245,9 +243,11 @@ impl TaskRegistry {
         let notifier = Notifier::clone(&self.notifier);
         let registry = Arc::clone(&self.inner);
         tokio::spawn(async move {
+            let mut stop_requested = false;
             let result = tokio::select! {
                 result = child.wait() => result,
                 _ = stop_receiver => {
+                    stop_requested = true;
                     let kill_result = child.start_kill();
                     if let Err(err) = kill_result {
                         Err(err)
@@ -265,11 +265,9 @@ impl TaskRegistry {
             }
             match result {
                 Ok(status) => {
-                    let signal = status.signal();
-                    let code =
-                        status.code().or_else(|| signal.map(|signal| 128 + signal)).unwrap_or(-1);
+                    let code = status.code().unwrap_or(-1);
                     state.exit_code = Some(code);
-                    state.status = if code == SIGKILL_EXIT_CODE {
+                    state.status = if stop_requested {
                         TaskStatus::Killed
                     } else if code == 0 {
                         TaskStatus::Completed
@@ -492,8 +490,8 @@ mod tests {
     use tokio::sync::{oneshot, watch};
 
     use super::{
-        BoundedOutput, MAX_FINISHED_TASKS, SIGKILL_EXIT_CODE, TaskEntry, TaskKind, TaskRegistry,
-        TaskRegistryInner, TaskState, TaskStatus,
+        BoundedOutput, MAX_FINISHED_TASKS, TaskEntry, TaskKind, TaskRegistry, TaskRegistryInner,
+        TaskState, TaskStatus,
     };
 
     #[test]
@@ -597,8 +595,10 @@ mod tests {
 
         let snapshot = registry.stop(&task.task_id).await.expect("test operation should succeed");
 
+        // 退出码按平台不同（Unix 被信号终止为 -1，Windows 为 TerminateProcess 的码），
+        // 状态由 stop 流程标志判定，这里只断言退出码被记录下来。
         assert_eq!(snapshot.status, TaskStatus::Killed);
-        assert_eq!(snapshot.exit_code, Some(SIGKILL_EXIT_CODE));
+        assert!(snapshot.exit_code.is_some());
         assert!(snapshot.finished_at.is_some());
     }
 }
