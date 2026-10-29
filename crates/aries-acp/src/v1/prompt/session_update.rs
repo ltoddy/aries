@@ -1,5 +1,5 @@
 use agent_client_protocol::schema::v1::{
-    CompactionStatus, CompactionUpdate, Content, ContentBlock, ContentChunk, Diff, Plan, SessionId,
+    CompactionStatus, CompactionUpdate, Content, ContentBlock, ContentChunk, Diff, Plan,
     SessionInfoUpdate, SessionMessageChunk, SessionUpdate, SubagentUpdate, TextContent,
     ToolCall as AcpToolCall, ToolCallContent, ToolCallId, ToolCallLocation, ToolCallStatus,
     ToolCallUpdate, ToolCallUpdateFields, ToolKind, UsageUpdate,
@@ -264,11 +264,7 @@ impl SessionUpdates {
                 ContentBlock::Text(TextContent::new(""))
             };
 
-        SessionUpdate::SessionMessageChunk(
-            SessionMessageChunk::new(chunk.message_id, content)
-                .sender_session_id(SessionId::new(chunk.sender_session_id))
-                .recipient_session_id(SessionId::new(chunk.recipient_session_id)),
-        )
+        SessionUpdate::SessionMessageChunk(SessionMessageChunk::new(chunk.message_id, content))
     }
 }
 
