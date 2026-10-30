@@ -68,6 +68,46 @@ fn content(value: &Value) -> String {
     }
 }
 
+fn content_list(value: &Value) -> String {
+    value
+        .as_array()
+        .map(|items| items.iter().map(content).collect::<Vec<_>>().join("\n\n"))
+        .filter(|text| !text.is_empty())
+        .unwrap_or_else(|| json(value))
+}
+
+fn plan_entries(entries: &Value) -> String {
+    entries
+        .as_array()
+        .map(|entries| {
+            entries
+                .iter()
+                .map(|entry| {
+                    format!(
+                        "- {} · {} · {}",
+                        status(&entry["status"]),
+                        string(entry, "priority"),
+                        string(entry, "content")
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+        .filter(|text| !text.is_empty())
+        .unwrap_or_else(|| "计划已清空".into())
+}
+
+fn plan_content(value: &Value) -> String {
+    match string(value, "type") {
+        "items" => format!("{}\n\n{}", string(value, "planId"), plan_entries(&value["entries"])),
+        "file" => {
+            format!("{}\n\n{}", string(value, "planId"), code_block("", string(value, "uri")))
+        }
+        "markdown" => format!("{}\n\n{}", string(value, "planId"), string(value, "content")),
+        _ => json(value),
+    }
+}
+
 impl From<&SessionUpdate> for UpdateDisplay {
     fn from(update: &SessionUpdate) -> Self {
         let value = match serde_json::to_value(update) {
@@ -90,27 +130,9 @@ impl From<&SessionUpdate> for UpdateDisplay {
                 .to_owned(),
                 content(&value["content"]),
             ),
-            "plan" => (
-                "执行计划".into(),
-                value["entries"]
-                    .as_array()
-                    .map(|entries| {
-                        entries
-                            .iter()
-                            .map(|entry| {
-                                format!(
-                                    "- {} · {} · {}",
-                                    status(&entry["status"]),
-                                    string(entry, "priority"),
-                                    string(entry, "content")
-                                )
-                            })
-                            .collect::<Vec<_>>()
-                            .join("\n")
-                    })
-                    .filter(|text| !text.is_empty())
-                    .unwrap_or_else(|| "计划已清空".into()),
-            ),
+            "plan" => ("执行计划".into(), plan_entries(&value["entries"])),
+            "plan_update" => ("计划更新".into(), plan_content(&value["plan"])),
+            "plan_removed" => ("计划移除".into(), code_block("", string(&value, "planId"))),
             "current_mode_update" => {
                 ("会话模式".into(), code_block("", string(&value, "currentModeId")))
             }
@@ -135,6 +157,40 @@ impl From<&SessionUpdate> for UpdateDisplay {
             "compaction_summary_chunk" => (
                 "压缩摘要".into(),
                 format!("{}\n\n{}", string(&value, "compactionId"), content(&value["content"])),
+            ),
+            "subagent_update" => {
+                let mut parts = vec![code_block("", string(&value, "sessionId"))];
+                if let Some(title) = value.get("title").and_then(Value::as_str) {
+                    parts.push(title.to_owned());
+                }
+                if let Some(description) = value.get("description").and_then(Value::as_str) {
+                    parts.push(description.to_owned());
+                }
+                if let Some(state) = value.get("state").filter(|state| !state.is_null()) {
+                    parts.push(json(state));
+                }
+                ("子 Agent".into(), parts.join("\n\n"))
+            }
+            "session_message" => {
+                let mut parts = vec![code_block("", string(&value, "messageId"))];
+                if let Some(sender) = value.get("senderSessionId").and_then(Value::as_str) {
+                    parts.push(format!("来自：{sender}"));
+                }
+                if let Some(recipient) = value.get("recipientSessionId").and_then(Value::as_str) {
+                    parts.push(format!("发送到：{recipient}"));
+                }
+                if value.get("content").is_some_and(Value::is_array) {
+                    parts.push(content_list(&value["content"]));
+                }
+                ("会话消息".into(), parts.join("\n\n"))
+            }
+            "session_message_chunk" => (
+                "会话消息".into(),
+                format!(
+                    "{}\n\n{}",
+                    code_block("", string(&value, "messageId")),
+                    content(&value["content"])
+                ),
             ),
             _ => (format!("会话更新 · {kind}"), json(&value)),
         };

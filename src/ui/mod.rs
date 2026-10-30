@@ -12,6 +12,7 @@ mod session_actions;
 mod session_config;
 mod session_list;
 mod sidebar;
+mod subagent_message;
 mod tabs;
 mod theme;
 mod thought_message;
@@ -95,6 +96,7 @@ pub struct ChatView {
     timeline: ListState,
     expanded_thoughts: HashSet<usize>,
     collapsed_streaming_thoughts: HashSet<usize>,
+    collapsed_subagents: HashSet<SessionId>,
     tool_diffs: HashMap<(usize, usize), Entity<DiffState>>,
     tool_diff_rows: HashMap<(usize, usize), (usize, usize)>,
     images: HashMap<usize, Vec<Arc<Image>>>,
@@ -213,6 +215,7 @@ impl ChatView {
             timeline: ListState::new(0, ListAlignment::Bottom, px(600.)),
             expanded_thoughts: HashSet::new(),
             collapsed_streaming_thoughts: HashSet::new(),
+            collapsed_subagents: HashSet::new(),
             tool_diffs: HashMap::new(),
             tool_diff_rows: HashMap::new(),
             images: HashMap::new(),

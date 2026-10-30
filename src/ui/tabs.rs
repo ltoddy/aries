@@ -372,7 +372,7 @@ impl Render for TabsView {
             .flex()
             .bg(p.background())
             .text_color(p.foreground())
-            .font_family(".SystemUIFont")
+            .font_family("Monaco")
             .text_sm()
             .child(
                 h_resizable("layout")

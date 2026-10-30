@@ -23,14 +23,14 @@ gpui-kit = { version = "0.7.3", features = [
     "tree-sitter-typescript",
     "tree-sitter-yaml",
 ] }
-agent-client-protocol = { version = "3.4", features = ["process"] }
-anyhow = "1"
-async-channel = "2"
+agent-client-protocol = { version = "3.5", features = ["process", "unstable"] }
+anyhow = "1.0"
+async-channel = "2.5"
 base64 = "0.23"
-dirs = "7"
+dirs = "7.0"
 libc = "0.2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 similar = "3.2"
 tokio = { version = "1", features = ["rt", "macros", "time", "sync", "process", "io-util"] }
 

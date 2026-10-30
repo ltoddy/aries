@@ -7,6 +7,7 @@ use agent_client_protocol::schema::v1::{
 };
 
 use crate::session::display::UpdateDisplay;
+use crate::session::subagent::SubagentState;
 use crate::session::tool_call::ToolCallState;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -25,6 +26,7 @@ pub struct Message {
     updates: Vec<SessionNotification>,
     compaction: Option<CompactionUpdate>,
     tool_call: Option<ToolCallState>,
+    subagent: Option<SubagentState>,
 }
 
 impl Message {
@@ -58,6 +60,9 @@ impl Message {
     pub fn compaction(&self) -> Option<&CompactionUpdate> {
         self.compaction.as_ref()
     }
+    pub fn subagent(&self) -> Option<&SubagentState> {
+        self.subagent.as_ref()
+    }
 }
 
 #[derive(Debug, Default)]
@@ -70,6 +75,7 @@ pub struct Chat {
     config_options: Vec<SessionConfigOption>,
     stream: Option<usize>,
     tools: HashMap<(SessionId, ToolCallId), usize>,
+    subagents: HashMap<SessionId, usize>,
 }
 
 impl Chat {
@@ -111,6 +117,7 @@ impl Chat {
             updates: Vec::new(),
             compaction: None,
             tool_call: None,
+            subagent: None,
         });
         self.busy = true;
         self.error = None;
@@ -124,6 +131,14 @@ impl Chat {
         }
         if matches!(&notification.update, SessionUpdate::UsageUpdate(_)) {
             return None;
+        }
+        if matches!(
+            &notification.update,
+            SessionUpdate::SubagentUpdate(_)
+                | SessionUpdate::SessionMessage(_)
+                | SessionUpdate::SessionMessageChunk(_)
+        ) {
+            return Some(self.receive_subagent(notification));
         }
         if matches!(
             &notification.update,
@@ -175,6 +190,7 @@ impl Chat {
                 updates: vec![notification],
                 compaction: None,
                 tool_call: None,
+                subagent: None,
             });
         } else {
             self.end_segment();
@@ -186,9 +202,43 @@ impl Chat {
                 updates: vec![notification],
                 compaction: None,
                 tool_call: None,
+                subagent: None,
             });
         }
         Some(self.messages.len() - 1)
+    }
+
+    fn receive_subagent(&mut self, notification: SessionNotification) -> usize {
+        let session_id = subagent_session_id(&notification);
+        let index = match self.subagents.get(&session_id) {
+            Some(index) => *index,
+            None => {
+                self.end_segment();
+                let index = self.messages.len();
+                self.messages.push(Message {
+                    role: Role::Event,
+                    title: "子 Agent".into(),
+                    text: String::new(),
+                    updates: Vec::new(),
+                    compaction: None,
+                    tool_call: None,
+                    subagent: Some(SubagentState::new(session_id.clone())),
+                });
+                self.subagents.insert(session_id, index);
+                index
+            }
+        };
+        let message = &mut self.messages[index];
+        let subagent = message.subagent.as_mut().expect("subagent entry has state");
+        match notification.update {
+            SessionUpdate::SubagentUpdate(update) => subagent.update_metadata(update),
+            SessionUpdate::SessionMessage(update) => subagent.update_message(update),
+            SessionUpdate::SessionMessageChunk(chunk) => subagent.append_message_chunk(chunk),
+            _ => unreachable!("only subagent notifications reach this handler"),
+        }
+        message.title = subagent.title().unwrap_or("子 Agent").into();
+        message.text = subagent.description().unwrap_or_default().into();
+        index
     }
 
     fn receive_tool_call(&mut self, notification: SessionNotification) -> usize {
@@ -210,6 +260,7 @@ impl Chat {
                     updates: Vec::new(),
                     compaction: None,
                     tool_call: Some(ToolCallState::new(ToolCall::new(id, ""))),
+                    subagent: None,
                 });
                 self.tools.insert(key, index);
                 index
@@ -255,6 +306,7 @@ impl Chat {
                         CompactionStatus::InProgress,
                     )),
                     tool_call: None,
+                    subagent: None,
                 });
                 self.messages.len() - 1
             });
@@ -328,6 +380,37 @@ impl Chat {
                 title
             })
             .unwrap_or_else(|| "新对话".into())
+    }
+}
+
+fn subagent_session_id(notification: &SessionNotification) -> SessionId {
+    match &notification.update {
+        SessionUpdate::SubagentUpdate(update) => update.session_id.clone(),
+        SessionUpdate::SessionMessage(update) => update
+            .sender_session_id
+            .as_ref()
+            .filter(|session_id| *session_id != &notification.session_id)
+            .or_else(|| {
+                update
+                    .recipient_session_id
+                    .as_ref()
+                    .filter(|session_id| *session_id != &notification.session_id)
+            })
+            .cloned()
+            .unwrap_or_else(|| notification.session_id.clone()),
+        SessionUpdate::SessionMessageChunk(chunk) => chunk
+            .sender_session_id
+            .as_ref()
+            .filter(|session_id| *session_id != &notification.session_id)
+            .or_else(|| {
+                chunk
+                    .recipient_session_id
+                    .as_ref()
+                    .filter(|session_id| *session_id != &notification.session_id)
+            })
+            .cloned()
+            .unwrap_or_else(|| notification.session_id.clone()),
+        _ => notification.session_id.clone(),
     }
 }
 

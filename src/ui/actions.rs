@@ -89,6 +89,7 @@ impl ChatView {
         self.command_menu.reset();
         self.expanded_thoughts.clear();
         self.collapsed_streaming_thoughts.clear();
+        self.collapsed_subagents.clear();
         self.tool_diffs.clear();
         self.tool_diff_rows.clear();
         self.images.clear();

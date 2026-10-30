@@ -4,7 +4,7 @@ use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::schema::v1::{
     AgentCapabilities, BooleanConfigOptionCapabilities, ClientCapabilities,
     ClientSessionCapabilities, CompactionCapabilities, Implementation, InitializeRequest,
-    NoticeCapabilities, SessionConfigOptionsCapabilities,
+    NoticeCapabilities, PlanCapabilities, SessionConfigOptionsCapabilities, SubagentCapabilities,
 };
 use agent_client_protocol::{Agent, ConnectionTo, Error};
 
@@ -15,15 +15,19 @@ pub async fn request(connection: &ConnectionTo<Agent>) -> Result<AgentCapabiliti
             .send_request(
                 InitializeRequest::new(ProtocolVersion::V1)
                     .client_capabilities(
-                        ClientCapabilities::new().terminal(true).session(
-                            ClientSessionCapabilities::new()
-                                .config_options(
-                                    SessionConfigOptionsCapabilities::new()
-                                        .boolean(BooleanConfigOptionCapabilities::new()),
-                                )
-                                .notices(NoticeCapabilities::new())
-                                .compaction(CompactionCapabilities::new()),
-                        ),
+                        ClientCapabilities::new()
+                            .terminal(true)
+                            .session(
+                                ClientSessionCapabilities::new()
+                                    .config_options(
+                                        SessionConfigOptionsCapabilities::new()
+                                            .boolean(BooleanConfigOptionCapabilities::new()),
+                                    )
+                                    .notices(NoticeCapabilities::new())
+                                    .compaction(CompactionCapabilities::new()),
+                            )
+                            .plan(PlanCapabilities::new())
+                            .subagents(SubagentCapabilities::new()),
                     )
                     .client_info(Implementation::new("aries-orbit", env!("CARGO_PKG_VERSION"))),
             )

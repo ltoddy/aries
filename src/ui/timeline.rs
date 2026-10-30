@@ -281,6 +281,9 @@ impl ChatView {
     ) -> AnyElement {
         self.cache_visible_images(index);
         let message = self.chat.messages()[index].clone();
+        if let Some(subagent) = message.subagent() {
+            return self.render_subagent_message(subagent, p, cx);
+        }
         if let Some(tool) = message.tool_call() {
             return self.render_tool_message(index, tool, p, window, cx);
         }
