@@ -1,6 +1,6 @@
 use agent_client_protocol::schema::v1::{
     CompactionStatus, CompactionUpdate, Content, ContentBlock, ContentChunk, Diff, Plan,
-    SessionInfoUpdate, SessionMessageChunk, SessionUpdate, SubagentUpdate, TextContent,
+    SessionInfoUpdate, SessionMessageChunk, SessionUpdate, SubagentUpdate, Terminal, TextContent,
     ToolCall as AcpToolCall, ToolCallContent, ToolCallId, ToolCallLocation, ToolCallStatus,
     ToolCallUpdate, ToolCallUpdateFields, ToolKind, UsageUpdate,
 };
@@ -288,7 +288,14 @@ fn parse_tool_call(t: ToolCall) -> (String, Vec<ToolCallContent>) {
             .unwrap_or_else(|_| (default_title, vec![])),
         bash::NAME => serde_json::from_value::<bash::BashArgs>(arguments)
             .map(|args| (args.title(), vec![]))
-            .unwrap_or_else(|_| (default_title, vec![])),
+            .unwrap_or_else(|_| {
+                (
+                    default_title,
+                    vec![ToolCallContent::Terminal(Terminal::new(
+                        std::env::var("SHELL").unwrap_or_else(|_| "bash".to_owned()),
+                    ))],
+                )
+            }),
         batch::NAME => serde_json::from_value::<batch::BatchArgs>(arguments)
             .map(|args| (args.title(), vec![]))
             .unwrap_or_else(|_| (default_title, vec![])),
