@@ -38,11 +38,11 @@ impl Tool for MonitorTool {
             "properties": {
                 "command": {
                     "type": "string",
-                    "description": "The shell command to run in the background"
+                    "description": "Non-interactive shell command, including any watching loop or repetition needed."
                 },
                 "description": {
                     "type": "string",
-                    "description": "A short description of what this monitor observes"
+                    "description": "Short user-facing summary of what this monitor observes."
                 }
             },
             "required": ["command"]

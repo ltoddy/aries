@@ -64,7 +64,7 @@ impl Tool for LspTool {
             "properties": {
                 "operation": {
                     "type": "string",
-                    "description": "The LSP operation to perform",
+                    "description": "goToDefinition/goToImplementation: definition or implementation locations; findReferences: references including declarations; hover: type, signature or docs; documentSymbol: file symbols; workspaceSymbol: workspace symbol search; prepareCallHierarchy: entry items; incomingCalls/outgoingCalls: callers or callees.",
                     "enum": [
                         "goToDefinition",
                         "findReferences",
@@ -79,19 +79,19 @@ impl Tool for LspTool {
                 },
                 "file_path": {
                     "type": "string",
-                    "description": "The file path to perform the operation on"
+                    "description": "Target file path, absolute or relative to the current working directory. Required except for workspaceSymbol."
                 },
                 "line": {
                     "type": "number",
-                    "description": "The line number to perform the operation at"
+                    "description": "0-based line index as a non-negative integer. Required except for documentSymbol and workspaceSymbol, where it is unused. Subtract 1 from Read line numbers."
                 },
                 "character": {
                     "type": "number",
-                    "description": "The character position to perform the operation at"
+                    "description": "0-based UTF-16 code-unit offset within the line, as a non-negative integer; not a byte offset or visual column. Required wherever line is required and unused otherwise."
                 },
                 "query": {
                     "type": "string",
-                    "description": "The query string for operations that require it"
+                    "description": "Symbol search text for workspaceSymbol only; defaults to an empty string. Matching behavior is determined by the language server."
                 }
             },
             "required": [

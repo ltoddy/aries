@@ -38,11 +38,11 @@ impl Tool for TaskOutputTool {
             "properties": {
                 "task_id": {
                     "type": "string",
-                    "description": "The background task id returned by Bash background or Monitor"
+                    "description": "Exact task_id returned by Bash with background=true or Monitor in this session, or by their task notification. Not a process PID or an Agent task_id."
                 },
                 "block": {
                     "type": "boolean",
-                    "description": "Whether to wait until the task finishes before returning. Defaults to true."
+                    "description": "Wait for the task to finish; defaults to true. false returns the current status and retained-output snapshot immediately."
                 }
             },
             "required": ["task_id"]

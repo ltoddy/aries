@@ -40,42 +40,42 @@ impl Tool for GrepTool {
             "properties": {
                 "pattern": {
                     "type": "string",
-                    "description": "The regular expression to search for, matched one line at a time. Multiline patterns are not supported."
+                    "description": "Regular expression using Rust regex syntax. Escape metacharacters for literal text; multiline matches, lookaround and backreferences are unsupported."
                 },
                 "include": {
                     "type": "string",
-                    "description": "Optional glob pattern to filter files (e.g., src/**/*.rs)"
+                    "description": "Optional path glob relative to the current working directory, e.g. src/**/*.rs. Filters files without changing the search root."
                 },
                 "output_mode": {
                     "type": "string",
                     "enum": ["content", "files_with_matches", "count"],
-                    "description": "Output mode: \"content\" shows matching lines (supports show_line_numbers and context), \"files_with_matches\" shows file paths sorted by mtime (default), \"count\" shows per-file matching line counts."
+                    "description": "files_with_matches (default) returns matching file paths; content returns matching lines with optional context; count returns matching-line counts per file, not occurrence counts."
                 },
                 "case_insensitive": {
                     "type": "boolean",
-                    "description": "Case insensitive search (rg -i). Defaults to false."
+                    "description": "Match without case sensitivity. Defaults to false."
                 },
                 "show_line_numbers": {
                     "type": "boolean",
-                    "description": "Show line numbers in content output (rg -n). Only applies to output_mode \"content\". Defaults to true."
+                    "description": "Include 1-based line numbers in content output. Defaults to true; ignored in other modes."
                 },
                 "context": {
                     "type": "integer",
                     "minimum": 0,
                     "default": 0,
-                    "description": "Number of lines to show on each side of a match (rg -C). Only applies to output_mode \"content\". Defaults to 0."
+                    "description": "Lines before and after each match in content mode; ignored in other modes and excluded from the match limit."
                 },
                 "hidden": {
                     "type": "boolean",
-                    "description": "Include hidden files and directories. Defaults to false."
+                    "description": "Include hidden files and directories. Defaults to false; ignore rules still apply."
                 },
                 "respect_ignore": {
                     "type": "boolean",
-                    "description": "Respect .gitignore and other ignore rules. Defaults to true."
+                    "description": "Honor .gitignore and other ignore rules. Defaults to true; independent of hidden-file filtering."
                 },
                 "limit": {
                     "type": "integer",
-                    "description": "Limit output to N matching lines across all files in \"content\" mode (context lines do not count), the N newest matching files in \"files_with_matches\" mode, or N files in \"count\" mode. Content and count results follow parallel traversal order. Defaults to 250. Pass 0 for unlimited."
+                    "description": "Maximum matching lines across all files in content mode (excluding context), or files in other modes. Defaults to 250; 0 is unlimited."
                 }
             },
             "required": ["pattern"]

@@ -58,21 +58,21 @@ impl Tool for WebSearchTool {
             "properties": {
                 "query": {
                     "type": "string",
-                    "description": "The search query to be executed"
+                    "description": "Search terms including specific entities and the relevant version or time range."
                 },
                 "num": {
                     "type": "number",
-                    "description": "Maximum number of search results to return (default: 15)"
+                    "description": "Requested maximum number of results, as an integer. Defaults to 15; the service may return fewer."
                 },
                 "allowed_domains": {
                     "type": "array",
                     "items": { "type": "string" },
-                    "description": "Only return results from these domains"
+                    "description": "Source domains to include, e.g. [\"example.com\"], not full page URLs. Omit for no domain inclusion filter."
                 },
                 "blocked_domains": {
                     "type": "array",
                     "items": { "type": "string" },
-                    "description": "Exclude results from these domains"
+                    "description": "Source domains to exclude, e.g. [\"example.com\"], not full page URLs. Omit for no domain exclusion filter."
                 }
             },
             "required": ["query"]

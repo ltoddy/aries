@@ -41,24 +41,25 @@ impl Tool for MultiEditTool {
             "properties": {
                 "file_path": {
                     "type": "string",
-                    "description": "The path to the file to modify"
+                    "description": "Target file path, absolute or relative to the current working directory (the active worktree, if any)."
                 },
                 "edits": {
                     "type": "array",
+                    "description": "Replacements in application order.",
                     "items": {
                         "type": "object",
                         "properties": {
                             "old_text": {
                                 "type": "string",
-                                "description": "The text to replace"
+                                "description": "Exact literal text to match at this step, including whitespace and newlines; not a regular expression. Exclude Read line numbers and the arrow prefix. Empty text is allowed only when the content at this step is empty."
                             },
                             "new_text": {
                                 "type": "string",
-                                "description": "The edited text to replace the old_text"
+                                "description": "Replacement text; may be empty for deletion but must differ from old_text."
                             },
                             "replace_all": {
                                 "type": "boolean",
-                                "description": "Replace all occurrences of old_text"
+                                "description": "Replace every occurrence at this step. Defaults to false, replacing only the first match even when several exist."
                             }
                         },
                         "required": ["old_text", "new_text"]

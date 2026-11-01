@@ -45,14 +45,14 @@ impl Tool for UpdatePlanTool {
             "properties": {
                 "items": {
                     "type": "array",
-                    "description": "Structured plan entries. Pass an empty array to clear the plan.",
+                    "description": "Complete list of plan entries. An empty array or a list with every status completed clears the plan.",
                     "items": {
                         "type": "object",
                         "properties": {
-                            "content": { "type": "string", "description": "Imperative form of the task (e.g. \"Run tests\")" },
-                            "active_form": { "type": "string", "description": "Present continuous form shown while executing (e.g. \"Running tests\")" },
-                            "priority": { "type": "string", "enum": ["high", "medium", "low"] },
-                            "status": { "type": "string", "enum": ["pending", "in_progress", "completed"] }
+                            "content": { "type": "string", "description": "Nonblank task description in imperative form, e.g. Run tests." },
+                            "active_form": { "type": "string", "description": "Nonblank text shown while the task is in progress, e.g. Running tests." },
+                            "priority": { "type": "string", "enum": ["high", "medium", "low"], "description": "Relative task priority for display." },
+                            "status": { "type": "string", "enum": ["pending", "in_progress", "completed"], "description": "pending means not started, in_progress means underway, completed means actually finished." }
                         },
                         "required": ["content", "active_form", "priority", "status"]
                     }

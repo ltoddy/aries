@@ -41,19 +41,19 @@ impl Tool for EditTool {
             "properties": {
                 "file_path": {
                     "type": "string",
-                    "description": "The path to the file to modify"
+                    "description": "Existing file path, absolute or relative to the current working directory (the active worktree, if any)."
                 },
                 "old_text": {
                     "type": "string",
-                    "description": "The text to replace"
+                    "description": "Exact literal text to replace, including whitespace and newlines; not a regular expression. Exclude Read line numbers and the arrow prefix."
                 },
                 "new_text": {
                     "type": "string",
-                    "description": "The edited text to replace the old_text"
+                    "description": "Replacement text; may be empty to delete the match. Must differ from old_text."
                 },
                 "replace_all": {
                     "type": "boolean",
-                    "description": "Replace all occurrences of old_text"
+                    "description": "Replace every literal occurrence in this file. Defaults to false, which requires exactly one match."
                 }
             },
             "required": ["file_path", "old_text", "new_text"]

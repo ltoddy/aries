@@ -48,7 +48,7 @@ impl Tool for WebFetchTool {
             "properties": {
                 "url": {
                     "type": "string",
-                    "description": "The URL to fetch content from"
+                    "description": "Full HTTP(S) URL of one page, typically from the user or a search result. Not a search query or local file path."
                 }
             },
             "required": ["url"]

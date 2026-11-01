@@ -59,7 +59,7 @@ impl Tool for EnterGitWorktreeTool {
             "properties": {
                 "name": {
                     "type": "string",
-                    "description": "Optional name for the worktree. Each segment may contain only letters, digits, underscores, and dashes. A random name is generated if not provided."
+                    "description": "Name used for the worktree directory and worktree-<name> branch. Slash-separated nonempty segments may contain only letters, digits, underscores and dashes. Omit for a random name; existing names may conflict."
                 }
             }
         })

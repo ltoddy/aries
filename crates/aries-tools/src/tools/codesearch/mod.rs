@@ -81,11 +81,11 @@ impl Tool for CodeSearchTool {
             "properties": {
                 "query": {
                     "type": "string",
-                    "description": "Search query to find relevant mod for APIs, Libraries, and SDKs. For example, 'React useState hook examples', 'Python pandas dataframe filtering'."
+                    "description": "Question about a library, SDK or API. Include relevant names, task and version when needed, e.g. React useState functional update examples."
                 },
                 "tokens_num": {
                     "type": "number",
-                    "description": "Number of tokens to return (1000-50000). Default is 5000 tokens."
+                    "description": "Requested content token budget, as an integer. Defaults to 5000; actual returned length and accepted limits depend on the remote service."
                 }
             },
             "required": ["query"]
