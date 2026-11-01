@@ -1,31 +1,9 @@
-通过 `$SHELL -c` 执行单条 shell 命令，并返回 stdout、stderr、exit_code；`background: true` 时命令转入后台并立即返回 `task_id`。
+在当前工作目录执行 shell 命令，用于构建、测试、运行程序、Git 操作及专用工具无法完成的系统任务。查找路径、搜索内容、读取、编辑和创建文件时，优先使用 `Glob`、`Grep`、`Read`、`Edit` / `MultiEdit`、`Write`。
 
-每次调用都在会话工作目录下启动一个新的 shell：`cd` 不会影响后续调用，shell 状态（变量、别名、函数）也不持久。shell 取自 `$SHELL` 环境变量，缺省为 `bash`。
-
-stdout/stderr 超过 30000 字符时会被截断，并在末尾提示被截断的行数。`background: true` 时命令在后台运行，返回的 `task_id` 可用 `TaskOutput` 查看输出、用 `TaskStop` 停止（此时 stdout/stderr 为空、exit_code 为 0）。可选参数 `description` 用于简短描述命令用途（5-10 个词）。不要使用需要交互式输入的命令。
-
-重要：避免使用本工具执行 `find`、`grep`、`cat`、`head`、`tail`、`sed`、`awk`、`echo` 等命令，除非用户明确要求，或你已确认专用工具无法完成任务。请优先使用对应的专用工具，这会带来更好的体验：
-
- - 文件搜索：使用 Glob 工具（不是 find 或 ls）
- - 内容搜索：使用 Grep 工具（不是 grep 或 rg）
- - 读取文件：使用 Read 工具（不是 cat/head/tail）
- - 编辑文件：使用 Edit 工具（不是 sed/awk）
- - 创建文件：使用 Write 工具（不是 echo >/cat <<EOF）
- - 输出内容：直接输出文本（不是 echo/printf）
-
-虽然 Bash 工具也能做类似的事，但优先使用内置专用工具会带来更好的体验，也更便于审查工具调用与授予权限。
-
-# 使用说明
-
- - 如果命令会创建新目录或文件，先用本工具运行 `ls` 确认父目录存在且位置正确
- - 命令中包含空格的文件路径务必用双引号包裹（例如 `cd "path with spaces/file.txt"`）
- - 尽量在整个会话中使用绝对路径、避免使用 `cd`，以保持当前工作目录不变。仅当用户明确要求时才使用 `cd`
- - 执行多条命令时：
-   - 如果命令相互独立、可并行，就在同一条消息里发起多个 Bash 工具调用。例如需要运行 "git status" 和 "git diff" 时，在一条消息里并行发起两个 Bash 调用
-   - 如果命令相互依赖、必须顺序执行，用单个 Bash 调用并以 `&&` 连接
-   - 仅当需要顺序执行但不关心前序命令是否失败时才用 `;`
-   - 不要用换行符分隔多条命令（引号内的换行是允许的）
- - 执行 git 命令时：
-   - 优先创建新 commit，而不是 amend 已有 commit
-   - 执行破坏性操作前（如 git reset --hard、git push --force、git checkout --），先考虑是否有更安全的替代方案能达到相同目的。只有当破坏性操作确实是最佳方案时才使用
-   - 除非用户明确要求，不要跳过 hooks（--no-verify）或绕过签名（--no-gpg-sign、-c commit.gpgsign=false）。如果 hook 失败，应调查并修复根本问题
+- `command` 通过 `$SHELL -c` 执行，未设置 `$SHELL` 时使用 `bash`。每次调用启动新的 shell，`cd`、变量、函数等状态不跨调用保留；已进入 worktree 时在该 worktree 中启动。
+- 不支持交互式终端操作；使用无需交互输入的命令。含空格的路径须正确引用；相互依赖的命令用 `&&` 顺序连接，互不依赖的命令可分别调用。
+- `description` 是展示给用户的简短用途说明。`background` 默认 `false`，等待命令结束后返回 `stdout`、`stderr`、`exit_code`；非零退出码表示异常退出，不应仅凭工具调用成功判断命令成功。
+- 前台输出的 stdout / stderr 各保留前 30000 个字符，超出会附截断提示；需要完整日志时在命令中保存到文件，再用 `Read` 分段读取。
+- `background=true` 立即返回 `task_id`，仅表示任务已启动；此时空输出和占位 `exit_code=0` 不代表执行成功。使用 `TaskOutput` 读取状态和输出，使用 `TaskStop` 停止；后台输出保留限制见 `TaskOutput`。
+- 持续日志跟踪或监视进程可用 `Monitor`；普通耗时命令可用本工具的后台模式。
+- 命令会实际执行，可能修改文件、启动进程或访问外部服务。失败或被中断不会撤销已产生的影响，重试前先确认当前状态。
