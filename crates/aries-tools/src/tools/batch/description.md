@@ -1,29 +1,13 @@
-在一次调用中并发执行多个独立的工具调用以减少延迟。
+在一次调用中并发执行多个互不依赖的工具请求，用于并行读取已知文件、搜索不同范围或开展独立调研。后一个请求需要前一个结果时，应逐步调用对应工具。
 
-负载示例：
+- `calls` 是调用数组，每项包含工具名 `tool` 和该工具的参数对象 `parameters`；参数必须事先已知，不能引用本批次其他请求的结果。
+- 最多 25 项，超过时整批拒绝执行。支持的工具名区分大小写：`Agent`、`Read`、`Glob`、`Grep`、`WebFetch`、`WebSearch`、`CodeSearch`、`TaskOutput`；其他工具和嵌套 `Batch` 会作为该项的失败返回。
+- 各项并发执行，不保证执行或完成顺序；等待全部结束后，`results` 按输入顺序返回。每项为 `{ "success": true, "result": ... }` 或 `{ "success": false, "error": ... }`，单项失败不取消其他请求。
+- `result` 保留子工具自身的结果格式和截断限制。整批返回不代表每项都成功，应逐项检查；重试时只重试需要重试的项。
+- 本工具不提供事务或回滚。`Agent` 仍可按其模式执行命令和修改文件；只读调研须按 `Agent` 说明核对模式及自定义工具范围，避免并发修改同一文件。`TaskOutput` 默认会等待任务结束，检查长期监控任务时须显式传 `block=false`。
+
+示例：并行读取两个已知文件。
+
 ```json
-{
-  "calls": [
-    { "tool": "Read",  "parameters": { "file_path": "src/index.ts", "offset": 1 } },
-    { "tool": "Grep",  "parameters": { "pattern": "Session\\.updatePart", "include": "src/**/*.ts" } },
-    { "tool": "Glob",  "parameters": { "pattern": "src/**/*.ts" } }
-  ]
-}
+{"calls":[{"tool":"Read","parameters":{"file_path":"src/lib.rs"}},{"tool":"Read","parameters":{"file_path":"Cargo.toml"}}]}
 ```
-
-执行规则：
-- 每次调用最多 25 个 call，超过会整个调用失败。
-- 全部 call 并行启动，不保证顺序；单个失败不会影响其他 call。
-- 每个 call 返回 `{ "success": true, "result": ... }` 或 `{ "success": false, "error": ... }`。
-- 支持作为子工具的列表：`Agent`、`Read`、`Glob`、`Grep`、`WebFetch`、`WebSearch`、`CodeSearch`、`TaskOutput`。
-- 写操作、进程控制和嵌套 `Batch` 在 batch 中调用都会被拒绝（返回 `success: false` 与对应错误消息）。
-
-适合的场景：
-- 一次性读取多个文件；
-- 组合 `Glob` + `Grep` + `Read`；
-- 多个互不依赖的只读查询；
-- 多个互不依赖的 `Agent` 调研任务。
-
-不适合的场景：
-- 后一步依赖前一步结果（例如先创建文件再读取）——请改用顺序调用。
-- 顺序敏感的有状态变更。

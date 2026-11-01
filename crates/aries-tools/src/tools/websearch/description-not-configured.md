@@ -1,11 +1,3 @@
-WebSearch 工具当前不可用：环境变量 `TAVILY_API_KEY` 未配置。
+通过 Tavily 搜索公开网络并返回标题、URL 和摘要；当前不可用，因为 `TAVILY_API_KEY` 未配置或为空，调用会直接报配置错误。
 
-要启用网络搜索功能，需要先设置该环境变量（Tavily API key）后重新启动程序。例如在 shell 中：
-
-```bash
-export TAVILY_API_KEY="your_tavily_api_key"
-```
-
-也可以把该变量写入 shell 配置文件（如 `~/.zshrc`、`~/.bashrc`），使其永久生效。
-
-在配置完成之前，请勿尝试使用本工具，并告知用户需要设置 `TAVILY_API_KEY` 环境变量才能使用网络搜索。
+需要用户在运行 Aries 的环境中设置 `TAVILY_API_KEY`，并重新启动程序后再搜索。配置完成前不要反复调用；若已有明确的网页 URL，可在 Firecrawl 可用时使用 `WebFetch` 读取，查询外部编程资料可尝试 `CodeSearch`。

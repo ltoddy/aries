@@ -1,19 +1,7 @@
-创建一个隔离的 git worktree，并将当前工具会话切换到该 worktree。
+基于当前 Git `HEAD` 创建新的 worktree 和分支，并将当前工具会话切换到该目录，用于用户明确要求在 worktree 中隔离开展工作。仅要求创建或切换分支时使用 Git 命令；不要因一般开发任务主动调用本工具。
 
-使用前提：
-- 仅当用户明确提到 `worktree` 时使用，例如“创建 worktree”、“使用 worktree”、“在 worktree 里做”等。
-- 当前目录必须位于 git 仓库中。
-- 当前会话不能已经处于本工具创建的 worktree session 中。
-
-不要使用的场景：
-- 用户只是要求创建分支、切换分支或在另一个分支上工作：请使用 git 命令。
-- 用户只是要求修 bug 或开发功能：除非用户明确提到 `worktree`，否则使用普通 git 工作流。
-- 不要主动使用此工具，必须等用户明确提到 `worktree`。
-
-行为：
-- 基于当前 `HEAD` 创建一个新分支。
-- 将当前工具会话的工作目录切换到新 worktree；后续相对路径和 shell 命令都会在该 worktree 内执行。
-- 如需中途离开 worktree，请使用 `ExitGitWorktree`。
-
-参数：
-- `name`：可选的 worktree 名称。不传时会自动生成随机名称。
+- 当前目录必须位于有可用 `HEAD` 的 Git 工作仓库中，且当前会话没有本工具创建的活动 worktree。
+- `name` 可省略以自动生成；显式名称由字母、数字、下划线和短横线组成，可用 `/` 分隔非空段，不接受空格或 `..`。同名目录、分支或 worktree 冲突时会失败。
+- 新分支名为 `worktree-<name>`，worktree 创建在 Aries 配置的 worktree 根目录下。它从已提交的 `HEAD` 开始，不会复制当前目录的未提交修改或未跟踪文件。
+- 成功返回 `worktree_path`、`worktree_branch` 和切换提示；后续相对文件路径和 shell 命令使用新目录，显式绝对路径仍指向原位置。
+- 调用会实际创建目录和分支并改变会话工作目录；返回值表示已进入。离开时用 `ExitGitWorktree`，不要重复调用来查询当前状态。
