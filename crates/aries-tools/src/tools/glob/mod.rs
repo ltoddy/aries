@@ -44,23 +44,23 @@ impl Tool for GlobTool {
             "properties": {
                 "pattern": {
                     "type": "string",
-                    "description": "The glob pattern to match against (e.g., src/**/*.rs)"
+                    "description": "Path glob relative to base_dir, e.g. **/*.rs or src/**/*.ts. Absolute patterns under base_dir are converted to relative patterns; prefer an explicit base_dir with a relative pattern."
                 },
                 "base_dir": {
                     "type": "string",
-                    "description": "Base directory for the glob pattern"
+                    "description": "Directory to search recursively. Defaults to the current working directory (the active worktree, if any); relative directories resolve from there."
                 },
                 "hidden": {
                     "type": "boolean",
-                    "description": "Include hidden files (starting with '.'). Defaults to false."
+                    "description": "Include hidden files and directories. Defaults to false; ignore rules still apply."
                 },
                 "respect_ignore": {
                     "type": "boolean",
-                    "description": "Respect .gitignore and other ignore rules. Defaults to true."
+                    "description": "Honor .gitignore and other ignore rules. Defaults to true; independent of hidden-file filtering."
                 },
                 "limit": {
                     "type": "integer",
-                    "description": "Maximum number of matched paths to return. Defaults to 100. Pass 0 for unlimited."
+                    "description": "Maximum number of matching file paths to return. Defaults to 100; 0 is unlimited."
                 }
             },
             "required": ["pattern"]

@@ -157,17 +157,18 @@ impl Tool for BatchTool {
             "properties": {
                 "calls": {
                     "type": "array",
+                    "description": "All argument values must be known before execution; results from sibling calls cannot be used as inputs.",
                     "maxItems": MAX_BATCH_CALLS,
                     "items": {
                         "type": "object",
                         "properties": {
                             "tool": {
                                 "type": "string",
-                                "description": "The name of the tool to call"
+                                "description": "Case-sensitive supported name: Agent, Read, Glob, Grep, WebFetch, WebSearch, CodeSearch or TaskOutput."
                             },
                             "parameters": {
                                 "type": "object",
-                                "description": "The parameters to pass to the tool"
+                                "description": "Argument object conforming to the selected tool schema."
                             }
                         },
                         "required": ["tool", "parameters"]

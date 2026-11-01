@@ -38,7 +38,7 @@ impl Tool for TaskStopTool {
             "properties": {
                 "task_id": {
                     "type": "string",
-                    "description": "The background task id to stop"
+                    "description": "Exact task_id returned by Bash with background=true or Monitor in this session, or by their task notification. Not a process PID or an Agent task_id."
                 }
             },
             "required": ["task_id"]

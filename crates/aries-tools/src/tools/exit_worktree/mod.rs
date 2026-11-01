@@ -41,7 +41,7 @@ impl Tool for ExitGitWorktreeTool {
                 "action": {
                     "type": "string",
                     "enum": ["keep", "remove"],
-                    "description": "\"keep\" exits and preserves the worktree; \"remove\" exits and deletes the worktree."
+                    "description": "keep leaves the worktree and preserves its directory and branch; remove leaves it and deletes both."
                 }
             },
             "required": ["action"]

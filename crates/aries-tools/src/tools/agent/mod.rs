@@ -93,15 +93,15 @@ impl Tool for AgentTool {
             "properties": {
                 "description": {
                     "type": "string",
-                    "description": "A short description of the task"
+                    "description": "Short user-facing title summarizing the delegated task."
                 },
                 "prompt": {
                     "type": "string",
-                    "description": "The highly detailed task description for the agent to perform autonomously"
+                    "description": "Self-contained task brief: goal, relevant context and paths, constraints, whether edits are allowed, expected deliverable and validation."
                 },
                 "mode": {
                     "type": "string",
-                    "description": "The type of agent to launch (e.g. 'build', 'explore', 'plan', 'general')"
+                    "description": "Built-in build/general allow shell commands and file edits; explore is read-only research; plan is read-only analysis and planning. Also accepts listed custom names, matched case-insensitively before built-ins. Unknown values fall back to general."
                 }
             },
             "required": ["description", "prompt", "mode"]

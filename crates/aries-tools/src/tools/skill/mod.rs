@@ -51,7 +51,7 @@ impl Tool for SkillTool {
             "properties": {
                 "name": {
                     "type": "string",
-                    "description": "The name of the skill from available_skills"
+                    "description": "Exact, case-sensitive skill name from available_skills, not a file path, search term or slash command."
                 }
             },
             "required": ["name"]

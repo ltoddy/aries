@@ -49,15 +49,15 @@ impl Tool for ReadTool {
             "properties": {
                 "file_path": {
                     "type": "string",
-                    "description": "The path to the file to read (absolute or relative to the working directory)"
+                    "description": "Text file path, absolute or relative to the current working directory (the active worktree, if any)."
                 },
                 "offset": {
                     "type": "number",
-                    "description": "The line number to start reading from (1-indexed). Only provide if the file is too large to read at once"
+                    "description": "First line to read, as a non-negative integer. Lines are 1-indexed; defaults to 1, and 0 is treated as 1."
                 },
                 "limit": {
                     "type": "number",
-                    "description": "The number of lines to read. Only provide if the file is too large to read at once"
+                    "description": "Maximum number of lines to read, as a positive integer. Defaults to 2000."
                 }
             },
             "required": ["file_path"]

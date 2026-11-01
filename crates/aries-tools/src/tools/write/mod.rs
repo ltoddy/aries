@@ -39,11 +39,11 @@ impl Tool for WriteTool {
             "properties": {
                 "file_path": {
                     "type": "string",
-                    "description": "The path to the file to write (absolute or relative to the working directory)"
+                    "description": "Destination file path, absolute or relative to the current working directory (the active worktree, if any)."
                 },
                 "content": {
                     "type": "string",
-                    "description": "The content to write to the file"
+                    "description": "Complete text to write, not a patch or text to append."
                 }
             },
             "required": ["file_path", "content"]

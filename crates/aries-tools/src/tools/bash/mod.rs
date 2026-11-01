@@ -64,15 +64,15 @@ impl Tool for BashTool {
             "properties": {
                 "command": {
                     "type": "string",
-                    "description": "The shell command to execute"
+                    "description": "Non-interactive shell command. Quote paths containing spaces; join dependent commands with &&."
                 },
                 "description": {
                     "type": "string",
-                    "description": "Clear, concise description of what this command does in 5-10 words"
+                    "description": "Short user-facing summary of the command purpose, e.g. Run unit tests."
                 },
                 "background": {
                     "type": "boolean",
-                    "description": "Set to true to run this command in the background. Use TaskOutput to read the output later."
+                    "description": "Run in the background instead of waiting for completion. Defaults to false."
                 }
             },
             "required": ["command"]
