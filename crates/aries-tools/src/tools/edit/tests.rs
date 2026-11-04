@@ -18,6 +18,7 @@ async fn test_edit_simple_replacement() {
     let dir = TempDir::new().expect("test operation should succeed");
     let file_path = dir.path().join("test.txt");
     let ctx = ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();
@@ -57,6 +58,7 @@ async fn test_edit_replace_all() {
     let dir = TempDir::new().expect("test operation should succeed");
     let file_path = dir.path().join("test.txt");
     let ctx = ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();
@@ -92,6 +94,7 @@ async fn test_edit_replace_all() {
 async fn test_edit_file_not_found() {
     let mut context = rig::tool::ToolContext::new();
     let tool = EditTool::new(ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();
@@ -119,6 +122,7 @@ async fn test_edit_old_text_not_found() {
     let dir = TempDir::new().expect("test operation should succeed");
     let file_path = dir.path().join("test.txt");
     let ctx = ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();
@@ -150,6 +154,7 @@ async fn test_edit_multiple_matches_without_replace_all() {
     let dir = TempDir::new().expect("test operation should succeed");
     let file_path = dir.path().join("test.txt");
     let ctx = ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();
@@ -185,6 +190,7 @@ async fn test_edit_rejects_unread_file() {
 
     let mut context = rig::tool::ToolContext::new();
     let tool = EditTool::new(ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();
@@ -212,6 +218,7 @@ async fn test_edit_rejects_modified_since_read() {
     let dir = TempDir::new().expect("test operation should succeed");
     let file_path = dir.path().join("test.txt");
     let ctx = ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();

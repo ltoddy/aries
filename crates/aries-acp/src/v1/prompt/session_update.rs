@@ -1,8 +1,8 @@
 use agent_client_protocol::schema::v1::{
-    CompactionStatus, CompactionUpdate, Content, ContentBlock, ContentChunk, Diff, Plan,
-    SessionInfoUpdate, SessionMessageChunk, SessionUpdate, SubagentUpdate, Terminal, TextContent,
-    ToolCall as AcpToolCall, ToolCallContent, ToolCallId, ToolCallLocation, ToolCallStatus,
-    ToolCallUpdate, ToolCallUpdateFields, ToolKind, UsageUpdate,
+    CompactionStatus, CompactionUpdate, Content, ContentBlock, ContentChunk, Diff, MessageId, Plan,
+    SessionId, SessionInfoUpdate, SessionMessage, SessionMessageChunk, SessionUpdate,
+    SubagentUpdate, Terminal, TextContent, ToolCall as AcpToolCall, ToolCallContent, ToolCallId,
+    ToolCallLocation, ToolCallStatus, ToolCallUpdate, ToolCallUpdateFields, ToolKind, UsageUpdate,
 };
 use aries_event::AgentEvent;
 use aries_tools::{
@@ -57,6 +57,7 @@ impl SessionUpdates {
             AgentEvent::SubagentUpdate(subagent_update) => {
                 Self(vec![Self::from_subagent_update(subagent_update)])
             },
+            AgentEvent::SessionMessage(message) => Self(vec![Self::from_session_message(message)]),
             AgentEvent::SessionMessageChunk(chunk) => {
                 Self(vec![Self::from_session_message_chunk(*chunk)])
             },
@@ -249,6 +250,16 @@ impl SessionUpdates {
             SubagentUpdate::new(subagent_update.session_id)
                 .title(subagent_update.title)
                 .description(subagent_update.description),
+        )
+    }
+
+    fn from_session_message(message: aries_event::SessionMessage) -> SessionUpdate {
+        SessionUpdate::SessionMessage(
+            SessionMessage::new(message.message_id)
+                .sender_session_id(SessionId::new(message.sender_session_id))
+                .recipient_session_id(SessionId::new(message.recipient_session_id))
+                .sender_message_id(MessageId::new(message.sender_message_id))
+                .recipient_message_id(MessageId::new(message.recipient_message_id)),
         )
     }
 

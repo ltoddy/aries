@@ -1,7 +1,7 @@
 use rig::agent::MultiTurnStreamItem;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
-use crate::event::SessionMessageChunk;
+use crate::event::{SessionMessage, SessionMessageChunk};
 use crate::{AgentEvent, Compaction, CompactionStatus, SubagentUpdate};
 
 #[derive(Debug, Clone)]
@@ -31,6 +31,24 @@ impl Notifier {
 
     pub fn send_subagent_update(&self, subagent_update: SubagentUpdate) {
         let event = AgentEvent::SubagentUpdate(subagent_update);
+        let _ = self.sender.send(event);
+    }
+
+    pub fn send_session_message(
+        &self,
+        message_id: impl Into<String>,
+        sender_session_id: impl Into<String>,
+        recipient_session_id: impl Into<String>,
+        sender_message_id: impl Into<String>,
+        recipient_message_id: impl Into<String>,
+    ) {
+        let event = AgentEvent::SessionMessage(SessionMessage::new(
+            message_id,
+            sender_session_id,
+            recipient_session_id,
+            sender_message_id,
+            recipient_message_id,
+        ));
         let _ = self.sender.send(event);
     }
 

@@ -24,10 +24,12 @@ pub struct AgentBuilder {
     extensions: AgentExtensions,
 
     notifier: Notifier,
+    session_id: String,
 }
 
 impl AgentBuilder {
     pub fn new(
+        session_id: impl Into<String>,
         model: Model<OpenAiWire>,
         mode: Mode,
         root_dir: impl AsRef<Path>,
@@ -47,6 +49,7 @@ impl AgentBuilder {
             lsp_client: None,
             extensions: AgentExtensions::empty(),
             notifier,
+            session_id: session_id.into(),
         }
     }
 
@@ -67,6 +70,7 @@ impl AgentBuilder {
         let current_dir = self.cwd;
 
         let tools = aries_tools::create_tools_from_mode(
+            &self.session_id,
             self.gctx.clone(),
             self.mode,
             self.model.clone(),
