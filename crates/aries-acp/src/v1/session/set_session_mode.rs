@@ -1,5 +1,6 @@
-use agent_client_protocol::schema::v1::{SetSessionModeRequest, SetSessionModeResponse};
-use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
+use agent_client_protocol::v1::schema::{SetSessionModeRequest, SetSessionModeResponse};
+use agent_client_protocol::v1::{ConnectionTo, Responder};
+use agent_client_protocol::{Client, Error};
 
 pub async fn set_session_mode(
     _req: SetSessionModeRequest,

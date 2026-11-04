@@ -1,10 +1,11 @@
 use std::str::FromStr;
 
-use agent_client_protocol::schema::v2::{
-    ConfigOptionUpdate, SessionUpdate, SetSessionConfigOptionRequest,
+use agent_client_protocol::v2::schema::{
+    self, ConfigOptionUpdate, SessionUpdate, SetSessionConfigOptionRequest,
     SetSessionConfigOptionResponse, UpdateSessionNotification,
 };
-use agent_client_protocol::{Client, Error, Responder, V2ConnectionTo};
+use agent_client_protocol::v2::{ConnectionTo, Responder};
+use agent_client_protocol::{Client, Error};
 use aries_mode::Mode;
 use aries_session::SharedRegistry;
 use tracing::info;
@@ -14,7 +15,7 @@ use super::config::{SessionConfig, config_options};
 pub async fn set_session_config_option(
     req: SetSessionConfigOptionRequest,
     responder: Responder<SetSessionConfigOptionResponse>,
-    cx: V2ConnectionTo<Client>,
+    cx: ConnectionTo<Client>,
     registry: SharedRegistry,
 ) -> Result<(), Error> {
     info!("Received set session config option request (v2): {req:?}");
@@ -28,7 +29,7 @@ pub async fn set_session_config_option(
         match registry.session(&session_id) {
             Some(session) => session,
             None => {
-                return responder.respond_with_error(Error::resource_not_found(Some(session_id)));
+                return responder.respond_with_error(schema::Error::resource_not_found().into());
             },
         }
     };

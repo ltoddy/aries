@@ -1,9 +1,10 @@
-use agent_client_protocol::schema::v1::{
+use agent_client_protocol::v1::schema::{
     AvailableCommand, AvailableCommandInput, AvailableCommandsUpdate, ContentBlock, ContentChunk,
     LoadSessionRequest, LoadSessionResponse, SessionNotification, SessionUpdate,
     UnstructuredCommandInput,
 };
-use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
+use agent_client_protocol::v1::{ConnectionTo, Responder};
+use agent_client_protocol::{Client, Error};
 use aries_session::SharedRegistry;
 use itertools::Itertools;
 use tracing::{info, instrument};

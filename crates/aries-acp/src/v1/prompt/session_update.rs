@@ -1,4 +1,4 @@
-use agent_client_protocol::schema::v1::{
+use agent_client_protocol::v1::schema::{
     CompactionStatus, CompactionUpdate, Content, ContentBlock, ContentChunk, Diff, MessageId, Plan,
     SessionId, SessionInfoUpdate, SessionMessage, SessionMessageChunk, SessionUpdate,
     SubagentUpdate, Terminal, TextContent, ToolCall as AcpToolCall, ToolCallContent, ToolCallId,

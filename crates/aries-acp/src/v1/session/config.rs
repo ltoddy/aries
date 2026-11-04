@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
-use agent_client_protocol::schema::v1::{
+use agent_client_protocol::v1::schema::{
     SessionConfigId, SessionConfigOption, SessionConfigOptionCategory, SessionConfigSelectOption,
     SessionConfigSelectOptions,
 };

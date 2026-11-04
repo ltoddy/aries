@@ -1,4 +1,4 @@
-use agent_client_protocol::schema::v1 as schema;
+use agent_client_protocol::v1::schema;
 use aries_tools::update_plan::{self, PlanEntryPriority, PlanEntryStatus};
 
 #[derive(Debug, Clone)]

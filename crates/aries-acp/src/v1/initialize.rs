@@ -1,12 +1,13 @@
 use agent_client_protocol::schema::ProtocolVersion;
-use agent_client_protocol::schema::v1::{
+use agent_client_protocol::v1::schema::{
     AgentCapabilities, Implementation, InitializeRequest, InitializeResponse, McpCapabilities,
     PromptCapabilities, ProvidersCapabilities, SessionAdditionalDirectoriesCapabilities,
     SessionCapabilities, SessionCloseCapabilities, SessionDeleteCapabilities,
     SessionForkCapabilities, SessionListCapabilities, SessionResumeCapabilities,
     SessionSystemPromptCapabilities,
 };
-use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
+use agent_client_protocol::v1::{ConnectionTo, Responder};
+use agent_client_protocol::{Client, Error};
 use tracing::info;
 
 pub async fn initialize(

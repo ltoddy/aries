@@ -1,5 +1,6 @@
-use agent_client_protocol::schema::v1::{ForkSessionRequest, ForkSessionResponse};
-use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
+use agent_client_protocol::v1::schema::{ForkSessionRequest, ForkSessionResponse};
+use agent_client_protocol::v1::{ConnectionTo, Responder};
+use agent_client_protocol::{Client, Error};
 use aries_session::SharedRegistry;
 use tracing::info;
 

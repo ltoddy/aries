@@ -1,5 +1,6 @@
-use agent_client_protocol::schema::v1::CancelNotification;
-use agent_client_protocol::{Client, ConnectionTo, Error};
+use agent_client_protocol::v1::ConnectionTo;
+use agent_client_protocol::v1::schema::{self, CancelNotification};
+use agent_client_protocol::{Client, Error};
 use aries_session::SharedRegistry;
 use tracing::{info, instrument};
 
@@ -17,7 +18,7 @@ pub async fn cancel(
         let registry = registry.lock().await;
         match registry.session(&session_id) {
             Some(session) => session,
-            None => return Err(Error::resource_not_found(Some(session_id))),
+            None => return Err(schema::Error::resource_not_found(Some(session_id)).into()),
         }
     };
     session.cancel();

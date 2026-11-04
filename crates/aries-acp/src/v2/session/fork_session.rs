@@ -1,5 +1,6 @@
-use agent_client_protocol::schema::v2::{ForkSessionRequest, ForkSessionResponse};
-use agent_client_protocol::{Client, Error, Responder, V2ConnectionTo};
+use agent_client_protocol::v2::schema::{ForkSessionRequest, ForkSessionResponse};
+use agent_client_protocol::v2::{ConnectionTo, Responder};
+use agent_client_protocol::{Client, Error};
 use aries_session::SharedRegistry;
 use tracing::info;
 
@@ -9,7 +10,7 @@ use crate::v2::mcp::McpServers;
 pub async fn fork_session(
     req: ForkSessionRequest,
     responder: Responder<ForkSessionResponse>,
-    _cx: V2ConnectionTo<Client>,
+    _cx: ConnectionTo<Client>,
     registry: SharedRegistry,
 ) -> Result<(), Error> {
     info!("Received fork session request (v2): {req:?}");

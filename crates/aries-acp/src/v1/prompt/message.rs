@@ -1,4 +1,4 @@
-use agent_client_protocol::schema::v1::{ContentBlock, EmbeddedResourceResource};
+use agent_client_protocol::v1::schema::{ContentBlock, EmbeddedResourceResource};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use rig::completion::Message;
