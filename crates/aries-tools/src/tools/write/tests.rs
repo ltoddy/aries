@@ -16,6 +16,7 @@ async fn test_write_empty_existing_file() {
     fs::write(&file_path, "").expect("test operation should succeed");
 
     let ctx = ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();
@@ -50,6 +51,7 @@ async fn test_write_new_file() {
 
     let mut context = rig::tool::ToolContext::new();
     let tool = WriteTool::new(ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();
@@ -76,6 +78,7 @@ async fn test_write_rejects_unread_empty_file() {
     fs::write(&file_path, "").expect("test operation should succeed");
 
     let ctx = ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();
@@ -105,6 +108,7 @@ async fn test_write_rejects_non_empty_existing_file() {
     fs::write(&file_path, "line1\nline2\nline3\n").expect("test operation should succeed");
 
     let ctx = ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();
@@ -140,6 +144,7 @@ async fn test_write_empty_content() {
     fs::write(&file_path, "").expect("test operation should succeed");
 
     let ctx = ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();
@@ -166,6 +171,7 @@ async fn test_write_resolves_relative_path_against_cwd() {
 
     let mut context = rig::tool::ToolContext::new();
     let tool = WriteTool::new(ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();

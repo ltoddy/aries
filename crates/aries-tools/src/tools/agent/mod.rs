@@ -122,6 +122,7 @@ impl Tool for AgentTool {
                 let tool_names = frontmatter.filter_tool_names(&universe);
                 let cwd = self.ctx.cwd();
                 let tools = create_tools_from_tool_names(
+                    self.ctx.session_id(),
                     self.gctx.clone(),
                     &tool_names,
                     self.model.clone(),
@@ -139,6 +140,7 @@ impl Tool for AgentTool {
                     mode.name().to_owned(),
                     mode.bare_preamble().to_owned(),
                     create_tools_from_mode(
+                        self.ctx.session_id(),
                         self.gctx.clone(),
                         mode,
                         self.model.clone(),
@@ -169,11 +171,19 @@ impl Tool for AgentTool {
 
         let session_id = format!("agent-{}", nanoid::nanoid!());
         let subagent_update =
-            SubagentUpdate::new(session_id).title(args.title()).description(args.description);
+            SubagentUpdate::new(&session_id).title(args.title()).description(args.description);
         self.notifier.send_subagent_update(subagent_update);
 
         let message_id = format!("agent-message-{}", nanoid::nanoid!());
         let mut stream = agent.prompt(args.prompt).stream();
+
+        self.notifier.send_session_message(
+            &message_id,
+            self.ctx.session_id(),
+            &session_id,
+            &message_id,
+            &message_id,
+        );
         let mut final_res = PromptResponse::empty();
         while let Some(chunk) = stream.next().await {
             let chunk = chunk.map_err(AgentError::execution)?;

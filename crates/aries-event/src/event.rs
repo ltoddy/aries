@@ -8,6 +8,7 @@ pub enum AgentEvent {
     StreamItem(Box<MultiTurnStreamItem>),
     SubagentUpdate(SubagentUpdate),
     SessionMessageChunk(Box<SessionMessageChunk>),
+    SessionMessage(SessionMessage),
     Compaction(Compaction),
     SessionInfoUpdate { title: String, updated_at: String },
 }
@@ -17,6 +18,39 @@ pub struct SubagentUpdate {
     pub session_id: String,
     pub title: Option<String>,
     pub description: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SessionMessage {
+    pub message_id: String,
+    pub sender_session_id: String,
+    pub recipient_session_id: String,
+    pub sender_message_id: String,
+    pub recipient_message_id: String,
+}
+
+impl SessionMessage {
+    pub fn new(
+        message_id: impl Into<String>,
+        sender_session_id: impl Into<String>,
+        recipient_session_id: impl Into<String>,
+        sender_message_id: impl Into<String>,
+        recipient_message_id: impl Into<String>,
+    ) -> Self {
+        let message_id = message_id.into();
+        let sender_session_id = sender_session_id.into();
+        let recipient_session_id = recipient_session_id.into();
+        let sender_message_id = sender_message_id.into();
+        let recipient_message_id = recipient_message_id.into();
+
+        Self {
+            message_id,
+            sender_session_id,
+            recipient_session_id,
+            sender_message_id,
+            recipient_message_id,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

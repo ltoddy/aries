@@ -17,6 +17,7 @@ async fn test_read_file() {
 
     let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();
@@ -41,6 +42,7 @@ async fn test_read_file_with_offset() {
 
     let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();
@@ -65,6 +67,7 @@ async fn test_read_file_with_limit() {
 
     let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();
@@ -90,6 +93,7 @@ async fn test_read_file_respects_default_line_cap() {
 
     let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();
@@ -117,6 +121,7 @@ async fn test_read_file_rejects_zero_limit() {
 
     let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();
@@ -138,6 +143,7 @@ async fn test_read_empty_file() {
 
     let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();
@@ -159,6 +165,7 @@ async fn test_read_directory_is_rejected() {
 
     let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();
@@ -180,6 +187,7 @@ async fn test_read_directory_is_rejected() {
 async fn test_read_file_not_found() {
     let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();
@@ -211,6 +219,7 @@ async fn test_read_file_marks_truncation() {
 
     let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();
@@ -235,6 +244,7 @@ async fn test_read_file_not_truncated_at_exact_limit() {
 
     let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();
@@ -276,6 +286,7 @@ async fn test_read_file_rejects_binary() {
 
     let mut context = rig::tool::ToolContext::new();
     let tool = ReadTool::new(ToolContext::new(
+        "test",
         None,
         {
             let (notifier, _) = aries_event::Notifier::channel();

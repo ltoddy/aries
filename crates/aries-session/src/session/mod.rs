@@ -179,6 +179,7 @@ impl Session {
         }
 
         let agent = AgentBuilder::new(
+            &self.id,
             self.model.clone(),
             mode,
             &self.session_dir,
@@ -407,6 +408,7 @@ impl Session {
         let mode = Mode::default();
         let model = crate::create_model(&config);
         let agent = AgentBuilder::new(
+            &id,
             model.clone(),
             mode,
             &session_dir,
