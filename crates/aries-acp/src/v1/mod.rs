@@ -35,7 +35,7 @@ pub async fn run(
         Arc::new(Mutex::new(SessionRegistry::new(gctx, setting).await?));
 
     Agent
-        .builder()
+        .v1()
         .name("aries")
         .on_receive_request(initialize, on_receive_request!())
         .on_receive_request(authenticate, on_receive_request!())

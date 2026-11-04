@@ -1,4 +1,4 @@
-use agent_client_protocol::schema::v2::{
+use agent_client_protocol::v2::schema::{
     CompactionStatus, CompactionUpdate, ContentBlock, ContentChunk, PlanUpdate, PlanUpdateContent,
     SessionInfoUpdate, SessionUpdate, ToolCallContent, ToolCallId, ToolCallLocation,
     ToolCallStatus, ToolCallUpdate, ToolKind, UsageUpdate,

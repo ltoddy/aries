@@ -1,9 +1,10 @@
-use agent_client_protocol::schema::v2::{
+use agent_client_protocol::v2::schema::{
     AvailableCommand, AvailableCommandInput, AvailableCommandsUpdate, Command, ContentBlock,
     ContentChunk, NewSessionRequest, NewSessionResponse, SessionUpdate, TextCommandInput,
     UpdateSessionNotification,
 };
-use agent_client_protocol::{Client, Error, Responder, V2ConnectionTo};
+use agent_client_protocol::v2::{ConnectionTo, Responder};
+use agent_client_protocol::{Client, Error};
 use aries_session::{SessionArgs, SharedRegistry};
 use itertools::Itertools;
 use tracing::info;
@@ -14,7 +15,7 @@ use crate::v2::mcp::McpServers;
 pub async fn new_session(
     req: NewSessionRequest,
     responder: Responder<NewSessionResponse>,
-    cx: V2ConnectionTo<Client>,
+    cx: ConnectionTo<Client>,
     registry: SharedRegistry,
     args: SessionArgs,
 ) -> Result<(), Error> {

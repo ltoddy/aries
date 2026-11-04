@@ -1,12 +1,13 @@
-use agent_client_protocol::schema::v2::{DeleteSessionRequest, DeleteSessionResponse};
-use agent_client_protocol::{Client, Error, Responder, V2ConnectionTo};
+use agent_client_protocol::v2::schema::{DeleteSessionRequest, DeleteSessionResponse};
+use agent_client_protocol::v2::{ConnectionTo, Responder};
+use agent_client_protocol::{Client, Error};
 use aries_session::SharedRegistry;
 use tracing::info;
 
 pub async fn delete_session(
     req: DeleteSessionRequest,
     responder: Responder<DeleteSessionResponse>,
-    _cx: V2ConnectionTo<Client>,
+    _cx: ConnectionTo<Client>,
     registry: SharedRegistry,
 ) -> Result<(), Error> {
     let session_id = req.session_id.to_string();

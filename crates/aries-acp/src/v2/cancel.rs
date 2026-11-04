@@ -1,11 +1,14 @@
-use agent_client_protocol::schema::v2::{CancelRequestNotification, CancelSessionNotification};
-use agent_client_protocol::{Client, Error, V2ConnectionTo};
+use agent_client_protocol::v2::ConnectionTo;
+use agent_client_protocol::v2::schema::{
+    self, CancelRequestNotification, CancelSessionNotification,
+};
+use agent_client_protocol::{Client, Error};
 use aries_session::SharedRegistry;
 use tracing::info;
 
 pub async fn cancel_request(
     notif: CancelRequestNotification,
-    _cx: V2ConnectionTo<Client>,
+    _cx: ConnectionTo<Client>,
 ) -> Result<(), Error> {
     info!("Received cancel request notification (v2): {notif:?}");
     Ok(())
@@ -13,7 +16,7 @@ pub async fn cancel_request(
 
 pub async fn cancel(
     notif: CancelSessionNotification,
-    _cx: V2ConnectionTo<Client>,
+    _cx: ConnectionTo<Client>,
     registry: SharedRegistry,
 ) -> Result<(), Error> {
     info!("Received cancel notification (v2): {notif:?}");
@@ -23,7 +26,7 @@ pub async fn cancel(
         let registry = registry.lock().await;
         match registry.session(&session_id) {
             Some(session) => session,
-            None => return Err(Error::resource_not_found(Some(session_id))),
+            None => return Err(schema::Error::resource_not_found().into()),
         }
     };
     session.cancel();

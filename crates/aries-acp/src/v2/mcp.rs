@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
-use agent_client_protocol::schema::v2::{
+use agent_client_protocol::v2::schema::{
     McpServer, McpServerHttp, McpServerStdio, MessageMcpNotification, MessageMcpRequest,
     MessageMcpResponse,
 };
-use agent_client_protocol::{Client, Error, Responder, V2ConnectionTo};
+use agent_client_protocol::v2::{ConnectionTo, Responder};
+use agent_client_protocol::{Client, Error};
 use aries_extension::{McpDefinition, McpServerConfig};
 use serde_json::{Map, Value};
 use tracing::info;
@@ -40,7 +41,7 @@ impl From<McpServers> for McpDefinition {
 pub async fn message(
     req: MessageMcpRequest,
     responder: Responder<MessageMcpResponse>,
-    _cx: V2ConnectionTo<Client>,
+    _cx: ConnectionTo<Client>,
 ) -> Result<(), Error> {
     info!("Received MCP message request (v2): {req:?}");
     responder.respond(MessageMcpResponse::success(Value::Object(Map::new())))
@@ -48,7 +49,7 @@ pub async fn message(
 
 pub async fn message_notification(
     notif: MessageMcpNotification,
-    _cx: V2ConnectionTo<Client>,
+    _cx: ConnectionTo<Client>,
 ) -> Result<(), Error> {
     info!("Received MCP message notification (v2): {notif:?}");
     Ok(())

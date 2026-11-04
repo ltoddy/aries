@@ -2,11 +2,12 @@ mod message;
 mod plan;
 mod session_update;
 
-use agent_client_protocol::schema::v2::{
-    IdleStateUpdate, PromptRequest, PromptResponse, StateUpdate, StopReason,
+use agent_client_protocol::v2::schema::{
+    self, IdleStateUpdate, PromptRequest, PromptResponse, StateUpdate, StopReason,
     UpdateSessionNotification,
 };
-use agent_client_protocol::{Client, Error, Responder, V2ConnectionTo};
+use agent_client_protocol::v2::{ConnectionTo, Responder};
+use agent_client_protocol::{Client, Error};
 use aries_event::AgentEvent;
 use aries_session::{PromptOutcome, SharedRegistry};
 use tracing::info;
@@ -17,7 +18,7 @@ use self::session_update::SessionUpdates;
 pub async fn prompt(
     req: PromptRequest,
     responder: Responder<PromptResponse>,
-    cx: V2ConnectionTo<Client>,
+    cx: ConnectionTo<Client>,
     registry: SharedRegistry,
 ) -> Result<(), Error> {
     info!("Received prompt request (v2): {req:?}");
@@ -28,7 +29,7 @@ pub async fn prompt(
         match registry.session(&session_id) {
             Some(session) => session,
             None => {
-                return responder.respond_with_error(Error::resource_not_found(Some(session_id)));
+                return responder.respond_with_error(schema::Error::resource_not_found().into());
             },
         }
     };
@@ -51,7 +52,7 @@ pub async fn prompt(
 
     let _ = cx.send_notification(UpdateSessionNotification::new(
         session_id.clone(),
-        agent_client_protocol::schema::v2::SessionUpdate::StateUpdate(StateUpdate::Idle(
+        agent_client_protocol::v2::schema::SessionUpdate::StateUpdate(StateUpdate::Idle(
             IdleStateUpdate::new().stop_reason(stop_reason),
         )),
     ));

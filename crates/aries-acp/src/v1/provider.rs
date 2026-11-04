@@ -1,8 +1,9 @@
-use agent_client_protocol::schema::v1::{
+use agent_client_protocol::v1::schema::{
     DisableProviderRequest, DisableProviderResponse, ListProvidersRequest, ListProvidersResponse,
     SetProviderRequest, SetProviderResponse,
 };
-use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
+use agent_client_protocol::v1::{ConnectionTo, Responder};
+use agent_client_protocol::{Client, Error};
 use tracing::info;
 
 pub async fn list_providers(

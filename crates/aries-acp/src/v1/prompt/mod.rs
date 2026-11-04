@@ -2,10 +2,11 @@ pub mod message;
 pub mod plan;
 pub mod session_update;
 
-use agent_client_protocol::schema::v1::{
-    PromptRequest, PromptResponse, SessionNotification, StopReason,
+use agent_client_protocol::v1::schema::{
+    self, PromptRequest, PromptResponse, SessionNotification, StopReason,
 };
-use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
+use agent_client_protocol::v1::{ConnectionTo, Responder};
+use agent_client_protocol::{Client, Error};
 use aries_event::AgentEvent;
 use aries_session::{PromptOutcome, SharedRegistry};
 use tracing::{info, instrument};
@@ -28,7 +29,9 @@ pub async fn prompt(
         match registry.session(&session_id) {
             Some(session) => session,
             None => {
-                return responder.respond_with_error(Error::resource_not_found(Some(session_id)));
+                return responder.respond_with_error(
+                    schema::Error::resource_not_found(Some(session_id)).into(),
+                );
             },
         }
     };

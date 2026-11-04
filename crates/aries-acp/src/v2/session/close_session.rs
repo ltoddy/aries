@@ -1,12 +1,13 @@
-use agent_client_protocol::schema::v2::{CloseSessionRequest, CloseSessionResponse};
-use agent_client_protocol::{Client, Error, Responder, V2ConnectionTo};
+use agent_client_protocol::v2::schema::{CloseSessionRequest, CloseSessionResponse};
+use agent_client_protocol::v2::{ConnectionTo, Responder};
+use agent_client_protocol::{Client, Error};
 use aries_session::SharedRegistry;
 use tracing::info;
 
 pub async fn close_session(
     req: CloseSessionRequest,
     responder: Responder<CloseSessionResponse>,
-    _cx: V2ConnectionTo<Client>,
+    _cx: ConnectionTo<Client>,
     registry: SharedRegistry,
 ) -> Result<(), Error> {
     let session_id = req.session_id.to_string();

@@ -1,5 +1,5 @@
 use agent_client_protocol::schema::ProtocolVersion;
-use agent_client_protocol::schema::v2::{
+use agent_client_protocol::v2::schema::{
     AgentAuthCapabilities, AgentCapabilities, Implementation, InitializeRequest,
     InitializeResponse, McpAcpCapabilities, McpCapabilities, McpHttpCapabilities,
     McpStdioCapabilities, PromptAudioCapabilities, PromptCapabilities,
@@ -7,13 +7,14 @@ use agent_client_protocol::schema::v2::{
     SessionAdditionalDirectoriesCapabilities, SessionCapabilities, SessionDeleteCapabilities,
     SessionForkCapabilities,
 };
-use agent_client_protocol::{Client, Error, Responder, V2ConnectionTo};
+use agent_client_protocol::v2::{ConnectionTo, Responder};
+use agent_client_protocol::{Client, Error};
 use tracing::info;
 
 pub async fn initialize(
     req: InitializeRequest,
     responder: Responder<InitializeResponse>,
-    _cx: V2ConnectionTo<Client>,
+    _cx: ConnectionTo<Client>,
 ) -> Result<(), Error> {
     info!("Received initialize request (v2): {req:?}");
 

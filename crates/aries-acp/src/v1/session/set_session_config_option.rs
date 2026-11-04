@@ -1,9 +1,10 @@
 use std::str::FromStr;
 
-use agent_client_protocol::schema::v1::{
-    SetSessionConfigOptionRequest, SetSessionConfigOptionResponse,
+use agent_client_protocol::v1::schema::{
+    self, SetSessionConfigOptionRequest, SetSessionConfigOptionResponse,
 };
-use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
+use agent_client_protocol::v1::{ConnectionTo, Responder};
+use agent_client_protocol::{Client, Error};
 use aries_mode::Mode;
 use aries_session::SharedRegistry;
 use tracing::{info, instrument};
@@ -32,7 +33,9 @@ pub async fn set_session_config_option(
         match registry.session(&session_id) {
             Some(session) => session,
             None => {
-                return responder.respond_with_error(Error::resource_not_found(Some(session_id)));
+                return responder.respond_with_error(
+                    schema::Error::resource_not_found(Some(session_id)).into(),
+                );
             },
         }
     };

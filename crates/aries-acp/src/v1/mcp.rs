@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
-use agent_client_protocol::schema::v1::{
+use agent_client_protocol::v1::schema::{
     McpServer, McpServerHttp, McpServerSse, McpServerStdio, MessageMcpNotification,
     MessageMcpRequest, MessageMcpResponse,
 };
-use agent_client_protocol::{Client, ConnectionTo, Error, Responder};
+use agent_client_protocol::v1::{ConnectionTo, Responder};
+use agent_client_protocol::{Client, Error};
 use aries_extension::{McpDefinition, McpServerConfig};
 use serde_json::{Map, Value};
 use tracing::info;
