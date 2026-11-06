@@ -38,7 +38,6 @@ use gpui_kit::*;
 
 pub(crate) use self::tabs::TabsView;
 use crate::acp::{Bridge, Permission};
-use crate::preferences::{Appearance, Preferences};
 use crate::session::chat::Chat;
 use crate::session::deletion::SessionDeletion;
 use crate::session::list::SessionList;
@@ -61,9 +60,7 @@ pub struct ChatView {
     cwd: PathBuf,
     choosing_directory: bool,
     session_directory_selected: bool,
-    preferences_path: Option<PathBuf>,
     agent: AcpAgentConfig,
-    appearance: Appearance,
     input: Entity<TextareaState>,
     command_menu: SlashMenu,
     chat: Chat,
@@ -91,7 +88,6 @@ pub struct ChatView {
     pending_config: Option<SessionConfigId>,
     config_error: Option<String>,
     permissions: VecDeque<Permission>,
-    preference_error: Option<String>,
     timeline: ListState,
     expanded_thoughts: HashSet<usize>,
     collapsed_streaming_thoughts: HashSet<usize>,
@@ -107,7 +103,6 @@ impl fmt::Debug for ChatView {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ChatView")
             .field("cwd", &self.cwd)
-            .field("appearance", &self.appearance)
             .field("session_id", &self.session_id)
             .field("status", &self.status)
             .field("message_count", &self.chat.messages().len())
@@ -119,23 +114,10 @@ impl fmt::Debug for ChatView {
 impl ChatView {
     pub fn new(
         cwd: PathBuf,
-        preferences_path: Option<PathBuf>,
         agent: AcpAgentConfig,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let appearance = preferences_path
-            .as_deref()
-            .and_then(|path| Preferences::load(path).ok())
-            .unwrap_or_default()
-            .appearance();
-        palette::apply(appearance, cx);
-        let system_theme = cx.observe_window_appearance(window, |this, window, cx| {
-            if this.appearance == Appearance::System {
-                palette::sync(window.appearance().into(), cx);
-                cx.notify();
-            }
-        });
         let input = cx.new(|cx| {
             TextareaState::new(window, cx)
                 .placeholder("发送消息…")
@@ -179,9 +161,7 @@ impl ChatView {
             cwd,
             choosing_directory: false,
             session_directory_selected: false,
-            preferences_path,
             agent,
-            appearance,
             input,
             command_menu: SlashMenu::default(),
             chat: Chat::default(),
@@ -209,7 +189,6 @@ impl ChatView {
             pending_config: None,
             config_error: None,
             permissions: VecDeque::new(),
-            preference_error: None,
             timeline: ListState::new(0, ListAlignment::Bottom, px(600.)),
             expanded_thoughts: HashSet::new(),
             collapsed_streaming_thoughts: HashSet::new(),
@@ -218,7 +197,7 @@ impl ChatView {
             images: HashMap::new(),
             attachment_images: HashMap::new(),
             markdown: HashMap::new(),
-            _subscriptions: vec![changes, quit, system_theme, escape],
+            _subscriptions: vec![changes, quit, escape],
         }
     }
 }

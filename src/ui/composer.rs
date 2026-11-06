@@ -1,7 +1,7 @@
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::input::{Enter, Escape, IndentInline, MoveDown, MoveUp, Textarea};
-use gpui_kit::component::{Disableable, Icon, Sizable};
+use gpui_kit::component::{ActiveTheme, Disableable, Icon, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -15,7 +15,7 @@ impl ChatView {
         div().flex_shrink_0().px_3().py_1().bg(p.background()).child(
             div()
                 .w_full()
-                .max_w(px(880.))
+                .max_w(rems(55.))
                 .mx_auto()
                 .flex()
                 .flex_col()
@@ -24,7 +24,7 @@ impl ChatView {
                     composer.child(
                         div()
                             .p_3()
-                            .rounded(px(12.))
+                            .rounded(cx.theme().radius_lg)
                             .border_1()
                             .border_color(p.border())
                             .bg(p.input())
@@ -89,7 +89,7 @@ impl ChatView {
                                 .items_end()
                                 .gap_2()
                                 .p_1()
-                                .rounded(px(14.))
+                                .rounded(rems(0.875))
                                 .border_1()
                                 .border_color(p.border())
                                 .bg(p.input())
@@ -111,7 +111,7 @@ impl ChatView {
                                             } else {
                                                 IconName::Send
                                             })
-                                            .size(px(17.)),
+                                            .size(rems(1.0625)),
                                         )
                                         .accessibility_label(if self.chat.is_busy() {
                                             "停止回复"
@@ -119,7 +119,7 @@ impl ChatView {
                                             "发送消息"
                                         })
                                         .size_10()
-                                        .rounded(px(12.))
+                                        .rounded(cx.theme().radius_lg)
                                         .disabled(if self.chat.is_busy() {
                                             self.stopping
                                         } else {

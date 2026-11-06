@@ -5,7 +5,7 @@ mod toolbar;
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::Button;
-use gpui_kit::component::{Disableable, Icon};
+use gpui_kit::component::{ActiveTheme, Disableable, Icon};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -26,10 +26,10 @@ impl ChatView {
                 div().p_3().child(
                     Button::new("new-chat")
                         .label("新建对话")
-                        .icon(Icon::new(IconName::Plus).size(px(15.)))
+                        .icon(Icon::new(IconName::Plus).size(rems(0.9375)))
                         .w_full()
-                        .h(px(38.))
-                        .rounded(px(12.))
+                        .h(rems(2.375))
+                        .rounded(cx.theme().radius_lg)
                         .disabled(!self.can_start_new_chat())
                         .on_click(cx.listener(|this, _, window, cx| {
                             if this.render_mode == crate::ui::ChatRenderMode::Sidebar
@@ -43,5 +43,13 @@ impl ChatView {
                 ),
             )
             .child(self.render_sessions(p, cx))
+            .child(
+                div()
+                    .flex_shrink_0()
+                    .p_3()
+                    .border_t_1()
+                    .border_color(p.border())
+                    .child(self.render_settings_button(p, cx)),
+            )
     }
 }

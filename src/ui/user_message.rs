@@ -28,7 +28,7 @@ impl ChatView {
                 row.child(
                     div()
                         .id(("copy-message", index))
-                        .w(px(24.))
+                        .w(rems(1.5))
                         .h_6()
                         .flex_shrink_0()
                         .flex()
@@ -49,7 +49,7 @@ impl ChatView {
                     .max_w(relative(0.72))
                     .px_2()
                     .py_1()
-                    .rounded(px(16.))
+                    .rounded(rems(1.))
                     .bg(p.bubble())
                     .flex()
                     .flex_col()

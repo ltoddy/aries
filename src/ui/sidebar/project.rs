@@ -60,7 +60,7 @@ impl ChatView {
                                         } else {
                                             IconName::Folder
                                         })
-                                        .size(px(14.))
+                                        .size(rems(0.875))
                                         .flex_shrink_0(),
                                     )
                                     .child(
@@ -91,7 +91,7 @@ impl ChatView {
                                     "project-menu:{}",
                                     cwd.display()
                                 )))
-                                .icon(Icon::new(IconName::Ellipsis).size(px(13.)))
+                                .icon(Icon::new(IconName::Ellipsis).size(rems(0.8125)))
                                 .ghost()
                                 .small()
                                 .tooltip("项目操作")

@@ -6,14 +6,21 @@ use agent_client_protocol::AcpAgentConfig;
 use agent_client_protocol::schema::v1::{SessionId, SessionInfo};
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
-use gpui_kit::component::{ActiveTheme, Icon, Sizable, h_resizable, resizable_panel};
+use gpui_kit::component::menu::{DropdownMenu, PopupMenuItem};
+use gpui_kit::component::{
+    ActiveTheme, Disableable, Icon, Sizable, Theme, h_resizable, resizable_panel,
+};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
-use crate::NewSession;
+use crate::preferences::{Appearance, Preferences};
 use crate::ui::new_chat::NewChatAction;
-use crate::ui::palette::Palette;
+use crate::ui::palette::{self, Palette};
 use crate::ui::{ChatRenderMode, ChatView};
+use crate::{
+    CloseTab, NewSession, NextTab, NextUserMessage, PreviousTab, PreviousUserMessage, ResetZoom,
+    ZoomIn, ZoomOut,
+};
 
 struct ChatTab {
     id: usize,
@@ -23,13 +30,23 @@ struct ChatTab {
 
 pub(crate) struct TabsView {
     cwd: PathBuf,
-    preferences_path: Option<PathBuf>,
+    pub(super) preferences_path: Option<PathBuf>,
+    pub(super) settings: Preferences,
+    pub(super) settings_error: Option<String>,
+    pub(super) settings_saving: bool,
+    save_task: Option<Task<()>>,
+    save_revision: usize,
+    _settings_subscriptions: Vec<Subscription>,
     agent: AcpAgentConfig,
     sidebar: Entity<ChatView>,
     _sidebar_subscription: Subscription,
     tabs: Vec<ChatTab>,
     active: usize,
     next_id: usize,
+    tab_scroll: ScrollHandle,
+    focus_handle: FocusHandle,
+    base_font_size: Pixels,
+    base_mono_font_size: Pixels,
 }
 
 impl fmt::Debug for TabsView {
@@ -50,24 +67,54 @@ impl TabsView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let sidebar = Self::create_chat_view(
-            &cwd,
-            preferences_path.clone(),
-            &agent,
-            ChatRenderMode::Sidebar,
-            window,
-            cx,
-        );
+        let (settings, settings_error) = match preferences_path.as_deref() {
+            Some(path) => Preferences::load_or_migrate(path, Preferences::legacy_path().as_deref()),
+            None => (Preferences::default(), Some("未找到用户主目录，设置无法保存".into())),
+        };
+        let base_font_size = cx.theme().font_size;
+        let base_mono_font_size = cx.theme().mono_font_size;
+        palette::apply(settings.appearance(), cx);
+        Theme::update(cx, |theme| {
+            theme.font_size = base_font_size * settings.zoom();
+            theme.mono_font_size = base_mono_font_size * settings.zoom();
+        });
+        let system_theme = cx.observe_window_appearance(window, |this, window, cx| {
+            if this.settings.appearance() == Appearance::System {
+                palette::sync(window.appearance().into(), cx);
+                cx.notify();
+            }
+        });
+        let quit = cx.on_app_quit(|this, _| {
+            let task = this.save_task.take();
+            async move {
+                if let Some(task) = task {
+                    task.await;
+                }
+            }
+        });
+        let sidebar = Self::create_chat_view(&cwd, &agent, ChatRenderMode::Sidebar, window, cx);
         let sidebar_subscription = Self::observe_tab(&sidebar, window, cx);
+        let focus_handle = cx.focus_handle();
+        focus_handle.focus(window, cx);
         Self {
             cwd,
             preferences_path,
+            settings,
+            settings_error,
+            settings_saving: false,
+            save_task: None,
+            save_revision: 0,
+            _settings_subscriptions: vec![system_theme, quit],
             agent,
             sidebar,
             _sidebar_subscription: sidebar_subscription,
             tabs: Vec::new(),
             active: 0,
             next_id: 0,
+            tab_scroll: ScrollHandle::new(),
+            focus_handle,
+            base_font_size,
+            base_mono_font_size,
         }
     }
 
@@ -90,7 +137,6 @@ impl TabsView {
 
     fn create_chat_view(
         cwd: &Path,
-        preferences_path: Option<PathBuf>,
         agent: &AcpAgentConfig,
         mode: ChatRenderMode,
         window: &mut Window,
@@ -99,7 +145,7 @@ impl TabsView {
         let host = cx.weak_entity();
         let cwd = cwd.to_path_buf();
         let agent = agent.clone();
-        let view = cx.new(|cx| ChatView::new(cwd, preferences_path, agent, window, cx));
+        let view = cx.new(|cx| ChatView::new(cwd, agent, window, cx));
         view.update(cx, |view, _| {
             view.set_tab_host(host);
             view.set_render_mode(mode);
@@ -146,17 +192,11 @@ impl TabsView {
     ) {
         let id = self.next_id;
         self.next_id += 1;
-        let view = Self::create_chat_view(
-            &self.cwd,
-            self.preferences_path.clone(),
-            &self.agent,
-            ChatRenderMode::Main,
-            window,
-            cx,
-        );
+        let view = Self::create_chat_view(&self.cwd, &self.agent, ChatRenderMode::Main, window, cx);
         let subscription = Self::observe_tab(&view, window, cx);
         self.tabs.push(ChatTab { id, view: view.clone(), _subscription: subscription });
         self.active = self.tabs.len() - 1;
+        self.tab_scroll.scroll_to_item(self.active);
         cx.spawn_in(window, async move |_, cx| {
             let _ = view.update_in(cx, |view, window, cx| {
                 if let Some(directory) = directory {
@@ -196,7 +236,7 @@ impl TabsView {
     ) {
         let session_id = session.session_id.clone();
         if let Some(index) = self.find_session_tab(&session_id, cx) {
-            self.active = index;
+            self.select_tab(index, window, cx);
             self.set_sidebar_session(session_id.clone(), cx);
             cx.notify();
             return;
@@ -211,18 +251,12 @@ impl TabsView {
         }
         let id = self.next_id;
         self.next_id += 1;
-        let view = Self::create_chat_view(
-            &self.cwd,
-            self.preferences_path.clone(),
-            &self.agent,
-            ChatRenderMode::Main,
-            window,
-            cx,
-        );
+        let view = Self::create_chat_view(&self.cwd, &self.agent, ChatRenderMode::Main, window, cx);
         let subscription = Self::observe_tab(&view, window, cx);
         view.update(cx, |view, cx| view.queue_session_load(session, cx));
         self.tabs.push(ChatTab { id, view, _subscription: subscription });
         self.active = self.tabs.len() - 1;
+        self.tab_scroll.scroll_to_item(self.active);
         self.set_sidebar_session(session_id.clone(), cx);
         cx.notify();
     }
@@ -259,7 +293,80 @@ impl TabsView {
         } else if index < self.active {
             self.active -= 1;
         }
+        self.tab_scroll.scroll_to_item(self.active);
         self.sync_sidebar_active_session(cx);
+        cx.notify();
+    }
+
+    fn select_tab(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+        if index >= self.tabs.len() {
+            return;
+        }
+        self.active = index;
+        self.tab_scroll.scroll_to_item(index);
+        self.sync_sidebar_active_session(cx);
+        self.focus_handle.focus(window, cx);
+        cx.notify();
+    }
+
+    fn switch_tab(&mut self, next: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(index) = adjacent_tab(self.active, self.tabs.len(), next) else {
+            return;
+        };
+        self.select_tab(index, window, cx);
+    }
+
+    pub(super) fn zoom(&mut self, step: i32, cx: &mut Context<Self>) {
+        let size = zoom_font_size(self.base_font_size, cx.theme().font_size, step);
+        Theme::update(cx, |theme| {
+            theme.font_size = size;
+            theme.mono_font_size = self.base_mono_font_size * (size / self.base_font_size);
+        });
+        self.settings.set_zoom(size / self.base_font_size);
+        self.save_settings(cx);
+        self.sidebar.read(cx).timeline.remeasure();
+        for tab in &self.tabs {
+            tab.view.read(cx).timeline.remeasure();
+        }
+        cx.notify();
+    }
+
+    pub(super) fn set_appearance(&mut self, appearance: Appearance, cx: &mut Context<Self>) {
+        self.settings.set_appearance(appearance);
+        palette::apply(appearance, cx);
+        self.save_settings(cx);
+    }
+
+    pub(super) fn save_settings(&mut self, cx: &mut Context<Self>) {
+        let Some(path) = self.preferences_path.clone() else {
+            self.settings_error = Some("设置已生效，但未找到用户主目录，无法保存".into());
+            cx.notify();
+            return;
+        };
+        let settings = self.settings;
+        self.save_revision += 1;
+        let revision = self.save_revision;
+        let previous = self.save_task.take();
+        self.settings_error = None;
+        self.settings_saving = true;
+        self.save_task = Some(cx.spawn(async move |view, cx| {
+            if let Some(previous) = previous {
+                previous.await;
+            }
+            let result = cx.background_spawn(async move { settings.save(&path) }).await;
+            let _ = view.update(cx, |this, cx| {
+                if this.save_revision == revision {
+                    this.settings_saving = false;
+                    this.settings_error =
+                        result.err().map(|error| format!("设置已生效，但未保存：{error}"));
+                    this.sidebar.update(cx, |_, cx| cx.notify());
+                    cx.refresh_windows();
+                    cx.notify();
+                }
+            });
+        }));
+        self.sidebar.update(cx, |_, cx| cx.notify());
+        cx.refresh_windows();
         cx.notify();
     }
 
@@ -276,17 +383,67 @@ impl TabsView {
             .bg(p.input())
             .border_b_1()
             .border_color(p.border())
-            .children(
-                self.tabs
-                    .iter()
-                    .enumerate()
-                    .map(|(index, tab)| self.render_tab(index, tab, can_close, p, cx)),
-            )
             .child(
-                Button::new("new-tab")
-                    .icon(Icon::new(IconName::Plus).size(px(14.)))
+                div()
+                    .id("tab-scroll")
+                    .flex_1()
+                    .min_w_0()
+                    .h_full()
+                    .flex()
+                    .items_center()
+                    .gap_1()
+                    .overflow_x_scroll()
+                    .track_scroll(&self.tab_scroll)
+                    .children(
+                        self.tabs
+                            .iter()
+                            .enumerate()
+                            .map(|(index, tab)| self.render_tab(index, tab, can_close, p, cx)),
+                    ),
+            )
+            .child({
+                let tabs = self
+                    .tabs
+                    .iter()
+                    .map(|tab| (tab.id, tab.view.read(cx).tab_title()))
+                    .collect::<Vec<_>>();
+                let active = self.tabs.get(self.active).map(|tab| tab.id);
+                let view = cx.weak_entity();
+                Button::new("all-tabs")
+                    .icon(IconName::ChevronDown)
                     .ghost()
                     .small()
+                    .flex_shrink_0()
+                    .disabled(tabs.is_empty())
+                    .tooltip("已打开的会话 · Ctrl + Tab 切换")
+                    .accessibility_label("已打开的会话")
+                    .dropdown_menu(move |mut menu, _, cx| {
+                        for (id, title) in &tabs {
+                            let id = *id;
+                            let view = view.clone();
+                            menu = menu.item(
+                                PopupMenuItem::new(title.clone())
+                                    .checked(active == Some(id))
+                                    .on_click(move |_, window, cx| {
+                                        let _ = view.update(cx, |this, cx| {
+                                            if let Some(index) =
+                                                this.tabs.iter().position(|tab| tab.id == id)
+                                            {
+                                                this.select_tab(index, window, cx);
+                                            }
+                                        });
+                                    }),
+                            );
+                        }
+                        menu.scrollable(true).max_h(cx.theme().font_size * 20.)
+                    })
+            })
+            .child(
+                Button::new("new-tab")
+                    .icon(Icon::new(IconName::Plus).size(rems(0.875)))
+                    .ghost()
+                    .small()
+                    .flex_shrink_0()
                     .tooltip("新建标签")
                     .accessibility_label("新建标签")
                     .on_click(cx.listener(|this, _, window, cx| this.new_tab(window, cx))),
@@ -303,7 +460,7 @@ impl TabsView {
             .justify_center()
             .child(
                 div()
-                    .max_w(px(360.))
+                    .max_w(rems(22.5))
                     .flex()
                     .flex_col()
                     .items_center()
@@ -333,13 +490,15 @@ impl TabsView {
         let active = index == self.active;
         let title = tab.view.read(cx).tab_title();
         let tab_label = format!("切换到标签 {title}");
+        let details = format!("{title}\n{}", tab.view.read(cx).cwd.display());
         div()
             .id(("tab", id))
             .h_7()
-            .max_w(px(180.))
-            .min_w(px(84.))
+            .flex_shrink_0()
+            .max_w(rems(11.25))
+            .min_w(rems(5.25))
             .px_1()
-            .rounded(px(8.))
+            .rounded(rems(0.5))
             .border_1()
             .border_color(if active { p.foreground() } else { p.border() })
             .flex()
@@ -356,10 +515,9 @@ impl TabsView {
                     .flex_1()
                     .min_w_0()
                     .accessibility_label(tab_label)
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.active = index;
-                        this.sync_sidebar_active_session(cx);
-                        cx.notify();
+                    .tooltip(details)
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.select_tab(index, window, cx);
                     }))
                     .child(
                         div()
@@ -376,18 +534,34 @@ impl TabsView {
             .when(can_close, |tab| {
                 tab.child(
                     Button::new(("close-tab", id))
-                        .icon(Icon::new(IconName::X).size(px(11.)))
+                        .icon(Icon::new(IconName::X).size(rems(0.6875)))
                         .ghost()
                         .small()
-                        .tooltip("关闭标签")
+                        .tooltip_with_action("关闭标签", &CloseTab, None)
                         .accessibility_label("关闭标签")
-                        .on_click(cx.listener(move |this, _, _, cx| {
+                        .on_click(cx.listener(move |this, _, window, cx| {
                             cx.stop_propagation();
                             this.close_tab(id, cx);
+                            this.focus_handle.focus(window, cx);
                         })),
                 )
             })
             .into_any_element()
+    }
+}
+
+fn adjacent_tab(active: usize, count: usize, next: bool) -> Option<usize> {
+    if count == 0 {
+        return None;
+    }
+    Some(if next { (active + 1) % count } else { (active + count - 1) % count })
+}
+
+fn zoom_font_size(base: Pixels, current: Pixels, step: i32) -> Pixels {
+    if step == 0 {
+        base
+    } else {
+        (current + base * (step as f32 * 0.1)).clamp(base * 0.8, base * 1.5)
     }
 }
 
@@ -469,20 +643,47 @@ impl Render for TabsView {
         let active = self.active_view();
         div()
             .size_full()
+            .track_focus(&self.focus_handle)
+            .on_action(cx.listener(|this, _: &CloseTab, window, cx| {
+                if let Some(tab) = this.tabs.get(this.active) {
+                    let id = tab.id;
+                    this.close_tab(id, cx);
+                    this.focus_handle.focus(window, cx);
+                }
+            }))
+            .on_action(
+                cx.listener(|this, _: &PreviousTab, window, cx| this.switch_tab(false, window, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &NextTab, window, cx| this.switch_tab(true, window, cx)),
+            )
+            .on_action(cx.listener(|this, _: &ZoomIn, _, cx| this.zoom(1, cx)))
+            .on_action(cx.listener(|this, _: &ZoomOut, _, cx| this.zoom(-1, cx)))
+            .on_action(cx.listener(|this, _: &ResetZoom, _, cx| this.zoom(0, cx)))
+            .on_action(cx.listener(|this, _: &PreviousUserMessage, _, cx| {
+                if let Some(view) = this.active_view() {
+                    view.update(cx, |view, cx| view.jump_user_message(false, cx));
+                }
+            }))
+            .on_action(cx.listener(|this, _: &NextUserMessage, _, cx| {
+                if let Some(view) = this.active_view() {
+                    view.update(cx, |view, cx| view.jump_user_message(true, cx));
+                }
+            }))
             .on_action(cx.listener(|this, _: &NewSession, window, cx| {
                 this.new_session(window, cx);
             }))
             .flex()
             .bg(p.background())
             .text_color(p.foreground())
-            .font_family("Monaco")
+            .font_family(cx.theme().font_family.clone())
             .text_sm()
             .child(
                 h_resizable("layout")
                     .child(
                         resizable_panel()
-                            .size(px(288.))
-                            .size_range(px(200.)..px(520.))
+                            .size(cx.theme().font_size * 18.)
+                            .size_range(cx.theme().font_size * 12.5..cx.theme().font_size * 32.5)
                             .child(self.sidebar.clone()),
                     )
                     .child(
@@ -503,5 +704,29 @@ impl Render for TabsView {
                         ),
                     ),
             )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui_kit::px;
+
+    use crate::ui::tabs::{adjacent_tab, zoom_font_size};
+
+    #[test]
+    fn tab_navigation_wraps_and_handles_empty_tabs() {
+        assert_eq!(adjacent_tab(0, 0, true), None);
+        assert_eq!(adjacent_tab(0, 1, false), Some(0));
+        assert_eq!(adjacent_tab(2, 3, true), Some(0));
+        assert_eq!(adjacent_tab(0, 3, false), Some(2));
+        assert_eq!(adjacent_tab(1, 3, true), Some(2));
+    }
+
+    #[test]
+    fn zoom_is_bounded_and_resettable() {
+        assert_eq!(zoom_font_size(px(16.), px(16.), 1), px(17.6));
+        assert_eq!(zoom_font_size(px(16.), px(24.), 1), px(24.));
+        assert_eq!(zoom_font_size(px(16.), px(12.8), -1), px(12.8));
+        assert_eq!(zoom_font_size(px(16.), px(24.), 0), px(16.));
     }
 }

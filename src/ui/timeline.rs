@@ -12,11 +12,40 @@ use crate::session::chat::Role;
 use crate::ui::ChatView;
 use crate::ui::palette::Palette;
 
+fn user_message_target(
+    anchors: impl DoubleEndedIterator<Item = usize>,
+    current: usize,
+    inside: bool,
+    next: bool,
+) -> Option<usize> {
+    if next {
+        anchors.into_iter().find(|index| *index > current)
+    } else {
+        anchors.into_iter().rev().find(|index| *index < current || (*index == current && inside))
+    }
+}
+
 pub(crate) fn markdown_style() -> TextViewStyle {
     TextViewStyle { paragraph_gap: rems(0.35), ..Default::default() }
 }
 
 impl ChatView {
+    pub(crate) fn jump_user_message(&mut self, next: bool, cx: &mut Context<Self>) {
+        let offset = self.timeline.logical_scroll_top();
+        let anchors = self
+            .chat
+            .messages()
+            .iter()
+            .enumerate()
+            .filter_map(|(index, message)| (message.role() == Role::User).then_some(index));
+        let target =
+            user_message_target(anchors, offset.item_ix, offset.offset_in_item > px(0.), next);
+        if let Some(item_ix) = target {
+            self.timeline.scroll_to(ListOffset { item_ix, offset_in_item: px(0.) });
+            cx.notify();
+        }
+    }
+
     pub fn render_timeline(&mut self, p: Palette, cx: &mut Context<Self>) -> AnyElement {
         if self.chat.messages().is_empty()
             && self.chat.error().is_none()
@@ -35,19 +64,19 @@ impl ChatView {
                         .flex_col()
                         .items_center()
                         .gap_4()
-                        .max_w(px(480.))
+                        .max_w(rems(30.))
                         .text_center()
                         .child(
                             div()
-                                .size(px(56.))
-                                .rounded(px(16.))
+                                .size(rems(3.5))
+                                .rounded(rems(1.))
                                 .border_1()
                                 .border_color(p.border())
                                 .bg(p.input())
                                 .flex()
                                 .items_center()
                                 .justify_center()
-                                .child(Icon::new(IconName::Bot).size(px(26.))),
+                                .child(Icon::new(IconName::Bot).size(rems(1.625))),
                         )
                         .child(
                             div()
@@ -75,7 +104,7 @@ impl ChatView {
             .id("timeline")
             .flex_1()
             .min_h_0()
-            .pl_5()
+            .pl_8()
             .pr_4()
             .py_2()
             .relative()
@@ -85,25 +114,27 @@ impl ChatView {
                         let view = view.clone();
                         view.update(cx, |this, cx| {
                             let gap = match this.chat.messages().get(index).map(|m| m.role()) {
-                                Some(Role::User) => px(12.),
-                                _ => px(4.),
+                                Some(Role::User) => rems(0.75),
+                                _ => rems(0.25),
                             };
                             div()
                                 .w_full()
                                 .pb(gap)
-                                .child(div().max_w(px(880.)).mx_auto().child(if index < messages {
-                                    this.timeline_item(index, p, window, cx)
-                                } else {
-                                    div()
-                                        .id("chat-error")
-                                        .rounded(px(12.))
-                                        .p_2()
-                                        .border_1()
-                                        .border_color(p.border())
-                                        .text_color(p.danger())
-                                        .child(error.clone().unwrap_or_default())
-                                        .into_any_element()
-                                }))
+                                .child(div().max_w(rems(55.)).mx_auto().child(
+                                    if index < messages {
+                                        this.timeline_item(index, p, window, cx)
+                                    } else {
+                                        div()
+                                            .id("chat-error")
+                                            .rounded(rems(0.75))
+                                            .p_2()
+                                            .border_1()
+                                            .border_color(p.border())
+                                            .text_color(p.danger())
+                                            .child(error.clone().unwrap_or_default())
+                                            .into_any_element()
+                                    },
+                                ))
                                 .into_any_element()
                         })
                         .unwrap_or_else(|_| div().into_any_element())
@@ -124,8 +155,8 @@ impl ChatView {
         let top_view = view.clone();
         div()
             .absolute()
-            .bottom(px(12.))
-            .right(px(20.))
+            .bottom(rems(0.75))
+            .right(rems(1.25))
             .flex()
             .flex_col()
             .gap_1()
@@ -175,7 +206,7 @@ impl ChatView {
                 Tooltip::element(move |_, _| div().child(label)).build(window, cx)
             })
             .on_click(move |_, _, cx| on_click(cx))
-            .child(Icon::new(icon).size(px(16.)).text_color(p.foreground()))
+            .child(Icon::new(icon).size(rems(1.)).text_color(p.foreground()))
             .into_any_element()
     }
 
@@ -196,10 +227,10 @@ impl ChatView {
         div()
             .id("user-anchors")
             .absolute()
-            .left(px(4.))
+            .left(rems(0.25))
             .top_0()
             .bottom_0()
-            .w(px(16.))
+            .w_6()
             .py_3()
             .flex()
             .flex_col()
@@ -211,36 +242,30 @@ impl ChatView {
                 let view = view.clone();
                 let preview = text.chars().take(300).collect::<String>();
                 let group = SharedString::from(format!("user-anchor-{index}"));
-                div()
-                    .id(("user-anchor", index))
+                Button::new(("user-anchor", index))
+                    .ghost()
+                    .small()
                     .group(group.clone())
-                    .w(px(16.))
-                    .h(px(10.))
+                    .size_6()
+                    .p_0()
                     .flex_shrink_0()
                     .flex()
                     .items_center()
                     .justify_center()
-                    .aria_label(format!("跳转到第 {} 条用户消息", anchor_index + 1))
-                    .tooltip_show_delay(Duration::ZERO)
-                    .tooltip(move |window, cx| {
-                        let preview = preview.clone();
-                        Tooltip::element(move |_, _| {
-                            div()
-                                .max_w(px(360.))
-                                .whitespace_normal()
-                                .line_height(rems(1.25))
-                                .child(preview.clone())
-                        })
-                        .build(window, cx)
-                    })
+                    .accessibility_label(format!("跳转到第 {} 条用户消息", anchor_index + 1))
+                    .tooltip_show_delay(Duration::from_millis(250))
+                    .tooltip(format!(
+                        "{preview}\n{} + Alt + ↑ / ↓ 跳转用户消息",
+                        if cfg!(target_os = "macos") { "⌘" } else { "Ctrl" }
+                    ))
                     .on_click(move |_, _, cx| {
                         timeline.scroll_to_reveal_item(index);
                         let _ = view.update(cx, |_, cx| cx.notify());
                     })
                     .child(
                         div()
-                            .w(px(12.))
-                            .h(px(2.))
+                            .w(rems(0.75))
+                            .h(rems(0.125))
                             .rounded_full()
                             .bg(p.border())
                             .group_hover(group, |style| style.bg(p.foreground())),
@@ -304,7 +329,7 @@ impl ChatView {
             .when(card, |body| {
                 body.px_2()
                     .py_1()
-                    .rounded(px(10.))
+                    .rounded(rems(0.625))
                     .bg(p.input())
                     .border_1()
                     .border_color(p.border())
@@ -318,7 +343,7 @@ impl ChatView {
                         .text_xs()
                         .text_color(p.muted())
                         .when(card, |header| {
-                            header.child(Icon::new(IconName::Activity).size(px(14.)))
+                            header.child(Icon::new(IconName::Activity).size(rems(0.875)))
                         })
                         .child(message.title().to_owned()),
                 )
@@ -362,7 +387,7 @@ impl ChatView {
                             .into_any_element()
                     })
                     .text_sm()
-                    .line_height(rems(1.375))
+                    .line_height(rems(1.5))
                     .into_any_element(),
             )
             .when_some(self.images.get(&index), |body, images| {
@@ -370,7 +395,7 @@ impl ChatView {
                     images.iter().map(|image| {
                         img(image.clone())
                             .w_full()
-                            .h(px(200.))
+                            .h(rems(12.5))
                             .object_fit(ObjectFit::Contain)
                             .with_fallback(|| div().child("图片无法预览").into_any_element())
                     }),
@@ -384,5 +409,25 @@ impl ChatView {
             .flex()
             .child(div().min_w_0().w_full().child(body))
             .into_any_element()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ui::timeline::user_message_target;
+
+    #[test]
+    fn message_navigation_handles_boundaries_and_partial_messages() {
+        let target = |current, inside, next| {
+            user_message_target([0, 4, 9].into_iter(), current, inside, next)
+        };
+        assert_eq!(user_message_target([].into_iter(), 0, false, true), None);
+        assert_eq!(target(0, false, false), None);
+        assert_eq!(target(0, true, false), Some(0));
+        assert_eq!(target(0, false, true), Some(4));
+        assert_eq!(target(6, false, false), Some(4));
+        assert_eq!(target(6, false, true), Some(9));
+        assert_eq!(target(9, false, true), None);
+        assert_eq!(target(12, false, false), Some(9));
     }
 }

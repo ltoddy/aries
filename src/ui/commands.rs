@@ -139,7 +139,7 @@ impl ChatView {
                 .left_0()
                 .right_0()
                 .mb_2()
-                .rounded(px(12.))
+                .rounded(rems(0.75))
                 .border_1()
                 .border_color(p.border())
                 .bg(p.input())
@@ -149,7 +149,7 @@ impl ChatView {
                 .child(
                     div()
                         .id("slash-command-list")
-                        .max_h(px(240.))
+                        .max_h(rems(15.))
                         .overflow_y_scroll()
                         .track_scroll(&self.command_menu.scroll)
                         .px_1()
@@ -188,7 +188,7 @@ impl ChatView {
                                 .min_w_0()
                                 .px_3()
                                 .py_2()
-                                .rounded(px(8.))
+                                .rounded(rems(0.5))
                                 .when(index == self.command_menu.selected, |row| row.bg(p.hover()))
                                 .hover(|row| row.bg(p.hover()))
                                 .aria_label(format!("/{}：{}", command.name, command.description))
@@ -196,7 +196,7 @@ impl ChatView {
                                     let details = details.clone();
                                     Tooltip::element(move |_, _| {
                                         div()
-                                            .max_w(px(480.))
+                                            .max_w(rems(30.))
                                             .whitespace_normal()
                                             .child(details.clone())
                                     })

@@ -6,7 +6,7 @@ use agent_client_protocol::schema::v1::{
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::menu::{DropdownMenu, PopupMenuItem};
-use gpui_kit::component::{Disableable, Icon, Sizable};
+use gpui_kit::component::{ActiveTheme, Disableable, Icon, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -74,7 +74,7 @@ impl ChatView {
         Button::new(SharedString::from(format!("session-config:{}:{}", session_id, option.id)))
             .ghost()
             .small()
-            .max_w(px(260.))
+            .max_w(rems(16.25))
             .min_w_0()
             .text_color(p.muted())
             .disabled(!supported || !self.is_session_idle() || self.disconnected)
@@ -87,16 +87,16 @@ impl ChatView {
                     .gap_1()
                     .min_w_0()
                     .text_xs()
-                    .child(Icon::new(icon).size(px(13.)).flex_shrink_0())
+                    .child(Icon::new(icon).size(rems(0.8125)).flex_shrink_0())
                     .child(div().min_w_0().truncate().child(value))
-                    .child(Icon::new(IconName::ChevronDown).size(px(12.)).flex_shrink_0()),
+                    .child(Icon::new(IconName::ChevronDown).size(rems(0.75)).flex_shrink_0()),
             )
-            .dropdown_menu_with_anchor(Anchor::BottomLeft, move |mut menu, _, _| {
+            .dropdown_menu_with_anchor(Anchor::BottomLeft, move |mut menu, _, cx| {
                 menu = menu
                     .label(option.name.clone())
-                    .min_w(px(180.))
-                    .max_w(px(360.))
-                    .max_h(px(320.))
+                    .min_w(cx.theme().font_size * 11.25)
+                    .max_w(cx.theme().font_size * 22.5)
+                    .max_h(cx.theme().font_size * 20.)
                     .scrollable(true);
                 match &option.kind {
                     SessionConfigKind::Select(select) => {

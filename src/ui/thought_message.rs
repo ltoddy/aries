@@ -58,10 +58,10 @@ impl ChatView {
                                 } else {
                                     IconName::ChevronRight
                                 })
-                                .size(px(14.))
+                                .size(rems(0.875))
                                 .flex_shrink_0(),
                             )
-                            .child(Icon::new(IconName::Brain).size(px(14.)).flex_shrink_0())
+                            .child(Icon::new(IconName::Brain).size(rems(0.875)).flex_shrink_0())
                             .child(message.title().to_owned()),
                     )
                     .on_click(cx.listener(move |this, _, _, cx| {
@@ -116,7 +116,7 @@ impl ChatView {
                                     .into_any_element()
                             })
                             .text_xs()
-                            .line_height(rems(1.125))
+                            .line_height(rems(1.375))
                             .text_color(p.muted()),
                     ),
                 )

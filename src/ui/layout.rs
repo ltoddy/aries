@@ -13,14 +13,14 @@ impl ChatView {
             .flex()
             .bg(p.background())
             .text_color(p.foreground())
-            .font_family("Monaco")
+            .font_family(cx.theme().font_family.clone())
             .text_sm()
             .child(
                 h_resizable("layout")
                     .child(
                         resizable_panel()
-                            .size(px(288.))
-                            .size_range(px(200.)..px(520.))
+                            .size(cx.theme().font_size * 18.)
+                            .size_range(cx.theme().font_size * 12.5..cx.theme().font_size * 32.5)
                             .child(self.sidebar(p, cx)),
                     )
                     .child(resizable_panel().child(self.render_main_area(p, cx))),
@@ -34,16 +34,6 @@ impl ChatView {
             .h_full()
             .flex()
             .flex_col()
-            .child(
-                div()
-                    .h(px(44.))
-                    .flex_shrink_0()
-                    .px_4()
-                    .flex()
-                    .items_center()
-                    .justify_end()
-                    .child(self.render_theme_button(p, cx)),
-            )
             .child(self.render_timeline(p, cx))
             .child(self.composer(p, cx))
     }

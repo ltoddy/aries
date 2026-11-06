@@ -12,7 +12,21 @@ use crate::acp::aries_config;
 use crate::preferences::Preferences;
 use crate::ui::TabsView;
 
-gpui_kit::actions!(orbit, [Quit, NewSession]);
+gpui_kit::actions!(
+    orbit,
+    [
+        Quit,
+        NewSession,
+        CloseTab,
+        PreviousTab,
+        NextTab,
+        ZoomIn,
+        ZoomOut,
+        ResetZoom,
+        PreviousUserMessage,
+        NextUserMessage,
+    ]
+);
 
 fn main() -> anyhow::Result<()> {
     let cwd = std::env::current_dir()?.canonicalize()?;
@@ -22,6 +36,34 @@ fn main() -> anyhow::Result<()> {
         #[cfg(target_os = "macos")]
         cx.bind_keys([KeyBinding::new("cmd-n", NewSession, None)]);
         cx.on_action(|_: &Quit, cx| cx.quit());
+        #[cfg(target_os = "macos")]
+        cx.bind_keys([
+            KeyBinding::new("cmd-w", CloseTab, None),
+            KeyBinding::new("cmd-shift-[", PreviousTab, None),
+            KeyBinding::new("cmd-shift-]", NextTab, None),
+            KeyBinding::new("cmd-=", ZoomIn, None),
+            KeyBinding::new("cmd-+", ZoomIn, None),
+            KeyBinding::new("cmd--", ZoomOut, None),
+            KeyBinding::new("cmd-0", ResetZoom, None),
+            KeyBinding::new("cmd-alt-up", PreviousUserMessage, None),
+            KeyBinding::new("cmd-alt-down", NextUserMessage, None),
+        ]);
+        #[cfg(not(target_os = "macos"))]
+        cx.bind_keys([
+            KeyBinding::new("ctrl-w", CloseTab, None),
+            KeyBinding::new("ctrl-shift-[", PreviousTab, None),
+            KeyBinding::new("ctrl-shift-]", NextTab, None),
+            KeyBinding::new("ctrl-=", ZoomIn, None),
+            KeyBinding::new("ctrl-+", ZoomIn, None),
+            KeyBinding::new("ctrl--", ZoomOut, None),
+            KeyBinding::new("ctrl-0", ResetZoom, None),
+            KeyBinding::new("ctrl-alt-up", PreviousUserMessage, None),
+            KeyBinding::new("ctrl-alt-down", NextUserMessage, None),
+        ]);
+        cx.bind_keys([
+            KeyBinding::new("ctrl-tab", NextTab, None),
+            KeyBinding::new("ctrl-shift-tab", PreviousTab, None),
+        ]);
         let options = WindowOptions {
             window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
                 None,

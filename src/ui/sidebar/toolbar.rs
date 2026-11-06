@@ -43,7 +43,7 @@ impl ChatView {
                     .gap_1()
                     .child(
                         Button::new("expand-all-sessions")
-                            .icon(Icon::new(IconName::ListChevronsUpDown).size(px(14.)))
+                            .icon(Icon::new(IconName::ListChevronsUpDown).size(rems(0.875)))
                             .tooltip("展开全部")
                             .accessibility_label("展开全部项目")
                             .ghost()
@@ -56,7 +56,7 @@ impl ChatView {
                     )
                     .child(
                         Button::new("collapse-all-sessions")
-                            .icon(Icon::new(IconName::ListChevronsDownUp).size(px(14.)))
+                            .icon(Icon::new(IconName::ListChevronsDownUp).size(rems(0.875)))
                             .tooltip("收起全部")
                             .accessibility_label("收起全部项目")
                             .ghost()
@@ -68,7 +68,7 @@ impl ChatView {
                     )
                     .child(
                         Button::new("locate-current-session")
-                            .icon(Icon::new(IconName::LocateFixed).size(px(14.)))
+                            .icon(Icon::new(IconName::LocateFixed).size(rems(0.875)))
                             .tooltip("定位当前会话")
                             .accessibility_label("定位当前会话")
                             .ghost()
@@ -79,7 +79,7 @@ impl ChatView {
                     )
                     .child(
                         Button::new("refresh-sessions")
-                            .icon(Icon::new(IconName::RefreshCw).size(px(14.)))
+                            .icon(Icon::new(IconName::RefreshCw).size(rems(0.875)))
                             .tooltip("重新获取会话列表")
                             .accessibility_label("刷新会话列表")
                             .ghost()
