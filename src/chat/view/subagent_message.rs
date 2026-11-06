@@ -10,7 +10,7 @@ use crate::chat::view::palette::Palette;
 use crate::chat::view::timeline::markdown_style;
 
 impl ChatView {
-    pub(super) fn render_subagent_message(
+    pub fn render_subagent_message(
         &self,
         subagent: &SubagentState,
         p: Palette,

@@ -11,11 +11,7 @@ use crate::chat::view::tabs::TabsView;
 use crate::preferences::Appearance;
 
 impl ChatView {
-    pub(super) fn render_settings_button(
-        &self,
-        p: Palette,
-        cx: &mut Context<Self>,
-    ) -> impl IntoElement {
+    pub fn render_settings_button(&self, p: Palette, cx: &mut Context<Self>) -> impl IntoElement {
         let host = self.tab_host.clone();
         let error = host
             .as_ref()
@@ -38,7 +34,7 @@ impl ChatView {
 }
 
 impl TabsView {
-    pub(super) fn open_settings(&self, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn open_settings(&self, window: &mut Window, cx: &mut Context<Self>) {
         let view = cx.weak_entity();
         window.open_dialog(cx, move |dialog, _, cx| {
             let view = view.clone();

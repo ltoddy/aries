@@ -76,7 +76,7 @@ impl ChatView {
         cx.notify();
     }
 
-    pub(crate) fn new_chat_in_directory(
+    pub fn new_chat_in_directory(
         &mut self,
         directory: PathBuf,
         window: &mut Window,
@@ -118,7 +118,7 @@ impl ChatView {
         cx.notify();
     }
 
-    pub(crate) fn start_new_chat(
+    pub fn start_new_chat(
         &mut self,
         directory: PathBuf,
         action: NewChatAction,

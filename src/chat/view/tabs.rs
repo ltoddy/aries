@@ -27,12 +27,12 @@ struct ChatTab {
     _subscription: Subscription,
 }
 
-pub(crate) struct TabsView {
+pub struct TabsView {
     cwd: PathBuf,
-    pub(super) preferences_path: Option<PathBuf>,
-    pub(super) settings: Preferences,
-    pub(super) settings_error: Option<String>,
-    pub(super) settings_saving: bool,
+    pub preferences_path: Option<PathBuf>,
+    pub settings: Preferences,
+    pub settings_error: Option<String>,
+    pub settings_saving: bool,
     save_task: Option<Task<()>>,
     save_revision: usize,
     _settings_subscriptions: Vec<Subscription>,
@@ -59,7 +59,7 @@ impl fmt::Debug for TabsView {
 }
 
 impl TabsView {
-    pub(crate) fn new(
+    pub fn new(
         cwd: PathBuf,
         preferences_path: Option<PathBuf>,
         agent: AcpAgentConfig,
@@ -152,11 +152,11 @@ impl TabsView {
         view
     }
 
-    pub(super) fn active_view(&self) -> Option<Entity<ChatView>> {
+    pub fn active_view(&self) -> Option<Entity<ChatView>> {
         self.tabs.get(self.active).map(|tab| tab.view.clone())
     }
 
-    pub(super) fn is_new_session_available(&self, cx: &App) -> bool {
+    pub fn is_new_session_available(&self, cx: &App) -> bool {
         self.active_view().unwrap_or_else(|| self.sidebar.clone()).read(cx).can_start_new_chat()
     }
 
@@ -171,7 +171,7 @@ impl TabsView {
         });
     }
 
-    pub(crate) fn new_tab_in_directory(
+    pub fn new_tab_in_directory(
         &mut self,
         directory: PathBuf,
         window: &mut Window,
@@ -215,7 +215,7 @@ impl TabsView {
         });
     }
 
-    pub(crate) fn open_session(
+    pub fn open_session(
         &mut self,
         session: SessionInfo,
         window: &mut Window,
@@ -252,11 +252,7 @@ impl TabsView {
         self.tabs.iter().position(|tab| tab.view.read(cx).matches_session(id))
     }
 
-    pub(crate) fn close_deleted_sessions(
-        &mut self,
-        deleted: &HashSet<SessionId>,
-        cx: &mut Context<Self>,
-    ) {
+    pub fn close_deleted_sessions(&mut self, deleted: &HashSet<SessionId>, cx: &mut Context<Self>) {
         let ids: Vec<_> = self
             .tabs
             .iter()
@@ -303,7 +299,7 @@ impl TabsView {
         self.select_tab(index, window, cx);
     }
 
-    pub(super) fn zoom(&mut self, step: i32, cx: &mut Context<Self>) {
+    pub fn zoom(&mut self, step: i32, cx: &mut Context<Self>) {
         let size = zoom_font_size(self.base_font_size, cx.theme().font_size, step);
         Theme::update(cx, |theme| {
             theme.font_size = size;
@@ -318,13 +314,13 @@ impl TabsView {
         cx.notify();
     }
 
-    pub(super) fn set_appearance(&mut self, appearance: Appearance, cx: &mut Context<Self>) {
+    pub fn set_appearance(&mut self, appearance: Appearance, cx: &mut Context<Self>) {
         self.settings.set_appearance(appearance);
         palette::apply(appearance, cx);
         self.save_settings(cx);
     }
 
-    pub(super) fn save_settings(&mut self, cx: &mut Context<Self>) {
+    pub fn save_settings(&mut self, cx: &mut Context<Self>) {
         let Some(path) = self.preferences_path.clone() else {
             self.settings_error = Some("设置已生效，但未找到用户主目录，无法保存".into());
             cx.notify();
@@ -439,9 +435,12 @@ impl TabsView {
     ) -> AnyElement {
         let id = tab.id;
         let active = index == self.active;
-        let title = tab.view.read(cx).tab_title();
-        let tab_label = format!("切换到标签 {title}");
-        let details = format!("{title}\n{}", tab.view.read(cx).cwd.display());
+        let view = tab.view.read(cx);
+        let title = view.tab_title();
+        let state = view.execution_state();
+        let status = state.label();
+        let tab_label = format!("切换到标签 {title} · {status}");
+        let details = format!("{title}\n{}\n{status}", view.cwd.display());
         div()
             .id(("tab", id))
             .h_7()
@@ -467,6 +466,7 @@ impl TabsView {
                     .min_w_0()
                     .accessibility_label(tab_label)
                     .tooltip(details)
+                    .child(state.render_tab_indicator(p))
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.select_tab(index, window, cx);
                     }))
@@ -517,15 +517,15 @@ fn zoom_font_size(base: Pixels, current: Pixels, step: i32) -> Pixels {
 }
 
 impl ChatView {
-    pub(crate) fn set_tab_host(&mut self, tab_host: WeakEntity<TabsView>) {
+    pub fn set_tab_host(&mut self, tab_host: WeakEntity<TabsView>) {
         self.tab_host = Some(tab_host);
     }
 
-    pub(crate) fn set_render_mode(&mut self, render_mode: ChatRenderMode) {
+    pub fn set_render_mode(&mut self, render_mode: ChatRenderMode) {
         self.render_mode = render_mode;
     }
 
-    pub(crate) fn request_new_tab(&mut self, cx: &mut Context<Self>) {
+    pub fn request_new_tab(&mut self, cx: &mut Context<Self>) {
         self.tab_new_request = true;
         cx.notify();
     }
@@ -534,7 +534,7 @@ impl ChatView {
         std::mem::take(&mut self.tab_new_request)
     }
 
-    pub(crate) fn request_session_tab(&mut self, session: SessionInfo, cx: &mut Context<Self>) {
+    pub fn request_session_tab(&mut self, session: SessionInfo, cx: &mut Context<Self>) {
         self.tab_session_request = Some(session);
         cx.notify();
     }
@@ -543,7 +543,7 @@ impl ChatView {
         self.tab_session_request.take()
     }
 
-    pub(crate) fn queue_session_load(&mut self, session: SessionInfo, cx: &mut Context<Self>) {
+    pub fn queue_session_load(&mut self, session: SessionInfo, cx: &mut Context<Self>) {
         self.chat.set_title(session.title.clone());
         if self.load_supported && !self.disconnected && self.is_session_idle() {
             self.load_session(session, cx);
@@ -553,7 +553,7 @@ impl ChatView {
         }
     }
 
-    pub(crate) fn matches_session(&self, id: &SessionId) -> bool {
+    pub fn matches_session(&self, id: &SessionId) -> bool {
         self.session_id.as_ref() == Some(id)
             || self.loading_session.as_ref().is_some_and(|loading| loading.session_id() == id)
             || self.queued_session_load.as_ref().is_some_and(|session| &session.session_id == id)
@@ -568,22 +568,22 @@ impl ChatView {
             && self.is_session_idle()
     }
 
-    pub(crate) fn active_session_id(&self) -> Option<SessionId> {
+    pub fn active_session_id(&self) -> Option<SessionId> {
         self.session_id
             .clone()
             .or_else(|| self.loading_session.as_ref().map(|l| l.session_id().clone()))
             .or_else(|| self.queued_session_load.as_ref().map(|s| s.session_id.clone()))
     }
 
-    pub(crate) fn tab_title(&self) -> String {
+    pub fn tab_title(&self) -> String {
         crate::chat::view::single_line(&self.chat.title())
     }
 
-    pub(crate) fn track_tab_session(&mut self, session_id: SessionId) {
+    pub fn track_tab_session(&mut self, session_id: SessionId) {
         self.session_id = Some(session_id);
     }
 
-    pub(crate) fn untrack_tab_session(&mut self) {
+    pub fn untrack_tab_session(&mut self) {
         self.session_id = None;
     }
 }

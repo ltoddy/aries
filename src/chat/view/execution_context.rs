@@ -3,8 +3,9 @@ use std::time::Duration;
 
 use git2::Repository;
 use gpui_kit::assets::IconName;
-use gpui_kit::component::Icon;
+use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::tooltip::Tooltip;
+use gpui_kit::component::{Icon, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -12,7 +13,7 @@ use crate::chat::view::ChatView;
 use crate::chat::view::palette::Palette;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub(super) enum GitBranch {
+pub enum GitBranch {
     #[default]
     Unavailable,
     Named(String),
@@ -48,7 +49,7 @@ impl GitBranch {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ExecutionState {
+pub enum ExecutionState {
     Disconnected,
     Deleting,
     Stopping,
@@ -64,7 +65,34 @@ enum ExecutionState {
 }
 
 impl ExecutionState {
-    fn label(self) -> &'static str {
+    pub fn render_tab_indicator(self, p: Palette) -> AnyElement {
+        let indicator = match self {
+            Self::Idle => None,
+            Self::Disconnected | Self::Failed => Some(
+                Icon::new(IconName::CircleX).size_3().text_color(p.danger()).into_any_element(),
+            ),
+            Self::Permission => Some(
+                Icon::new(IconName::CircleQuestionMark)
+                    .size_3()
+                    .text_color(p.foreground())
+                    .into_any_element(),
+            ),
+            Self::ChoosingProject => {
+                Some(Icon::new(IconName::Folder).size_3().text_color(p.muted()).into_any_element())
+            }
+            _ => Some(Spinner::new().small().color(p.muted()).into_any_element()),
+        };
+        div()
+            .size_4()
+            .flex_shrink_0()
+            .flex()
+            .items_center()
+            .justify_center()
+            .children(indicator)
+            .into_any_element()
+    }
+
+    pub fn label(self) -> &'static str {
         match self {
             Self::Disconnected => "连接已断开，请新建会话",
             Self::Deleting => "删除会话中",
@@ -83,7 +111,7 @@ impl ExecutionState {
 }
 
 impl ChatView {
-    pub(super) fn watch_git_branch(&mut self, cx: &mut Context<Self>) {
+    pub fn watch_git_branch(&mut self, cx: &mut Context<Self>) {
         self.git_branch = GitBranch::Unavailable;
         self.git_branch_task = Some(cx.spawn(async move |view, cx| {
             loop {
@@ -108,7 +136,7 @@ impl ChatView {
         }));
     }
 
-    fn execution_state(&self) -> ExecutionState {
+    pub fn execution_state(&self) -> ExecutionState {
         execution_state([
             (self.disconnected, ExecutionState::Disconnected),
             (self.stopping, ExecutionState::Stopping),
@@ -127,7 +155,7 @@ impl ChatView {
         ])
     }
 
-    pub(super) fn render_execution_context(&self, p: Palette) -> impl IntoElement {
+    pub fn render_execution_context(&self, p: Palette) -> impl IntoElement {
         let selected = self.session_id.is_some() || self.session_directory_selected;
         let project = if selected {
             self.cwd

@@ -8,7 +8,7 @@ use gpui_kit::{Image, ImageFormat};
 use crate::chat::model::chat::Role;
 use crate::chat::view::ChatView;
 
-pub(crate) fn content_image(content: &ContentBlock) -> Option<Arc<Image>> {
+pub fn content_image(content: &ContentBlock) -> Option<Arc<Image>> {
     let ContentBlock::Image(image) = content else {
         return None;
     };
@@ -73,7 +73,7 @@ impl ChatView {
         self.attachment_images.clear();
     }
 
-    pub(crate) fn cache_visible_images(&mut self, index: usize) {
+    pub fn cache_visible_images(&mut self, index: usize) {
         if self.images.contains_key(&index) {
             return;
         }
@@ -100,7 +100,7 @@ impl ChatView {
         }
     }
 
-    pub(crate) fn cache_attachment_image(
+    pub fn cache_attachment_image(
         &mut self,
         message_index: usize,
         attachment_index: usize,

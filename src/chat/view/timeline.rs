@@ -3,14 +3,14 @@ use std::time::Duration;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::text::{TextView, TextViewState, TextViewStyle};
-use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{ActiveTheme, Icon, Sizable};
+use gpui_kit::component::{ActiveTheme, Disableable, Icon, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
 use crate::chat::model::chat::Role;
 use crate::chat::view::ChatView;
 use crate::chat::view::palette::Palette;
+use crate::{NextUserMessage, PreviousUserMessage};
 
 fn user_message_target(
     anchors: impl DoubleEndedIterator<Item = usize>,
@@ -25,12 +25,12 @@ fn user_message_target(
     }
 }
 
-pub(crate) fn markdown_style() -> TextViewStyle {
+pub fn markdown_style() -> TextViewStyle {
     TextViewStyle { paragraph_gap: rems(0.35), ..Default::default() }
 }
 
 impl ChatView {
-    pub(crate) fn jump_user_message(&mut self, next: bool, cx: &mut Context<Self>) {
+    fn user_message_target(&self, next: bool) -> Option<usize> {
         let offset = self.timeline.logical_scroll_top();
         let anchors = self
             .chat
@@ -38,9 +38,11 @@ impl ChatView {
             .iter()
             .enumerate()
             .filter_map(|(index, message)| (message.role() == Role::User).then_some(index));
-        let target =
-            user_message_target(anchors, offset.item_ix, offset.offset_in_item > px(0.), next);
-        if let Some(item_ix) = target {
+        user_message_target(anchors, offset.item_ix, offset.offset_in_item > px(0.), next)
+    }
+
+    pub fn jump_user_message(&mut self, next: bool, cx: &mut Context<Self>) {
+        if let Some(item_ix) = self.user_message_target(next) {
             self.timeline.scroll_to(ListOffset { item_ix, offset_in_item: px(0.) });
             cx.notify();
         }
@@ -149,64 +151,73 @@ impl ChatView {
     }
 
     fn render_scroll_controls(&self, p: Palette, cx: &mut Context<Self>) -> AnyElement {
-        let timeline = self.timeline.clone();
-        let top_timeline = timeline.clone();
-        let view = cx.weak_entity();
-        let top_view = view.clone();
         div()
             .absolute()
-            .bottom(rems(0.75))
-            .right(rems(1.25))
+            .bottom_3()
+            .right_5()
             .flex()
             .flex_col()
-            .gap_1()
-            .child(Self::scroll_control(
-                "scroll-to-top",
-                IconName::ArrowUp,
-                "滚动到顶部",
-                p,
-                move |cx| {
-                    top_timeline.scroll_to(ListOffset { item_ix: 0, offset_in_item: px(0.) });
-                    let _ = top_view.update(cx, |_, cx| cx.notify());
-                },
-            ))
-            .child(Self::scroll_control(
-                "scroll-to-bottom",
-                IconName::ArrowDown,
-                "滚动到底部",
-                p,
-                move |cx| {
-                    timeline.scroll_to_end();
-                    let _ = view.update(cx, |_, cx| cx.notify());
-                },
-            ))
-            .into_any_element()
-    }
-
-    fn scroll_control(
-        id: &'static str,
-        icon: IconName,
-        label: &'static str,
-        p: Palette,
-        on_click: impl Fn(&mut App) + 'static,
-    ) -> AnyElement {
-        div()
-            .id(id)
-            .size_8()
-            .rounded_full()
-            .border_1()
-            .border_color(p.border())
-            .bg(p.input())
-            .flex()
-            .items_center()
-            .justify_center()
-            .aria_label(label)
-            .hover(|style| style.bg(p.muted()))
-            .tooltip(move |window, cx| {
-                Tooltip::element(move |_, _| div().child(label)).build(window, cx)
+            .items_end()
+            .gap_2()
+            .child(
+                div()
+                    .flex()
+                    .gap_1()
+                    .child(
+                        Button::new("scroll-to-top")
+                            .outline()
+                            .small()
+                            .bg(p.input())
+                            .icon(IconName::ArrowUpToLine)
+                            .accessibility_label("回到顶部")
+                            .tooltip("回到顶部")
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.timeline.scroll_to(ListOffset::default());
+                                cx.notify();
+                            })),
+                    )
+                    .child(
+                        Button::new("previous-user-message")
+                            .outline()
+                            .small()
+                            .bg(p.input())
+                            .icon(IconName::ArrowUp)
+                            .accessibility_label("上一条用户消息")
+                            .tooltip_with_action("上一条用户消息", &PreviousUserMessage, None)
+                            .disabled(self.user_message_target(false).is_none())
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.jump_user_message(false, cx);
+                            })),
+                    )
+                    .child(
+                        Button::new("next-user-message")
+                            .outline()
+                            .small()
+                            .bg(p.input())
+                            .icon(IconName::ArrowDown)
+                            .accessibility_label("下一条用户消息")
+                            .tooltip_with_action("下一条用户消息", &NextUserMessage, None)
+                            .disabled(self.user_message_target(true).is_none())
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.jump_user_message(true, cx);
+                            })),
+                    ),
+            )
+            .when(!self.timeline.is_following_tail(), |controls| {
+                controls.child(
+                    Button::new("scroll-to-bottom")
+                        .outline()
+                        .small()
+                        .bg(p.input())
+                        .icon(IconName::ArrowDown)
+                        .label("回到最新")
+                        .accessibility_label("回到最新消息并恢复自动跟随")
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.timeline.set_follow_mode(FollowMode::Tail);
+                            cx.notify();
+                        })),
+                )
             })
-            .on_click(move |_, _, cx| on_click(cx))
-            .child(Icon::new(icon).size(rems(1.)).text_color(p.foreground()))
             .into_any_element()
     }
 
@@ -259,7 +270,7 @@ impl ChatView {
                         if cfg!(target_os = "macos") { "⌘" } else { "Ctrl" }
                     ))
                     .on_click(move |_, _, cx| {
-                        timeline.scroll_to_reveal_item(index);
+                        timeline.scroll_to(ListOffset { item_ix: index, offset_in_item: px(0.) });
                         let _ = view.update(cx, |_, cx| cx.notify());
                     })
                     .child(
@@ -277,12 +288,14 @@ impl ChatView {
     fn sync_timeline_items(&self) {
         let count = self.chat.messages().len() + usize::from(self.chat.error().is_some());
         let current = self.timeline.item_count();
-        if current != count {
-            self.timeline.reset_with_uniform_height(count, px(96.));
+        if current < count {
+            self.timeline.splice(current..current, count - current);
+        } else if current > count {
+            self.timeline.splice(count..current, 0);
         }
     }
 
-    pub(crate) fn markdown_state(
+    pub fn markdown_state(
         &mut self,
         index: usize,
         text: &str,

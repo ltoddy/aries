@@ -37,7 +37,7 @@ use gpui_kit::component::text::TextViewState;
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
-pub(crate) use self::tabs::TabsView;
+pub use self::tabs::TabsView;
 use crate::acp::{Bridge, Permission};
 use crate::chat::model::chat::Chat;
 use crate::chat::model::deletion::SessionDeletion;
@@ -47,12 +47,12 @@ use crate::chat::view::commands::SlashMenu;
 use crate::chat::view::execution_context::GitBranch;
 use crate::chat::view::new_chat::NewChatAction;
 
-pub(crate) fn single_line(text: &str) -> String {
+pub fn single_line(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum ChatRenderMode {
+pub enum ChatRenderMode {
     Full,
     Sidebar,
     Main,
@@ -164,6 +164,12 @@ impl ChatView {
         });
         let session_scroll = ScrollHandle::new();
         let current_session_anchor = ScrollAnchor::for_handle(session_scroll.clone());
+        let timeline = ListState::new(0, ListAlignment::Bottom, px(600.));
+        timeline.set_follow_mode(FollowMode::Tail);
+        let view = cx.weak_entity();
+        timeline.set_scroll_handler(move |_, _, cx| {
+            let _ = view.update(cx, |_, cx| cx.notify());
+        });
         Self {
             cwd,
             git_branch: GitBranch::default(),
@@ -198,7 +204,7 @@ impl ChatView {
             pending_config: None,
             config_error: None,
             permissions: VecDeque::new(),
-            timeline: ListState::new(0, ListAlignment::Bottom, px(600.)),
+            timeline,
             expanded_thoughts: HashSet::new(),
             collapsed_streaming_thoughts: HashSet::new(),
             collapsed_subagents: HashSet::new(),

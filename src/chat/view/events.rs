@@ -52,7 +52,6 @@ impl ChatView {
     }
 
     pub fn apply_event(&mut self, event: Event, window: &mut Window, cx: &mut Context<Self>) {
-        let follow = self.timeline.is_scrolled_to_end().unwrap_or(true);
         match event {
             Event::Connected { list_sessions, load_session } => {
                 self.session_list.connected(list_sessions);
@@ -159,9 +158,6 @@ impl ChatView {
                 self.chat.finish(Some(format!("{error}\n请新建对话重新连接 Aries。")));
             }
         }
-        if follow {
-            self.timeline.scroll_to_end();
-        }
         cx.notify();
     }
 
@@ -184,6 +180,9 @@ impl ChatView {
             self.command_menu.reset();
         }
         if let Some(index) = self.chat.receive(notification) {
+            if index < self.timeline.item_count() {
+                self.timeline.remeasure_items(index..index + 1);
+            }
             self.cache_message_images(index);
             self.cache_tool_diffs(index, cx);
         }

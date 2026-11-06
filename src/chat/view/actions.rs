@@ -36,7 +36,7 @@ impl ChatView {
         } else {
             self.apply_event(Event::Disconnected("无法发送消息，请新建对话".into()), window, cx);
         }
-        self.timeline.scroll_to_end();
+        self.timeline.set_follow_mode(FollowMode::Tail);
         cx.notify();
     }
 
@@ -106,5 +106,6 @@ impl ChatView {
         self.pending_config = None;
         self.config_error = None;
         self.timeline.reset(0);
+        self.timeline.set_follow_mode(FollowMode::Tail);
     }
 }
