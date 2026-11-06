@@ -57,18 +57,7 @@ impl ChatView {
                             )),
                     )
                 })
-                .child(self.render_execution_context(p))
-                .when_some(self.tokens, |composer, tokens| {
-                    composer.child(
-                        div()
-                            .id("usage")
-                            .min_w_0()
-                            .truncate()
-                            .text_xs()
-                            .text_color(p.muted())
-                            .child(format!("{tokens} tokens")),
-                    )
-                })
+                .child(self.render_execution_context(p, cx))
                 .child(
                     div()
                         .relative()

@@ -186,14 +186,14 @@ impl TabsView {
     }
 
     fn new_session(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let view = self.active_view().unwrap_or(&self.sidebar);
-        view.update(cx, |view, cx| {
-            if view.session_id.is_some() || view.session_directory_selected {
-                view.new_chat_in_directory(view.cwd.clone(), window, cx);
-            } else {
-                view.new_chat(window, cx);
-            }
-        });
+        if let Some(view) = self.active_view() {
+            view.update(cx, |view, cx| {
+                let directory = view.cwd.clone();
+                view.new_chat_in_directory(directory, window, cx);
+            });
+        } else {
+            self.sidebar.update(cx, |view, cx| view.new_chat(window, cx));
+        }
     }
 
     pub fn new_tab_in_directory(

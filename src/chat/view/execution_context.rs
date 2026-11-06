@@ -1,9 +1,10 @@
 use std::time::Duration;
 
 use gpui_kit::assets::IconName;
+use gpui_kit::base::motion::{self, Transition};
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{Icon, Sizable};
+use gpui_kit::component::{ActiveTheme, Icon, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -126,7 +127,7 @@ impl ChatView {
         ])
     }
 
-    pub fn render_execution_context(&self, p: Palette) -> impl IntoElement {
+    pub fn render_execution_context(&self, p: Palette, cx: &Context<Self>) -> impl IntoElement {
         let selected = self.session_id.is_some() || self.session_directory_selected;
         let project = if selected {
             self.cwd
@@ -148,16 +149,6 @@ impl ChatView {
         if let Some(branch) = &branch {
             directory.push_str(&format!("\nGit：{branch}"));
         }
-        let state = self.execution_state();
-        let label =
-            if state == ExecutionState::Failed { self.status.as_str() } else { state.label() };
-        let detail = if matches!(state, ExecutionState::Disconnected | ExecutionState::Failed) {
-            self.chat.error().unwrap_or("连接已断开").to_owned()
-        } else if self.chat.is_busy() {
-            self.status.clone()
-        } else {
-            state.label().into()
-        };
         div()
             .flex()
             .items_center()
@@ -194,27 +185,66 @@ impl ChatView {
                         )
                     }),
             )
-            .child(
-                div()
-                    .id("execution-state")
-                    .min_w_0()
-                    .max_w(relative(0.5))
-                    .truncate()
-                    .text_color(match state {
-                        ExecutionState::Disconnected | ExecutionState::Failed => p.danger(),
-                        ExecutionState::Permission => p.foreground(),
-                        _ => p.muted(),
+            .when_some(self.tokens, |row, tokens| {
+                row.child(TokenUsage {
+                    id: ElementId::NamedChild(
+                        ElementId::from(("usage", cx.entity_id())).into(),
+                        format!("usage-{:?}", self.session_id).into(),
+                    ),
+                    tokens,
+                })
+            })
+    }
+}
+
+#[derive(IntoElement)]
+struct TokenUsage {
+    id: ElementId,
+    tokens: u64,
+}
+
+impl RenderOnce for TokenUsage {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let digits = self.tokens.to_string();
+        let duration = cx.theme().motion_tokens().duration_normal;
+        let mut number = div().flex().font_family(cx.theme().mono_font_family.clone());
+        for (ix, digit) in digits.bytes().enumerate() {
+            let place = digits.len() - ix - 1;
+            let position = motion::transition(
+                (self.id.clone(), SharedString::from(format!("digit-{place}"))),
+                f32::from(digit - b'0'),
+                Transition::new(duration),
+                window,
+                cx,
+            );
+            let lower = position.floor();
+            let fraction = position - lower;
+            number = number.child(div().relative().w(rems(0.5)).h_4().overflow_hidden().children(
+                (0..=1).filter_map(|offset| {
+                    let value = lower as u8 + offset;
+                    (value <= 9).then(|| {
+                        div()
+                            .absolute()
+                            .top(rems(f32::from(offset) - fraction))
+                            .left_0()
+                            .w_full()
+                            .h_4()
+                            .line_height(rems(1.))
+                            .text_center()
+                            .child(value.to_string())
                     })
-                    .aria_label(format!("执行状态：{label}"))
-                    .tooltip(move |window, cx| {
-                        let detail = detail.clone();
-                        Tooltip::element(move |_, _| {
-                            div().max_w(rems(30.)).whitespace_normal().child(detail.clone())
-                        })
-                        .build(window, cx)
-                    })
-                    .child(label.to_owned()),
-            )
+                }),
+            ));
+        }
+        div()
+            .id(self.id)
+            .flex_shrink_0()
+            .flex()
+            .items_center()
+            .gap_1()
+            .aria_label(format!("{} tokens", self.tokens))
+            .child(number)
+            .child("tokens")
     }
 }
 
