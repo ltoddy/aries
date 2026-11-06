@@ -100,6 +100,14 @@ impl ChatView {
     ) {
         let (deleted, failed) = result.into_parts();
         let deleted: HashSet<_> = deleted.into_iter().collect();
+        if !deleted.is_empty()
+            && let Some(host) = self.tab_host.clone()
+        {
+            let deleted = deleted.clone();
+            cx.defer(move |cx| {
+                let _ = host.update(cx, |host, cx| host.close_deleted_sessions(&deleted, cx));
+            });
+        }
         self.drafts.retain(|id, _| !deleted.contains(id));
         if self.session_id.as_ref().is_some_and(|id| deleted.contains(id)) {
             self.reset_chat();

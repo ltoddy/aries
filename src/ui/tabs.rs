@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
@@ -228,6 +229,22 @@ impl TabsView {
 
     fn find_session_tab(&self, id: &SessionId, cx: &App) -> Option<usize> {
         self.tabs.iter().position(|tab| tab.view.read(cx).matches_session(id))
+    }
+
+    pub(crate) fn close_deleted_sessions(
+        &mut self,
+        deleted: &HashSet<SessionId>,
+        cx: &mut Context<Self>,
+    ) {
+        let ids: Vec<_> = self
+            .tabs
+            .iter()
+            .filter(|tab| deleted.iter().any(|id| tab.view.read(cx).matches_session(id)))
+            .map(|tab| tab.id)
+            .collect();
+        for id in ids {
+            self.close_tab(id, cx);
+        }
     }
 
     fn close_tab(&mut self, id: usize, cx: &mut Context<Self>) {
