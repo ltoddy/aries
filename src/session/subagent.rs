@@ -1,4 +1,3 @@
-use agent_client_protocol::schema::MaybeUndefined;
 use agent_client_protocol::v1::schema::{SessionId, StateUpdate, SubagentUpdate};
 
 #[derive(Clone, Debug)]
@@ -59,30 +58,19 @@ impl SubagentState {
         }
     }
 
-    pub fn append_chunk(&mut self, message_id: String, text: &str) {
+    pub fn append_chunk(&mut self, message_id: &str, text: &str) {
         if let Some(msg) = self.messages.iter_mut().find(|m| m.message_id == message_id) {
             msg.text.push_str(text);
         } else {
-            self.messages.push(SubagentMessage { message_id, text: text.into() });
+            self.messages
+                .push(SubagentMessage { message_id: message_id.into(), text: text.into() });
         }
     }
 
     pub fn update_metadata(&mut self, update: SubagentUpdate) {
-        apply_maybe_string(update.title, &mut self.title);
-        apply_maybe_string(update.description, &mut self.description);
-        match update.state {
-            MaybeUndefined::Value(state) => self.state = Some(state_text(&state).into()),
-            MaybeUndefined::Null => self.state = None,
-            MaybeUndefined::Undefined => {}
-        }
-    }
-}
-
-fn apply_maybe_string(value: MaybeUndefined<String>, target: &mut Option<String>) {
-    match value {
-        MaybeUndefined::Value(value) => *target = Some(value),
-        MaybeUndefined::Null => *target = None,
-        MaybeUndefined::Undefined => {}
+        update.title.update_to(&mut self.title);
+        update.description.update_to(&mut self.description);
+        update.state.map_value(|state| state_text(&state).into()).update_to(&mut self.state);
     }
 }
 

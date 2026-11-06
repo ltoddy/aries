@@ -1,4 +1,7 @@
-use agent_client_protocol::v1::schema::SessionUpdate;
+use std::fmt::Debug;
+
+use agent_client_protocol::v1::schema::{CompactionUpdate, SessionUpdate};
+use serde::Serialize;
 use serde_json::Value;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -110,6 +113,18 @@ fn plan_content(value: &Value) -> String {
 
 impl From<&SessionUpdate> for UpdateDisplay {
     fn from(update: &SessionUpdate) -> Self {
+        Self::from_serializable(update, None)
+    }
+}
+
+impl From<&CompactionUpdate> for UpdateDisplay {
+    fn from(update: &CompactionUpdate) -> Self {
+        Self::from_serializable(update, Some("compaction_update"))
+    }
+}
+
+impl UpdateDisplay {
+    fn from_serializable(update: &(impl Serialize + Debug), kind: Option<&str>) -> Self {
         let value = match serde_json::to_value(update) {
             Ok(value) => value,
             Err(error) => {
@@ -119,7 +134,7 @@ impl From<&SessionUpdate> for UpdateDisplay {
                 };
             }
         };
-        let kind = string(&value, "sessionUpdate");
+        let kind = kind.unwrap_or_else(|| string(&value, "sessionUpdate"));
         let (title, body) = match kind {
             "agent_message_chunk" | "user_message_chunk" | "agent_thought_chunk" => (
                 match kind {

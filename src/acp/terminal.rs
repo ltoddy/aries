@@ -66,10 +66,10 @@ impl Terminals {
         let (kill, kills) = mpsc::unbounded_channel();
         self.entries
             .lock()
-            .unwrap_or_else(|error| error.into_inner())
-            .insert(key.clone(), Terminal { output: receiver, kill });
+            .expect("terminal entries lock poisoned")
+            .insert(key, Terminal { output: receiver, kill });
         let limit =
-            request.output_byte_limit.unwrap_or(1024 * 1024).min(usize::MAX as u64) as usize;
+            usize::try_from(request.output_byte_limit.unwrap_or(1024 * 1024)).unwrap_or(usize::MAX);
         tokio::spawn(run(process, output, kills, limit));
         Ok(id)
     }
@@ -89,7 +89,7 @@ impl Terminals {
     ) -> Result<watch::Receiver<TerminalOutputResponse>, Error> {
         self.entries
             .lock()
-            .unwrap_or_else(|error| error.into_inner())
+            .expect("terminal entries lock poisoned")
             .get(&(session.clone(), id.clone()))
             .map(|terminal| terminal.output.clone())
             .ok_or_else(|| Error::invalid_params().data("终端不存在或已释放"))
@@ -111,7 +111,7 @@ impl Terminals {
 
     pub async fn kill(&self, session: &SessionId, id: &TerminalId) -> Result<(), Error> {
         {
-            let entries = self.entries.lock().unwrap_or_else(|error| error.into_inner());
+            let entries = self.entries.lock().expect("terminal entries lock poisoned");
             let terminal = entries
                 .get(&(session.clone(), id.clone()))
                 .ok_or_else(|| Error::invalid_params().data("终端不存在或已释放"))?;
@@ -125,7 +125,7 @@ impl Terminals {
         self.kill(session, id).await?;
         self.entries
             .lock()
-            .unwrap_or_else(|error| error.into_inner())
+            .expect("terminal entries lock poisoned")
             .remove(&(session.clone(), id.clone()));
         Ok(())
     }
@@ -215,13 +215,15 @@ async fn run(
     let mut status = None;
     let mut exit_deadline = None;
     loop {
-        if status.is_some()
-            && (!out_open && !err_open
-                || exit_deadline.is_some_and(|deadline| tokio::time::Instant::now() >= deadline))
-        {
+        if status.is_some() && !out_open && !err_open {
             break;
         }
         tokio::select! {
+            _ = async {
+                if let Some(deadline) = exit_deadline {
+                    tokio::time::sleep_until(deadline).await;
+                }
+            }, if exit_deadline.is_some() => break,
             _ = kills.recv(), if !killed => { process.kill(); killed = true; }
             result = process.child.wait(), if status.is_none() => {
                 status = Some(match result {

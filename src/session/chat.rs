@@ -66,6 +66,21 @@ impl Message {
 }
 
 #[derive(Debug, Default)]
+struct MessageParticipants {
+    sender: Option<SessionId>,
+    recipient: Option<SessionId>,
+}
+
+impl MessageParticipants {
+    fn route(&self, parent: &SessionId) -> Option<&SessionId> {
+        self.sender
+            .as_ref()
+            .filter(|id| *id != parent)
+            .or_else(|| self.recipient.as_ref().filter(|id| *id != parent))
+    }
+}
+
+#[derive(Debug, Default)]
 pub struct Chat {
     messages: Vec<Message>,
     busy: bool,
@@ -76,7 +91,7 @@ pub struct Chat {
     stream: Option<usize>,
     tools: HashMap<(SessionId, ToolCallId), usize>,
     subagents: HashMap<SessionId, usize>,
-    subagent_message_route: HashMap<(SessionId, String), SessionId>,
+    subagent_message_route: HashMap<(SessionId, String), MessageParticipants>,
     pending_subagent_chunks: HashMap<(SessionId, String), Vec<String>>,
 }
 
@@ -235,32 +250,31 @@ impl Chat {
             return None;
         };
         let parent_session_id = notification.session_id.clone();
-        let subagent_session_id = match &msg.sender_session_id {
-            MaybeUndefined::Value(id) if id != &parent_session_id => Some(id),
-            _ => match &msg.recipient_session_id {
-                MaybeUndefined::Value(id) if id != &parent_session_id => Some(id),
-                _ => None,
-            },
-        };
-        let subagent_session_id = subagent_session_id?;
         let route_key = (parent_session_id.clone(), msg.message_id.to_string());
-        self.subagent_message_route.insert(route_key.clone(), subagent_session_id.clone());
-        let index = self.ensure_subagent_message(subagent_session_id)?;
+        let participants = self.subagent_message_route.entry(route_key.clone()).or_default();
+        msg.sender_session_id.clone().update_to(&mut participants.sender);
+        msg.recipient_session_id.clone().update_to(&mut participants.recipient);
+        let subagent_session_id = participants.route(&parent_session_id)?.clone();
+        let index = self.ensure_subagent_message(&subagent_session_id)?;
         let subagent = self.messages[index].subagent.as_mut()?;
-        if let MaybeUndefined::Value(content) = &msg.content {
-            let text = content.iter().fold(String::new(), |mut acc, block| {
-                if let ContentBlock::Text(t) = block {
-                    acc.push_str(&t.text);
-                }
-                acc
-            });
-            if !text.is_empty() {
+        match &msg.content {
+            MaybeUndefined::Value(content) => {
+                let text = content.iter().fold(String::new(), |mut acc, block| {
+                    if let ContentBlock::Text(t) = block {
+                        acc.push_str(&t.text);
+                    }
+                    acc
+                });
                 subagent.upsert_message(msg.message_id.to_string(), text);
             }
+            MaybeUndefined::Null => {
+                subagent.upsert_message(msg.message_id.to_string(), String::new());
+            }
+            MaybeUndefined::Undefined => {}
         }
         if let Some(pending) = self.pending_subagent_chunks.remove(&route_key) {
             for text in pending {
-                subagent.append_chunk(msg.message_id.to_string(), &text);
+                subagent.append_chunk(&msg.message_id.0, &text);
             }
         }
         Some(index)
@@ -278,13 +292,18 @@ impl Chat {
             return None;
         }
         let route_key = (notification.session_id.clone(), chunk.message_id.to_string());
-        let Some(subagent_session_id) = self.subagent_message_route.get(&route_key).cloned() else {
+        let Some(subagent_session_id) = self
+            .subagent_message_route
+            .get(&route_key)
+            .and_then(|participants| participants.route(&notification.session_id))
+            .cloned()
+        else {
             self.pending_subagent_chunks.entry(route_key).or_default().push(text.into());
             return None;
         };
         let index = self.ensure_subagent_message(&subagent_session_id)?;
         let subagent = self.messages[index].subagent.as_mut()?;
-        subagent.append_chunk(chunk.message_id.to_string(), text);
+        subagent.append_chunk(&chunk.message_id.0, text);
         Some(index)
     }
 
@@ -398,8 +417,7 @@ impl Chat {
             }
             _ => unreachable!(),
         }
-        (message.title, message.text) =
-            UpdateDisplay::from(&SessionUpdate::CompactionUpdate(state.clone())).into_parts();
+        (message.title, message.text) = UpdateDisplay::from(&*state).into_parts();
         message.updates.push(notification);
         index
     }
