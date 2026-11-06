@@ -157,7 +157,7 @@ impl ChatView {
                         .border_l_1()
                         .border_color(p.border())
                         .when(include_current, |rows| {
-                            rows.child(self.render_current_session(p, cx))
+                            rows.children(self.render_current_session(p, cx))
                         })
                         .children(sessions.map(|session| self.render_session_row(session, p, cx))),
                 )

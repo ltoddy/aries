@@ -10,9 +10,9 @@ use crate::chat::view::palette::Palette;
 impl ChatView {
     pub fn render_sessions(&self, p: Palette, cx: &mut Context<Self>) -> impl IntoElement {
         let list = &self.session_list;
-        let current_listed = self.session_id.as_ref().is_some_and(|id| list.session(id).is_some());
+        let include_current = self.session_id.as_ref().is_some_and(|id| list.session(id).is_none());
         let mut groups: BTreeSet<&Path> = list.projects().collect();
-        if !current_listed {
+        if include_current {
             groups.insert(&self.cwd);
         }
         div()
@@ -32,7 +32,7 @@ impl ChatView {
                     .track_scroll(&self.session_scroll)
                     .pb_3()
                     .children(groups.into_iter().map(|cwd| {
-                        self.render_project(cwd, !current_listed && cwd == self.cwd, p, cx)
+                        self.render_project(cwd, include_current && cwd == self.cwd, p, cx)
                     }))
                     .when(list.is_loading(), |list| {
                         list.child(

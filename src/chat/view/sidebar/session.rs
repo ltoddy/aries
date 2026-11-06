@@ -11,28 +11,13 @@ use crate::chat::view::ChatView;
 use crate::chat::view::palette::Palette;
 
 impl ChatView {
-    pub fn render_current_session(&self, p: Palette, cx: &mut Context<Self>) -> AnyElement {
-        if let Some(id) = &self.session_id {
-            return self
-                .render_session_row(
-                    &SessionInfo::new(id.clone(), self.cwd.clone()).title(self.chat.title()),
-                    p,
-                    cx,
-                )
-                .into_any_element();
-        }
-        let title = self.chat.title();
-        let display_title = crate::chat::view::single_line(&title);
-        div()
-            .id("current-chat")
-            .anchor_scroll(Some(self.current_session_anchor.clone()))
-            .px_2()
-            .py_1()
-            .mb_1()
-            .bg(p.hover())
-            .child(div().truncate().font_weight(FontWeight::MEDIUM).child(display_title))
-            .child(div().mt_1().text_xs().text_color(p.muted()).child("发送消息开始对话"))
-            .into_any_element()
+    pub fn render_current_session(&self, p: Palette, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let id = self.session_id.as_ref()?;
+        Some(self.render_session_row(
+            &SessionInfo::new(id.clone(), self.cwd.clone()).title(self.chat.title()),
+            p,
+            cx,
+        ))
     }
 
     pub fn render_session_row(
