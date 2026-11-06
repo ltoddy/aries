@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use agent_client_protocol::schema::MaybeUndefined;
-use agent_client_protocol::schema::v1::{
+use agent_client_protocol::v1::schema::{
     AvailableCommand, CompactionStatus, CompactionUpdate, ContentBlock, ContentChunk,
     SessionConfigOption, SessionId, SessionNotification, SessionUpdate, ToolCall, ToolCallId,
 };

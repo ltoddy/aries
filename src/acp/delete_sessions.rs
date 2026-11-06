@@ -1,8 +1,9 @@
 use std::collections::HashSet;
 use std::time::Duration;
 
-use agent_client_protocol::schema::v1::{DeleteSessionRequest, SessionId};
-use agent_client_protocol::{Agent, ConnectionTo, Error};
+use agent_client_protocol::v1::ConnectionTo;
+use agent_client_protocol::v1::schema::{DeleteSessionRequest, SessionId};
+use agent_client_protocol::{Agent, Error};
 
 #[derive(Debug, Default)]
 pub struct DeletionReport {

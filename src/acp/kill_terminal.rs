@@ -1,5 +1,6 @@
-use agent_client_protocol::schema::v1::{KillTerminalRequest, KillTerminalResponse};
-use agent_client_protocol::{Agent, ConnectionTo, Error, Responder};
+use agent_client_protocol::v1::schema::{KillTerminalRequest, KillTerminalResponse};
+use agent_client_protocol::v1::{ConnectionTo, Responder};
+use agent_client_protocol::{Agent, Error};
 
 use crate::acp::terminal::SharedTerminals;
 

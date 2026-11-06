@@ -1,8 +1,9 @@
-use agent_client_protocol::schema::v1::{
+use agent_client_protocol::v1::schema::{
     RequestPermissionOutcome, RequestPermissionRequest, RequestPermissionResponse,
     SelectedPermissionOutcome,
 };
-use agent_client_protocol::{Agent, ConnectionTo, Error, Responder};
+use agent_client_protocol::v1::{ConnectionTo, Responder};
+use agent_client_protocol::{Agent, Error};
 use async_channel::Sender;
 use tokio::sync::{oneshot, watch};
 

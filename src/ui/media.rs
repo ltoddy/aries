@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use agent_client_protocol::schema::MaybeUndefined;
-use agent_client_protocol::schema::v1::{ContentBlock, SessionUpdate};
+use agent_client_protocol::v1::schema::{ContentBlock, SessionUpdate};
 use base64::Engine;
 use gpui_kit::{Image, ImageFormat};
 

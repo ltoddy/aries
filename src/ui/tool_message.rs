@@ -1,4 +1,4 @@
-use agent_client_protocol::schema::v1::{ToolCallStatus, ToolKind};
+use agent_client_protocol::v1::schema::{ToolCallStatus, ToolKind};
 use gpui_kit::assets::IconName;
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::tooltip::Tooltip;

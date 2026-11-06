@@ -1,4 +1,4 @@
-use agent_client_protocol::schema::v1::{AvailableCommand, AvailableCommandInput};
+use agent_client_protocol::v1::schema::{AvailableCommand, AvailableCommandInput};
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::prelude::*;
 use gpui_kit::*;

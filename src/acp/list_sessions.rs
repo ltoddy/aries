@@ -1,8 +1,9 @@
 use std::collections::HashSet;
 use std::time::Duration;
 
-use agent_client_protocol::schema::v1::{ListSessionsRequest, SessionInfo};
-use agent_client_protocol::{Agent, ConnectionTo, Error};
+use agent_client_protocol::v1::ConnectionTo;
+use agent_client_protocol::v1::schema::{ListSessionsRequest, SessionInfo};
+use agent_client_protocol::{Agent, Error};
 use async_channel::Sender;
 
 use crate::acp::Event;

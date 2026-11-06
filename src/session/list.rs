@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use agent_client_protocol::Error;
-use agent_client_protocol::schema::v1::{SessionId, SessionInfo, SessionInfoUpdate};
+use agent_client_protocol::v1::schema::{SessionId, SessionInfo, SessionInfoUpdate};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum ListState {

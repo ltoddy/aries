@@ -2,7 +2,7 @@ use std::ops::ControlFlow;
 use std::time::Duration;
 
 use agent_client_protocol::Error;
-use agent_client_protocol::schema::v1::{CancelNotification, ContentBlock, PromptRequest};
+use agent_client_protocol::v1::schema::{CancelNotification, ContentBlock, PromptRequest};
 
 use crate::acp::connection::{self, AgentConnection};
 use crate::acp::{Command, Event, PromptTarget, new_session};

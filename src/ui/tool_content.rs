@@ -1,4 +1,4 @@
-use agent_client_protocol::schema::v1::{SessionUpdate, ToolCallContent};
+use agent_client_protocol::v1::schema::{SessionUpdate, ToolCallContent};
 use gpui_kit::assets::IconName;
 use gpui_kit::component::ActiveTheme;
 use gpui_kit::component::Icon;

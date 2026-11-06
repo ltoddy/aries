@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use agent_client_protocol::Error;
-use agent_client_protocol::schema::v1::{NewSessionRequest, NewSessionResponse};
+use agent_client_protocol::v1::schema::{NewSessionRequest, NewSessionResponse};
 
 use crate::acp::Command;
 use crate::acp::connection::{self, AgentConnection};

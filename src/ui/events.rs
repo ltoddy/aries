@@ -1,4 +1,4 @@
-use agent_client_protocol::schema::v1::{
+use agent_client_protocol::v1::schema::{
     PermissionOptionId, SessionNotification, SessionUpdate, StopReason,
 };
 use gpui_kit::*;

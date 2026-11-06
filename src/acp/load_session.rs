@@ -1,7 +1,8 @@
 use std::time::Duration;
 
-use agent_client_protocol::schema::v1::{LoadSessionRequest, LoadSessionResponse};
-use agent_client_protocol::{Agent, ConnectionTo, Error};
+use agent_client_protocol::v1::ConnectionTo;
+use agent_client_protocol::v1::schema::{LoadSessionRequest, LoadSessionResponse};
+use agent_client_protocol::{Agent, Error};
 
 pub async fn request(
     connection: &ConnectionTo<Agent>,

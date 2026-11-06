@@ -3,7 +3,7 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 use agent_client_protocol::AcpAgentConfig;
-use agent_client_protocol::schema::v1::{SessionId, SessionInfo};
+use agent_client_protocol::v1::schema::{SessionId, SessionInfo};
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::{ActiveTheme, Icon, Sizable, Theme, h_resizable, resizable_panel};

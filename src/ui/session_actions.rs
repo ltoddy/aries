@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use agent_client_protocol::schema::v1::SessionId;
+use agent_client_protocol::v1::schema::SessionId;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::notification::Notification;
 use gpui_kit::component::{Sizable, WindowExt};

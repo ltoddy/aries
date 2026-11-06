@@ -1,5 +1,5 @@
 use agent_client_protocol::Error;
-use agent_client_protocol::schema::v1::SessionNotification;
+use agent_client_protocol::v1::schema::SessionNotification;
 use async_channel::Sender;
 
 use crate::acp::Event;

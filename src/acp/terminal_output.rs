@@ -1,5 +1,6 @@
-use agent_client_protocol::schema::v1::{TerminalOutputRequest, TerminalOutputResponse};
-use agent_client_protocol::{Error, Responder};
+use agent_client_protocol::Error;
+use agent_client_protocol::v1::Responder;
+use agent_client_protocol::v1::schema::{TerminalOutputRequest, TerminalOutputResponse};
 
 use crate::acp::terminal::SharedTerminals;
 

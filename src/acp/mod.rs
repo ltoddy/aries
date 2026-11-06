@@ -21,7 +21,7 @@ mod wait_for_terminal_exit;
 use std::path::PathBuf;
 
 use agent_client_protocol::Error;
-use agent_client_protocol::schema::v1::{
+use agent_client_protocol::v1::schema::{
     LoadSessionRequest, LoadSessionResponse, NewSessionResponse, SessionConfigId,
     SessionConfigOption, SessionId, SessionInfo, SessionNotification,
     SetSessionConfigOptionRequest, StopReason,

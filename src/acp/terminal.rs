@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use agent_client_protocol::Error;
-use agent_client_protocol::schema::v1::{
+use agent_client_protocol::v1::schema::{
     CreateTerminalRequest, SessionId, TerminalExitStatus, TerminalId, TerminalOutputResponse,
 };
 use tokio::io::AsyncReadExt;

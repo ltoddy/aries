@@ -1,4 +1,4 @@
-use agent_client_protocol::schema::v1::{PermissionOption, PermissionOptionId};
+use agent_client_protocol::v1::schema::{PermissionOption, PermissionOptionId};
 use tokio::sync::oneshot;
 
 #[derive(Debug)]

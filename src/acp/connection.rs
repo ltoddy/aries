@@ -2,8 +2,9 @@ use std::collections::VecDeque;
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
-use agent_client_protocol::schema::v1::AgentCapabilities;
-use agent_client_protocol::{AcpAgent, AcpAgentConfig, Agent, ConnectionTo, Error};
+use agent_client_protocol::v1::ConnectionTo;
+use agent_client_protocol::v1::schema::AgentCapabilities;
+use agent_client_protocol::{AcpAgent, AcpAgentConfig, Agent, Error};
 use async_channel::{Receiver, Sender};
 use tokio::sync::watch;
 
@@ -162,7 +163,7 @@ pub async fn connect(
     let wait = terminals;
     let updates = events.clone();
     let permissions = events.clone();
-    agent_client_protocol::Client.builder()
+    agent_client_protocol::Client.v1()
         .name("aries-orbit")
         .on_receive_notification(
             async move |notification, _connection| {

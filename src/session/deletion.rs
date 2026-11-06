@@ -1,4 +1,4 @@
-use agent_client_protocol::schema::v1::SessionId;
+use agent_client_protocol::v1::schema::SessionId;
 
 #[derive(Debug, Default)]
 enum DeletionState {

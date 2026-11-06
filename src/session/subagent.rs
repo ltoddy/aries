@@ -1,5 +1,5 @@
 use agent_client_protocol::schema::MaybeUndefined;
-use agent_client_protocol::schema::v1::{SessionId, StateUpdate, SubagentUpdate};
+use agent_client_protocol::v1::schema::{SessionId, StateUpdate, SubagentUpdate};
 
 #[derive(Clone, Debug)]
 pub struct SubagentMessage {

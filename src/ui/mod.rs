@@ -28,7 +28,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use agent_client_protocol::AcpAgentConfig;
-use agent_client_protocol::schema::v1::{
+use agent_client_protocol::v1::schema::{
     SessionConfigId, SessionId, SessionInfo, SessionNotification,
 };
 use gpui_kit::component::ActiveTheme;

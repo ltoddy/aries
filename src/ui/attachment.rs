@@ -1,4 +1,4 @@
-use agent_client_protocol::schema::v1::{ContentBlock, EmbeddedResourceResource};
+use agent_client_protocol::v1::schema::{ContentBlock, EmbeddedResourceResource};
 use gpui_kit::assets::IconName;
 use gpui_kit::component::Icon;
 use gpui_kit::component::tooltip::Tooltip;

@@ -1,5 +1,5 @@
 use agent_client_protocol::Error;
-use agent_client_protocol::schema::v1::{
+use agent_client_protocol::v1::schema::{
     SessionConfigId, SessionConfigKind, SessionConfigOption, SessionConfigOptionCategory,
     SessionConfigSelectOptions, SessionId, SetSessionConfigOptionRequest,
 };

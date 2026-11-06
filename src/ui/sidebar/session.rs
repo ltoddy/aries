@@ -1,4 +1,4 @@
-use agent_client_protocol::schema::v1::SessionInfo;
+use agent_client_protocol::v1::schema::SessionInfo;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::menu::{DropdownMenu, PopupMenuItem};

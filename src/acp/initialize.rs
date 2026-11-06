@@ -1,12 +1,13 @@
 use std::time::Duration;
 
 use agent_client_protocol::schema::ProtocolVersion;
-use agent_client_protocol::schema::v1::{
+use agent_client_protocol::v1::ConnectionTo;
+use agent_client_protocol::v1::schema::{
     AgentCapabilities, BooleanConfigOptionCapabilities, ClientCapabilities,
     ClientSessionCapabilities, CompactionCapabilities, Implementation, InitializeRequest,
     NoticeCapabilities, PlanCapabilities, SessionConfigOptionsCapabilities, SubagentCapabilities,
 };
-use agent_client_protocol::{Agent, ConnectionTo, Error};
+use agent_client_protocol::{Agent, Error};
 
 pub async fn request(connection: &ConnectionTo<Agent>) -> Result<AgentCapabilities, Error> {
     let response = tokio::time::timeout(

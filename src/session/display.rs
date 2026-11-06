@@ -1,4 +1,4 @@
-use agent_client_protocol::schema::v1::SessionUpdate;
+use agent_client_protocol::v1::schema::SessionUpdate;
 use serde_json::Value;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
