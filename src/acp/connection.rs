@@ -183,13 +183,13 @@ pub async fn connect(
         )
         .on_receive_request(
             async move |request, responder, _connection| {
-                create_terminal::handle(request, responder, create.clone()).await
+                create_terminal::handle(request, responder, &create).await
             },
             agent_client_protocol::on_receive_request!(),
         )
         .on_receive_request(
             async move |request, responder, _connection| {
-                terminal_output::handle(request, responder, output.clone()).await
+                terminal_output::handle(request, responder, &output).await
             },
             agent_client_protocol::on_receive_request!(),
         )
@@ -212,26 +212,28 @@ pub async fn connect(
             agent_client_protocol::on_receive_request!(),
         )
         .connect_with(AcpAgent::new(config), |client| async move {
-            let setup = initialize::request(&client);
-            tokio::pin!(setup);
             let mut pending = VecDeque::new();
-            let capabilities = loop {
-                tokio::select! {
-                    biased;
-                    command = commands.recv() => match command {
-                        Ok(Command::Cancel) => return Err(Error::internal_error().data("已停止连接 Aries")),
-                        Ok(command) => pending.push_back(command),
-                        Err(_) => return Ok(()),
-                    },
-                    _ = client.incoming_closed() => return Err(closed()),
-                    result = &mut setup => break result?,
+            let capabilities = {
+                let setup = initialize::request(&client);
+                tokio::pin!(setup);
+                loop {
+                    tokio::select! {
+                        biased;
+                        command = commands.recv() => match command {
+                            Ok(Command::Cancel) => return Err(Error::internal_error().data("已停止连接 Aries")),
+                            Ok(command) => pending.push_back(command),
+                            Err(_) => return Ok(()),
+                        },
+                        _ = client.incoming_closed() => return Err(closed()),
+                        result = &mut setup => break result?,
+                    }
                 }
             };
             let _ = events.send(Event::Connected {
                 list_sessions: capabilities.session_capabilities.list.is_some(),
                 load_session: capabilities.load_session,
             }).await;
-            AgentConnection { client: client.clone(), commands, events, cancel, capabilities }
+            AgentConnection { client, commands, events, cancel, capabilities }
                 .run(pending).await
         })
         .await

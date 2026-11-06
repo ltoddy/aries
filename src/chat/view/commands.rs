@@ -169,16 +169,16 @@ impl ChatView {
                             let name = command.name.clone();
                             let hint = match &command.input {
                                 Some(AvailableCommandInput::Unstructured(input)) => {
-                                    Some(input.hint.clone())
+                                    Some(input.hint.as_str())
                                 }
                                 _ => None,
                             };
-                            let details = format!(
+                            let details = SharedString::from(format!(
                                 "/{}{}\n{}",
                                 command.name,
                                 hint.map(|hint| format!(" {hint}")).unwrap_or_default(),
                                 command.description,
-                            );
+                            ));
                             div()
                                 .id(("slash-command", index))
                                 .flex()

@@ -45,14 +45,14 @@ impl ChatView {
         p: Palette,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let value = config::value_name(option);
+        let value = SharedString::from(config::value_name(option).into_owned());
         let label = if matches!(option.kind, SessionConfigKind::Boolean(_)) {
             value.clone()
         } else {
-            format!("{}：{value}", option.name)
+            SharedString::from(format!("{}：{value}", option.name))
         };
         let tooltip = match &option.description {
-            Some(description) => format!("{label}\n{description}"),
+            Some(description) => SharedString::from(format!("{label}\n{description}")),
             None => label.clone(),
         };
         let icon = match option.category {
@@ -135,7 +135,7 @@ impl ChatView {
                                     option.id.clone(),
                                     value,
                                 ),
-                                name.into(),
+                                name,
                                 value == current.current_value,
                             ));
                         }
@@ -200,7 +200,7 @@ impl ChatView {
 fn config_item(
     view: WeakEntity<ChatView>,
     request: SetSessionConfigOptionRequest,
-    name: String,
+    name: impl Into<SharedString>,
     selected: bool,
 ) -> PopupMenuItem {
     PopupMenuItem::new(name).checked(selected).on_click(move |_, _, cx| {

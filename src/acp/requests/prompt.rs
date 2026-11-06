@@ -35,21 +35,22 @@ pub async fn request(
     tokio::pin!(response);
     let deadline = tokio::time::sleep(Duration::from_secs(10));
     tokio::pin!(deadline);
-    let mut cancelling = false;
+    let mut cancel = Some(CancelNotification::new(session_id));
     let result = loop {
         tokio::select! {
             result = &mut response => break result,
             command = connection.commands().recv() => match command {
-                Ok(Command::Cancel) if !cancelling => {
-                    cancelling = true;
-                    connection.set_cancelled(true);
-                    connection.client().send_notification(CancelNotification::new(session_id.clone()))?;
-                    deadline.as_mut().reset(tokio::time::Instant::now() + Duration::from_secs(10));
+                Ok(Command::Cancel) => {
+                    if let Some(notification) = cancel.take() {
+                        connection.set_cancelled(true);
+                        connection.client().send_notification(notification)?;
+                        deadline.as_mut().reset(tokio::time::Instant::now() + Duration::from_secs(10));
+                    }
                 }
                 Ok(command) => connection.handle_busy_command(command).await,
                 Err(_) => return Ok(ControlFlow::Break(())),
             },
-            _ = &mut deadline, if cancelling => return Err(Error::internal_error().data("Agent 未响应停止请求，连接已关闭")),
+            _ = &mut deadline, if cancel.is_none() => return Err(Error::internal_error().data("Agent 未响应停止请求，连接已关闭")),
             _ = connection.client().incoming_closed() => return Err(connection::closed()),
         }
     };

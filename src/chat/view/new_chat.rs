@@ -87,9 +87,10 @@ impl ChatView {
         }
         self.choosing_directory = true;
         cx.spawn_in(window, async move |view, cx| {
-            let path = directory.clone();
-            let result =
-                cx.background_executor().spawn(async move { validate_directory(&path) }).await;
+            let (result, directory) = cx
+                .background_executor()
+                .spawn(async move { (validate_directory(&directory), directory) })
+                .await;
             let _ = view.update_in(cx, |this, window, cx| {
                 this.choosing_directory = false;
                 match result {

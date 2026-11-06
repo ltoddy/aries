@@ -5,7 +5,6 @@ use gpui_kit::component::{ActiveTheme, Icon, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
-use crate::chat::model::chat::Message;
 use crate::chat::view::ChatView;
 use crate::chat::view::palette::Palette;
 
@@ -13,7 +12,6 @@ impl ChatView {
     pub fn render_thought_message(
         &mut self,
         index: usize,
-        message: &Message,
         p: Palette,
         cx: &mut Context<Self>,
     ) -> AnyElement {
@@ -22,6 +20,8 @@ impl ChatView {
         } else {
             self.expanded_thoughts.contains(&index)
         };
+        let markdown = expanded.then(|| self.markdown_state(index, cx));
+        let message = &self.chat.messages()[index];
         div()
             .id(("message", index))
             .aria_label(message.title().to_owned())
@@ -76,10 +76,10 @@ impl ChatView {
                         cx.notify();
                     })),
             )
-            .when(expanded, |body| {
+            .when_some(markdown, |body, markdown| {
                 body.child(
                     div().w_full().min_w_0().child(
-                        TextView::new(&self.markdown_state(index, message.text(), cx))
+                        TextView::new(&markdown)
                             .selectable(true)
                             .scrollable(false)
                             .w_full()
@@ -98,7 +98,6 @@ impl ChatView {
                                         )
                                     })
                                     .child({
-                                        let code = code.clone();
                                         Button::new("copy-code-block")
                                             .ghost()
                                             .xsmall()

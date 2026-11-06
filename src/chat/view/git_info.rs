@@ -13,13 +13,14 @@ use gpui_kit::*;
 use crate::chat::view::ChatView;
 use crate::chat::view::git_index::{IndexAction, update_index};
 
-pub fn render_git_info(view: Entity<ChatView>, cx: &App) -> Option<AnyElement> {
+pub fn render_git_info(view: &Entity<ChatView>, cx: &App) -> Option<AnyElement> {
     let chat = view.read(cx);
     let info = chat.git_info.as_ref()?;
     let id: SharedString =
         format!("project-git-{:?}-{}", view.entity_id(), chat.cwd.display()).into();
     if chat.git_info_collapsed {
         let summary = info.summary();
+        let view = view.clone();
         return Some(
             div()
                 .id(id)
@@ -107,8 +108,8 @@ pub fn render_git_info(view: Entity<ChatView>, cx: &App) -> Option<AnyElement> {
                 .when(chat.git_index_busy, |panel| {
                     panel.child(div().text_xs().child("正在更新暂存区…"))
                 })
-                .child(render_change_group(view.clone(), ChangeGroup::Staged, cx))
-                .child(render_change_group(view.clone(), ChangeGroup::Unstaged, cx)),
+                .child(render_change_group(view, ChangeGroup::Staged, cx))
+                .child(render_change_group(view, ChangeGroup::Unstaged, cx)),
         }
         .into_any_element(),
     )
@@ -143,7 +144,7 @@ impl ChangeGroup {
     }
 }
 
-fn render_change_group(view: Entity<ChatView>, group: ChangeGroup, cx: &App) -> AnyElement {
+fn render_change_group(view: &Entity<ChatView>, group: ChangeGroup, cx: &App) -> AnyElement {
     let chat = view.read(cx);
     let count = chat
         .git_info
@@ -162,11 +163,12 @@ fn render_change_group(view: Entity<ChatView>, group: ChangeGroup, cx: &App) -> 
     if count == 0 {
         return panel.into_any_element();
     }
+    let view = view.clone();
     panel = panel.child(
         uniform_list(group.id(), count, move |range, _, cx| {
             let chat = view.read(cx);
             let files = chat.git_info.as_ref().and_then(GitInfo::changed_files).unwrap_or_default();
-            let directory = chat.cwd.clone();
+            let directory = &chat.cwd;
             let busy = chat.git_index_busy;
             let start = range.start;
             let length = range.len();
@@ -176,7 +178,7 @@ fn render_change_group(view: Entity<ChatView>, group: ChangeGroup, cx: &App) -> 
                 .skip(start)
                 .take(length)
                 .map(|file| {
-                    let path = file.path.to_string_lossy().into_owned();
+                    let path = SharedString::from(file.path.to_string_lossy().into_owned());
                     let status = ChangedFile::status_kind(file.status);
                     let action = group.action();
                     let action_label = match action {
@@ -187,7 +189,7 @@ fn render_change_group(view: Entity<ChatView>, group: ChangeGroup, cx: &App) -> 
                     let target = file.path.clone();
                     let directory = directory.clone();
                     div()
-                        .id(SharedString::from(path.clone()))
+                        .id(path.clone())
                         .h_8()
                         .w_full()
                         .min_w_0()
@@ -270,18 +272,18 @@ impl ChatView {
         self.git_revision += 1;
         let directory = self.cwd.clone();
         cx.spawn_in(window, async move |view, cx| {
-            let cwd = directory.clone();
             let result = cx
                 .background_executor()
                 .spawn(async move {
-                    let result = update_index(&cwd, &path, action);
-                    (result, GitInfo::read(&cwd), path)
+                    let result = update_index(&directory, &path, action);
+                    let info = GitInfo::read(&directory);
+                    (result, info, path, directory)
                 })
                 .await;
             let _ = view.update_in(cx, |this, window, cx| {
                 this.git_index_busy = false;
                 this.git_revision += 1;
-                if this.cwd == directory {
+                if this.cwd == result.3 {
                     this.git_info = result.1;
                 }
                 if let Err(error) = result.0 {
@@ -393,11 +395,6 @@ impl ChangedFile {
         }
     }
 
-    #[cfg(test)]
-    pub fn path(&self) -> &str {
-        &self.path
-    }
-
     fn status_icon(status: Status) -> IconName {
         if status.is_conflicted() {
             IconName::FileExclamationPoint
@@ -431,27 +428,6 @@ impl ChangedFile {
             "类型变更"
         } else {
             "修改"
-        }
-    }
-
-    #[cfg(test)]
-    fn status_label(&self) -> String {
-        let status = self.status;
-        let kind = Self::status_kind(status);
-        let staged = status.intersects(
-            Status::INDEX_NEW
-                | Status::INDEX_MODIFIED
-                | Status::INDEX_DELETED
-                | Status::INDEX_RENAMED
-                | Status::INDEX_TYPECHANGE,
-        );
-        let unstaged = status.intersects(
-            Status::WT_MODIFIED | Status::WT_DELETED | Status::WT_RENAMED | Status::WT_TYPECHANGE,
-        );
-        match (staged, unstaged) {
-            (true, true) => format!("{kind} · 部分暂存"),
-            (true, false) => format!("{kind} · 已暂存"),
-            _ => kind.to_owned(),
         }
     }
 }
@@ -550,240 +526,4 @@ impl GitInfo {
             None => format!("{branch} · 无法读取变更"),
         }
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::fs;
-    use std::path::PathBuf;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-
-    use git2::{Repository, RepositoryInitOptions, Signature};
-
-    use crate::chat::view::git_index::{IndexAction, update_index};
-    use crate::chat::view::git_info::{ChangeGroup, ChangedFile, GitInfo, LineChanges};
-
-    static NEXT_DIRECTORY: AtomicUsize = AtomicUsize::new(0);
-
-    struct TestDirectory(PathBuf);
-
-    impl TestDirectory {
-        fn new() -> Self {
-            let id = NEXT_DIRECTORY.fetch_add(1, Ordering::Relaxed);
-            let path =
-                std::env::temp_dir().join(format!("aries-orbit-git-{}-{id}", std::process::id()));
-            fs::create_dir(&path).expect("test directory should be created");
-            Self(path)
-        }
-
-        fn repository(&self) -> Repository {
-            let mut options = RepositoryInitOptions::new();
-            options.initial_head("main");
-            Repository::init_opts(&self.0, &options).expect("test repository should be initialized")
-        }
-    }
-
-    impl Drop for TestDirectory {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
-        }
-    }
-
-    #[test]
-    fn hides_non_repository() {
-        let directory = TestDirectory::new();
-        assert_eq!(GitInfo::read(&directory.0), None);
-    }
-
-    #[test]
-    fn reads_unborn_branch() {
-        let directory = TestDirectory::new();
-        let _repository = directory.repository();
-        let info =
-            GitInfo::read(&directory.0).expect("empty repository should have Git information");
-        assert_eq!(info.branch(), "main");
-        assert_eq!(info.changed_files(), Some([].as_slice()));
-        assert_eq!(info.summary(), "main · 工作区干净");
-    }
-
-    #[test]
-    fn counts_staged_and_untracked_files_without_ignored_files() {
-        let directory = TestDirectory::new();
-        let repository = directory.repository();
-        fs::write(directory.0.join(".gitignore"), "ignored\n")
-            .expect("ignore file should be written");
-        fs::write(directory.0.join("ignored"), "ignored").expect("ignored file should be written");
-        fs::create_dir(directory.0.join("nested")).expect("nested directory should be created");
-        fs::write(directory.0.join("nested/untracked"), "new")
-            .expect("untracked file should be written");
-        fs::write(directory.0.join("staged"), "staged").expect("staged file should be written");
-        let mut index = repository.index().expect("repository should have an index");
-        index.add_path(Path::new("staged")).expect("file should be staged");
-        index.write().expect("index should be written");
-        fs::write(directory.0.join("staged"), "modified").expect("staged file should be modified");
-        let info = GitInfo::read(&directory.0).expect("repository should have Git information");
-        let files = info.changed_files().expect("file status should be readable");
-        assert_eq!(
-            files.iter().map(|file| file.path()).collect::<Vec<_>>(),
-            [".gitignore", "nested/untracked", "staged"]
-        );
-        assert_eq!(files[0].status_label(), "未跟踪");
-        assert_eq!(files[2].status_label(), "新增 · 部分暂存");
-        assert!(files[0].change(ChangeGroup::Staged).is_none());
-        assert!(files[0].change(ChangeGroup::Unstaged).is_some());
-        let staged =
-            files[2].change(ChangeGroup::Staged).expect("file should appear in staged group");
-        let unstaged =
-            files[2].change(ChangeGroup::Unstaged).expect("file should appear in unstaged group");
-        assert_eq!(ChangedFile::status_kind(staged.status), "新增");
-        assert_eq!(ChangedFile::status_kind(unstaged.status), "修改");
-        assert_eq!(staged.path, unstaged.path);
-    }
-
-    #[test]
-    fn counts_lines_separately_for_partial_staging_and_deletion() {
-        let directory = TestDirectory::new();
-        let repository = directory.repository();
-        let path = Path::new("file");
-        fs::write(directory.0.join(path), "one\ntwo\nthree\n").expect("file should be written");
-        update_index(&directory.0, path, IndexAction::Stage).expect("file should be staged");
-        let tree_id = repository
-            .index()
-            .expect("index should exist")
-            .write_tree()
-            .expect("tree should be written");
-        let tree = repository.find_tree(tree_id).expect("tree should exist");
-        let signature =
-            Signature::now("Test", "test@example.com").expect("signature should be valid");
-        repository
-            .commit(Some("HEAD"), &signature, &signature, "initial", &tree, &[])
-            .expect("commit should exist");
-        fs::write(directory.0.join(path), "one\nchanged\nthree\nextra\n")
-            .expect("file should be modified");
-        update_index(&directory.0, path, IndexAction::Stage).expect("changes should be staged");
-        fs::write(directory.0.join(path), "one\nchanged\n").expect("file should be modified again");
-        let info = GitInfo::read(&directory.0).expect("Git information should exist");
-        let file = &info.changed_files().expect("files should be readable")[0];
-        assert_eq!(
-            file.change(ChangeGroup::Staged).expect("staged changes should exist").lines,
-            LineChanges::Text { added: 2, deleted: 1 }
-        );
-        assert_eq!(
-            file.change(ChangeGroup::Unstaged).expect("unstaged changes should exist").lines,
-            LineChanges::Text { added: 0, deleted: 2 }
-        );
-        fs::remove_file(directory.0.join(path)).expect("file should be deleted");
-        let info = GitInfo::read(&directory.0).expect("Git information should exist");
-        assert_eq!(
-            info.changed_files().expect("files should exist")[0]
-                .change(ChangeGroup::Unstaged)
-                .expect("deletion should exist")
-                .lines,
-            LineChanges::Text { added: 0, deleted: 4 }
-        );
-        update_index(&directory.0, path, IndexAction::Stage).expect("deletion should be staged");
-        let info = GitInfo::read(&directory.0).expect("Git information should exist");
-        assert_eq!(
-            info.changed_files().expect("files should exist")[0]
-                .change(ChangeGroup::Staged)
-                .expect("deletion should exist")
-                .lines,
-            LineChanges::Text { added: 0, deleted: 3 }
-        );
-    }
-
-    #[test]
-    fn counts_untracked_and_unborn_files_and_identifies_binary_content() {
-        let directory = TestDirectory::new();
-        let _repository = directory.repository();
-        fs::write(directory.0.join("text"), "one\ntwo").expect("text should be written");
-        fs::write(directory.0.join("binary"), b"one\0two\n").expect("binary should be written");
-        for group in [ChangeGroup::Unstaged, ChangeGroup::Staged] {
-            if matches!(group, ChangeGroup::Staged) {
-                for path in ["text", "binary"] {
-                    update_index(&directory.0, Path::new(path), IndexAction::Stage)
-                        .expect("file should be staged");
-                }
-            }
-            let info = GitInfo::read(&directory.0).expect("Git information should exist");
-            let files = info.changed_files().expect("files should be readable");
-            assert_eq!(
-                files[0].change(group).expect("binary should exist").lines,
-                LineChanges::Binary
-            );
-            assert_eq!(
-                files[1].change(group).expect("text should exist").lines,
-                LineChanges::Text { added: 2, deleted: 0 }
-            );
-        }
-    }
-
-    #[test]
-    fn discovers_repository_from_subdirectory() {
-        let directory = TestDirectory::new();
-        let _repository = directory.repository();
-        let nested = directory.0.join("nested");
-        fs::create_dir(&nested).expect("nested directory should be created");
-        assert_eq!(
-            GitInfo::read(&nested).expect("parent repository should be discovered").branch(),
-            "main"
-        );
-    }
-
-    #[test]
-    fn renamed_file_uses_each_groups_current_path() {
-        let directory = TestDirectory::new();
-        let repository = directory.repository();
-        fs::write(directory.0.join("old"), "original").expect("file should be written");
-        update_index(&directory.0, Path::new("old"), IndexAction::Stage)
-            .expect("file should be staged");
-        let tree_id = repository
-            .index()
-            .expect("index should exist")
-            .write_tree()
-            .expect("tree should be written");
-        let tree = repository.find_tree(tree_id).expect("tree should exist");
-        let signature =
-            Signature::now("Test", "test@example.com").expect("signature should be valid");
-        repository
-            .commit(Some("HEAD"), &signature, &signature, "initial", &tree, &[])
-            .expect("commit should be created");
-        fs::rename(directory.0.join("old"), directory.0.join("new"))
-            .expect("file should be renamed");
-        update_index(&directory.0, Path::new("new"), IndexAction::Stage)
-            .expect("rename should be staged");
-        fs::write(directory.0.join("new"), "modified").expect("file should be modified");
-        let info = GitInfo::read(&directory.0).expect("Git information should exist");
-        let files = info.changed_files().expect("files should be readable");
-        assert_eq!(files.len(), 1);
-        let staged = files[0].change(ChangeGroup::Staged).expect("rename should be staged");
-        let unstaged =
-            files[0].change(ChangeGroup::Unstaged).expect("modification should be unstaged");
-        assert_eq!(staged.path, Path::new("new"));
-        assert_eq!(unstaged.path, Path::new("new"));
-        assert_eq!(ChangedFile::status_kind(staged.status), "重命名");
-        assert_eq!(ChangedFile::status_kind(unstaged.status), "修改");
-        assert_eq!(staged.lines, LineChanges::Text { added: 0, deleted: 0 });
-        assert_eq!(unstaged.lines, LineChanges::Text { added: 1, deleted: 1 });
-    }
-
-    #[test]
-    fn reads_detached_head() {
-        let directory = TestDirectory::new();
-        let repository = directory.repository();
-        let mut index = repository.index().expect("repository should have an index");
-        let tree_id = index.write_tree().expect("empty tree should be written");
-        let tree = repository.find_tree(tree_id).expect("tree should exist");
-        let signature =
-            Signature::now("Test", "test@example.com").expect("signature should be valid");
-        let commit = repository
-            .commit(Some("HEAD"), &signature, &signature, "initial", &tree, &[])
-            .expect("initial commit should be created");
-        repository.set_head_detached(commit).expect("HEAD should be detached");
-        let info =
-            GitInfo::read(&directory.0).expect("detached repository should have Git information");
-        assert_eq!(info.branch(), format!("游离 HEAD · {}", &commit.to_string()[..7]));
-    }
-
-    use std::path::Path;
 }

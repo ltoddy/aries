@@ -105,7 +105,6 @@ impl ChatView {
                                         )
                                     })
                                     .child({
-                                        let code = code.clone();
                                         Button::new("copy-code-block")
                                             .ghost()
                                             .xsmall()

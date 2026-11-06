@@ -152,16 +152,16 @@ impl TabsView {
         view
     }
 
-    pub fn active_view(&self) -> Option<Entity<ChatView>> {
-        self.tabs.get(self.active).map(|tab| tab.view.clone())
+    pub fn active_view(&self) -> Option<&Entity<ChatView>> {
+        self.tabs.get(self.active).map(|tab| &tab.view)
     }
 
     pub fn is_new_session_available(&self, cx: &App) -> bool {
-        self.active_view().unwrap_or_else(|| self.sidebar.clone()).read(cx).can_start_new_chat()
+        self.active_view().unwrap_or(&self.sidebar).read(cx).can_start_new_chat()
     }
 
     fn new_session(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let view = self.active_view().unwrap_or_else(|| self.sidebar.clone());
+        let view = self.active_view().unwrap_or(&self.sidebar);
         view.update(cx, |view, cx| {
             if view.session_id.is_some() || view.session_directory_selected {
                 view.new_chat_in_directory(view.cwd.clone(), window, cx);
@@ -198,8 +198,11 @@ impl TabsView {
     }
 
     fn sync_sidebar_active_session(&mut self, cx: &mut Context<Self>) {
-        let session_id =
-            self.tabs.get(self.active).and_then(|tab| tab.view.read(cx).active_session_id());
+        let session_id = self
+            .tabs
+            .get(self.active)
+            .and_then(|tab| tab.view.read(cx).active_session_id())
+            .cloned();
         self.sidebar.update(cx, |view, _| {
             if let Some(id) = session_id {
                 view.track_tab_session(id);
@@ -224,7 +227,7 @@ impl TabsView {
         let session_id = session.session_id.clone();
         if let Some(index) = self.find_session_tab(&session_id, cx) {
             self.select_tab(index, window, cx);
-            self.set_sidebar_session(session_id.clone(), cx);
+            self.set_sidebar_session(session_id, cx);
             cx.notify();
             return;
         }
@@ -232,7 +235,7 @@ impl TabsView {
             && tab.view.read(cx).is_empty_tab(cx)
         {
             tab.view.update(cx, |view, cx| view.queue_session_load(session, cx));
-            self.set_sidebar_session(session_id.clone(), cx);
+            self.set_sidebar_session(session_id, cx);
             cx.notify();
             return;
         }
@@ -244,7 +247,7 @@ impl TabsView {
         self.tabs.push(ChatTab { id, view, _subscription: subscription });
         self.active = self.tabs.len() - 1;
         self.tab_scroll.scroll_to_item(self.active);
-        self.set_sidebar_session(session_id.clone(), cx);
+        self.set_sidebar_session(session_id, cx);
         cx.notify();
     }
 
@@ -568,11 +571,11 @@ impl ChatView {
             && self.is_session_idle()
     }
 
-    pub fn active_session_id(&self) -> Option<SessionId> {
+    pub fn active_session_id(&self) -> Option<&SessionId> {
         self.session_id
-            .clone()
-            .or_else(|| self.loading_session.as_ref().map(|l| l.session_id().clone()))
-            .or_else(|| self.queued_session_load.as_ref().map(|s| s.session_id.clone()))
+            .as_ref()
+            .or_else(|| self.loading_session.as_ref().map(|l| l.session_id()))
+            .or_else(|| self.queued_session_load.as_ref().map(|s| &s.session_id))
     }
 
     pub fn tab_title(&self) -> String {
@@ -591,8 +594,8 @@ impl ChatView {
 impl Render for TabsView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let p = Palette::new(cx.theme().mode);
-        let active = self.active_view();
-        let view = active.clone().unwrap_or_else(|| self.sidebar.clone());
+        let active = self.active_view().cloned();
+        let view = active.as_ref().unwrap_or(&self.sidebar);
         let git_info = crate::chat::view::git_info::render_git_info(view, cx);
         div()
             .size_full()

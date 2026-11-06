@@ -96,13 +96,12 @@ fn file_name<'a>(uri: &'a str, fallback: &'a str) -> &'a str {
 
 impl ChatView {
     pub fn render_attachment(
-        &mut self,
+        &self,
         message_index: usize,
         attachment_index: usize,
         content: &ContentBlock,
         p: Palette,
     ) -> AnyElement {
-        self.cache_attachment_image(message_index, attachment_index, content);
         let info = AttachmentInfo::from(content);
         let subtitle = info
             .mime_type
@@ -115,6 +114,7 @@ impl ChatView {
             .filter(|text| !text.is_empty())
             .collect::<Vec<_>>()
             .join("\n");
+        let details = SharedString::from(details);
         let icon = info.icon;
         let preview = match self.attachment_images.get(&(message_index, attachment_index)) {
             Some(image) => img(image.clone())

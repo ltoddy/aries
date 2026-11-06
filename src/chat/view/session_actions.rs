@@ -46,12 +46,14 @@ impl ChatView {
         if !self.can_manage_sessions() {
             return;
         }
-        let available: HashSet<_> = self.session_ids(None).into_iter().collect();
-        let mut seen = HashSet::new();
-        let ids: Vec<_> = ids
-            .into_iter()
-            .filter(|id| available.contains(id) && seen.insert(id.clone()))
+        let mut available: HashSet<_> = self
+            .session_list
+            .entries()
+            .iter()
+            .map(|session| &session.session_id)
+            .chain(self.session_id.as_ref())
             .collect();
+        let ids: Vec<_> = ids.into_iter().filter(|id| available.remove(id)).collect();
         if ids.is_empty() {
             return;
         }
@@ -100,14 +102,6 @@ impl ChatView {
     ) {
         let (deleted, failed) = result.into_parts();
         let deleted: HashSet<_> = deleted.into_iter().collect();
-        if !deleted.is_empty()
-            && let Some(host) = self.tab_host.clone()
-        {
-            let deleted = deleted.clone();
-            cx.defer(move |cx| {
-                let _ = host.update(cx, |host, cx| host.close_deleted_sessions(&deleted, cx));
-            });
-        }
         self.drafts.retain(|id, _| !deleted.contains(id));
         if self.session_id.as_ref().is_some_and(|id| deleted.contains(id)) {
             self.reset_chat();
@@ -142,6 +136,13 @@ impl ChatView {
         };
         window.push_notification(notification.autohide(true), cx);
         self.session_deletion.finish_deletion(error);
+        if !deleted.is_empty()
+            && let Some(host) = self.tab_host.clone()
+        {
+            cx.defer(move |cx| {
+                let _ = host.update(cx, |host, cx| host.close_deleted_sessions(&deleted, cx));
+            });
+        }
         self.refresh_sessions(cx);
         cx.notify();
     }
@@ -169,12 +170,13 @@ impl ChatView {
 
     pub fn render_session_delete_popup(
         &self,
-        anchor: String,
+        anchor: impl AsRef<str>,
         p: Palette,
         cx: &mut Context<Self>,
     ) -> Option<AnyElement> {
+        let anchor = anchor.as_ref();
         let pending = self.session_deletion.pending_deletion()?;
-        if !pending.is_anchor(&anchor) {
+        if !pending.is_anchor(anchor) {
             return None;
         }
         Some(

@@ -84,8 +84,9 @@ impl ChatView {
                 else {
                     return;
                 };
-                let cwd = directory.clone();
-                let info = cx.background_spawn(async move { GitInfo::read(&cwd) }).await;
+                let (info, directory) = cx
+                    .background_spawn(async move { (GitInfo::read(&directory), directory) })
+                    .await;
                 if view
                     .update(cx, |this, cx| {
                         if this.cwd == directory

@@ -42,8 +42,8 @@ impl ChatView {
                     .on_click({
                         let session_id = subagent.session_id().clone();
                         cx.listener(move |this, _, _, cx| {
-                            if !this.collapsed_subagents.insert(session_id.clone()) {
-                                this.collapsed_subagents.remove(&session_id);
+                            if !this.collapsed_subagents.remove(&session_id) {
+                                this.collapsed_subagents.insert(session_id.clone());
                             }
                             cx.notify();
                         })
@@ -148,7 +148,6 @@ impl ChatView {
                             )
                         })
                         .child({
-                            let code = code.clone();
                             Button::new("copy-code-block")
                                 .ghost()
                                 .xsmall()

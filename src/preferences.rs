@@ -56,7 +56,7 @@ impl Preferences {
         dirs::config_dir().map(|path| path.join("aries-orbit/preferences.json"))
     }
 
-    pub fn load(path: &Path) -> std::io::Result<Self> {
+    pub fn load(path: impl AsRef<Path>) -> std::io::Result<Self> {
         let text = fs::read_to_string(path)?;
         let settings: Self = toml::from_str(&text)
             .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
@@ -108,7 +108,8 @@ impl Preferences {
         }
     }
 
-    pub fn save(&self, path: &Path) -> std::io::Result<()> {
+    pub fn save(&self, path: impl AsRef<Path>) -> std::io::Result<()> {
+        let path = path.as_ref();
         let text = toml::to_string_pretty(self)
             .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
         if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {

@@ -99,7 +99,6 @@ impl ChatView {
         }
         self.sync_timeline_items();
         let messages = self.chat.messages().len();
-        let error = self.chat.error().map(str::to_owned);
         let view = cx.weak_entity();
         let timeline = self.timeline.clone();
         div()
@@ -113,7 +112,6 @@ impl ChatView {
             .child(
                 div().w_full().h_full().child(
                     list(timeline, move |index, window, cx| {
-                        let view = view.clone();
                         view.update(cx, |this, cx| {
                             let gap = match this.chat.messages().get(index).map(|m| m.role()) {
                                 Some(Role::User) => rems(0.75),
@@ -133,7 +131,7 @@ impl ChatView {
                                             .border_1()
                                             .border_color(p.border())
                                             .text_color(p.danger())
-                                            .child(error.clone().unwrap_or_default())
+                                            .child(this.chat.error().unwrap_or_default().to_owned())
                                             .into_any_element()
                                     },
                                 ))
@@ -230,9 +228,8 @@ impl ChatView {
             .iter()
             .enumerate()
             .filter(|(_, message)| matches!(message.role(), Role::User))
-            .map(|(index, message)| (index, message.text().to_owned()))
-            .collect::<Vec<_>>();
-        if anchors.is_empty() {
+            .map(|(index, message)| (index, message.text()));
+        if anchors.clone().next().is_none() {
             return div().into_any_element();
         }
         div()
@@ -248,7 +245,7 @@ impl ChatView {
             .items_center()
             .gap_1()
             .overflow_y_scroll()
-            .children(anchors.into_iter().enumerate().map(|(anchor_index, (index, text))| {
+            .children(anchors.enumerate().map(|(anchor_index, (index, text))| {
                 let timeline = timeline.clone();
                 let view = view.clone();
                 let preview = text.chars().take(300).collect::<String>();
@@ -298,9 +295,9 @@ impl ChatView {
     pub fn markdown_state(
         &mut self,
         index: usize,
-        text: &str,
         cx: &mut Context<Self>,
     ) -> Entity<TextViewState> {
+        let text = self.chat.messages()[index].text();
         let value = if text.is_empty() { "（空内容）" } else { text };
         let state = self
             .markdown
@@ -319,7 +316,10 @@ impl ChatView {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         self.cache_visible_images(index);
-        let message = self.chat.messages()[index].clone();
+        if self.chat.messages()[index].role() == Role::Thought {
+            return self.render_thought_message(index, p, cx);
+        }
+        let message = &self.chat.messages()[index];
         if let Some(subagent) = message.subagent() {
             return self.render_subagent_message(subagent, p, cx);
         }
@@ -327,11 +327,10 @@ impl ChatView {
             return self.render_tool_message(index, tool, p, window, cx);
         }
         if message.role() == Role::User {
-            return self.render_user_message(index, &message, p);
+            return self.render_user_message(index, message, p);
         }
-        if message.role() == Role::Thought {
-            return self.render_thought_message(index, &message, p, cx);
-        }
+        let markdown = self.markdown_state(index, cx);
+        let message = &self.chat.messages()[index];
         let card = message.role() == Role::Event;
         let body = div()
             .w_full()
@@ -362,7 +361,7 @@ impl ChatView {
                 )
             })
             .child(
-                TextView::new(&self.markdown_state(index, message.text(), cx))
+                TextView::new(&markdown)
                     .style(markdown_style())
                     .selectable(true)
                     .scrollable(false)
@@ -382,7 +381,6 @@ impl ChatView {
                                 )
                             })
                             .child({
-                                let code = code.clone();
                                 Button::new("copy-code-block")
                                     .ghost()
                                     .xsmall()

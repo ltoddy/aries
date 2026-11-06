@@ -19,8 +19,10 @@ impl ChatView {
             .tab_host
             .as_ref()
             .and_then(|host| host.upgrade())
-            .and_then(|host| host.read(cx).active_view())
-            .map_or_else(|| self.can_start_new_chat(), |view| view.read(cx).can_start_new_chat());
+            .and_then(|host| {
+                host.read(cx).active_view().map(|view| view.read(cx).can_start_new_chat())
+            })
+            .unwrap_or_else(|| self.can_start_new_chat());
         div()
             .id("sidebar")
             .w_full()

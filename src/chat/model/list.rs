@@ -47,11 +47,21 @@ impl SessionList {
             .map(|&index| &self.entries[index])
     }
 
-    fn rebuild_indices(&mut self) {
+    fn rebuild_projects(&mut self) {
         self.projects.clear();
+        for (index, session) in self.entries.iter().enumerate() {
+            if let Some(indices) = self.projects.get_mut(session.cwd.as_path()) {
+                indices.push(index);
+            } else {
+                self.projects.insert(session.cwd.clone(), vec![index]);
+            }
+        }
+    }
+
+    fn rebuild_indices(&mut self) {
+        self.rebuild_projects();
         self.indices.clear();
         for (index, session) in self.entries.iter().enumerate() {
-            self.projects.entry(session.cwd.clone()).or_default().push(index);
             self.indices.insert(session.session_id.clone(), index);
         }
     }
@@ -126,13 +136,17 @@ impl SessionList {
         }
         self.state = ListState::Ready;
         match result {
-            Ok(sessions) => {
-                let mut ids = HashSet::new();
-                self.entries = sessions
-                    .into_iter()
-                    .filter(|session| ids.insert(session.session_id.clone()))
-                    .collect();
-                self.rebuild_indices();
+            Ok(mut sessions) => {
+                self.indices.clear();
+                sessions.retain(|session| {
+                    if self.indices.contains_key(&session.session_id) {
+                        return false;
+                    }
+                    self.indices.insert(session.session_id.clone(), self.indices.len());
+                    true
+                });
+                self.entries = sessions;
+                self.rebuild_projects();
                 self.error = None;
             }
             Err(error) => self.error = Some(error.to_string()),
@@ -157,11 +171,17 @@ impl SessionList {
     }
 
     pub fn expand_project(&mut self, cwd: &Path) {
-        self.expanded_cwds.insert(cwd.to_path_buf());
+        if !self.expanded_cwds.contains(cwd) {
+            self.expanded_cwds.insert(cwd.to_path_buf());
+        }
     }
 
     pub fn expand_all(&mut self) {
-        self.expanded_cwds.extend(self.projects.keys().cloned());
+        for cwd in self.projects.keys() {
+            if !self.expanded_cwds.contains(cwd.as_path()) {
+                self.expanded_cwds.insert(cwd.clone());
+            }
+        }
     }
 
     pub fn collapse_all(&mut self) {

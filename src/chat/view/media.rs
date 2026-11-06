@@ -78,7 +78,17 @@ impl ChatView {
             return;
         }
         let message = &self.chat.messages()[index];
-        if message.role() == Role::User || message.tool_call().is_some() {
+        if message.role() == Role::User {
+            for (attachment_index, content) in message.attachments() {
+                if !self.attachment_images.contains_key(&(index, attachment_index))
+                    && let Some(image) = content_image(content)
+                {
+                    self.attachment_images.insert((index, attachment_index), image);
+                }
+            }
+            return;
+        }
+        if message.tool_call().is_some() {
             return;
         }
         let images = if let Some(compaction) = message.compaction() {
@@ -97,20 +107,6 @@ impl ChatView {
         };
         if !images.is_empty() {
             self.images.insert(index, images);
-        }
-    }
-
-    pub fn cache_attachment_image(
-        &mut self,
-        message_index: usize,
-        attachment_index: usize,
-        content: &ContentBlock,
-    ) {
-        if self.attachment_images.contains_key(&(message_index, attachment_index)) {
-            return;
-        }
-        if let Some(image) = content_image(content) {
-            self.attachment_images.insert((message_index, attachment_index), image);
         }
     }
 }

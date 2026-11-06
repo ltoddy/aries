@@ -48,7 +48,7 @@ impl ChatView {
         };
         let color = if failed { p.danger() } else { p.muted() };
         let title = crate::chat::view::single_line(tool.title());
-        let details = format!("{} · {status}", tool.title());
+        let details = SharedString::from(format!("{} · {status}", tool.title()));
         div()
             .id(("message", index))
             .aria_label(format!("工具调用：{} · {status}", tool.title()))

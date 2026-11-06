@@ -12,8 +12,6 @@ use tokio::io::AsyncReadExt;
 use tokio::process::{Child, Command};
 use tokio::sync::{mpsc, watch};
 
-type Key = (SessionId, TerminalId);
-
 #[derive(Debug)]
 struct Terminal {
     output: watch::Receiver<TerminalOutputResponse>,
@@ -22,7 +20,7 @@ struct Terminal {
 
 #[derive(Debug)]
 pub struct Terminals {
-    entries: Mutex<HashMap<Key, Terminal>>,
+    entries: Mutex<HashMap<SessionId, HashMap<TerminalId, Terminal>>>,
     next_id: AtomicU64,
     prefix: u128,
 }
@@ -61,13 +59,14 @@ impl Terminals {
             self.prefix,
             self.next_id.fetch_add(1, Ordering::Relaxed)
         ));
-        let key = (request.session_id, id.clone());
         let (output, receiver) = watch::channel(TerminalOutputResponse::new("", false));
         let (kill, kills) = mpsc::unbounded_channel();
         self.entries
             .lock()
             .expect("terminal entries lock poisoned")
-            .insert(key, Terminal { output: receiver, kill });
+            .entry(request.session_id)
+            .or_default()
+            .insert(id.clone(), Terminal { output: receiver, kill });
         let limit =
             usize::try_from(request.output_byte_limit.unwrap_or(1024 * 1024)).unwrap_or(usize::MAX);
         tokio::spawn(run(process, output, kills, limit));
@@ -79,7 +78,12 @@ impl Terminals {
         session: &SessionId,
         id: &TerminalId,
     ) -> Result<TerminalOutputResponse, Error> {
-        Ok(self.receiver(session, id)?.borrow().clone())
+        let entries = self.entries.lock().expect("terminal entries lock poisoned");
+        entries
+            .get(session)
+            .and_then(|terminals| terminals.get(id))
+            .map(|terminal| terminal.output.borrow().clone())
+            .ok_or_else(|| Error::invalid_params().data("终端不存在或已释放"))
     }
 
     fn receiver(
@@ -90,7 +94,8 @@ impl Terminals {
         self.entries
             .lock()
             .expect("terminal entries lock poisoned")
-            .get(&(session.clone(), id.clone()))
+            .get(session)
+            .and_then(|terminals| terminals.get(id))
             .map(|terminal| terminal.output.clone())
             .ok_or_else(|| Error::invalid_params().data("终端不存在或已释放"))
     }
@@ -113,7 +118,8 @@ impl Terminals {
         {
             let entries = self.entries.lock().expect("terminal entries lock poisoned");
             let terminal = entries
-                .get(&(session.clone(), id.clone()))
+                .get(session)
+                .and_then(|terminals| terminals.get(id))
                 .ok_or_else(|| Error::invalid_params().data("终端不存在或已释放"))?;
             let _ = terminal.kill.send(());
         }
@@ -123,10 +129,13 @@ impl Terminals {
 
     pub async fn release(&self, session: &SessionId, id: &TerminalId) -> Result<(), Error> {
         self.kill(session, id).await?;
-        self.entries
-            .lock()
-            .expect("terminal entries lock poisoned")
-            .remove(&(session.clone(), id.clone()));
+        let mut entries = self.entries.lock().expect("terminal entries lock poisoned");
+        if let Some(terminals) = entries.get_mut(session) {
+            terminals.remove(id);
+            if terminals.is_empty() {
+                entries.remove(session);
+            }
+        }
         Ok(())
     }
 }

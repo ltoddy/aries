@@ -7,12 +7,7 @@ use crate::chat::view::ChatView;
 use crate::chat::view::palette::Palette;
 
 impl ChatView {
-    pub fn render_user_message(
-        &mut self,
-        index: usize,
-        message: &Message,
-        p: Palette,
-    ) -> AnyElement {
+    pub fn render_user_message(&self, index: usize, message: &Message, p: Palette) -> AnyElement {
         div()
             .id(("message", index))
             .aria_label("用户消息")

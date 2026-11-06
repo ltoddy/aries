@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use agent_client_protocol::v1::schema::{
     SessionConfigKind, SessionConfigOption, SessionConfigOptionValue, SessionConfigSelectOption,
     SessionConfigSelectOptions,
@@ -14,16 +16,20 @@ pub fn select_options(
     options.iter().chain(groups.iter().flat_map(|group| &group.options))
 }
 
-pub fn value_name(option: &SessionConfigOption) -> String {
+pub fn value_name(option: &SessionConfigOption) -> Cow<'_, str> {
     match &option.kind {
-        SessionConfigKind::Select(select) => select_options(&select.options)
-            .find(|choice| choice.value == select.current_value)
-            .map(|choice| choice.name.clone())
-            .unwrap_or_else(|| select.current_value.to_string()),
-        SessionConfigKind::Boolean(value) => {
-            format!("{}：{}", option.name, if value.current_value { "开启" } else { "关闭" })
-        }
-        _ => option.name.clone(),
+        SessionConfigKind::Select(select) => Cow::Borrowed(
+            select_options(&select.options)
+                .find(|choice| choice.value == select.current_value)
+                .map(|choice| choice.name.as_str())
+                .unwrap_or(&select.current_value.0),
+        ),
+        SessionConfigKind::Boolean(value) => Cow::Owned(format!(
+            "{}：{}",
+            option.name,
+            if value.current_value { "开启" } else { "关闭" }
+        )),
+        _ => Cow::Borrowed(&option.name),
     }
 }
 
