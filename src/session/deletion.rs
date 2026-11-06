@@ -12,7 +12,6 @@ enum DeletionState {
 pub struct SessionDeletion {
     deletion: DeletionState,
     error: Option<String>,
-    notice: Option<String>,
 }
 
 #[derive(Debug)]
@@ -48,7 +47,6 @@ impl SessionDeletion {
             return;
         }
         self.error = None;
-        self.notice = None;
         self.deletion = DeletionState::Confirming(PendingDeletion { ids, anchor });
     }
 
@@ -76,9 +74,8 @@ impl SessionDeletion {
         self.error = Some(error);
     }
 
-    pub fn finish_deletion(&mut self, notice: String, error: Option<String>) {
+    pub fn finish_deletion(&mut self, error: Option<String>) {
         self.deletion = DeletionState::Idle;
-        self.notice = Some(notice);
         self.error = error;
     }
 
@@ -92,9 +89,5 @@ impl SessionDeletion {
 
     pub fn error(&self) -> Option<&str> {
         self.error.as_deref()
-    }
-
-    pub fn notice(&self) -> Option<&str> {
-        self.notice.as_deref()
     }
 }

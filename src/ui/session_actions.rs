@@ -2,8 +2,9 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use agent_client_protocol::schema::v1::SessionId;
-use gpui_kit::component::Sizable;
 use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::notification::Notification;
+use gpui_kit::component::{Sizable, WindowExt};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -126,7 +127,13 @@ impl ChatView {
                 .collect::<Vec<_>>()
                 .join("\n")
         });
-        self.session_deletion.finish_deletion(notice, error);
+        let notification = if failed.is_empty() {
+            Notification::success(notice)
+        } else {
+            Notification::warning(notice)
+        };
+        window.push_notification(notification.autohide(true), cx);
+        self.session_deletion.finish_deletion(error);
         self.refresh_sessions(cx);
         cx.notify();
     }
@@ -137,9 +144,6 @@ impl ChatView {
             .flex_shrink_0()
             .when(actions.is_deleting(), |panel| {
                 panel.child(div().p_2().text_xs().text_color(p.muted()).child("正在删除会话…"))
-            })
-            .when_some(actions.notice().map(str::to_owned), |panel, notice| {
-                panel.child(div().p_2().text_xs().text_color(p.muted()).child(notice))
             })
             .when_some(actions.error().map(str::to_owned), |panel, error| {
                 panel.child(
