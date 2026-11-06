@@ -8,12 +8,16 @@ use agent_client_protocol::{AcpAgent, AcpAgentConfig, Agent, Error};
 use async_channel::{Receiver, Sender};
 use tokio::sync::watch;
 
-use crate::acp::terminal::Terminals;
-use crate::acp::{
-    Command, DeletionReport, Event, create_terminal, delete_sessions, initialize, kill_terminal,
-    list_sessions, load_session, new_session, prompt, release_terminal, request_permission,
-    session_update, set_session_config_option, terminal_output, wait_for_terminal_exit,
+use crate::acp::handlers::{
+    create_terminal, kill_terminal, release_terminal, request_permission, session_update,
+    terminal_output, wait_for_terminal_exit,
 };
+use crate::acp::requests::{
+    delete_sessions, initialize, list_sessions, load_session, new_session, prompt,
+    set_session_config_option,
+};
+use crate::acp::terminal::Terminals;
+use crate::acp::{Command, DeletionReport, Event};
 
 pub struct AgentConnection {
     client: ConnectionTo<Agent>,

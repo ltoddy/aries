@@ -1,16 +1,15 @@
 #![warn(missing_debug_implementations)]
 
 mod acp;
+mod chat;
 mod preferences;
-mod session;
-mod ui;
 
 use gpui_kit::assets::AllAssets;
 use gpui_kit::*;
 
 use crate::acp::aries_config;
+use crate::chat::view::TabsView;
 use crate::preferences::Preferences;
-use crate::ui::TabsView;
 
 gpui_kit::actions!(
     orbit,
