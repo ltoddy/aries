@@ -93,7 +93,7 @@ impl ChatView {
                             .min_w_0()
                             .style(markdown_style())
                             .selectable(true)
-                            .scrollable(true)
+                            .scrollable(false)
                             .code_block_actions(|code_block, _window, cx| {
                                 let code = code_block.code().to_string();
                                 div()
