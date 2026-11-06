@@ -156,11 +156,7 @@ impl UpdateDisplay {
                 format!("{}\n\n{}", string(&value, "severity"), string(&value, "description")),
             ),
             "compaction_update" => {
-                let mut parts = vec![format!(
-                    "{} · {}",
-                    string(&value, "compactionId"),
-                    status(&value["status"])
-                )];
+                let mut parts = Vec::new();
                 if let Some(summary) = value["summary"].as_array() {
                     parts.extend(summary.iter().map(content));
                 }
@@ -169,10 +165,7 @@ impl UpdateDisplay {
                 }
                 ("上下文压缩".into(), parts.join("\n\n"))
             }
-            "compaction_summary_chunk" => (
-                "压缩摘要".into(),
-                format!("{}\n\n{}", string(&value, "compactionId"), content(&value["content"])),
-            ),
+            "compaction_summary_chunk" => ("压缩摘要".into(), content(&value["content"])),
             "subagent_update" => {
                 let mut parts = vec![code_block("", string(&value, "sessionId"))];
                 if let Some(title) = value.get("title").and_then(Value::as_str) {

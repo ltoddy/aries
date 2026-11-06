@@ -1,4 +1,4 @@
-pub(crate) mod motion;
+pub mod motion;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -193,7 +193,7 @@ pub fn render_git_info(
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum ChangeGroup {
+pub enum ChangeGroup {
     Staged,
     Unstaged,
 }
@@ -440,7 +440,7 @@ impl ChatView {
         cx.notify();
     }
 
-    pub(crate) fn sync_git_info(
+    pub fn sync_git_info(
         &mut self,
         result: Result<Option<GitInfo>, String>,
         animate: bool,
@@ -555,7 +555,7 @@ impl ChatView {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct FileChange {
+pub struct FileChange {
     path: PathBuf,
     status: Status,
     lines: LineChanges,

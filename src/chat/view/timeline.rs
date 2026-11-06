@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use agent_client_protocol::schema::MaybeUndefined;
+use agent_client_protocol::v1::schema::CompactionStatus;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::text::{TextView, TextViewState, TextViewStyle};
@@ -8,8 +10,10 @@ use gpui_kit::prelude::*;
 use gpui_kit::*;
 
 use crate::chat::model::chat::Role;
+use crate::chat::model::display::UpdateDisplay;
 use crate::chat::view::ChatView;
 use crate::chat::view::palette::Palette;
+use crate::chat::view::tool_message::MessageStatusIcon;
 use crate::{NextUserMessage, PreviousUserMessage};
 
 fn user_message_target(
@@ -300,7 +304,13 @@ impl ChatView {
         index: usize,
         cx: &mut Context<Self>,
     ) -> Entity<TextViewState> {
-        let text = self.chat.messages()[index].text();
+        let message = &self.chat.messages()[index];
+        let compaction_body = message.compaction().map(|state| {
+            let mut error = state.clone();
+            error.summary = MaybeUndefined::Undefined;
+            UpdateDisplay::from(&error).into_parts().1
+        });
+        let text = compaction_body.as_deref().unwrap_or_else(|| message.text());
         let value = if text.is_empty() { "（空内容）" } else { text };
         let state = self
             .markdown
@@ -334,7 +344,15 @@ impl ChatView {
         }
         let markdown = self.markdown_state(index, cx);
         let message = &self.chat.messages()[index];
-        let card = message.role() == Role::Event;
+        let compaction = message.compaction();
+        let compaction_status = compaction.map(|state| match state.status {
+            CompactionStatus::InProgress => ("进行中", IconName::Loader),
+            CompactionStatus::Completed => ("已完成", IconName::CircleCheck),
+            CompactionStatus::Failed => ("失败", IconName::CircleX),
+            CompactionStatus::Cancelled => ("已取消", IconName::CirclePause),
+            _ => ("未知状态", IconName::CircleQuestionMark),
+        });
+        let card = message.role() == Role::Event && compaction.is_none();
         let body = div()
             .w_full()
             .min_w_0()
@@ -352,6 +370,7 @@ impl ChatView {
             .when(card || !message.title().is_empty(), |body| {
                 body.child(
                     div()
+                        .id(("message-header", index))
                         .flex()
                         .items_center()
                         .gap_2()
@@ -360,49 +379,96 @@ impl ChatView {
                         .when(card, |header| {
                             header.child(Icon::new(IconName::Activity).size(rems(0.875)))
                         })
+                        .when_some(
+                            compaction.zip(compaction_status),
+                            |header, (state, (_, icon))| {
+                                let color = if state.status == CompactionStatus::Failed {
+                                    p.danger()
+                                } else {
+                                    p.muted()
+                                };
+                                let mut summary = state.clone();
+                                summary.error = MaybeUndefined::Undefined;
+                                let summary = UpdateDisplay::from(&summary).into_parts().1;
+                                header
+                                    .h_6()
+                                    .when(!summary.is_empty(), |header| {
+                                        header.tooltip(move |window, cx| {
+                                            gpui_kit::component::tooltip::Tooltip::new(
+                                                summary.clone(),
+                                            )
+                                            .build(window, cx)
+                                        })
+                                    })
+                                    .child(MessageStatusIcon {
+                                        id: ElementId::NamedChild(
+                                            ElementId::from((
+                                                "compaction-status-motion",
+                                                cx.entity_id(),
+                                            ))
+                                            .into(),
+                                            format!(
+                                                "{:?}-{}",
+                                                self.session_id, state.compaction_id
+                                            )
+                                            .into(),
+                                        ),
+                                        running: state.status == CompactionStatus::InProgress,
+                                        completed: state.status == CompactionStatus::Completed,
+                                        icon,
+                                        color,
+                                    })
+                                    .child(Icon::new(IconName::Activity).size(rems(0.875)))
+                            },
+                        )
                         .child(message.title().to_owned()),
                 )
             })
-            .child(
-                TextView::new(&markdown)
-                    .style(markdown_style())
-                    .selectable(true)
-                    .scrollable(false)
-                    .w_full()
-                    .code_block_actions(|code_block, _window, cx| {
-                        let code = code_block.code().to_string();
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap_1()
-                            .when_some(code_block.lang(), |el, lang| {
-                                el.child(
-                                    div()
-                                        .text_xs()
-                                        .text_color(cx.theme().muted)
-                                        .child(lang.to_string()),
-                                )
-                            })
-                            .child({
-                                Button::new("copy-code-block")
-                                    .ghost()
-                                    .xsmall()
-                                    .on_click(move |_, _, cx| {
-                                        cx.write_to_clipboard(ClipboardItem::new_string(
-                                            code.clone(),
-                                        ));
-                                    })
-                                    .child(
-                                        Icon::new(IconName::Copy)
-                                            .xsmall()
-                                            .text_color(cx.theme().muted),
+            .children(
+                (compaction.is_none()
+                    || compaction
+                        .is_some_and(|state| matches!(&state.error, MaybeUndefined::Value(_))))
+                .then(|| {
+                    TextView::new(&markdown)
+                        .style(markdown_style())
+                        .selectable(true)
+                        .scrollable(false)
+                        .w_full()
+                        .code_block_actions(|code_block, _window, cx| {
+                            let code = code_block.code().to_string();
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap_1()
+                                .when_some(code_block.lang(), |el, lang| {
+                                    el.child(
+                                        div()
+                                            .text_xs()
+                                            .text_color(cx.theme().muted)
+                                            .child(lang.to_string()),
                                     )
-                            })
-                            .into_any_element()
-                    })
-                    .text_sm()
-                    .line_height(rems(1.5))
-                    .into_any_element(),
+                                })
+                                .child({
+                                    Button::new("copy-code-block")
+                                        .ghost()
+                                        .xsmall()
+                                        .on_click(move |_, _, cx| {
+                                            cx.write_to_clipboard(ClipboardItem::new_string(
+                                                code.clone(),
+                                            ));
+                                        })
+                                        .child(
+                                            Icon::new(IconName::Copy)
+                                                .xsmall()
+                                                .text_color(cx.theme().muted),
+                                        )
+                                })
+                                .into_any_element()
+                        })
+                        .text_sm()
+                        .line_height(rems(1.5))
+                        .into_any_element()
+                }),
             )
             .when_some(self.images.get(&index), |body, images| {
                 body.child(div().id(("images", index)).w_full().flex().flex_col().gap_1().children(
@@ -417,7 +483,10 @@ impl ChatView {
             });
         div()
             .id(("message", index))
-            .aria_label(message.title().to_owned())
+            .aria_label(match compaction_status {
+                Some((status, _)) => format!("上下文压缩 · {status}"),
+                None => message.title().to_owned(),
+            })
             .aria_value(message.text().to_owned())
             .w_full()
             .flex()

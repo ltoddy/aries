@@ -88,7 +88,7 @@ impl ChatView {
                                     .items_center()
                                     .gap_1()
                                     .text_color(color)
-                                    .child(ToolStatusIcon {
+                                    .child(MessageStatusIcon {
                                         id: ElementId::NamedChild(
                                             ElementId::from(("tool-status-motion", cx.entity_id()))
                                                 .into(),
@@ -126,15 +126,15 @@ impl ChatView {
 }
 
 #[derive(IntoElement)]
-struct ToolStatusIcon {
-    id: ElementId,
-    running: bool,
-    completed: bool,
-    icon: IconName,
-    color: Hsla,
+pub struct MessageStatusIcon {
+    pub id: ElementId,
+    pub running: bool,
+    pub completed: bool,
+    pub icon: IconName,
+    pub color: Hsla,
 }
 
-impl RenderOnce for ToolStatusIcon {
+impl RenderOnce for MessageStatusIcon {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let motion = cx.theme().motion_tokens();
         let completion = motion::transition(

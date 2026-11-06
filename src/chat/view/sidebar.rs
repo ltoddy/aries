@@ -1,5 +1,5 @@
 mod list;
-pub(crate) mod motion;
+pub mod motion;
 mod project;
 mod session;
 mod toolbar;

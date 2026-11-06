@@ -4,12 +4,12 @@ use std::path::{Component, Path};
 use git2::{Error, ErrorCode, Index, Repository, Status, StatusOptions};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum IndexAction {
+pub enum IndexAction {
     Stage,
     Unstage,
 }
 
-pub(super) fn update_index(cwd: &Path, path: &Path, action: IndexAction) -> Result<(), Error> {
+pub fn update_index(cwd: &Path, path: &Path, action: IndexAction) -> Result<(), Error> {
     if path.as_os_str().is_empty()
         || path.components().any(|component| !matches!(component, Component::Normal(_)))
         || path.as_os_str().as_encoded_bytes().ends_with(b"/")

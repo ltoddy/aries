@@ -11,15 +11,15 @@ use gpui_kit::*;
 use crate::chat::view::ChatView;
 
 #[derive(Clone)]
-pub(crate) struct SidebarRow {
-    pub(crate) session: SessionInfo,
+pub struct SidebarRow {
+    pub session: SessionInfo,
     entered_at: Option<Instant>,
     exit: Option<(Instant, Duration, f32)>,
     pending_created: bool,
 }
 
 impl SidebarRow {
-    pub(crate) fn is_exiting(&self) -> bool {
+    pub fn is_exiting(&self) -> bool {
         self.exit.is_some()
     }
 
@@ -41,7 +41,7 @@ fn progress(now: Instant, start: Instant, duration: Duration) -> f32 {
 }
 
 #[derive(Default)]
-pub(crate) struct SidebarMotion {
+pub struct SidebarMotion {
     initialized: bool,
     seen: HashSet<SessionId>,
     deleted: HashSet<SessionId>,
@@ -49,7 +49,7 @@ pub(crate) struct SidebarMotion {
 }
 
 impl SidebarMotion {
-    pub(crate) fn receive(&mut self, sessions: Vec<SessionInfo>, now: Instant) {
+    pub fn receive(&mut self, sessions: Vec<SessionInfo>, now: Instant) {
         let confirmed: HashSet<_> =
             sessions.iter().map(|session| session.session_id.clone()).collect();
         self.reconcile(sessions, now);
@@ -104,7 +104,7 @@ impl SidebarMotion {
         self.rows = rows;
     }
 
-    pub(crate) fn add_created(&mut self, session: SessionInfo, now: Instant) {
+    pub fn add_created(&mut self, session: SessionInfo, now: Instant) {
         if self.deleted.contains(&session.session_id)
             || !self.seen.insert(session.session_id.clone())
         {
@@ -116,7 +116,7 @@ impl SidebarMotion {
         );
     }
 
-    pub(crate) fn delete(&mut self, ids: &HashSet<SessionId>, now: Instant, duration: Duration) {
+    pub fn delete(&mut self, ids: &HashSet<SessionId>, now: Instant, duration: Duration) {
         self.deleted.extend(ids.iter().cloned());
         for row in &mut self.rows {
             if ids.contains(&row.session.session_id) && !row.is_exiting() {
@@ -127,7 +127,7 @@ impl SidebarMotion {
         self.cleanup(now, duration.is_zero());
     }
 
-    pub(crate) fn cleanup(&mut self, now: Instant, reduced: bool) {
+    pub fn cleanup(&mut self, now: Instant, reduced: bool) {
         self.rows.retain(|row| {
             row.exit.is_none_or(|(start, duration, _)| {
                 !reduced && now.saturating_duration_since(start) < duration
@@ -140,15 +140,15 @@ impl SidebarMotion {
         }
     }
 
-    pub(crate) fn projects(&self) -> BTreeSet<PathBuf> {
+    pub fn projects(&self) -> BTreeSet<PathBuf> {
         self.rows.iter().map(|row| row.session.cwd.clone()).collect()
     }
 
-    pub(crate) fn project_rows(&self, cwd: &Path) -> Vec<&SidebarRow> {
+    pub fn project_rows(&self, cwd: &Path) -> Vec<&SidebarRow> {
         self.rows.iter().filter(|row| row.session.cwd == cwd).collect()
     }
 
-    pub(crate) fn session_ids(&self, cwd: Option<&Path>) -> Vec<SessionId> {
+    pub fn session_ids(&self, cwd: Option<&Path>) -> Vec<SessionId> {
         self.rows
             .iter()
             .filter(|row| !row.is_exiting() && cwd.is_none_or(|cwd| row.session.cwd == cwd))
@@ -156,13 +156,13 @@ impl SidebarMotion {
             .collect()
     }
 
-    pub(crate) fn is_deleted(&self, id: &SessionId) -> bool {
+    pub fn is_deleted(&self, id: &SessionId) -> bool {
         self.deleted.contains(id)
     }
 }
 
 impl ChatView {
-    pub(crate) fn sync_sidebar_rows(&mut self, cx: &mut Context<Self>) {
+    pub fn sync_sidebar_rows(&mut self, cx: &mut Context<Self>) {
         let mut sessions: Vec<_> = self
             .session_list
             .projects()
@@ -177,7 +177,7 @@ impl ChatView {
         self.sidebar_motion.reconcile(sessions, cx.background_executor().now());
     }
 
-    pub(crate) fn begin_sidebar_exit(&mut self, ids: &HashSet<SessionId>, cx: &mut Context<Self>) {
+    pub fn begin_sidebar_exit(&mut self, ids: &HashSet<SessionId>, cx: &mut Context<Self>) {
         self.sync_sidebar_rows(cx);
         let duration = if cx.reduce_motion() {
             Duration::ZERO
@@ -199,10 +199,10 @@ impl ChatView {
 }
 
 #[derive(IntoElement)]
-pub(crate) struct ProjectBody {
-    pub(crate) id: ElementId,
-    pub(crate) expanded: bool,
-    pub(crate) child: AnyElement,
+pub struct ProjectBody {
+    pub id: ElementId,
+    pub expanded: bool,
+    pub child: AnyElement,
 }
 
 impl RenderOnce for ProjectBody {
@@ -228,11 +228,11 @@ impl RenderOnce for ProjectBody {
 }
 
 #[derive(IntoElement)]
-pub(crate) struct SessionSurface {
-    pub(crate) row: SidebarRow,
-    pub(crate) selected: bool,
-    pub(crate) background: Hsla,
-    pub(crate) child: AnyElement,
+pub struct SessionSurface {
+    pub row: SidebarRow,
+    pub selected: bool,
+    pub background: Hsla,
+    pub child: AnyElement,
 }
 
 impl RenderOnce for SessionSurface {

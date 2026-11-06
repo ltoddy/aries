@@ -7,7 +7,7 @@ use gpui_kit::base::motion::Easing;
 use crate::chat::view::git_info::{ChangeGroup, ChangedFile, FileChange, GitInfo};
 
 #[derive(Clone)]
-pub(crate) struct Fade {
+pub struct Fade {
     from: f32,
     to: f32,
     started: Instant,
@@ -16,21 +16,15 @@ pub(crate) struct Fade {
 }
 
 impl Fade {
-    pub(crate) fn settled(value: f32) -> Self {
+    pub fn settled(value: f32) -> Self {
         Self::new(value, value, Instant::now(), Duration::ZERO, Easing::Linear)
     }
 
-    pub(crate) fn new(
-        from: f32,
-        to: f32,
-        now: Instant,
-        duration: Duration,
-        easing: Easing,
-    ) -> Self {
+    pub fn new(from: f32, to: f32, now: Instant, duration: Duration, easing: Easing) -> Self {
         Self { from, to, started: now, duration, easing }
     }
 
-    pub(crate) fn sample(&self, now: Instant) -> f32 {
+    pub fn sample(&self, now: Instant) -> f32 {
         if !self.active(now) {
             return self.to.clamp(0.0, 1.0);
         }
@@ -39,15 +33,15 @@ impl Fade {
         (self.from + (self.to - self.from) * self.easing.sample(progress)).clamp(0.0, 1.0)
     }
 
-    pub(crate) fn active(&self, now: Instant) -> bool {
+    pub fn active(&self, now: Instant) -> bool {
         now.saturating_duration_since(self.started) < self.duration
     }
 
-    pub(crate) fn retarget(&mut self, to: f32, now: Instant, duration: Duration, easing: Easing) {
+    pub fn retarget(&mut self, to: f32, now: Instant, duration: Duration, easing: Easing) {
         *self = Self::new(self.sample(now), to, now, duration, easing);
     }
 
-    pub(crate) fn settle(&mut self) {
+    pub fn settle(&mut self) {
         self.from = self.to;
         self.duration = Duration::ZERO;
     }
@@ -60,21 +54,21 @@ impl Default for Fade {
 }
 
 #[derive(Clone)]
-pub(crate) struct GitRow {
-    pub(crate) group: ChangeGroup,
-    pub(crate) file: FileChange,
-    pub(crate) visibility: Fade,
-    pub(crate) status: Fade,
-    pub(crate) lines: Fade,
-    pub(crate) exiting: bool,
+pub struct GitRow {
+    pub group: ChangeGroup,
+    pub file: FileChange,
+    pub visibility: Fade,
+    pub status: Fade,
+    pub lines: Fade,
+    pub exiting: bool,
 }
 
-pub(crate) struct GitMotion {
-    pub(crate) rows: Vec<GitRow>,
-    pub(crate) summary: Fade,
-    pub(crate) previous_summary: Option<String>,
-    pub(crate) scroll: [UniformListScrollHandle; 2],
-    pub(crate) panel: Fade,
+pub struct GitMotion {
+    pub rows: Vec<GitRow>,
+    pub summary: Fade,
+    pub previous_summary: Option<String>,
+    pub scroll: [UniformListScrollHandle; 2],
+    pub panel: Fade,
     cwd: Option<PathBuf>,
     snapshot: Option<GitInfo>,
     initialized: bool,
@@ -96,7 +90,7 @@ impl Default for GitMotion {
 }
 
 impl GitMotion {
-    pub(crate) fn reset(&mut self, cwd: &Path) -> bool {
+    pub fn reset(&mut self, cwd: &Path) -> bool {
         if self.cwd.as_deref() == Some(cwd) {
             return false;
         }
@@ -104,7 +98,7 @@ impl GitMotion {
         true
     }
 
-    pub(crate) fn sync(
+    pub fn sync(
         &mut self,
         info: Option<&GitInfo>,
         now: Instant,
@@ -221,7 +215,7 @@ impl GitMotion {
         true
     }
 
-    pub(crate) fn cleanup(&mut self, now: Instant, reduced: bool) -> bool {
+    pub fn cleanup(&mut self, now: Instant, reduced: bool) -> bool {
         if reduced || !self.summary.active(now) {
             self.previous_summary = None;
         }
@@ -243,16 +237,11 @@ impl GitMotion {
         changed
     }
 
-    pub(crate) fn rows(&self, group: ChangeGroup) -> impl Iterator<Item = &GitRow> {
+    pub fn rows(&self, group: ChangeGroup) -> impl Iterator<Item = &GitRow> {
         self.rows.iter().filter(move |row| row.group == group)
     }
 }
 
-pub(crate) fn accept_result(
-    cwd: &Path,
-    revision: u64,
-    result_cwd: &Path,
-    result_revision: u64,
-) -> bool {
+pub fn accept_result(cwd: &Path, revision: u64, result_cwd: &Path, result_revision: u64) -> bool {
     cwd == result_cwd && revision == result_revision
 }
