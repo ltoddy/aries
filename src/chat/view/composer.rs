@@ -1,4 +1,5 @@
 use gpui_kit::assets::IconName;
+use gpui_kit::base::motion::{Presence, Transition};
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::input::{Enter, Escape, IndentInline, MoveDown, MoveUp, Textarea};
 use gpui_kit::component::{ActiveTheme, Disableable, Icon, Sizable};
@@ -31,8 +32,9 @@ impl ChatView {
                 .flex_col()
                 .gap_2()
                 .when_some(self.permissions.front(), |composer, permission| {
-                    composer.child(
-                        div()
+                    composer.child(PermissionPrompt {
+                        id: ("permission-motion", cx.entity_id()).into(),
+                        child: div()
                             .p_3()
                             .rounded(cx.theme().radius_lg)
                             .border_1()
@@ -54,8 +56,9 @@ impl ChatView {
                                             this.choose_permission(id.clone(), cx)
                                         }))
                                 }),
-                            )),
-                    )
+                            ))
+                            .into_any_element(),
+                    })
                 })
                 .child(self.render_execution_context(p, cx))
                 .child(
@@ -174,6 +177,29 @@ impl ChatView {
                                 )),
                         ),
                 ),
+        )
+    }
+}
+
+#[derive(IntoElement)]
+struct PermissionPrompt {
+    id: ElementId,
+    child: AnyElement,
+}
+
+impl RenderOnce for PermissionPrompt {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let motion = cx.theme().motion_tokens();
+        let distance = motion.distance_short;
+        let transition =
+            Transition::new(motion.duration_normal).easing(motion.easing_enter.clone());
+        let presence = Presence::new(self.id, true).transition(transition).sample(window, cx);
+        div().w_full().child(
+            div()
+                .relative()
+                .top(distance * (1. - presence.progress))
+                .opacity(presence.progress)
+                .child(self.child),
         )
     }
 }

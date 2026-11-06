@@ -5,7 +5,6 @@ use gpui_kit::*;
 
 use crate::acp::{Bridge, Event};
 use crate::chat::view::ChatView;
-use crate::chat::view::new_chat::NewChatAction;
 
 impl ChatView {
     pub fn connect(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -56,7 +55,7 @@ impl ChatView {
             Event::Connected { list_sessions, load_session } => {
                 self.session_list.connected(list_sessions);
                 self.load_supported = load_session;
-                if !self.stopping && self.creating_session.is_none() {
+                if !self.stopping && !self.creating_session {
                     self.status = if self.chat.is_busy() { "思考中…" } else { "就绪" }.into();
                 }
                 if let Some(session) = self.queued_session_load.take() {
@@ -67,7 +66,15 @@ impl ChatView {
                 }
             }
             Event::Sessions(result) => {
+                let received = self.session_list.is_loading() && result.is_ok();
                 self.session_list.receive(result);
+                if received {
+                    self.sidebar_motion.receive(
+                        self.session_list.entries().to_vec(),
+                        cx.background_executor().now(),
+                    );
+                    self.sync_sidebar_rows(cx);
+                }
                 if self.session_list.take_refresh_request() {
                     self.refresh_sessions(cx);
                 }
@@ -80,8 +87,18 @@ impl ChatView {
                 self.finish_session_config(session_id, config_id, result, cx);
             }
             Event::Ready(response) => {
-                let action = self.creating_session.take();
-                self.session_id = Some(response.session_id);
+                let creating_session = std::mem::take(&mut self.creating_session);
+                self.session_id = Some(response.session_id.clone());
+                if creating_session {
+                    let session = agent_client_protocol::v1::schema::SessionInfo::new(
+                        response.session_id,
+                        self.cwd.clone(),
+                    )
+                    .title(self.chat.title());
+                    self.sidebar_motion
+                        .add_created(session.clone(), cx.background_executor().now());
+                    self.created_sidebar_session = Some(session);
+                }
                 self.chat.end_segment();
                 self.status = if self.chat.is_busy() { "思考中…" } else { "就绪" }.into();
                 for notification in std::mem::take(&mut self.pending_updates) {
@@ -90,16 +107,14 @@ impl ChatView {
                 if let Some(options) = response.config_options {
                     self.chat.set_config_options(options);
                 }
-                if action.is_some() && self.render_mode != crate::chat::view::ChatRenderMode::Main {
+                if creating_session && self.render_mode != crate::chat::view::ChatRenderMode::Main {
                     self.refresh_sessions(cx);
-                }
-                if matches!(action, Some(NewChatAction::SendPrompt)) {
-                    self.send(window, cx);
                 }
             }
             Event::Update(notification) => {
                 if let SessionUpdate::SessionInfoUpdate(update) = &notification.update {
                     self.session_list.update(&notification.session_id, update);
+                    self.sync_sidebar_rows(cx);
                     if self.render_mode != crate::chat::view::ChatRenderMode::Main {
                         self.refresh_sessions(cx);
                     }
@@ -111,9 +126,7 @@ impl ChatView {
                     cx.notify();
                     return;
                 }
-                if self.session_id.is_none()
-                    && (self.chat.is_busy() || self.creating_session.is_some())
-                {
+                if self.session_id.is_none() && (self.chat.is_busy() || self.creating_session) {
                     self.pending_updates.push(*notification);
                 } else {
                     self.receive_update(*notification, cx);
@@ -147,7 +160,7 @@ impl ChatView {
                 self.disconnected = true;
                 self.load_supported = false;
                 self.loading_session = None;
-                self.creating_session = None;
+                self.creating_session = false;
                 self.pending_updates.clear();
                 if self.pending_config.take().is_some() {
                     self.config_error = Some("连接已断开，无法确认配置是否更新。".into());
@@ -157,6 +170,9 @@ impl ChatView {
                 self.status = "连接已断开".into();
                 self.chat.finish(Some(format!("{error}\n请新建对话重新连接 Aries。")));
             }
+        }
+        if self.render_mode != crate::chat::view::ChatRenderMode::Main {
+            self.sync_sidebar_rows(cx);
         }
         cx.notify();
     }

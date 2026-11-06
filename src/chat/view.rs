@@ -47,7 +47,8 @@ use crate::chat::model::list::SessionList;
 use crate::chat::model::load::SessionLoad;
 use crate::chat::view::commands::SlashMenu;
 use crate::chat::view::git_info::GitInfo;
-use crate::chat::view::new_chat::NewChatAction;
+use crate::chat::view::git_info::motion::GitMotion;
+use crate::chat::view::sidebar::motion::SidebarMotion;
 
 pub fn single_line(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
@@ -67,6 +68,11 @@ pub struct ChatView {
     git_index_busy: bool,
     git_revision: u64,
     git_info_collapsed: bool,
+    git_motion: GitMotion,
+    git_pending_index: Option<(PathBuf, git_index::IndexAction)>,
+    git_read_error: Option<String>,
+    git_trigger_focus: FocusHandle,
+    git_panel_focus: FocusHandle,
     choosing_directory: bool,
     session_directory_selected: bool,
     agent: AcpAgentConfig,
@@ -76,6 +82,9 @@ pub struct ChatView {
     bridge: Option<Bridge>,
     receiver: Option<Task<()>>,
     session_id: Option<SessionId>,
+    created_sidebar_session: Option<SessionInfo>,
+    sidebar_loading_session: Option<SessionId>,
+    sidebar_motion: SidebarMotion,
     tab_host: Option<WeakEntity<TabsView>>,
     render_mode: ChatRenderMode,
     queued_session_load: Option<SessionInfo>,
@@ -84,7 +93,7 @@ pub struct ChatView {
     pending_updates: Vec<SessionNotification>,
     drafts: HashMap<SessionId, String>,
     loading_session: Option<SessionLoad>,
-    creating_session: Option<NewChatAction>,
+    creating_session: bool,
     load_supported: bool,
     session_list: SessionList,
     session_scroll: ScrollHandle,
@@ -171,6 +180,11 @@ impl ChatView {
             git_index_busy: false,
             git_revision: 0,
             git_info_collapsed: true,
+            git_motion: GitMotion::default(),
+            git_pending_index: None,
+            git_read_error: None,
+            git_trigger_focus: cx.focus_handle().tab_stop(true),
+            git_panel_focus: cx.focus_handle().tab_stop(true),
             choosing_directory: false,
             session_directory_selected: false,
             agent,
@@ -180,6 +194,9 @@ impl ChatView {
             bridge: None,
             receiver: None,
             session_id: None,
+            created_sidebar_session: None,
+            sidebar_loading_session: None,
+            sidebar_motion: SidebarMotion::default(),
             tab_host: None,
             render_mode: ChatRenderMode::Full,
             queued_session_load: None,
@@ -188,7 +205,7 @@ impl ChatView {
             pending_updates: Vec::new(),
             drafts: HashMap::new(),
             loading_session: None,
-            creating_session: None,
+            creating_session: false,
             load_supported: false,
             session_list: SessionList::default(),
             session_scroll,
@@ -216,6 +233,7 @@ impl ChatView {
 
 impl Render for ChatView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.sidebar_motion.cleanup(cx.background_executor().now(), cx.reduce_motion());
         let p = palette::Palette::new(cx.theme().mode);
         match self.render_mode {
             ChatRenderMode::Full => self.render_layout(cx).into_any_element(),

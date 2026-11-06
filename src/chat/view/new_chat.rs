@@ -7,23 +7,12 @@ use gpui_kit::*;
 use crate::acp::{Command, Event};
 use crate::chat::view::ChatView;
 
-#[derive(Clone, Copy, Debug)]
-pub enum NewChatAction {
-    Create,
-    SendPrompt,
-}
-
 impl ChatView {
     pub fn can_start_new_chat(&self) -> bool {
         self.is_session_idle()
     }
 
-    pub fn choose_session_directory(
-        &mut self,
-        action: NewChatAction,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    pub fn choose_session_directory(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !self.can_start_new_chat() {
             return;
         }
@@ -51,14 +40,12 @@ impl ChatView {
                 this.choosing_directory = false;
                 match result {
                     Ok(Some(directory)) => {
-                        if matches!(action, NewChatAction::Create)
-                            && let Some(host) = &this.tab_host
-                        {
+                        if let Some(host) = &this.tab_host {
                             let _ = host.update(cx, |host, cx| {
                                 host.new_tab_in_directory(directory, window, cx);
                             });
                         } else {
-                            this.start_new_chat(directory, action, window, cx);
+                            this.start_new_chat(directory, window, cx);
                         }
                     }
                     Ok(None) => {}
@@ -101,7 +88,7 @@ impl ChatView {
                                 host.new_tab_in_directory(directory, window, cx);
                             });
                         } else {
-                            this.start_new_chat(directory, NewChatAction::Create, window, cx);
+                            this.start_new_chat(directory, window, cx);
                         }
                     }
                     Err(error) => window.push_notification(
@@ -122,7 +109,6 @@ impl ChatView {
     pub fn start_new_chat(
         &mut self,
         directory: PathBuf,
-        action: NewChatAction,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -141,13 +127,11 @@ impl ChatView {
         self.session_directory_selected = true;
         self.disconnected = false;
         self.input.update(cx, |input, cx| {
-            if matches!(action, NewChatAction::Create) {
-                input.set_value("", window, cx);
-            }
+            input.set_value("", window, cx);
             input.focus(window, cx);
         });
         self.connect(window, cx);
-        self.creating_session = Some(action);
+        self.creating_session = true;
         self.status = "正在创建会话…".into();
         if !self
             .bridge

@@ -1,8 +1,9 @@
 use agent_client_protocol::v1::schema::{ToolCallStatus, ToolKind};
 use gpui_kit::assets::IconName;
+use gpui_kit::base::motion::{self, Transition};
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{Icon, Sizable};
+use gpui_kit::component::{ActiveTheme, Icon, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -87,15 +88,24 @@ impl ChatView {
                                     .items_center()
                                     .gap_1()
                                     .text_color(color)
-                                    .child(
-                                        if tool.call().status == ToolCallStatus::InProgress
-                                            && !tool.is_interrupted()
-                                        {
-                                            Spinner::new().small().color(color).into_any_element()
-                                        } else {
-                                            Icon::new(status_icon).size(px(14.)).into_any_element()
-                                        },
-                                    )
+                                    .child(ToolStatusIcon {
+                                        id: ElementId::NamedChild(
+                                            ElementId::from(("tool-status-motion", cx.entity_id()))
+                                                .into(),
+                                            format!(
+                                                "{:?}-{}",
+                                                self.session_id,
+                                                tool.call().tool_call_id
+                                            )
+                                            .into(),
+                                        ),
+                                        running: tool.call().status == ToolCallStatus::InProgress
+                                            && !tool.is_interrupted(),
+                                        completed: tool.call().status == ToolCallStatus::Completed
+                                            && !tool.is_interrupted(),
+                                        icon: status_icon,
+                                        color,
+                                    })
                                     .when(failed || tool.is_interrupted(), |status_row| {
                                         status_row.child(status)
                                     }),
@@ -112,5 +122,36 @@ impl ChatView {
             )
             .child(self.render_tool_content(index, tool, p, window, cx))
             .into_any_element()
+    }
+}
+
+#[derive(IntoElement)]
+struct ToolStatusIcon {
+    id: ElementId,
+    running: bool,
+    completed: bool,
+    icon: IconName,
+    color: Hsla,
+}
+
+impl RenderOnce for ToolStatusIcon {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let motion = cx.theme().motion_tokens();
+        let completion = motion::transition(
+            (self.id, "completion"),
+            if self.completed { 1. } else { 0. },
+            Transition::new(motion.duration_fast).easing(motion.easing_enter.clone()),
+            window,
+            cx,
+        );
+        div().size(rems(0.875)).flex().items_center().justify_center().child(if self.running {
+            Spinner::new().small().color(self.color).into_any_element()
+        } else {
+            Icon::new(self.icon)
+                .size(rems(0.875))
+                .text_color(self.color)
+                .opacity(if self.completed { completion } else { 1. })
+                .into_any_element()
+        })
     }
 }

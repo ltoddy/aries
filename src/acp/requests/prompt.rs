@@ -2,32 +2,22 @@ use std::ops::ControlFlow;
 use std::time::Duration;
 
 use agent_client_protocol::Error;
-use agent_client_protocol::v1::schema::{CancelNotification, ContentBlock, PromptRequest};
+use agent_client_protocol::v1::schema::{
+    CancelNotification, ContentBlock, PromptRequest, SessionId,
+};
 
 use crate::acp::connection::{self, AgentConnection};
-use crate::acp::requests::new_session;
-use crate::acp::{Command, Event, PromptTarget};
+use crate::acp::{Command, Event};
 
 pub async fn request(
     connection: &AgentConnection,
-    target: PromptTarget,
+    session_id: SessionId,
     text: String,
 ) -> Result<ControlFlow<()>, Error> {
     if text.trim().is_empty() {
         return Ok(ControlFlow::Continue(()));
     }
     connection.set_cancelled(false);
-    let session_id = match target {
-        PromptTarget::Existing(id) => id,
-        PromptTarget::New(cwd) => {
-            let Some(response) = new_session::request(connection, cwd).await? else {
-                return Ok(ControlFlow::Break(()));
-            };
-            let id = response.session_id.clone();
-            connection.emit(Event::Ready(Box::new(response))).await;
-            id
-        }
-    };
     let response = connection
         .client()
         .send_request(PromptRequest::new(session_id.clone(), vec![ContentBlock::from(text)]))

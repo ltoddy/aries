@@ -131,8 +131,8 @@ impl AgentConnection {
                     };
                     let _ = self.events.send(Event::SessionLoaded { session_id, result }).await;
                 }
-                Command::Prompt { target, text } => {
-                    if prompt::request(self, target, text).await? == ControlFlow::Break(()) {
+                Command::Prompt { session_id, text } => {
+                    if prompt::request(self, session_id, text).await? == ControlFlow::Break(()) {
                         break;
                     }
                 }

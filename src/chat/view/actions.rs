@@ -1,18 +1,16 @@
 use gpui_kit::*;
 
-use crate::acp::{Command, Event, PromptTarget};
+use crate::acp::{Command, Event};
 use crate::chat::view::ChatView;
-use crate::chat::view::new_chat::NewChatAction;
 
 impl ChatView {
     pub fn send(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !self.can_send(cx) {
             return;
         }
-        if self.session_id.is_none() && !self.session_directory_selected {
-            self.choose_session_directory(NewChatAction::SendPrompt, window, cx);
+        let Some(session_id) = self.session_id.clone() else {
             return;
-        }
+        };
         let Some(prompt) = self.chat.begin_turn(&self.input.read(cx).value()) else {
             return;
         };
@@ -22,15 +20,10 @@ impl ChatView {
         if !self.session_list.is_connecting() && !self.disconnected {
             self.status = "思考中…".into();
         }
-        let target = self
-            .session_id
-            .clone()
-            .map(PromptTarget::Existing)
-            .unwrap_or_else(|| PromptTarget::New(self.cwd.clone()));
         if self
             .bridge
             .as_ref()
-            .is_some_and(|bridge| bridge.send(Command::Prompt { target, text: prompt }).is_ok())
+            .is_some_and(|bridge| bridge.send(Command::Prompt { session_id, text: prompt }).is_ok())
         {
             self.input.update(cx, |input, cx| input.set_value("", window, cx));
         } else {
@@ -44,13 +37,14 @@ impl ChatView {
         !self.chat.is_busy()
             && !self.session_deletion.is_busy()
             && self.loading_session.is_none()
-            && self.creating_session.is_none()
+            && !self.creating_session
             && !self.choosing_directory
             && self.pending_config.is_none()
     }
 
     pub fn can_send(&self, cx: &App) -> bool {
-        self.is_session_idle()
+        self.session_id.is_some()
+            && self.is_session_idle()
             && !self.disconnected
             && !self.input.read(cx).value().trim().is_empty()
     }
@@ -81,7 +75,7 @@ impl ChatView {
     }
 
     pub fn new_chat(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.choose_session_directory(NewChatAction::Create, window, cx);
+        self.choose_session_directory(window, cx);
     }
 
     pub fn reset_chat(&mut self) {
@@ -99,7 +93,7 @@ impl ChatView {
         self.pending_updates.clear();
         self.session_directory_selected = false;
         self.loading_session = None;
-        self.creating_session = None;
+        self.creating_session = false;
         self.stopping = false;
         self.status = "就绪".into();
         self.tokens = None;

@@ -11,12 +11,6 @@ pub enum Command {
     DeleteSessions(Vec<SessionId>),
     LoadSession(Box<LoadSessionRequest>),
     SetSessionConfigOption(Box<SetSessionConfigOptionRequest>),
-    Prompt { target: PromptTarget, text: String },
+    Prompt { session_id: SessionId, text: String },
     Cancel,
-}
-
-#[derive(Debug)]
-pub enum PromptTarget {
-    New(PathBuf),
-    Existing(SessionId),
 }

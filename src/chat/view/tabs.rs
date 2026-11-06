@@ -8,13 +8,10 @@ use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::searchable_list::SearchableVec;
 use gpui_kit::component::select::{SelectEvent, SelectState};
-use gpui_kit::component::{
-    ActiveTheme, Disableable, Icon, Sizable, Theme, h_resizable, resizable_panel,
-};
+use gpui_kit::component::{ActiveTheme, Icon, Sizable, Theme, h_resizable, resizable_panel};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
-use crate::chat::view::new_chat::NewChatAction;
 use crate::chat::view::palette::{self, Palette};
 use crate::chat::view::{ChatRenderMode, ChatView};
 use crate::preferences::{Appearance, Preferences, SendKey};
@@ -154,6 +151,20 @@ impl TabsView {
             {
                 this.open_session(session, window, cx);
             } else {
+                if view != this.sidebar {
+                    let created = view.update(cx, |view, _| view.created_sidebar_session.take());
+                    if let Some(session) = created {
+                        this.sidebar.update(cx, |sidebar, cx| {
+                            sidebar.session_list.expand_project(&session.cwd);
+                            sidebar
+                                .sidebar_motion
+                                .add_created(session, cx.background_executor().now());
+                            sidebar.refresh_sessions(cx);
+                            cx.notify();
+                        });
+                    }
+                    this.sync_sidebar_active_session(cx);
+                }
                 cx.notify();
             }
         })
@@ -179,10 +190,6 @@ impl TabsView {
 
     pub fn active_view(&self) -> Option<&Entity<ChatView>> {
         self.tabs.get(self.active).map(|tab| &tab.view)
-    }
-
-    pub fn is_new_session_available(&self, cx: &App) -> bool {
-        self.active_view().unwrap_or(&self.sidebar).read(cx).can_start_new_chat()
     }
 
     fn new_session(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -215,7 +222,7 @@ impl TabsView {
         self.tab_scroll.scroll_to_item(self.active);
         cx.spawn_in(window, async move |_, cx| {
             let _ = view.update_in(cx, |view, window, cx| {
-                view.start_new_chat(directory, NewChatAction::Create, window, cx);
+                view.start_new_chat(directory, window, cx);
             });
         })
         .detach();
@@ -228,18 +235,41 @@ impl TabsView {
             .get(self.active)
             .and_then(|tab| tab.view.read(cx).active_session_id())
             .cloned();
-        self.sidebar.update(cx, |view, _| {
-            if let Some(id) = session_id {
-                view.track_tab_session(id);
-            } else {
-                view.untrack_tab_session();
+        let active = self.tabs.get(self.active).map(|tab| tab.view.read(cx));
+        let cwd = active.as_ref().map(|view| view.cwd.clone());
+        let title = active.as_ref().map(|view| view.chat.title());
+        let loading = active.as_ref().and_then(|view| {
+            view.loading_session.as_ref().map(|load| load.session_id().clone()).or_else(|| {
+                view.queued_session_load.as_ref().map(|session| session.session_id.clone())
+            })
+        });
+        self.sidebar.update(cx, |view, cx| {
+            let changed = view.session_id != session_id
+                || view.sidebar_loading_session != loading
+                || cwd.as_ref().is_some_and(|cwd| &view.cwd != cwd)
+                || title.as_ref().is_some_and(|title| view.chat.title() != *title);
+            view.session_id = session_id;
+            view.sidebar_loading_session = loading;
+            if let Some(cwd) = cwd {
+                view.cwd = cwd;
+            }
+            if let Some(title) = title {
+                view.chat.set_title(Some(title));
+            }
+            if changed {
+                view.sync_sidebar_rows(cx);
+                cx.notify();
             }
         });
     }
 
     fn set_sidebar_session(&mut self, session_id: SessionId, cx: &mut Context<Self>) {
-        self.sidebar.update(cx, |view, _| {
-            view.track_tab_session(session_id);
+        self.sidebar.update(cx, |view, cx| {
+            if view.session_id.as_ref() != Some(&session_id) {
+                view.session_id = Some(session_id);
+                view.sync_sidebar_rows(cx);
+                cx.notify();
+            }
         });
     }
 
@@ -429,17 +459,6 @@ impl TabsView {
                             .map(|(index, tab)| self.render_tab(index, tab, can_close, p, cx)),
                     ),
             )
-            .child(
-                Button::new("new-tab")
-                    .icon(Icon::new(IconName::Plus).size(rems(0.875)))
-                    .ghost()
-                    .small()
-                    .flex_shrink_0()
-                    .tooltip_with_action("新建会话", &NewSession, None)
-                    .accessibility_label("新建会话")
-                    .disabled(!self.is_new_session_available(cx))
-                    .on_click(cx.listener(|this, _, window, cx| this.new_session(window, cx))),
-            )
             .into_any_element()
     }
 
@@ -464,7 +483,7 @@ impl TabsView {
                             .text_xs()
                             .line_height(rems(1.25))
                             .text_color(p.muted())
-                            .child("从左侧选择一个会话，或点击上方 + 新建会话并选择项目。"),
+                            .child("从左侧选择一个会话，或点击左侧顶部“新建会话”按钮或按 ⌘N 选择项目并新建会话。"),
                     ),
             )
             .into_any_element()
@@ -615,22 +634,14 @@ impl ChatView {
     pub fn tab_title(&self) -> String {
         crate::chat::view::single_line(&self.chat.title())
     }
-
-    pub fn track_tab_session(&mut self, session_id: SessionId) {
-        self.session_id = Some(session_id);
-    }
-
-    pub fn untrack_tab_session(&mut self) {
-        self.session_id = None;
-    }
 }
 
 impl Render for TabsView {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let p = Palette::new(cx.theme().mode);
         let active = self.active_view().cloned();
         let view = active.as_ref().unwrap_or(&self.sidebar);
-        let git_info = crate::chat::view::git_info::render_git_info(view, cx);
+        let git_info = crate::chat::view::git_info::render_git_info(view, window, cx);
         div()
             .size_full()
             .track_focus(&self.focus_handle)

@@ -21,19 +21,14 @@ impl ChatView {
     }
 
     pub fn session_ids(&self, cwd: Option<&Path>) -> Vec<SessionId> {
-        let mut ids: Vec<_> = self
-            .session_list
-            .entries()
-            .iter()
-            .filter(|session| cwd.is_none_or(|cwd| cwd == session.cwd))
-            .map(|session| session.session_id.clone())
-            .collect();
+        let mut ids = self.sidebar_motion.session_ids(cwd);
         if cwd.is_none_or(|cwd| cwd == self.cwd)
             && let Some(id) = &self.session_id
             && !ids.contains(id)
         {
             ids.push(id.clone());
         }
+        ids.retain(|id| !self.sidebar_motion.is_deleted(id));
         ids
     }
 
@@ -46,14 +41,11 @@ impl ChatView {
         if !self.can_manage_sessions() {
             return;
         }
-        let mut available: HashSet<_> = self
-            .session_list
-            .entries()
-            .iter()
-            .map(|session| &session.session_id)
-            .chain(self.session_id.as_ref())
+        let mut available: HashSet<_> = self.session_ids(None).into_iter().collect();
+        let ids: Vec<_> = ids
+            .into_iter()
+            .filter(|id| !self.sidebar_motion.is_deleted(id) && available.remove(id))
             .collect();
-        let ids: Vec<_> = ids.into_iter().filter(|id| available.remove(id)).collect();
         if ids.is_empty() {
             return;
         }
@@ -102,6 +94,7 @@ impl ChatView {
     ) {
         let (deleted, failed) = result.into_parts();
         let deleted: HashSet<_> = deleted.into_iter().collect();
+        self.begin_sidebar_exit(&deleted, cx);
         self.drafts.retain(|id, _| !deleted.contains(id));
         if self.session_id.as_ref().is_some_and(|id| deleted.contains(id)) {
             self.reset_chat();

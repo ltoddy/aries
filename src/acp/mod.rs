@@ -9,7 +9,7 @@ mod requests;
 mod terminal;
 
 pub use self::bridge::Bridge;
-pub use self::command::{Command, PromptTarget};
+pub use self::command::Command;
 pub use self::config::aries_config;
 pub use self::event::Event;
 pub use self::permission::Permission;

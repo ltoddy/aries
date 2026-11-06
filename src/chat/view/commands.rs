@@ -45,7 +45,7 @@ impl ChatView {
             || self.command_menu.dismissed
             || self.disconnected
             || self.loading_session.is_some()
-            || self.creating_session.is_some()
+            || self.creating_session
             || self.choosing_directory
         {
             return None;

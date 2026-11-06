@@ -76,7 +76,11 @@ impl ExecutionState {
 
 impl ChatView {
     pub fn watch_git_info(&mut self, cx: &mut Context<Self>) {
-        self.git_info = None;
+        if self.git_motion.reset(&self.cwd) {
+            self.git_info = None;
+            self.git_read_error = None;
+            self.git_info_collapsed = true;
+        }
         self.git_revision += 1;
         self.git_info_task = Some(cx.spawn(async move |view, cx| {
             loop {
@@ -90,13 +94,14 @@ impl ChatView {
                     .await;
                 if view
                     .update(cx, |this, cx| {
-                        if this.cwd == directory
-                            && this.git_revision == revision
-                            && !this.git_index_busy
-                            && this.git_info != info
+                        if crate::chat::view::git_info::motion::accept_result(
+                            &this.cwd,
+                            this.git_revision,
+                            &directory,
+                            revision,
+                        ) && !this.git_index_busy
                         {
-                            this.git_info = info;
-                            cx.notify();
+                            this.sync_git_info(info, true, cx);
                         }
                     })
                     .is_err()
@@ -120,7 +125,7 @@ impl ChatView {
                 self.loading_session.is_some() || self.queued_session_load.is_some(),
                 ExecutionState::Loading,
             ),
-            (self.creating_session.is_some(), ExecutionState::Creating),
+            (self.creating_session, ExecutionState::Creating),
             (self.pending_config.is_some(), ExecutionState::Configuring),
             (self.chat.is_busy(), ExecutionState::Running),
             (self.chat.error().is_some(), ExecutionState::Failed),
@@ -135,12 +140,12 @@ impl ChatView {
                 .map(|name| name.to_string_lossy().into_owned())
                 .unwrap_or_else(|| self.cwd.display().to_string())
         } else {
-            "发送时选择项目目录".into()
+            "新建会话时选择项目目录".into()
         };
         let mut directory = if selected {
             format!("执行目录：{}", self.cwd.display())
         } else {
-            "发送前需选择项目目录".into()
+            "请通过左侧新建会话按钮或 ⌘N 选择项目目录".into()
         };
         let branch = selected
             .then_some(self.git_info.as_ref())
