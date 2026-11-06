@@ -6,10 +6,7 @@ use agent_client_protocol::AcpAgentConfig;
 use agent_client_protocol::schema::v1::{SessionId, SessionInfo};
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
-use gpui_kit::component::menu::{DropdownMenu, PopupMenuItem};
-use gpui_kit::component::{
-    ActiveTheme, Disableable, Icon, Sizable, Theme, h_resizable, resizable_panel,
-};
+use gpui_kit::component::{ActiveTheme, Icon, Sizable, Theme, h_resizable, resizable_panel};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -401,43 +398,6 @@ impl TabsView {
                             .map(|(index, tab)| self.render_tab(index, tab, can_close, p, cx)),
                     ),
             )
-            .child({
-                let tabs = self
-                    .tabs
-                    .iter()
-                    .map(|tab| (tab.id, tab.view.read(cx).tab_title()))
-                    .collect::<Vec<_>>();
-                let active = self.tabs.get(self.active).map(|tab| tab.id);
-                let view = cx.weak_entity();
-                Button::new("all-tabs")
-                    .icon(IconName::ChevronDown)
-                    .ghost()
-                    .small()
-                    .flex_shrink_0()
-                    .disabled(tabs.is_empty())
-                    .tooltip("已打开的会话 · Ctrl + Tab 切换")
-                    .accessibility_label("已打开的会话")
-                    .dropdown_menu(move |mut menu, _, cx| {
-                        for (id, title) in &tabs {
-                            let id = *id;
-                            let view = view.clone();
-                            menu = menu.item(
-                                PopupMenuItem::new(title.clone())
-                                    .checked(active == Some(id))
-                                    .on_click(move |_, window, cx| {
-                                        let _ = view.update(cx, |this, cx| {
-                                            if let Some(index) =
-                                                this.tabs.iter().position(|tab| tab.id == id)
-                                            {
-                                                this.select_tab(index, window, cx);
-                                            }
-                                        });
-                                    }),
-                            );
-                        }
-                        menu.scrollable(true).max_h(cx.theme().font_size * 20.)
-                    })
-            })
             .child(
                 Button::new("new-tab")
                     .icon(Icon::new(IconName::Plus).size(rems(0.875)))

@@ -242,9 +242,7 @@ impl Chat {
                 _ => None,
             },
         };
-        let Some(subagent_session_id) = subagent_session_id else {
-            return None;
-        };
+        let subagent_session_id = subagent_session_id?;
         let route_key = (parent_session_id.clone(), msg.message_id.to_string());
         self.subagent_message_route.insert(route_key.clone(), subagent_session_id.clone());
         let index = self.ensure_subagent_message(subagent_session_id)?;
@@ -295,13 +293,9 @@ impl Chat {
             return None;
         };
         let session_id = update.session_id.clone();
-        let Some(index) = self.ensure_subagent_message(&session_id) else {
-            return None;
-        };
+        let index = self.ensure_subagent_message(&session_id)?;
         let message = &mut self.messages[index];
-        let Some(subagent) = message.subagent.as_mut() else {
-            return None;
-        };
+        let subagent = message.subagent.as_mut()?;
         let SessionUpdate::SubagentUpdate(update) = notification.update else {
             return None;
         };
