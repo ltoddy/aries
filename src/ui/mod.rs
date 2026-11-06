@@ -31,7 +31,6 @@ use agent_client_protocol::schema::v1::{
     SessionConfigId, SessionId, SessionInfo, SessionNotification,
 };
 use gpui_kit::component::ActiveTheme;
-use gpui_kit::component::diff::DiffState;
 use gpui_kit::component::input::{InputEvent, TextareaState};
 use gpui_kit::component::text::TextViewState;
 use gpui_kit::prelude::*;
@@ -97,8 +96,7 @@ pub struct ChatView {
     expanded_thoughts: HashSet<usize>,
     collapsed_streaming_thoughts: HashSet<usize>,
     collapsed_subagents: HashSet<SessionId>,
-    tool_diffs: HashMap<(usize, usize), Entity<DiffState>>,
-    tool_diff_rows: HashMap<(usize, usize), (usize, usize)>,
+    tool_diffs: HashMap<(usize, usize), String>,
     images: HashMap<usize, Vec<Arc<Image>>>,
     attachment_images: HashMap<(usize, usize), Arc<Image>>,
     markdown: HashMap<usize, Entity<TextViewState>>,
@@ -217,7 +215,6 @@ impl ChatView {
             collapsed_streaming_thoughts: HashSet::new(),
             collapsed_subagents: HashSet::new(),
             tool_diffs: HashMap::new(),
-            tool_diff_rows: HashMap::new(),
             images: HashMap::new(),
             attachment_images: HashMap::new(),
             markdown: HashMap::new(),

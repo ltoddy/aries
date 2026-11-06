@@ -101,6 +101,9 @@ impl ChatView {
             Event::Update(notification) => {
                 if let SessionUpdate::SessionInfoUpdate(update) = &notification.update {
                     self.session_list.update(&notification.session_id, update);
+                    if self.render_mode != crate::ui::ChatRenderMode::Main {
+                        self.refresh_sessions(cx);
+                    }
                 }
                 if let Some(loading) = &mut self.loading_session
                     && loading.session_id() == &notification.session_id

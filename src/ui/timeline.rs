@@ -1,9 +1,10 @@
 use std::time::Duration;
 
 use gpui_kit::assets::IconName;
-use gpui_kit::component::Icon;
+use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::text::{TextView, TextViewState, TextViewStyle};
 use gpui_kit::component::tooltip::Tooltip;
+use gpui_kit::component::{ActiveTheme, Icon, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -79,7 +80,7 @@ impl ChatView {
             .py_2()
             .relative()
             .child(
-                div().max_w(px(880.)).w_full().h_full().mx_auto().child(
+                div().w_full().h_full().child(
                     list(timeline, move |index, window, cx| {
                         let view = view.clone();
                         view.update(cx, |this, cx| {
@@ -90,7 +91,7 @@ impl ChatView {
                             div()
                                 .w_full()
                                 .pb(gap)
-                                .child(if index < messages {
+                                .child(div().max_w(px(880.)).mx_auto().child(if index < messages {
                                     this.timeline_item(index, p, window, cx)
                                 } else {
                                     div()
@@ -102,7 +103,7 @@ impl ChatView {
                                         .text_color(p.danger())
                                         .child(error.clone().unwrap_or_default())
                                         .into_any_element()
-                                })
+                                }))
                                 .into_any_element()
                         })
                         .unwrap_or_else(|_| div().into_any_element())
@@ -328,6 +329,38 @@ impl ChatView {
                     .selectable(true)
                     .scrollable(false)
                     .w_full()
+                    .code_block_actions(|code_block, _window, cx| {
+                        let code = code_block.code().to_string();
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_1()
+                            .when_some(code_block.lang(), |el, lang| {
+                                el.child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(cx.theme().muted)
+                                        .child(lang.to_string()),
+                                )
+                            })
+                            .child({
+                                let code = code.clone();
+                                Button::new("copy-code-block")
+                                    .ghost()
+                                    .xsmall()
+                                    .on_click(move |_, _, cx| {
+                                        cx.write_to_clipboard(ClipboardItem::new_string(
+                                            code.clone(),
+                                        ));
+                                    })
+                                    .child(
+                                        Icon::new(IconName::Copy)
+                                            .xsmall()
+                                            .text_color(cx.theme().muted),
+                                    )
+                            })
+                            .into_any_element()
+                    })
                     .text_sm()
                     .line_height(rems(1.375))
                     .into_any_element(),

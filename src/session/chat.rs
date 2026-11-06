@@ -76,6 +76,8 @@ pub struct Chat {
     stream: Option<usize>,
     tools: HashMap<(SessionId, ToolCallId), usize>,
     subagents: HashMap<SessionId, usize>,
+    subagent_message_route: HashMap<(SessionId, String), SessionId>,
+    pending_subagent_chunks: HashMap<(SessionId, String), Vec<String>>,
 }
 
 impl Chat {
@@ -132,13 +134,14 @@ impl Chat {
         if matches!(&notification.update, SessionUpdate::UsageUpdate(_)) {
             return None;
         }
-        if matches!(
-            &notification.update,
-            SessionUpdate::SubagentUpdate(_)
-                | SessionUpdate::SessionMessage(_)
-                | SessionUpdate::SessionMessageChunk(_)
-        ) {
-            return Some(self.receive_subagent(notification));
+        if let SessionUpdate::SessionMessage(_) = &notification.update {
+            return self.receive_subagent_message(notification);
+        }
+        if let SessionUpdate::SessionMessageChunk(_) = &notification.update {
+            return self.receive_subagent_chunk(notification);
+        }
+        if matches!(&notification.update, SessionUpdate::SubagentUpdate(_)) {
+            return self.receive_subagent(notification);
         }
         if matches!(
             &notification.update,
@@ -208,37 +211,104 @@ impl Chat {
         Some(self.messages.len() - 1)
     }
 
-    fn receive_subagent(&mut self, notification: SessionNotification) -> usize {
-        let session_id = subagent_session_id(&notification);
-        let index = match self.subagents.get(&session_id) {
-            Some(index) => *index,
-            None => {
-                self.end_segment();
-                let index = self.messages.len();
-                self.messages.push(Message {
-                    role: Role::Event,
-                    title: "子 Agent".into(),
-                    text: String::new(),
-                    updates: Vec::new(),
-                    compaction: None,
-                    tool_call: None,
-                    subagent: Some(SubagentState::new(session_id.clone())),
-                });
-                self.subagents.insert(session_id, index);
-                index
+    fn ensure_subagent_message(&mut self, session_id: &SessionId) -> Option<usize> {
+        if let Some(&index) = self.subagents.get(session_id) {
+            return Some(index);
+        }
+        self.end_segment();
+        let index = self.messages.len();
+        self.messages.push(Message {
+            role: Role::Event,
+            title: "子 Agent".into(),
+            text: String::new(),
+            updates: Vec::new(),
+            compaction: None,
+            tool_call: None,
+            subagent: Some(SubagentState::new(session_id.clone())),
+        });
+        self.subagents.insert(session_id.clone(), index);
+        Some(index)
+    }
+
+    fn receive_subagent_message(&mut self, notification: SessionNotification) -> Option<usize> {
+        let SessionUpdate::SessionMessage(msg) = &notification.update else {
+            return None;
+        };
+        let parent_session_id = notification.session_id.clone();
+        let subagent_session_id = match &msg.sender_session_id {
+            MaybeUndefined::Value(id) if id != &parent_session_id => Some(id),
+            _ => match &msg.recipient_session_id {
+                MaybeUndefined::Value(id) if id != &parent_session_id => Some(id),
+                _ => None,
+            },
+        };
+        let Some(subagent_session_id) = subagent_session_id else {
+            return None;
+        };
+        let route_key = (parent_session_id.clone(), msg.message_id.to_string());
+        self.subagent_message_route.insert(route_key.clone(), subagent_session_id.clone());
+        let index = self.ensure_subagent_message(subagent_session_id)?;
+        let subagent = self.messages[index].subagent.as_mut()?;
+        if let MaybeUndefined::Value(content) = &msg.content {
+            let text = content.iter().fold(String::new(), |mut acc, block| {
+                if let ContentBlock::Text(t) = block {
+                    acc.push_str(&t.text);
+                }
+                acc
+            });
+            if !text.is_empty() {
+                subagent.upsert_message(msg.message_id.to_string(), text);
             }
+        }
+        if let Some(pending) = self.pending_subagent_chunks.remove(&route_key) {
+            for text in pending {
+                subagent.append_chunk(msg.message_id.to_string(), &text);
+            }
+        }
+        Some(index)
+    }
+
+    fn receive_subagent_chunk(&mut self, notification: SessionNotification) -> Option<usize> {
+        let SessionUpdate::SessionMessageChunk(chunk) = &notification.update else {
+            return None;
+        };
+        let text = match &chunk.content {
+            ContentBlock::Text(t) => t.text.as_str(),
+            _ => return None,
+        };
+        if text.is_empty() {
+            return None;
+        }
+        let route_key = (notification.session_id.clone(), chunk.message_id.to_string());
+        let Some(subagent_session_id) = self.subagent_message_route.get(&route_key).cloned() else {
+            self.pending_subagent_chunks.entry(route_key).or_default().push(text.into());
+            return None;
+        };
+        let index = self.ensure_subagent_message(&subagent_session_id)?;
+        let subagent = self.messages[index].subagent.as_mut()?;
+        subagent.append_chunk(chunk.message_id.to_string(), text);
+        Some(index)
+    }
+
+    fn receive_subagent(&mut self, notification: SessionNotification) -> Option<usize> {
+        let SessionUpdate::SubagentUpdate(update) = &notification.update else {
+            return None;
+        };
+        let session_id = update.session_id.clone();
+        let Some(index) = self.ensure_subagent_message(&session_id) else {
+            return None;
         };
         let message = &mut self.messages[index];
-        let subagent = message.subagent.as_mut().expect("subagent entry has state");
-        match notification.update {
-            SessionUpdate::SubagentUpdate(update) => subagent.update_metadata(update),
-            SessionUpdate::SessionMessage(update) => subagent.update_message(update),
-            SessionUpdate::SessionMessageChunk(chunk) => subagent.append_message_chunk(chunk),
-            _ => unreachable!("only subagent notifications reach this handler"),
-        }
+        let Some(subagent) = message.subagent.as_mut() else {
+            return None;
+        };
+        let SessionUpdate::SubagentUpdate(update) = notification.update else {
+            return None;
+        };
+        subagent.update_metadata(update);
         message.title = subagent.title().unwrap_or("子 Agent").into();
         message.text = subagent.description().unwrap_or_default().into();
-        index
+        Some(index)
     }
 
     fn receive_tool_call(&mut self, notification: SessionNotification) -> usize {
@@ -380,37 +450,6 @@ impl Chat {
                 title
             })
             .unwrap_or_else(|| "新对话".into())
-    }
-}
-
-fn subagent_session_id(notification: &SessionNotification) -> SessionId {
-    match &notification.update {
-        SessionUpdate::SubagentUpdate(update) => update.session_id.clone(),
-        SessionUpdate::SessionMessage(update) => update
-            .sender_session_id
-            .as_ref()
-            .filter(|session_id| *session_id != &notification.session_id)
-            .or_else(|| {
-                update
-                    .recipient_session_id
-                    .as_ref()
-                    .filter(|session_id| *session_id != &notification.session_id)
-            })
-            .cloned()
-            .unwrap_or_else(|| notification.session_id.clone()),
-        SessionUpdate::SessionMessageChunk(chunk) => chunk
-            .sender_session_id
-            .as_ref()
-            .filter(|session_id| *session_id != &notification.session_id)
-            .or_else(|| {
-                chunk
-                    .recipient_session_id
-                    .as_ref()
-                    .filter(|session_id| *session_id != &notification.session_id)
-            })
-            .cloned()
-            .unwrap_or_else(|| notification.session_id.clone()),
-        _ => notification.session_id.clone(),
     }
 }
 

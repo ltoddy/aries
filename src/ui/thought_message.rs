@@ -1,7 +1,7 @@
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::text::TextView;
-use gpui_kit::component::{Icon, Sizable};
+use gpui_kit::component::{ActiveTheme, Icon, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -83,6 +83,38 @@ impl ChatView {
                             .selectable(true)
                             .scrollable(false)
                             .w_full()
+                            .code_block_actions(|code_block, _window, cx| {
+                                let code = code_block.code().to_string();
+                                div()
+                                    .flex()
+                                    .items_center()
+                                    .gap_1()
+                                    .when_some(code_block.lang(), |el, lang| {
+                                        el.child(
+                                            div()
+                                                .text_xs()
+                                                .text_color(cx.theme().muted)
+                                                .child(lang.to_string()),
+                                        )
+                                    })
+                                    .child({
+                                        let code = code.clone();
+                                        Button::new("copy-code-block")
+                                            .ghost()
+                                            .xsmall()
+                                            .on_click(move |_, _, cx| {
+                                                cx.write_to_clipboard(ClipboardItem::new_string(
+                                                    code.clone(),
+                                                ));
+                                            })
+                                            .child(
+                                                Icon::new(IconName::Copy)
+                                                    .xsmall()
+                                                    .text_color(cx.theme().muted),
+                                            )
+                                    })
+                                    .into_any_element()
+                            })
                             .text_xs()
                             .line_height(rems(1.125))
                             .text_color(p.muted()),

@@ -9,6 +9,7 @@ use gpui_kit::component::{ActiveTheme, Icon, Sizable, h_resizable, resizable_pan
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
+use crate::ui::new_chat::NewChatAction;
 use crate::ui::palette::Palette;
 use crate::ui::{ChatRenderMode, ChatView};
 
@@ -120,9 +121,33 @@ impl TabsView {
             cx,
         );
         let subscription = Self::observe_tab(&view, window, cx);
-        self.tabs.push(ChatTab { id, view, _subscription: subscription });
+        self.tabs.push(ChatTab { id, view: view.clone(), _subscription: subscription });
         self.active = self.tabs.len() - 1;
+        cx.spawn_in(window, async move |_, cx| {
+            let _ = view.update_in(cx, |view, window, cx| {
+                view.choose_session_directory(NewChatAction::Create, window, cx);
+            });
+        })
+        .detach();
         cx.notify();
+    }
+
+    fn sync_sidebar_active_session(&mut self, cx: &mut Context<Self>) {
+        let session_id =
+            self.tabs.get(self.active).and_then(|tab| tab.view.read(cx).active_session_id());
+        self.sidebar.update(cx, |view, _| {
+            if let Some(id) = session_id {
+                view.track_tab_session(id);
+            } else {
+                view.untrack_tab_session();
+            }
+        });
+    }
+
+    fn set_sidebar_session(&mut self, session_id: SessionId, cx: &mut Context<Self>) {
+        self.sidebar.update(cx, |view, _| {
+            view.track_tab_session(session_id);
+        });
     }
 
     pub(crate) fn open_session(
@@ -131,8 +156,10 @@ impl TabsView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if let Some(index) = self.find_session_tab(&session.session_id, cx) {
+        let session_id = session.session_id.clone();
+        if let Some(index) = self.find_session_tab(&session_id, cx) {
             self.active = index;
+            self.set_sidebar_session(session_id.clone(), cx);
             cx.notify();
             return;
         }
@@ -140,6 +167,7 @@ impl TabsView {
             && tab.view.read(cx).is_empty_tab(cx)
         {
             tab.view.update(cx, |view, cx| view.queue_session_load(session, cx));
+            self.set_sidebar_session(session_id.clone(), cx);
             cx.notify();
             return;
         }
@@ -157,6 +185,7 @@ impl TabsView {
         view.update(cx, |view, cx| view.queue_session_load(session, cx));
         self.tabs.push(ChatTab { id, view, _subscription: subscription });
         self.active = self.tabs.len() - 1;
+        self.set_sidebar_session(session_id.clone(), cx);
         cx.notify();
     }
 
@@ -176,6 +205,7 @@ impl TabsView {
         } else if index < self.active {
             self.active -= 1;
         }
+        self.sync_sidebar_active_session(cx);
         cx.notify();
     }
 
@@ -274,6 +304,7 @@ impl TabsView {
                     .accessibility_label(tab_label)
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.active = index;
+                        this.sync_sidebar_active_session(cx);
                         cx.notify();
                     }))
                     .child(
@@ -358,8 +389,23 @@ impl ChatView {
             && self.is_session_idle()
     }
 
+    pub(crate) fn active_session_id(&self) -> Option<SessionId> {
+        self.session_id
+            .clone()
+            .or_else(|| self.loading_session.as_ref().map(|l| l.session_id().clone()))
+            .or_else(|| self.queued_session_load.as_ref().map(|s| s.session_id.clone()))
+    }
+
     pub(crate) fn tab_title(&self) -> String {
         crate::ui::single_line(&self.chat.title())
+    }
+
+    pub(crate) fn track_tab_session(&mut self, session_id: SessionId) {
+        self.session_id = Some(session_id);
+    }
+
+    pub(crate) fn untrack_tab_session(&mut self) {
+        self.session_id = None;
     }
 }
 
