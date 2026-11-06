@@ -3,7 +3,8 @@ pub mod plan;
 pub mod session_update;
 
 use agent_client_protocol::v1::schema::{
-    self, PromptRequest, PromptResponse, SessionNotification, StopReason,
+    self, PromptRequest, PromptResponse, SessionInfoUpdate, SessionNotification, SessionUpdate,
+    StopReason,
 };
 use agent_client_protocol::v1::{ConnectionTo, Responder};
 use agent_client_protocol::{Client, Error};
@@ -51,5 +52,11 @@ pub async fn prompt(
 
     let mut registry = registry.lock().await;
     registry.putback_session(session);
+
+    let _ = cx.send_notification(SessionNotification::new(
+        session_id,
+        SessionUpdate::SessionInfoUpdate(SessionInfoUpdate::new()),
+    ));
+
     responder.respond(PromptResponse::new(stop_reason))
 }

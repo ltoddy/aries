@@ -29,7 +29,7 @@ pub async fn execute(args: PruneSessionsArgs, gctx: GlobalContext) -> anyhow::Re
     let sessions = if all {
         session_repo.find().await?
     } else if empty {
-        session_repo.find_by_null_title().await?
+        session_repo.find_by_title(aries_persistence::UNTITLED_SESSION).await?
     } else if let Some(session_ids) = session_ids {
         session_repo.find_by_session_id_in(session_ids).await?
     } else {

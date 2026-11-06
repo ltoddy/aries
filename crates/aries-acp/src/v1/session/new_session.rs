@@ -1,6 +1,6 @@
 use agent_client_protocol::v1::schema::{
     AvailableCommand, AvailableCommandInput, AvailableCommandsUpdate, ContentBlock, ContentChunk,
-    NewSessionRequest, NewSessionResponse, SessionNotification, SessionUpdate,
+    NewSessionRequest, NewSessionResponse, SessionInfoUpdate, SessionNotification, SessionUpdate,
     UnstructuredCommandInput,
 };
 use agent_client_protocol::v1::{ConnectionTo, Responder};
@@ -57,6 +57,10 @@ pub async fn new_session(
         SessionUpdate::AvailableCommandsUpdate(AvailableCommandsUpdate::new(available_commands)),
     ));
 
+    let _ = cx.send_notification(SessionNotification::new(
+        session.id(),
+        SessionUpdate::SessionInfoUpdate(SessionInfoUpdate::new()),
+    ));
     let config_options = config_options(session.setting(), session.mode());
     let resp = NewSessionResponse::new(session.id()).config_options(config_options);
     responder.respond(resp)

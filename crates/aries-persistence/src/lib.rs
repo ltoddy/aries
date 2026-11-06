@@ -7,7 +7,7 @@ mod tool_call;
 use std::path::Path;
 
 use jiff::{Span, Timestamp, Zoned};
-pub use session::{Session, SessionRepository};
+pub use session::{Session, SessionRepository, UNTITLED_SESSION};
 pub use token_audit::{TokenAudit, TokenAuditRepository};
 pub use tool_call::{ToolCall, ToolCallRepository};
 
