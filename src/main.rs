@@ -12,13 +12,15 @@ use crate::acp::aries_config;
 use crate::preferences::Preferences;
 use crate::ui::TabsView;
 
-gpui_kit::actions!(orbit, [Quit]);
+gpui_kit::actions!(orbit, [Quit, NewSession]);
 
 fn main() -> anyhow::Result<()> {
     let cwd = std::env::current_dir()?.canonicalize()?;
     gpui_kit::application().with_assets(AllAssets).run(move |cx| {
         gpui_kit::init(cx);
         cx.bind_keys([KeyBinding::new("cmd-q", Quit, None), KeyBinding::new("ctrl-q", Quit, None)]);
+        #[cfg(target_os = "macos")]
+        cx.bind_keys([KeyBinding::new("cmd-n", NewSession, None)]);
         cx.on_action(|_: &Quit, cx| cx.quit());
         let options = WindowOptions {
             window_bounds: Some(WindowBounds::Windowed(Bounds::centered(

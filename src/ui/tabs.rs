@@ -9,6 +9,7 @@ use gpui_kit::component::{ActiveTheme, Icon, Sizable, h_resizable, resizable_pan
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
+use crate::NewSession;
 use crate::ui::new_chat::NewChatAction;
 use crate::ui::palette::Palette;
 use crate::ui::{ChatRenderMode, ChatView};
@@ -107,6 +108,20 @@ impl TabsView {
 
     fn active_view(&self) -> Option<Entity<ChatView>> {
         self.tabs.get(self.active).map(|tab| tab.view.clone())
+    }
+
+    fn new_session(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(view) = self.active_view() {
+            view.update(cx, |view, cx| {
+                if view.session_id.is_some() || view.session_directory_selected {
+                    view.new_chat_in_directory(view.cwd.clone(), window, cx);
+                } else if view.can_start_new_chat() {
+                    view.request_new_tab(cx);
+                }
+            });
+        } else if self.sidebar.read(cx).can_start_new_chat() {
+            self.new_tab(window, cx);
+        }
     }
 
     fn new_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -437,6 +452,9 @@ impl Render for TabsView {
         let active = self.active_view();
         div()
             .size_full()
+            .on_action(cx.listener(|this, _: &NewSession, window, cx| {
+                this.new_session(window, cx);
+            }))
             .flex()
             .bg(p.background())
             .text_color(p.foreground())
