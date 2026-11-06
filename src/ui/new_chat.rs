@@ -1,5 +1,7 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
+use gpui_kit::component::WindowExt;
+use gpui_kit::component::notification::Notification;
 use gpui_kit::*;
 
 use crate::acp::{Command, Event};
@@ -40,16 +42,7 @@ impl ChatView {
                 };
                 let directory = cx
                     .background_executor()
-                    .spawn(async move {
-                        let directory = path.canonicalize()?;
-                        if !directory.is_dir() {
-                            return Err(std::io::Error::new(
-                                std::io::ErrorKind::NotADirectory,
-                                "请选择文件夹",
-                            ));
-                        }
-                        Ok(directory)
-                    })
+                    .spawn(async move { validate_directory(&path) })
                     .await?;
                 Ok(Some(directory))
             }
@@ -71,7 +64,49 @@ impl ChatView {
         cx.notify();
     }
 
-    fn start_new_chat(
+    pub(crate) fn new_chat_in_directory(
+        &mut self,
+        directory: PathBuf,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.can_start_new_chat() {
+            return;
+        }
+        self.choosing_directory = true;
+        cx.spawn_in(window, async move |view, cx| {
+            let path = directory.clone();
+            let result =
+                cx.background_executor().spawn(async move { validate_directory(&path) }).await;
+            let _ = view.update_in(cx, |this, window, cx| {
+                this.choosing_directory = false;
+                match result {
+                    Ok(directory) => {
+                        this.session_list.expand_project(&directory);
+                        if let Some(host) = &this.tab_host {
+                            let _ = host.update(cx, |host, cx| {
+                                host.new_tab_in_directory(directory, window, cx);
+                            });
+                        } else {
+                            this.start_new_chat(directory, NewChatAction::Create, window, cx);
+                        }
+                    }
+                    Err(error) => window.push_notification(
+                        Notification::error(format!(
+                            "无法在目录 {} 新建会话：{error}。请检查目录是否存在且可访问。",
+                            directory.display()
+                        )),
+                        cx,
+                    ),
+                }
+                cx.notify();
+            });
+        })
+        .detach();
+        cx.notify();
+    }
+
+    pub(crate) fn start_new_chat(
         &mut self,
         directory: PathBuf,
         action: NewChatAction,
@@ -112,5 +147,39 @@ impl ChatView {
             );
         }
         cx.notify();
+    }
+}
+
+fn validate_directory(path: &Path) -> std::io::Result<PathBuf> {
+    let directory = path.canonicalize()?;
+    if !directory.is_dir() {
+        return Err(std::io::Error::new(std::io::ErrorKind::NotADirectory, "请选择文件夹"));
+    }
+    Ok(directory)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ui::new_chat::validate_directory;
+
+    #[test]
+    fn accepts_existing_directory() {
+        let directory = std::env::current_dir().unwrap();
+        assert_eq!(validate_directory(&directory).unwrap(), directory.canonicalize().unwrap());
+    }
+
+    #[test]
+    fn rejects_file() {
+        let file = std::env::current_exe().unwrap();
+        assert_eq!(
+            validate_directory(&file).unwrap_err().kind(),
+            std::io::ErrorKind::NotADirectory
+        );
+    }
+
+    #[test]
+    fn rejects_missing_directory() {
+        let path = std::env::current_exe().unwrap().join("missing-directory");
+        assert!(validate_directory(&path).is_err());
     }
 }

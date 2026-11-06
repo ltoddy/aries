@@ -25,9 +25,12 @@ impl ChatView {
         let count = sessions.len() + usize::from(include_current);
         let directory = cwd.file_name().unwrap_or(cwd.as_os_str()).to_string_lossy();
         let path = cwd.to_path_buf();
+        let new_path = path.clone();
+        let new_enabled = self.can_start_new_chat();
         let delete_path = path.clone();
         let delete_anchor = format!("project:{}", delete_path.display());
         let has_sessions = sessions.len() > 0 || (include_current && self.session_id.is_some());
+        let delete_enabled = self.can_manage_sessions() && has_sessions;
         let view = cx.weak_entity();
         div()
             .mb_2()
@@ -93,18 +96,36 @@ impl ChatView {
                                 .small()
                                 .tooltip("项目操作")
                                 .accessibility_label(format!("项目 {} 的更多操作", cwd.display()))
-                                .disabled(!self.can_manage_sessions() || !has_sessions)
+                                .disabled(!new_enabled && !delete_enabled)
                                 .dropdown_menu_with_anchor(
                                     Anchor::TopRight,
                                     {
                                         let delete_anchor = delete_anchor.clone();
                                         move |menu, _, _| {
+                                            let new_view = view.clone();
+                                            let new_path = new_path.clone();
                                             let view = view.clone();
                                             let delete_path = delete_path.clone();
                                             let delete_anchor = delete_anchor.clone();
                                             menu.item(
+                                                PopupMenuItem::new("新建会话")
+                                                    .icon(IconName::Plus)
+                                                    .disabled(!new_enabled)
+                                                    .on_click(move |_, window, cx| {
+                                                        let _ = new_view.update(cx, |this, cx| {
+                                                            this.new_chat_in_directory(
+                                                                new_path.clone(),
+                                                                window,
+                                                                cx,
+                                                            );
+                                                        });
+                                                    }),
+                                            )
+                                            .item(PopupMenuItem::separator())
+                                            .item(
                                                 PopupMenuItem::new("删除项目会话")
                                                     .icon(IconName::Trash)
+                                                    .disabled(!delete_enabled)
                                                     .on_click(move |_, _, cx| {
                                                         let _ = view.update(cx, |this, cx| {
                                                             let ids = this

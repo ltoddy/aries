@@ -110,6 +110,24 @@ impl TabsView {
     }
 
     fn new_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.create_tab(None, window, cx);
+    }
+
+    pub(crate) fn new_tab_in_directory(
+        &mut self,
+        directory: PathBuf,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.create_tab(Some(directory), window, cx);
+    }
+
+    fn create_tab(
+        &mut self,
+        directory: Option<PathBuf>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let id = self.next_id;
         self.next_id += 1;
         let view = Self::create_chat_view(
@@ -125,7 +143,11 @@ impl TabsView {
         self.active = self.tabs.len() - 1;
         cx.spawn_in(window, async move |_, cx| {
             let _ = view.update_in(cx, |view, window, cx| {
-                view.choose_session_directory(NewChatAction::Create, window, cx);
+                if let Some(directory) = directory {
+                    view.start_new_chat(directory, NewChatAction::Create, window, cx);
+                } else {
+                    view.choose_session_directory(NewChatAction::Create, window, cx);
+                }
             });
         })
         .detach();
