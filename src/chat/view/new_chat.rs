@@ -32,7 +32,7 @@ impl ChatView {
             files: false,
             directories: true,
             multiple: false,
-            prompt: Some("选择会话工作目录".into()),
+            prompt: Some("选择新会话的项目目录".into()),
         });
         cx.spawn_in(window, async move |view, cx| {
             let result: anyhow::Result<Option<PathBuf>> = async {
@@ -50,11 +50,23 @@ impl ChatView {
             let _ = view.update_in(cx, |this, window, cx| {
                 this.choosing_directory = false;
                 match result {
-                    Ok(Some(directory)) => this.start_new_chat(directory, action, window, cx),
+                    Ok(Some(directory)) => {
+                        if matches!(action, NewChatAction::Create)
+                            && let Some(host) = &this.tab_host
+                        {
+                            let _ = host.update(cx, |host, cx| {
+                                host.new_tab_in_directory(directory, window, cx);
+                            });
+                        } else {
+                            this.start_new_chat(directory, action, window, cx);
+                        }
+                    }
                     Ok(None) => {}
                     Err(error) => {
-                        this.status = "选择目录失败".into();
-                        this.chat.finish(Some(format!("无法选择工作目录：{error}")));
+                        window.push_notification(
+                            Notification::error(format!("无法选择项目目录：{error}")),
+                            cx,
+                        );
                     }
                 }
                 cx.notify();

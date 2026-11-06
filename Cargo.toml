@@ -4,6 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+agent-client-protocol = { version = "5.0", features = ["process", "unstable"] }
+anyhow = "1.0"
+async-channel = "2.5"
+base64 = "0.23"
+dirs = "7.0"
+git2 = { version = "0.21.0", default-features = false }
 gpui-kit = { version = "0.9.0", features = [
     "tree-sitter",
     "tree-sitter-bash",
@@ -23,17 +29,12 @@ gpui-kit = { version = "0.9.0", features = [
     "tree-sitter-typescript",
     "tree-sitter-yaml",
 ] }
-agent-client-protocol = { version = "5.0", features = ["process", "unstable"] }
-anyhow = "1.0"
-async-channel = "2.5"
-base64 = "0.23"
-dirs = "7.0"
 libc = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 similar = "3.2"
-toml = "1.1"
 tokio = { version = "1", features = ["rt", "macros", "time", "sync", "process", "io-util"] }
+toml = "1.1"
 
 [profile.dev]
 debug = 0

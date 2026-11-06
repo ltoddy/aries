@@ -108,7 +108,7 @@ impl ChatView {
                                             let delete_path = delete_path.clone();
                                             let delete_anchor = delete_anchor.clone();
                                             menu.item(
-                                                PopupMenuItem::new("新建会话")
+                                                PopupMenuItem::new("在此项目新建会话")
                                                     .icon(IconName::Plus)
                                                     .disabled(!new_enabled)
                                                     .on_click(move |_, window, cx| {

@@ -12,7 +12,7 @@ use crate::chat::view::palette::Palette;
 impl ChatView {
     pub fn composer(&self, p: Palette, cx: &mut Context<Self>) -> impl IntoElement {
         let can_send = self.can_send(cx);
-        div().flex_shrink_0().px_3().py_1().bg(p.background()).child(
+        div().flex_shrink_0().pl_8().pr_4().py_2().bg(p.background()).child(
             div()
                 .w_full()
                 .max_w(rems(55.))
@@ -72,18 +72,6 @@ impl ChatView {
                             this.command_menu_action(CommandMenuAction::Dismiss, window, cx)
                         }))
                         .children(self.render_commands(p, cx))
-                        .when_some(self.tokens, |composer, tokens| {
-                            composer.child(
-                                div()
-                                    .id("usage")
-                                    .flex()
-                                    .justify_end()
-                                    .px_2()
-                                    .text_xs()
-                                    .text_color(p.muted())
-                                    .child(format!("{tokens} tokens")),
-                            )
-                        })
                         .child(
                             div()
                                 .flex()
@@ -139,20 +127,36 @@ impl ChatView {
                 .child(
                     div()
                         .flex()
-                        .items_start()
-                        .gap_2()
-                        .child(div().flex_1().min_w_0().when(
+                        .flex_col()
+                        .gap_1()
+                        .when(
                             !self.chat.config_options().is_empty() || self.config_error.is_some(),
                             |footer| footer.child(self.render_session_config(p, cx)),
-                        ))
+                        )
                         .child(
                             div()
-                                .flex_shrink_0()
-                                .px_2()
-                                .py_1()
-                                .text_size(rems(0.6875))
+                                .flex()
+                                .items_center()
+                                .gap_2()
+                                .min_h_6()
+                                .text_xs()
                                 .text_color(p.muted())
-                                .child("Enter 发送，Shift + Enter 换行"),
+                                .child(
+                                    div()
+                                        .id("usage")
+                                        .flex_1()
+                                        .min_w_0()
+                                        .truncate()
+                                        .when_some(self.tokens, |usage, tokens| {
+                                            usage.child(format!("{tokens} tokens"))
+                                        }),
+                                )
+                                .child(
+                                    div()
+                                        .min_w_0()
+                                        .text_right()
+                                        .child("Enter 发送 · Shift + Enter 换行"),
+                                ),
                         ),
                 ),
         )

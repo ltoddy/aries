@@ -1,8 +1,7 @@
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::Path;
 use std::time::Duration;
 
+use git2::Repository;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::Icon;
 use gpui_kit::component::tooltip::Tooltip;
@@ -22,37 +21,21 @@ pub(super) enum GitBranch {
 
 impl GitBranch {
     fn read(cwd: &Path) -> Self {
-        let output = Command::new("git")
-            .arg("--no-optional-locks")
-            .arg("-C")
-            .arg(cwd)
-            .args(["rev-parse", "--git-path", "HEAD"])
-            .output();
-        let Ok(output) = output else {
+        let Ok(repository) = Repository::discover(cwd) else {
             return Self::Unavailable;
         };
-        if !output.status.success() {
-            return Self::Unavailable;
-        }
-        let Ok(path) = std::str::from_utf8(&output.stdout) else {
+        let Ok(head) = repository.find_reference("HEAD") else {
             return Self::Unavailable;
         };
-        let path = PathBuf::from(path.trim());
-        let path = if path.is_absolute() { path } else { cwd.join(path) };
-        fs::read_to_string(path).map(|head| Self::from_head(&head)).unwrap_or_default()
-    }
-
-    fn from_head(head: &str) -> Self {
-        let head = head.trim();
-        if let Some(branch) = head.strip_prefix("ref: refs/heads/") {
-            if !branch.is_empty() {
-                return Self::Named(branch.into());
-            }
-        } else if matches!(head.len(), 40 | 64) && head.bytes().all(|byte| byte.is_ascii_hexdigit())
-        {
-            return Self::Detached(head[..7].into());
+        let Ok(target) = head.symbolic_target() else {
+            return Self::Unavailable;
+        };
+        if let Some(branch) = target.and_then(|name| name.strip_prefix("refs/heads/")) {
+            return Self::Named(branch.to_owned());
         }
-        Self::Unavailable
+        head.target()
+            .map(|commit| Self::Detached(commit.to_string()[..7].to_owned()))
+            .unwrap_or_default()
     }
 
     fn label(&self) -> Option<String> {
@@ -67,6 +50,7 @@ impl GitBranch {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ExecutionState {
     Disconnected,
+    Deleting,
     Stopping,
     Permission,
     Connecting,
@@ -82,7 +66,8 @@ enum ExecutionState {
 impl ExecutionState {
     fn label(self) -> &'static str {
         match self {
-            Self::Disconnected => "连接断开",
+            Self::Disconnected => "连接已断开，请新建会话",
+            Self::Deleting => "删除会话中",
             Self::Stopping => "正在停止",
             Self::Permission => "等待授权",
             Self::Connecting => "连接中",
@@ -127,11 +112,9 @@ impl ChatView {
         execution_state([
             (self.disconnected, ExecutionState::Disconnected),
             (self.stopping, ExecutionState::Stopping),
+            (self.session_deletion.is_busy(), ExecutionState::Deleting),
             (!self.permissions.is_empty(), ExecutionState::Permission),
-            (
-                self.session_list.is_connecting() || self.bridge.is_none(),
-                ExecutionState::Connecting,
-            ),
+            (self.session_list.is_connecting(), ExecutionState::Connecting),
             (self.choosing_directory, ExecutionState::ChoosingProject),
             (
                 self.loading_session.is_some() || self.queued_session_load.is_some(),
@@ -152,7 +135,7 @@ impl ChatView {
                 .map(|name| name.to_string_lossy().into_owned())
                 .unwrap_or_else(|| self.cwd.display().to_string())
         } else {
-            "待选择项目".into()
+            "发送时选择项目目录".into()
         };
         let mut directory = if selected {
             format!("执行目录：{}", self.cwd.display())
@@ -177,7 +160,8 @@ impl ChatView {
             .flex()
             .items_center()
             .gap_3()
-            .px_2()
+            .min_w_0()
+            .min_h_6()
             .text_xs()
             .text_color(p.muted())
             .child(
@@ -211,7 +195,9 @@ impl ChatView {
             .child(
                 div()
                     .id("execution-state")
-                    .flex_shrink_0()
+                    .min_w_0()
+                    .max_w(relative(0.5))
+                    .truncate()
                     .text_color(match state {
                         ExecutionState::Disconnected | ExecutionState::Failed => p.danger(),
                         ExecutionState::Permission => p.foreground(),

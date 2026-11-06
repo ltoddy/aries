@@ -6,7 +6,9 @@ use agent_client_protocol::AcpAgentConfig;
 use agent_client_protocol::v1::schema::{SessionId, SessionInfo};
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
-use gpui_kit::component::{ActiveTheme, Icon, Sizable, Theme, h_resizable, resizable_panel};
+use gpui_kit::component::{
+    ActiveTheme, Disableable, Icon, Sizable, Theme, h_resizable, resizable_panel,
+};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -122,7 +124,7 @@ impl TabsView {
     ) -> Subscription {
         cx.observe_in(view, window, |this, view, window, cx| {
             if view.update(cx, |view, _| view.take_new_tab_request()) {
-                this.new_tab(window, cx);
+                this.new_session(window, cx);
             } else if let Some(session) = view.update(cx, |view, _| view.take_session_tab_request())
             {
                 this.open_session(session, window, cx);
@@ -150,26 +152,23 @@ impl TabsView {
         view
     }
 
-    fn active_view(&self) -> Option<Entity<ChatView>> {
+    pub(super) fn active_view(&self) -> Option<Entity<ChatView>> {
         self.tabs.get(self.active).map(|tab| tab.view.clone())
     }
 
-    fn new_session(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(view) = self.active_view() {
-            view.update(cx, |view, cx| {
-                if view.session_id.is_some() || view.session_directory_selected {
-                    view.new_chat_in_directory(view.cwd.clone(), window, cx);
-                } else if view.can_start_new_chat() {
-                    view.request_new_tab(cx);
-                }
-            });
-        } else if self.sidebar.read(cx).can_start_new_chat() {
-            self.new_tab(window, cx);
-        }
+    pub(super) fn is_new_session_available(&self, cx: &App) -> bool {
+        self.active_view().unwrap_or_else(|| self.sidebar.clone()).read(cx).can_start_new_chat()
     }
 
-    fn new_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.create_tab(None, window, cx);
+    fn new_session(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let view = self.active_view().unwrap_or_else(|| self.sidebar.clone());
+        view.update(cx, |view, cx| {
+            if view.session_id.is_some() || view.session_directory_selected {
+                view.new_chat_in_directory(view.cwd.clone(), window, cx);
+            } else {
+                view.new_chat(window, cx);
+            }
+        });
     }
 
     pub(crate) fn new_tab_in_directory(
@@ -178,15 +177,10 @@ impl TabsView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.create_tab(Some(directory), window, cx);
+        self.create_tab(directory, window, cx);
     }
 
-    fn create_tab(
-        &mut self,
-        directory: Option<PathBuf>,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    fn create_tab(&mut self, directory: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
         let id = self.next_id;
         self.next_id += 1;
         let view = Self::create_chat_view(&self.cwd, &self.agent, ChatRenderMode::Main, window, cx);
@@ -196,11 +190,7 @@ impl TabsView {
         self.tab_scroll.scroll_to_item(self.active);
         cx.spawn_in(window, async move |_, cx| {
             let _ = view.update_in(cx, |view, window, cx| {
-                if let Some(directory) = directory {
-                    view.start_new_chat(directory, NewChatAction::Create, window, cx);
-                } else {
-                    view.choose_session_directory(NewChatAction::Create, window, cx);
-                }
+                view.start_new_chat(directory, NewChatAction::Create, window, cx);
             });
         })
         .detach();
@@ -404,9 +394,10 @@ impl TabsView {
                     .ghost()
                     .small()
                     .flex_shrink_0()
-                    .tooltip("新建标签")
-                    .accessibility_label("新建标签")
-                    .on_click(cx.listener(|this, _, window, cx| this.new_tab(window, cx))),
+                    .tooltip_with_action("新建会话", &NewSession, None)
+                    .accessibility_label("新建会话")
+                    .disabled(!self.is_new_session_available(cx))
+                    .on_click(cx.listener(|this, _, window, cx| this.new_session(window, cx))),
             )
             .into_any_element()
     }
@@ -432,7 +423,7 @@ impl TabsView {
                             .text_xs()
                             .line_height(rems(1.25))
                             .text_color(p.muted())
-                            .child("从左侧选择一个会话，或点击上方 + 新建标签。"),
+                            .child("从左侧选择一个会话，或点击上方 + 新建会话并选择项目。"),
                     ),
             )
             .into_any_element()
