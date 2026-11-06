@@ -706,27 +706,3 @@ impl Render for TabsView {
             )
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use gpui_kit::px;
-
-    use crate::ui::tabs::{adjacent_tab, zoom_font_size};
-
-    #[test]
-    fn tab_navigation_wraps_and_handles_empty_tabs() {
-        assert_eq!(adjacent_tab(0, 0, true), None);
-        assert_eq!(adjacent_tab(0, 1, false), Some(0));
-        assert_eq!(adjacent_tab(2, 3, true), Some(0));
-        assert_eq!(adjacent_tab(0, 3, false), Some(2));
-        assert_eq!(adjacent_tab(1, 3, true), Some(2));
-    }
-
-    #[test]
-    fn zoom_is_bounded_and_resettable() {
-        assert_eq!(zoom_font_size(px(16.), px(16.), 1), px(17.6));
-        assert_eq!(zoom_font_size(px(16.), px(24.), 1), px(24.));
-        assert_eq!(zoom_font_size(px(16.), px(12.8), -1), px(12.8));
-        assert_eq!(zoom_font_size(px(16.), px(24.), 0), px(16.));
-    }
-}

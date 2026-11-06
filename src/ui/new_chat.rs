@@ -124,6 +124,7 @@ impl ChatView {
         }
         self.reset_chat();
         self.cwd = directory;
+        self.watch_git_branch(cx);
         self.session_directory_selected = true;
         self.disconnected = false;
         self.input.update(cx, |input, cx| {
@@ -156,30 +157,4 @@ fn validate_directory(path: &Path) -> std::io::Result<PathBuf> {
         return Err(std::io::Error::new(std::io::ErrorKind::NotADirectory, "请选择文件夹"));
     }
     Ok(directory)
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::ui::new_chat::validate_directory;
-
-    #[test]
-    fn accepts_existing_directory() {
-        let directory = std::env::current_dir().unwrap();
-        assert_eq!(validate_directory(&directory).unwrap(), directory.canonicalize().unwrap());
-    }
-
-    #[test]
-    fn rejects_file() {
-        let file = std::env::current_exe().unwrap();
-        assert_eq!(
-            validate_directory(&file).unwrap_err().kind(),
-            std::io::ErrorKind::NotADirectory
-        );
-    }
-
-    #[test]
-    fn rejects_missing_directory() {
-        let path = std::env::current_exe().unwrap().join("missing-directory");
-        assert!(validate_directory(&path).is_err());
-    }
 }

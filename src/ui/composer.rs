@@ -47,6 +47,7 @@ impl ChatView {
                             )),
                     )
                 })
+                .child(self.render_execution_context(p))
                 .child(
                     div()
                         .relative()

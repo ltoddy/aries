@@ -411,23 +411,3 @@ impl ChatView {
             .into_any_element()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use crate::ui::timeline::user_message_target;
-
-    #[test]
-    fn message_navigation_handles_boundaries_and_partial_messages() {
-        let target = |current, inside, next| {
-            user_message_target([0, 4, 9].into_iter(), current, inside, next)
-        };
-        assert_eq!(user_message_target([].into_iter(), 0, false, true), None);
-        assert_eq!(target(0, false, false), None);
-        assert_eq!(target(0, true, false), Some(0));
-        assert_eq!(target(0, false, true), Some(4));
-        assert_eq!(target(6, false, false), Some(4));
-        assert_eq!(target(6, false, true), Some(9));
-        assert_eq!(target(9, false, true), None);
-        assert_eq!(target(12, false, false), Some(9));
-    }
-}

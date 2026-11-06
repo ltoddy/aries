@@ -3,6 +3,7 @@ mod attachment;
 mod commands;
 mod composer;
 mod events;
+mod execution_context;
 mod layout;
 mod load_session;
 mod media;
@@ -43,6 +44,7 @@ use crate::session::deletion::SessionDeletion;
 use crate::session::list::SessionList;
 use crate::session::load::SessionLoad;
 use crate::ui::commands::SlashMenu;
+use crate::ui::execution_context::GitBranch;
 use crate::ui::new_chat::NewChatAction;
 
 pub(crate) fn single_line(text: &str) -> String {
@@ -58,6 +60,8 @@ pub(crate) enum ChatRenderMode {
 
 pub struct ChatView {
     cwd: PathBuf,
+    git_branch: GitBranch,
+    git_branch_task: Option<Task<()>>,
     choosing_directory: bool,
     session_directory_selected: bool,
     agent: AcpAgentConfig,
@@ -154,11 +158,16 @@ impl ChatView {
                 this.cancel_session_deletion(cx);
             }
         });
-        cx.defer_in(window, |this, window, cx| this.connect(window, cx));
+        cx.defer_in(window, |this, window, cx| {
+            this.watch_git_branch(cx);
+            this.connect(window, cx);
+        });
         let session_scroll = ScrollHandle::new();
         let current_session_anchor = ScrollAnchor::for_handle(session_scroll.clone());
         Self {
             cwd,
+            git_branch: GitBranch::default(),
+            git_branch_task: None,
             choosing_directory: false,
             session_directory_selected: false,
             agent,
