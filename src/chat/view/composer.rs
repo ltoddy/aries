@@ -8,10 +8,20 @@ use gpui_kit::*;
 use crate::chat::view::ChatView;
 use crate::chat::view::commands::CommandMenuAction;
 use crate::chat::view::palette::Palette;
+use crate::preferences::SendKey;
 
 impl ChatView {
+    fn send_key(&self, cx: &App) -> SendKey {
+        self.tab_host
+            .as_ref()
+            .and_then(|host| host.upgrade())
+            .map(|host| host.read(cx).settings.send_key())
+            .unwrap_or_default()
+    }
+
     pub fn composer(&self, p: Palette, cx: &mut Context<Self>) -> impl IntoElement {
         let can_send = self.can_send(cx);
+        let send_key = self.send_key(cx);
         div().flex_shrink_0().pl_8().pr_4().py_2().bg(p.background()).child(
             div()
                 .w_full()
@@ -48,6 +58,17 @@ impl ChatView {
                     )
                 })
                 .child(self.render_execution_context(p))
+                .when_some(self.tokens, |composer, tokens| {
+                    composer.child(
+                        div()
+                            .id("usage")
+                            .min_w_0()
+                            .truncate()
+                            .text_xs()
+                            .text_color(p.muted())
+                            .child(format!("{tokens} tokens")),
+                    )
+                })
                 .child(
                     div()
                         .relative()
@@ -61,8 +82,24 @@ impl ChatView {
                             this.command_menu_action(CommandMenuAction::Next, window, cx)
                         }))
                         .capture_action(cx.listener(|this, action: &Enter, window, cx| {
-                            if !action.shift && !action.secondary {
+                            if action.secondary
+                                || !this.input.read(cx).focus_handle(cx).is_focused(window)
+                                || this.input.update(cx, |input, cx| {
+                                    input.marked_text_range(window, cx).is_some()
+                                })
+                            {
+                                return;
+                            }
+                            if !action.shift {
                                 this.command_menu_action(CommandMenuAction::Complete, window, cx);
+                                if window.default_prevented() {
+                                    return;
+                                }
+                            }
+                            if action.shift == (this.send_key(cx) == SendKey::ShiftEnter) {
+                                window.prevent_default();
+                                cx.stop_propagation();
+                                this.send(window, cx);
                             }
                         }))
                         .capture_action(cx.listener(|this, _: &IndentInline, window, cx| {
@@ -127,36 +164,25 @@ impl ChatView {
                 .child(
                     div()
                         .flex()
-                        .flex_col()
-                        .gap_1()
-                        .when(
+                        .items_center()
+                        .justify_between()
+                        .gap_2()
+                        .min_h_6()
+                        .child(div().flex_1().min_w_0().when(
                             !self.chat.config_options().is_empty() || self.config_error.is_some(),
                             |footer| footer.child(self.render_session_config(p, cx)),
-                        )
+                        ))
                         .child(
                             div()
-                                .flex()
-                                .items_center()
-                                .gap_2()
-                                .min_h_6()
+                                .flex_shrink_0()
                                 .text_xs()
                                 .text_color(p.muted())
-                                .child(
-                                    div()
-                                        .id("usage")
-                                        .flex_1()
-                                        .min_w_0()
-                                        .truncate()
-                                        .when_some(self.tokens, |usage, tokens| {
-                                            usage.child(format!("{tokens} tokens"))
-                                        }),
-                                )
-                                .child(
-                                    div()
-                                        .min_w_0()
-                                        .text_right()
-                                        .child("Enter 发送 · Shift + Enter 换行"),
-                                ),
+                                .text_right()
+                                .child(format!(
+                                    "{} 发送 · {} 换行",
+                                    send_key.send_label(),
+                                    send_key.newline_label(),
+                                )),
                         ),
                 ),
         )

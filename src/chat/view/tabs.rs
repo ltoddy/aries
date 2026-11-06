@@ -6,6 +6,8 @@ use agent_client_protocol::AcpAgentConfig;
 use agent_client_protocol::v1::schema::{SessionId, SessionInfo};
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::searchable_list::SearchableVec;
+use gpui_kit::component::select::{SelectEvent, SelectState};
 use gpui_kit::component::{
     ActiveTheme, Disableable, Icon, Sizable, Theme, h_resizable, resizable_panel,
 };
@@ -15,11 +17,8 @@ use gpui_kit::*;
 use crate::chat::view::new_chat::NewChatAction;
 use crate::chat::view::palette::{self, Palette};
 use crate::chat::view::{ChatRenderMode, ChatView};
-use crate::preferences::{Appearance, Preferences};
-use crate::{
-    CloseTab, NewSession, NextTab, NextUserMessage, PreviousTab, PreviousUserMessage, ResetZoom,
-    ZoomIn, ZoomOut,
-};
+use crate::preferences::{Appearance, Preferences, SendKey};
+use crate::{CloseTab, NewSession, NextTab, NextUserMessage, PreviousTab, PreviousUserMessage};
 
 struct ChatTab {
     id: usize,
@@ -44,8 +43,9 @@ pub struct TabsView {
     next_id: usize,
     tab_scroll: ScrollHandle,
     focus_handle: FocusHandle,
-    base_font_size: Pixels,
-    base_mono_font_size: Pixels,
+    pub font_select: Entity<SelectState<SearchableVec<String>>>,
+    default_font_family: SharedString,
+    mono_font_ratio: f32,
 }
 
 impl fmt::Debug for TabsView {
@@ -70,12 +70,36 @@ impl TabsView {
             Some(path) => Preferences::load_or_migrate(path, Preferences::legacy_path().as_deref()),
             None => (Preferences::default(), Some("未找到用户主目录，设置无法保存".into())),
         };
-        let base_font_size = cx.theme().font_size;
-        let base_mono_font_size = cx.theme().mono_font_size;
+        let default_font_family = cx.theme().font_family.clone();
+        let mono_font_ratio = cx.theme().mono_font_size / cx.theme().font_size;
         palette::apply(settings.appearance(), cx);
         Theme::update(cx, |theme| {
-            theme.font_size = base_font_size * settings.zoom();
-            theme.mono_font_size = base_mono_font_size * settings.zoom();
+            theme.font_family = settings
+                .font_family()
+                .map(SharedString::from)
+                .unwrap_or_else(|| default_font_family.clone());
+            theme.font_size = px(settings.font_size());
+            theme.mono_font_size = theme.font_size * mono_font_ratio;
+        });
+        let mut fonts = cx.text_system().all_font_names();
+        if let Some(family) = settings.font_family() {
+            fonts.push(family.to_owned());
+        }
+        fonts.sort_unstable();
+        fonts.dedup();
+        fonts.insert(0, "系统默认".into());
+        let selected = settings.font_family().unwrap_or("系统默认").to_owned();
+        let font_select = cx.new(|cx| {
+            let mut state =
+                SelectState::new(SearchableVec::new(fonts), None, window, cx).searchable(true);
+            state.set_selected_value(&selected, window, cx);
+            state
+        });
+        let font_subscription = cx.subscribe(&font_select, |this, _, event, cx| {
+            if let SelectEvent::Confirm(Some(family)) = event {
+                this.settings.set_font_family((family != "系统默认").then(|| family.clone()));
+                this.apply_typography(cx);
+            }
         });
         let system_theme = cx.observe_window_appearance(window, |this, window, cx| {
             if this.settings.appearance() == Appearance::System {
@@ -103,7 +127,7 @@ impl TabsView {
             settings_saving: false,
             save_task: None,
             save_revision: 0,
-            _settings_subscriptions: vec![system_theme, quit],
+            _settings_subscriptions: vec![system_theme, quit, font_subscription],
             agent,
             sidebar,
             _sidebar_subscription: sidebar_subscription,
@@ -112,8 +136,9 @@ impl TabsView {
             next_id: 0,
             tab_scroll: ScrollHandle::new(),
             focus_handle,
-            base_font_size,
-            base_mono_font_size,
+            font_select,
+            default_font_family,
+            mono_font_ratio,
         }
     }
 
@@ -302,19 +327,36 @@ impl TabsView {
         self.select_tab(index, window, cx);
     }
 
-    pub fn zoom(&mut self, step: i32, cx: &mut Context<Self>) {
-        let size = zoom_font_size(self.base_font_size, cx.theme().font_size, step);
+    pub fn change_font_size(&mut self, step: i32, cx: &mut Context<Self>) {
+        let size = if step == 0 { 16.0 } else { self.settings.font_size() + step as f32 };
+        self.settings.set_font_size(size);
+        self.apply_typography(cx);
+    }
+
+    fn apply_typography(&mut self, cx: &mut Context<Self>) {
         Theme::update(cx, |theme| {
-            theme.font_size = size;
-            theme.mono_font_size = self.base_mono_font_size * (size / self.base_font_size);
+            theme.font_family = self
+                .settings
+                .font_family()
+                .map(SharedString::from)
+                .unwrap_or_else(|| self.default_font_family.clone());
+            theme.font_size = px(self.settings.font_size());
+            theme.mono_font_size = theme.font_size * self.mono_font_ratio;
         });
-        self.settings.set_zoom(size / self.base_font_size);
         self.save_settings(cx);
         self.sidebar.read(cx).timeline.remeasure();
         for tab in &self.tabs {
             tab.view.read(cx).timeline.remeasure();
         }
         cx.notify();
+    }
+
+    pub fn set_send_key(&mut self, send_key: SendKey, cx: &mut Context<Self>) {
+        self.settings.set_send_key(send_key);
+        for tab in &self.tabs {
+            tab.view.update(cx, |_, cx| cx.notify());
+        }
+        self.save_settings(cx);
     }
 
     pub fn set_appearance(&mut self, appearance: Appearance, cx: &mut Context<Self>) {
@@ -329,7 +371,7 @@ impl TabsView {
             cx.notify();
             return;
         };
-        let settings = self.settings;
+        let settings = self.settings.clone();
         self.save_revision += 1;
         let revision = self.save_revision;
         let previous = self.save_task.take();
@@ -511,14 +553,6 @@ fn adjacent_tab(active: usize, count: usize, next: bool) -> Option<usize> {
     Some(if next { (active + 1) % count } else { (active + count - 1) % count })
 }
 
-fn zoom_font_size(base: Pixels, current: Pixels, step: i32) -> Pixels {
-    if step == 0 {
-        base
-    } else {
-        (current + base * (step as f32 * 0.1)).clamp(base * 0.8, base * 1.5)
-    }
-}
-
 impl ChatView {
     pub fn set_tab_host(&mut self, tab_host: WeakEntity<TabsView>) {
         self.tab_host = Some(tab_host);
@@ -613,9 +647,6 @@ impl Render for TabsView {
             .on_action(
                 cx.listener(|this, _: &NextTab, window, cx| this.switch_tab(true, window, cx)),
             )
-            .on_action(cx.listener(|this, _: &ZoomIn, _, cx| this.zoom(1, cx)))
-            .on_action(cx.listener(|this, _: &ZoomOut, _, cx| this.zoom(-1, cx)))
-            .on_action(cx.listener(|this, _: &ResetZoom, _, cx| this.zoom(0, cx)))
             .on_action(cx.listener(|this, _: &PreviousUserMessage, _, cx| {
                 if let Some(view) = this.active_view() {
                     view.update(cx, |view, cx| view.jump_user_message(false, cx));

@@ -127,20 +127,9 @@ impl ChatView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let input = cx.new(|cx| {
-            TextareaState::new(window, cx)
-                .placeholder("发送消息…")
-                .auto_grow(2, 6)
-                .submit_on_enter(true)
-        });
-        let changes = cx.subscribe_in(&input, window, |this, input, event, window, cx| {
-            if let InputEvent::PressEnter { shift: false, .. } = event {
-                let composing =
-                    input.update(cx, |input, cx| input.marked_text_range(window, cx).is_some());
-                if !composing && !this.complete_selected_command(window, cx) {
-                    this.send(window, cx);
-                }
-            }
+        let input =
+            cx.new(|cx| TextareaState::new(window, cx).placeholder("发送消息…").auto_grow(2, 6));
+        let changes = cx.subscribe_in(&input, window, |this, _, event, _, cx| {
             match event {
                 InputEvent::Change => this.command_menu.reset(),
                 InputEvent::Focus => this.command_menu.focus(),

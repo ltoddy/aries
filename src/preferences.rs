@@ -12,26 +12,60 @@ pub enum Appearance {
     Dark,
 }
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SendKey {
+    #[default]
+    Enter,
+    ShiftEnter,
+}
+
+impl SendKey {
+    pub fn send_label(self) -> &'static str {
+        match self {
+            Self::Enter => "Enter",
+            Self::ShiftEnter => "Shift + Enter",
+        }
+    }
+
+    pub fn newline_label(self) -> &'static str {
+        match self {
+            Self::Enter => "Shift + Enter",
+            Self::ShiftEnter => "Enter",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(default)]
 pub struct Preferences {
     appearance: AppearanceSettings,
+    send_key: SendKey,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(default)]
 struct AppearanceSettings {
     theme: Appearance,
-    zoom: f32,
+    font_family: Option<String>,
+    font_size: f32,
 }
 
 impl Default for AppearanceSettings {
     fn default() -> Self {
-        Self { theme: Appearance::System, zoom: 1.0 }
+        Self { theme: Appearance::System, font_family: None, font_size: 16.0 }
     }
 }
 
 impl Preferences {
+    pub fn send_key(&self) -> SendKey {
+        self.send_key
+    }
+
+    pub fn set_send_key(&mut self, send_key: SendKey) {
+        self.send_key = send_key;
+    }
+
     pub fn appearance(&self) -> Appearance {
         self.appearance.theme
     }
@@ -40,12 +74,20 @@ impl Preferences {
         self.appearance.theme = appearance;
     }
 
-    pub fn zoom(&self) -> f32 {
-        self.appearance.zoom
+    pub fn font_family(&self) -> Option<&str> {
+        self.appearance.font_family.as_deref()
     }
 
-    pub fn set_zoom(&mut self, zoom: f32) {
-        self.appearance.zoom = zoom.clamp(0.8, 1.5);
+    pub fn set_font_family(&mut self, family: Option<String>) {
+        self.appearance.font_family = family;
+    }
+
+    pub fn font_size(&self) -> f32 {
+        self.appearance.font_size
+    }
+
+    pub fn set_font_size(&mut self, size: f32) {
+        self.appearance.font_size = size.clamp(12.0, 24.0);
     }
 
     pub fn path() -> Option<PathBuf> {
@@ -57,14 +99,20 @@ impl Preferences {
     }
 
     pub fn load(path: impl AsRef<Path>) -> std::io::Result<Self> {
-        let text = fs::read_to_string(path)?;
-        let settings: Self = toml::from_str(&text)
+        Self::parse(&fs::read_to_string(path)?)
+    }
+
+    fn parse(text: &str) -> std::io::Result<Self> {
+        let settings: Self = toml::from_str(text)
             .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
-        if !settings.zoom().is_finite() || !(0.8..=1.5).contains(&settings.zoom()) {
+        if !settings.font_size().is_finite() || !(12.0..=24.0).contains(&settings.font_size()) {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                "缩放比例必须在 0.8–1.5 之间",
+                "字号必须在 12–24 之间",
             ));
+        }
+        if settings.font_family().is_some_and(|family| family.trim().is_empty()) {
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "字体名称不能为空"));
         }
         Ok(settings)
     }

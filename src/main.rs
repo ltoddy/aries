@@ -11,18 +11,7 @@ use crate::preferences::Preferences;
 
 gpui_kit::actions!(
     orbit,
-    [
-        Quit,
-        NewSession,
-        CloseTab,
-        PreviousTab,
-        NextTab,
-        ZoomIn,
-        ZoomOut,
-        ResetZoom,
-        PreviousUserMessage,
-        NextUserMessage,
-    ]
+    [Quit, NewSession, CloseTab, PreviousTab, NextTab, PreviousUserMessage, NextUserMessage,]
 );
 
 fn main() -> anyhow::Result<()> {
@@ -38,10 +27,6 @@ fn main() -> anyhow::Result<()> {
             KeyBinding::new("cmd-w", CloseTab, None),
             KeyBinding::new("cmd-shift-[", PreviousTab, None),
             KeyBinding::new("cmd-shift-]", NextTab, None),
-            KeyBinding::new("cmd-=", ZoomIn, None),
-            KeyBinding::new("cmd-+", ZoomIn, None),
-            KeyBinding::new("cmd--", ZoomOut, None),
-            KeyBinding::new("cmd-0", ResetZoom, None),
             KeyBinding::new("cmd-alt-up", PreviousUserMessage, None),
             KeyBinding::new("cmd-alt-down", NextUserMessage, None),
         ]);
@@ -50,10 +35,6 @@ fn main() -> anyhow::Result<()> {
             KeyBinding::new("ctrl-w", CloseTab, None),
             KeyBinding::new("ctrl-shift-[", PreviousTab, None),
             KeyBinding::new("ctrl-shift-]", NextTab, None),
-            KeyBinding::new("ctrl-=", ZoomIn, None),
-            KeyBinding::new("ctrl-+", ZoomIn, None),
-            KeyBinding::new("ctrl--", ZoomOut, None),
-            KeyBinding::new("ctrl-0", ResetZoom, None),
             KeyBinding::new("ctrl-alt-up", PreviousUserMessage, None),
             KeyBinding::new("ctrl-alt-down", NextUserMessage, None),
         ]);

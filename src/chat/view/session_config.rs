@@ -22,7 +22,7 @@ impl ChatView {
             .flex()
             .flex_col()
             .gap_1()
-            .child(div().flex().flex_wrap().items_center().gap_1().when_some(
+            .child(div().flex().min_w_0().items_center().gap_1().when_some(
                 self.session_id.as_ref(),
                 |row, session_id| {
                     row.children(

@@ -1,6 +1,7 @@
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::radio::{Radio, RadioGroup};
+use gpui_kit::component::select::Select;
 use gpui_kit::component::{ActiveTheme, Disableable, Icon, Sizable, WindowExt};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
@@ -8,7 +9,7 @@ use gpui_kit::*;
 use crate::chat::view::ChatView;
 use crate::chat::view::palette::Palette;
 use crate::chat::view::tabs::TabsView;
-use crate::preferences::Appearance;
+use crate::preferences::{Appearance, SendKey};
 
 impl ChatView {
     pub fn render_settings_button(&self, p: Palette, cx: &mut Context<Self>) -> impl IntoElement {
@@ -45,17 +46,21 @@ impl TabsView {
                     };
                     let this = owner.read(cx);
                     let appearance = this.settings.appearance();
-                    let zoom = this.settings.zoom();
+                    let send_key = this.settings.send_key();
+                    let send_keys = [SendKey::Enter, SendKey::ShiftEnter];
+                    let send_key_view = view.clone();
+                    let font_size = this.settings.font_size();
+                    let font_select = this.font_select.clone();
                     let error = this.settings_error.clone();
                     let saving = this.settings_saving;
                     let path =
                         this.preferences_path.as_ref().map(|path| path.display().to_string());
                     let appearances = [Appearance::System, Appearance::Light, Appearance::Dark];
                     let theme_view = view.clone();
-                    let smaller = view.clone();
-                    let larger = view.clone();
-                    let reset = view.clone();
                     let retry = view.clone();
+                    let font_smaller = view.clone();
+                    let font_larger = view.clone();
+                    let font_reset = view.clone();
                     content
                         .gap_4()
                         .child(div().font_weight(FontWeight::MEDIUM).child("外观"))
@@ -80,47 +85,61 @@ impl TabsView {
                             ),
                         )
                         .child(
+                            div().flex().flex_col().gap_2().child("字体").child(
+                                Select::new(&font_select)
+                                    .id("settings-font-family")
+                                    .accessibility_label("字体")
+                                    .search_placeholder("搜索字体")
+                                    .menu_max_h(rems(16.))
+                                    .w_full(),
+                            ),
+                        )
+                        .child(
                             div()
                                 .flex()
                                 .items_center()
                                 .justify_between()
                                 .gap_3()
-                                .child("界面缩放")
+                                .child("字号")
                                 .child(
                                     div()
                                         .flex()
                                         .items_center()
                                         .gap_2()
                                         .child(
-                                            Button::new("settings-zoom-out")
+                                            Button::new("settings-font-smaller")
                                                 .icon(IconName::Minus)
                                                 .small()
-                                                .disabled(zoom <= 0.8)
-                                                .accessibility_label("缩小界面")
+                                                .disabled(font_size <= 12.0)
+                                                .accessibility_label("减小字号")
                                                 .on_click(move |_, _, cx| {
-                                                    let _ = smaller
-                                                        .update(cx, |this, cx| this.zoom(-1, cx));
+                                                    let _ = font_smaller.update(cx, |this, cx| {
+                                                        this.change_font_size(-1, cx)
+                                                    });
                                                 }),
                                         )
                                         .child(
-                                            Button::new("settings-zoom-reset")
-                                                .label(format!("{:.0}%", zoom * 100.))
+                                            Button::new("settings-font-reset")
+                                                .label(format!("{font_size} px"))
                                                 .small()
-                                                .tooltip("恢复默认大小")
+                                                .tooltip("恢复默认字号（16 px）")
+                                                .accessibility_label("恢复默认字号")
                                                 .on_click(move |_, _, cx| {
-                                                    let _ = reset
-                                                        .update(cx, |this, cx| this.zoom(0, cx));
+                                                    let _ = font_reset.update(cx, |this, cx| {
+                                                        this.change_font_size(0, cx)
+                                                    });
                                                 }),
                                         )
                                         .child(
-                                            Button::new("settings-zoom-in")
+                                            Button::new("settings-font-larger")
                                                 .icon(IconName::Plus)
                                                 .small()
-                                                .disabled(zoom >= 1.5)
-                                                .accessibility_label("放大界面")
+                                                .disabled(font_size >= 24.0)
+                                                .accessibility_label("增大字号")
                                                 .on_click(move |_, _, cx| {
-                                                    let _ = larger
-                                                        .update(cx, |this, cx| this.zoom(1, cx));
+                                                    let _ = font_larger.update(cx, |this, cx| {
+                                                        this.change_font_size(1, cx)
+                                                    });
                                                 }),
                                         ),
                                 ),
@@ -129,7 +148,29 @@ impl TabsView {
                             div()
                                 .text_sm()
                                 .text_color(cx.theme().muted_foreground)
-                                .child("修改即时生效并自动保存；缩放范围为 80%–150%。"),
+                                .child("修改即时生效并自动保存。字号范围为 12–24 px。"),
+                        )
+                        .child(div().font_weight(FontWeight::MEDIUM).child("消息输入"))
+                        .child(
+                            div().flex().flex_col().gap_2().child("发送消息按键").child(
+                                RadioGroup::new("settings-send-key")
+                                    .selected_index(
+                                        send_keys.iter().position(|key| *key == send_key),
+                                    )
+                                    .children([
+                                        Radio::new("send-key-enter")
+                                            .label("Enter 发送，Shift + Enter 换行"),
+                                        Radio::new("send-key-shift-enter")
+                                            .label("Shift + Enter 发送，Enter 换行"),
+                                    ])
+                                    .on_change(move |index, _, cx| {
+                                        if let Some(send_key) = send_keys.get(*index) {
+                                            let _ = send_key_view.update(cx, |this, cx| {
+                                                this.set_send_key(*send_key, cx);
+                                            });
+                                        }
+                                    }),
+                            ),
                         )
                         .child(
                             div()
@@ -143,7 +184,9 @@ impl TabsView {
                                         .label("快捷键…")
                                         .small()
                                         .accessibility_label("查看快捷键说明")
-                                        .on_click(|_, window, cx| open_shortcut_help(window, cx)),
+                                        .on_click(move |_, window, cx| {
+                                            open_shortcut_help(send_key, window, cx)
+                                        }),
                                 ),
                         )
                         .when(saving, |content| {
@@ -189,10 +232,10 @@ impl TabsView {
     }
 }
 
-fn open_shortcut_help(window: &mut Window, cx: &mut App) {
-    window.open_dialog(cx, |dialog, _, cx| {
+fn open_shortcut_help(send_key: SendKey, window: &mut Window, cx: &mut App) {
+    window.open_dialog(cx, move |dialog, _, cx| {
         dialog.title("快捷键").centered().width(cx.theme().font_size * 30.).content(
-            |content, _, cx| {
+            move |content, _, cx| {
                 let modifier = if cfg!(target_os = "macos") { "⌘" } else { "Ctrl" };
                 let mut sessions = vec![
                     ("关闭当前标签", format!("{modifier} + W")),
@@ -215,18 +258,10 @@ fn open_shortcut_help(window: &mut Window, cx: &mut App) {
                         ],
                     ),
                     (
-                        "界面缩放",
-                        vec![
-                            ("放大", format!("{modifier} + + / {modifier} + =")),
-                            ("缩小", format!("{modifier} + −")),
-                            ("恢复默认大小", format!("{modifier} + 0")),
-                        ],
-                    ),
-                    (
                         "输入与弹框",
                         vec![
-                            ("发送消息", "Enter".into()),
-                            ("输入框换行", "Shift + Enter".into()),
+                            ("发送消息", send_key.send_label().into()),
+                            ("输入框换行", send_key.newline_label().into()),
                             ("关闭弹框", "Esc".into()),
                         ],
                     ),

@@ -73,11 +73,13 @@ pub fn apply(appearance: Appearance, cx: &mut App) {
 }
 
 pub fn sync(mode: ThemeMode, cx: &mut App) {
+    let font_family = Theme::global(cx).font_family.clone();
     let font_size = Theme::global(cx).font_size;
     let mono_font_size = Theme::global(cx).mono_font_size;
     Theme::change(mode, None, cx);
     let p = Palette::new(mode);
     Theme::update(cx, |theme| {
+        theme.font_family = font_family;
         theme.font_size = font_size;
         theme.mono_font_size = mono_font_size;
         theme.colors.background = p.background();
