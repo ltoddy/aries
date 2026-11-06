@@ -185,6 +185,8 @@ pub fn render_git_info(
     }
     Some(
         div()
+            .absolute()
+            .inset_0()
             .children([Some(panel.into_any_element()), ball].into_iter().flatten())
             .into_any_element(),
     )

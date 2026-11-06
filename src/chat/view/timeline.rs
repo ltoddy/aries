@@ -145,6 +145,24 @@ impl ChatView {
             )
             .child(self.render_user_anchors(p, cx))
             .child(self.render_scroll_controls(p, cx))
+            .when(!self.timeline.is_following_tail(), |el| {
+                el.child(
+                    div().absolute().bottom_4().left_0().right_0().flex().justify_center().child(
+                        Button::new("scroll-to-bottom")
+                            .icon(IconName::ArrowDown)
+                            .size(rems(2.5))
+                            .rounded_full()
+                            .bg(p.bubble())
+                            .opacity(0.7)
+                            .shadow_md()
+                            .accessibility_label("回到最新消息并恢复自动跟随")
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.timeline.set_follow_mode(FollowMode::Tail);
+                                cx.notify();
+                            })),
+                    ),
+                )
+            })
             .into_any_element()
     }
 
@@ -201,21 +219,6 @@ impl ChatView {
                             })),
                     ),
             )
-            .when(!self.timeline.is_following_tail(), |controls| {
-                controls.child(
-                    Button::new("scroll-to-bottom")
-                        .outline()
-                        .small()
-                        .bg(p.input())
-                        .icon(IconName::ArrowDown)
-                        .label("回到最新")
-                        .accessibility_label("回到最新消息并恢复自动跟随")
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.timeline.set_follow_mode(FollowMode::Tail);
-                            cx.notify();
-                        })),
-                )
-            })
             .into_any_element()
     }
 
