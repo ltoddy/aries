@@ -4,6 +4,8 @@ mod commands;
 mod composer;
 mod events;
 mod execution_context;
+mod git_index;
+mod git_info;
 mod layout;
 mod load_session;
 mod media;
@@ -44,7 +46,7 @@ use crate::chat::model::deletion::SessionDeletion;
 use crate::chat::model::list::SessionList;
 use crate::chat::model::load::SessionLoad;
 use crate::chat::view::commands::SlashMenu;
-use crate::chat::view::execution_context::GitBranch;
+use crate::chat::view::git_info::GitInfo;
 use crate::chat::view::new_chat::NewChatAction;
 
 pub fn single_line(text: &str) -> String {
@@ -60,8 +62,11 @@ pub enum ChatRenderMode {
 
 pub struct ChatView {
     cwd: PathBuf,
-    git_branch: GitBranch,
-    git_branch_task: Option<Task<()>>,
+    git_info: Option<GitInfo>,
+    git_info_task: Option<Task<()>>,
+    git_index_busy: bool,
+    git_revision: u64,
+    git_info_collapsed: bool,
     choosing_directory: bool,
     session_directory_selected: bool,
     agent: AcpAgentConfig,
@@ -159,7 +164,7 @@ impl ChatView {
             }
         });
         cx.defer_in(window, |this, window, cx| {
-            this.watch_git_branch(cx);
+            this.watch_git_info(cx);
             this.connect(window, cx);
         });
         let session_scroll = ScrollHandle::new();
@@ -172,8 +177,11 @@ impl ChatView {
         });
         Self {
             cwd,
-            git_branch: GitBranch::default(),
-            git_branch_task: None,
+            git_info: None,
+            git_info_task: None,
+            git_index_busy: false,
+            git_revision: 0,
+            git_info_collapsed: true,
             choosing_directory: false,
             session_directory_selected: false,
             agent,

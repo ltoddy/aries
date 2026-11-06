@@ -136,7 +136,7 @@ impl ChatView {
         }
         self.reset_chat();
         self.cwd = directory;
-        self.watch_git_branch(cx);
+        self.watch_git_info(cx);
         self.session_directory_selected = true;
         self.disconnected = false;
         self.input.update(cx, |input, cx| {

@@ -1,7 +1,5 @@
-use std::path::Path;
 use std::time::Duration;
 
-use git2::Repository;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::tooltip::Tooltip;
@@ -10,43 +8,8 @@ use gpui_kit::prelude::*;
 use gpui_kit::*;
 
 use crate::chat::view::ChatView;
+use crate::chat::view::git_info::GitInfo;
 use crate::chat::view::palette::Palette;
-
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub enum GitBranch {
-    #[default]
-    Unavailable,
-    Named(String),
-    Detached(String),
-}
-
-impl GitBranch {
-    fn read(cwd: &Path) -> Self {
-        let Ok(repository) = Repository::discover(cwd) else {
-            return Self::Unavailable;
-        };
-        let Ok(head) = repository.find_reference("HEAD") else {
-            return Self::Unavailable;
-        };
-        let Ok(target) = head.symbolic_target() else {
-            return Self::Unavailable;
-        };
-        if let Some(branch) = target.and_then(|name| name.strip_prefix("refs/heads/")) {
-            return Self::Named(branch.to_owned());
-        }
-        head.target()
-            .map(|commit| Self::Detached(commit.to_string()[..7].to_owned()))
-            .unwrap_or_default()
-    }
-
-    fn label(&self) -> Option<String> {
-        match self {
-            Self::Unavailable => None,
-            Self::Named(branch) => Some(branch.clone()),
-            Self::Detached(commit) => Some(format!("游离 HEAD · {commit}")),
-        }
-    }
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExecutionState {
@@ -111,19 +74,26 @@ impl ExecutionState {
 }
 
 impl ChatView {
-    pub fn watch_git_branch(&mut self, cx: &mut Context<Self>) {
-        self.git_branch = GitBranch::Unavailable;
-        self.git_branch_task = Some(cx.spawn(async move |view, cx| {
+    pub fn watch_git_info(&mut self, cx: &mut Context<Self>) {
+        self.git_info = None;
+        self.git_revision += 1;
+        self.git_info_task = Some(cx.spawn(async move |view, cx| {
             loop {
-                let Ok(directory) = view.read_with(cx, |this, _| this.cwd.clone()) else {
+                let Ok((directory, revision)) =
+                    view.read_with(cx, |this, _| (this.cwd.clone(), this.git_revision))
+                else {
                     return;
                 };
                 let cwd = directory.clone();
-                let branch = cx.background_spawn(async move { GitBranch::read(&cwd) }).await;
+                let info = cx.background_spawn(async move { GitInfo::read(&cwd) }).await;
                 if view
                     .update(cx, |this, cx| {
-                        if this.cwd == directory && this.git_branch != branch {
-                            this.git_branch = branch;
+                        if this.cwd == directory
+                            && this.git_revision == revision
+                            && !this.git_index_busy
+                            && this.git_info != info
+                        {
+                            this.git_info = info;
                             cx.notify();
                         }
                     })
@@ -170,7 +140,10 @@ impl ChatView {
         } else {
             "发送前需选择项目目录".into()
         };
-        let branch = selected.then(|| self.git_branch.label()).flatten();
+        let branch = selected
+            .then_some(self.git_info.as_ref())
+            .flatten()
+            .map(|info| info.branch().to_owned());
         if let Some(branch) = &branch {
             directory.push_str(&format!("\nGit：{branch}"));
         }

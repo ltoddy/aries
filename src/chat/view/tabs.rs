@@ -445,8 +445,8 @@ impl TabsView {
             .id(("tab", id))
             .h_7()
             .flex_shrink_0()
-            .max_w(rems(11.25))
-            .min_w(rems(5.25))
+            .w(rems(11.25))
+            .min_w(rems(11.25))
             .px_1()
             .rounded(rems(0.5))
             .border_1()
@@ -592,6 +592,8 @@ impl Render for TabsView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let p = Palette::new(cx.theme().mode);
         let active = self.active_view();
+        let view = active.clone().unwrap_or_else(|| self.sidebar.clone());
+        let git_info = crate::chat::view::git_info::render_git_info(view, cx);
         div()
             .size_full()
             .track_focus(&self.focus_handle)
@@ -646,12 +648,21 @@ impl Render for TabsView {
                                 .flex()
                                 .flex_col()
                                 .child(self.render_tab_bar(p, cx))
-                                .child(match active {
-                                    Some(view) => {
-                                        div().flex_1().min_h_0().child(view).into_any_element()
-                                    }
-                                    None => self.render_empty_main(p),
-                                }),
+                                .child(
+                                    div()
+                                        .relative()
+                                        .flex()
+                                        .flex_col()
+                                        .flex_1()
+                                        .min_h_0()
+                                        .child(match active {
+                                            Some(view) => {
+                                                div().size_full().child(view).into_any_element()
+                                            }
+                                            None => self.render_empty_main(p),
+                                        })
+                                        .children(git_info),
+                                ),
                         ),
                     ),
             )

@@ -64,7 +64,7 @@ impl ChatView {
                 self.reset_chat();
                 self.chat = chat;
                 self.cwd = session.cwd;
-                self.watch_git_branch(cx);
+                self.watch_git_info(cx);
                 self.session_id = Some(session.session_id);
                 self.tokens = tokens;
                 self.input.update(cx, |input, cx| input.set_value(draft, window, cx));
