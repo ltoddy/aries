@@ -58,28 +58,7 @@ impl SessionUpdates {
     }
 
     fn from_prompt_response(res: PromptResponse) -> Vec<SessionUpdate> {
-        let usage = res.usage();
-
-        let completions = res.completion_calls.len();
-        let input_tokens = usage.input_tokens.unwrap_or_default();
-        let cached_input_tokens = usage.cached_input_tokens.unwrap_or_default();
-        let output_tokens = usage.output_tokens.unwrap_or_default();
-        let total_tokens = usage.total_tokens.unwrap_or_default();
-        let reasoning_tokens = usage.reasoning_tokens.unwrap_or_default();
-
-        let text = format!(
-            "\n\nCompletion({}) - This turn token usage: input tokens = {} (cached = {}), output tokens = {}, total tokens = {}, reasoning tokens = {}",
-            completions,
-            input_tokens,
-            cached_input_tokens,
-            output_tokens,
-            total_tokens,
-            reasoning_tokens,
-        );
-
-        let mut updates =
-            vec![SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::from(text), ""))];
-
+        let mut updates = vec![];
         if let Some(completion) = res.completion_calls.last() {
             let total_tokens = completion.usage.total_tokens.unwrap_or_default();
             updates.push(SessionUpdate::UsageUpdate(UsageUpdate::new(total_tokens, 0)));

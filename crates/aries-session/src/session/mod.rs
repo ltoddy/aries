@@ -499,6 +499,7 @@ impl Session {
             self.mode.name(),
             self.db.clone(),
             self.instruction_ctx.clone(),
+            Notifier::clone(&self.notifier),
         )
     }
 

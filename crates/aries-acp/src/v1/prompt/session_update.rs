@@ -9,7 +9,7 @@ use aries_tools::{
     agent, bash, batch, codesearch, edit, glob, grep, lsp, monitor, multiedit, read, skill,
     task_output, task_stop, update_plan, webfetch, websearch, write,
 };
-use rig::agent::{MultiTurnStreamItem, PromptResponse};
+use rig::agent::{CompletionCall, MultiTurnStreamItem, PromptResponse};
 use rig::completion::Message;
 use rig::message::{
     AssistantContent, DocumentData, ToolCall, ToolFunction, ToolName, ToolResult, UserContent,
@@ -34,7 +34,7 @@ impl SessionUpdates {
                 MultiTurnStreamItem::ToolResult { tool_result } => {
                     Self(Self::from_tool_result(tool_result))
                 },
-                MultiTurnStreamItem::CompletionCall(_) => Default::default(),
+                MultiTurnStreamItem::CompletionCall(call) => Self(Self::from_completion_call(call)),
                 MultiTurnStreamItem::FinalResponse(res) => Self(Self::from_prompt_response(res)),
                 MultiTurnStreamItem::ToolExecutionCommitted { tool_call } => {
                     Self(vec![SessionUpdate::ToolCallUpdate(ToolCallUpdate::new(
@@ -159,6 +159,11 @@ impl SessionUpdates {
         vec![]
     }
 
+    fn from_completion_call(call: CompletionCall) -> Vec<SessionUpdate> {
+        let total_tokens = call.usage.total_tokens.unwrap_or_default();
+        vec![SessionUpdate::UsageUpdate(UsageUpdate::new(total_tokens, 0))]
+    }
+
     fn from_tool_result(tool_result: ToolResult) -> Vec<SessionUpdate> {
         let raw_output = tool_result.content.first().and_then(|content| content.as_json()).cloned();
 
@@ -185,30 +190,9 @@ impl SessionUpdates {
     }
 
     fn from_prompt_response(res: PromptResponse) -> Vec<SessionUpdate> {
-        let usage = res.usage();
-
-        let completions = res.completion_calls.len();
-        let input_tokens = usage.input_tokens.unwrap_or_default();
-        let cached_input_tokens = usage.cached_input_tokens.unwrap_or_default();
-        let output_tokens = usage.output_tokens.unwrap_or_default();
-        let total_tokens = usage.total_tokens.unwrap_or_default();
-        let reasoning_tokens = usage.reasoning_tokens.unwrap_or_default();
-
-        let text = format!(
-            "\n\nCompletion({}) - This turn token usage: input tokens = {} (cached = {}), output tokens = {}, total tokens = {}, reasoning tokens = {}",
-            completions,
-            input_tokens,
-            cached_input_tokens,
-            output_tokens,
-            total_tokens,
-            reasoning_tokens,
-        );
-        let mut updates =
-            vec![SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::from(text)))];
-
+        let mut updates = vec![];
         if let Some(completion) = res.completion_calls.last() {
             let total_tokens = completion.usage.total_tokens.unwrap_or_default();
-
             updates.push(SessionUpdate::UsageUpdate(UsageUpdate::new(total_tokens, 0)));
         }
         updates

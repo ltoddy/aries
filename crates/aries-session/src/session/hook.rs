@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::time;
 
 use aries_compact::{ContextWindow, TokenEstimator, micro_compact};
+use aries_event::Notifier;
 use aries_extension::hook::input::{
     PostToolUseFailureHookInput, PostToolUseHookInput, PreToolUseHookInput, SubagentStartHookInput,
     SubagentStopHookInput,
@@ -10,11 +11,11 @@ use aries_extension::hook::input::{
 use aries_extension::hook::{HookDecision, HooksExecutor};
 use aries_persistence::ToolCallRepository;
 use rig::agent::{
-    AgentHook, CompletionCallAction, CompletionCallEvent, DispatchAction, DispatchEvent,
-    HookContext, InvalidToolCallAction, InvalidToolCallContext, ModelSelection,
-    ModelSelectionAction, ModelTurnAction, ModelTurnFinished, ObservationAction, OutcomeAction,
-    OutcomeEvent, ReasoningDelta, RequestPatch, RunSettled, RunStart, RunStartAction,
-    StepEventKind, TextDelta, ToolCallDelta,
+    AgentHook, CompletionCall, CompletionCallAction, CompletionCallEvent, DispatchAction,
+    DispatchEvent, HookContext, InvalidToolCallAction, InvalidToolCallContext, ModelSelection,
+    ModelSelectionAction, ModelTurnAction, ModelTurnFinished, MultiTurnStreamItem,
+    ObservationAction, OutcomeAction, OutcomeEvent, ReasoningDelta, RequestPatch, RunSettled,
+    RunStart, RunStartAction, StepEventKind, TextDelta, ToolCallDelta,
 };
 use rig::effect::{Answered, EffectKind};
 use serde_json::Value;
@@ -44,6 +45,7 @@ pub struct SessionPromptHook {
     tool_call_repo: ToolCallRepository,
     instruction_ctx: InstructionContext,
     window: ContextWindow,
+    notifier: Notifier,
 }
 
 impl SessionPromptHook {
@@ -57,6 +59,7 @@ impl SessionPromptHook {
         agent_type: impl Into<String>,
         db: Db,
         instruction_ctx: InstructionContext,
+        notifier: Notifier,
     ) -> Self {
         let session_id = session_id.into();
         let cwd = cwd.as_ref();
@@ -78,6 +81,7 @@ impl SessionPromptHook {
             tool_call_repo,
             instruction_ctx,
             window,
+            notifier,
         }
     }
 
@@ -173,8 +177,13 @@ impl AgentHook for SessionPromptHook {
     async fn on_model_turn_finished(
         &self,
         _ctx: &HookContext,
-        _event: ModelTurnFinished<'_>,
+        event: ModelTurnFinished<'_>,
     ) -> ModelTurnAction {
+        self.notifier.send_stream_item(MultiTurnStreamItem::CompletionCall(CompletionCall::new(
+            event.turn,
+            event.usage,
+            event.raw.clone(),
+        )));
         ModelTurnAction::continue_run()
     }
 

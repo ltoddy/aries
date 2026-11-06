@@ -32,6 +32,8 @@ pub struct SessionRepository {
     db: Db,
 }
 
+pub const UNTITLED_SESSION: &str = "Untitled Session";
+
 impl SessionRepository {
     pub fn new(db: Db) -> Self {
         Self { db }
@@ -46,6 +48,7 @@ impl SessionRepository {
     ) -> toasty::Result<Session> {
         Session::create()
             .session_id(session_id)
+            .title(UNTITLED_SESSION)
             .cwd(cwd)
             .root_dir(root_dir)
             .transcript_path(transcript_path)
@@ -95,8 +98,11 @@ impl SessionRepository {
         Session::filter(Session::fields().updated_at().lt(updated_at)).exec(&mut self.db).await
     }
 
-    pub async fn find_by_null_title(&mut self) -> toasty::Result<Vec<Session>> {
-        Session::filter(Session::fields().title().is_none()).exec(&mut self.db).await
+    pub async fn find_by_title(
+        &mut self,
+        title: impl IntoExpr<Option<String>>,
+    ) -> toasty::Result<Vec<Session>> {
+        Session::filter(Session::fields().title().eq(title)).exec(&mut self.db).await
     }
 
     pub async fn update_title_by_session_id(
