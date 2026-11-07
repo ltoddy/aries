@@ -1,3 +1,4 @@
+pub mod auth_status;
 pub mod authenticate;
 pub mod cancel;
 pub mod initialize;
@@ -14,15 +15,17 @@ use aries_init::{GlobalContext, Setting};
 use aries_session::{SessionArgs, SessionRegistry};
 use tokio::sync::Mutex;
 
+use self::auth_status::auth_status;
 use self::authenticate::authenticate;
-use self::cancel::cancel;
+use self::cancel::{cancel, cancel_request};
 use self::initialize::initialize;
 use self::logout::logout;
 use self::prompt::prompt;
 use self::provider::{disable_provider, list_providers, set_provider};
 use self::session::{
-    close_session, delete_session, fork_session, list_session, load_session, new_session,
-    resume_session, set_session_config_option, set_session_mode,
+    archive_session, close_session, delete_session, fork_session, list_session, load_session,
+    new_session, resume_session, session_status, set_session_config_option, set_session_mode,
+    set_session_title, unarchive_session,
 };
 
 pub async fn run(
@@ -39,6 +42,7 @@ pub async fn run(
         .name("aries")
         .on_receive_request(initialize, on_receive_request!())
         .on_receive_request(authenticate, on_receive_request!())
+        .on_receive_request(auth_status, on_receive_request!())
         .on_receive_request(list_providers, on_receive_request!())
         .on_receive_request(set_provider, on_receive_request!())
         .on_receive_request(disable_provider, on_receive_request!())
@@ -96,6 +100,10 @@ pub async fn run(
             on_receive_request!(),
         )
         .on_receive_request(logout, on_receive_request!())
+        .on_receive_request(archive_session, on_receive_request!())
+        .on_receive_request(unarchive_session, on_receive_request!())
+        .on_receive_request(session_status, on_receive_request!())
+        .on_receive_request(set_session_title, on_receive_request!())
         .on_receive_request(resume_session, on_receive_request!())
         .on_receive_request(set_session_mode, on_receive_request!())
         .on_receive_request(
@@ -117,6 +125,7 @@ pub async fn run(
             on_receive_request!(),
         )
         .on_receive_request(mcp::message, on_receive_request!())
+        .on_receive_notification(cancel_request, on_receive_notification!())
         .on_receive_notification(
             async move |args, cx| cancel(args, cx, registry.clone()).await,
             on_receive_notification!(),
