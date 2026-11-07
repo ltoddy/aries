@@ -76,6 +76,7 @@ pub struct Session {
     cancel_token: Arc<parking_lot::Mutex<CancellationToken>>,
     receiver: Arc<Mutex<UnboundedReceiver<AgentEvent>>>,
     notifier: Notifier,
+    db: Db,
 
     compactor: ContextCompactor,
     hooks_executor: Arc<HooksExecutor>,
@@ -185,6 +186,7 @@ impl Session {
             &self.cwd,
             self.gctx.clone(),
             Notifier::clone(&self.notifier),
+            self.db.clone(),
         )
         .with_lsp_client(self.lsp_client.clone())
         .with_extensions(self.extensions.clone())
@@ -427,6 +429,7 @@ impl Session {
             cwd,
             gctx.clone(),
             Notifier::clone(&notifier),
+            db.clone(),
         )
         .with_lsp_client(lsp_client.clone())
         .with_extensions(extensions.clone())
@@ -476,6 +479,7 @@ impl Session {
             extensions,
             last_assistant_message: None,
             compactor,
+            db,
         })
     }
 

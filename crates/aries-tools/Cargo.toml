@@ -17,6 +17,7 @@ aries-filesystem = { version = "0.1.0", path = "../aries-filesystem" }
 aries-init = { version = "0.1.0", path = "../aries-init" }
 aries-lspclient = { version = "0.1.0", path = "../aries-lspclient" }
 aries-mode = { version = "0.1.0", path = "../aries-mode" }
+aries-persistence = { version = "0.1.0", path = "../aries-persistence" }
 aries-preamble = { version = "0.1.0", path = "../aries-preamble" }
 firecrawl.workspace = true
 futures.workspace = true
@@ -36,9 +37,10 @@ serde.workspace = true
 serde_json.workspace = true
 similar.workspace = true
 thiserror.workspace = true
+toasty.workspace = true
 tokio = { workspace = true, features = ["fs", "process", "sync", "time", "io-util"] }
-tree-sitter-bash.workspace = true
 tree-sitter.workspace = true
+tree-sitter-bash.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true

@@ -1,4 +1,5 @@
 mod context;
+mod hook;
 mod tools;
 
 use std::path::Path;
@@ -12,6 +13,7 @@ use itertools::Itertools;
 use rig::Model;
 use rig::providers::openai::wire::OpenAiWire;
 use rig::tool::ToolSet;
+use toasty::Db;
 
 pub use self::context::ToolContext;
 pub use self::tools::{
@@ -58,6 +60,7 @@ pub fn create_tools_from_mode(
     lsp_client: Option<aries_lspclient::SharedLspClient>,
     extensions: AgentExtensions,
     notifier: Notifier,
+    db: Db,
 ) -> ToolSet {
     let session_id = session_id.into();
     let tool_names = tool_names_from_mode(mode);
@@ -72,6 +75,7 @@ pub fn create_tools_from_mode(
         lsp_client,
         extensions,
         notifier,
+        db,
     )
 }
 
@@ -119,6 +123,7 @@ pub fn create_tools_from_tool_names(
     lsp_client: Option<aries_lspclient::SharedLspClient>,
     extensions: AgentExtensions,
     notifier: Notifier,
+    db: Db,
 ) -> ToolSet {
     let session_id = session_id.into();
     let parent_dir = parent_dir.as_ref();
@@ -138,6 +143,7 @@ pub fn create_tools_from_tool_names(
                     parent_dir,
                     Notifier::clone(&notifier),
                     extensions.clone(),
+                    db.clone(),
                 ));
             },
             bash::NAME => {
@@ -151,6 +157,7 @@ pub fn create_tools_from_tool_names(
                     parent_dir,
                     Notifier::clone(&notifier),
                     extensions.clone(),
+                    db.clone(),
                 ));
             },
             codesearch::NAME => {

@@ -15,10 +15,12 @@ use rig::providers::openai::wire::OpenAiWire;
 use rig::tool::server::ToolServer;
 use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
+use toasty::Db;
 
 pub use self::args::AgentArgs;
 pub use self::error::AgentError;
 pub use self::output::AgentOutput;
+use crate::hook::TokenUsageHook;
 use crate::{create_tools_from_mode, create_tools_from_tool_names, tool_names_from_mode};
 
 pub const NAME: &str = "Agent";
@@ -34,6 +36,8 @@ pub struct AgentTool {
     parent_dir: PathBuf,
     notifier: Notifier,
     extensions: AgentExtensions,
+    hook: TokenUsageHook,
+    db: Db,
 }
 
 impl AgentTool {
@@ -44,10 +48,12 @@ impl AgentTool {
         parent_dir: impl AsRef<Path>,
         notifier: Notifier,
         extensions: AgentExtensions,
+        db: Db,
     ) -> Self {
         let parent_dir = parent_dir.as_ref();
+        let hook = TokenUsageHook::new(gctx.current_dir(), db.clone());
 
-        Self { gctx, ctx, model, parent_dir: parent_dir.to_owned(), notifier, extensions }
+        Self { gctx, ctx, model, parent_dir: parent_dir.to_owned(), notifier, extensions, hook, db }
     }
 
     fn find_agent(&self, mode: impl Into<String>) -> Option<&AgentDefinition> {
@@ -131,6 +137,7 @@ impl Tool for AgentTool {
                     None,
                     AgentExtensions::empty(),
                     Notifier::clone(&self.notifier),
+                    self.db.clone(),
                 );
                 (name, preamble, tools)
             },
@@ -149,6 +156,7 @@ impl Tool for AgentTool {
                         None,
                         AgentExtensions::empty(),
                         Notifier::clone(&self.notifier),
+                        self.db.clone(),
                     ),
                 )
             },
@@ -166,6 +174,7 @@ impl Tool for AgentTool {
             .preamble(&preamble)
             .append_preamble(&aries_preamble::env::section(cwd, self.model.name()))
             .tool_server_handle(tool_server_handle)
+            .add_hook(self.hook.clone())
             .default_max_turns(DEFAULT_MAX_TURNS)
             .build();
 

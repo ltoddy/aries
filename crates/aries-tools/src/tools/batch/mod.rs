@@ -12,6 +12,7 @@ use rig::Model;
 use rig::providers::openai::wire::OpenAiWire;
 use rig::tool::Tool;
 use serde_json::Value;
+use toasty::Db;
 
 pub use self::args::{BatchArgs, BatchCall, NAME};
 pub use self::error::BatchError;
@@ -28,6 +29,7 @@ pub struct BatchTool {
     parent_dir: PathBuf,
     notifier: Notifier,
     extensions: AgentExtensions,
+    db: Db,
 }
 
 impl BatchTool {
@@ -38,10 +40,11 @@ impl BatchTool {
         parent_dir: impl AsRef<Path>,
         notifier: Notifier,
         extensions: AgentExtensions,
+        db: Db,
     ) -> Self {
         let parent_dir = parent_dir.as_ref();
 
-        Self { gctx, ctx, model, parent_dir: parent_dir.to_owned(), notifier, extensions }
+        Self { gctx, ctx, model, parent_dir: parent_dir.to_owned(), notifier, extensions, db }
     }
 
     async fn dispatch(
@@ -64,6 +67,7 @@ impl BatchTool {
                         &self.parent_dir,
                         Notifier::clone(&self.notifier),
                         self.extensions.clone(),
+                        self.db.clone(),
                     ),
                     context,
                     args,
