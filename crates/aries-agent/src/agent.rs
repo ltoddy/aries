@@ -1,7 +1,7 @@
 use aries_event::Notifier;
 use futures::StreamExt;
 use rig::Model;
-use rig::agent::{Agent, AgentHook, MultiTurnStreamItem, PromptResponse};
+use rig::agent::{Agent, MultiTurnStreamItem, PromptResponse};
 use rig::completion::Message;
 use rig::providers::openai::wire::OpenAiWire;
 
@@ -32,18 +32,16 @@ impl AriesAgent {
         Self { inner, name, preamble: bare_preamble, notifier }
     }
 
-    pub async fn prompt<I, T, P>(
+    pub async fn prompt<I, T>(
         &self,
         prompt: impl Into<Message> + Send,
         history: I,
-        hook: P,
     ) -> AriesResult<PromptResponse>
     where
         I: IntoIterator<Item = T>,
         T: Into<Message>,
-        P: AgentHook + 'static,
     {
-        let stream = self.inner.prompt(prompt).history(history).add_hook(hook).stream();
+        let stream = self.inner.prompt(prompt).history(history).stream();
         tokio::pin!(stream);
 
         let mut final_res = PromptResponse::empty();

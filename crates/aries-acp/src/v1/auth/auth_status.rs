@@ -1,4 +1,4 @@
-use agent_client_protocol::v1::schema::{AuthStatusRequest, AuthStatusResponse};
+use agent_client_protocol::v1::schema::{AuthState, AuthStatusRequest, AuthStatusResponse};
 use agent_client_protocol::v1::{ConnectionTo, Responder};
 use agent_client_protocol::{Client, Error};
 use tracing::info;
@@ -10,6 +10,6 @@ pub async fn auth_status(
 ) -> Result<(), Error> {
     info!("Received auth status request {req:?}");
 
-    // TODO: Report the current authentication status.
-    responder.respond_with_error(Error::internal_error().data("auth/status is not implemented yet"))
+    let resp = AuthStatusResponse::new(AuthState::NotRequired);
+    responder.respond(resp)
 }

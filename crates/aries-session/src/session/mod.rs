@@ -67,7 +67,6 @@ pub struct Session {
     chat_history: ChatHistory,
     chat_context: ChatContext,
 
-    db: Db,
     session_repo: SessionRepository,
 
     session_dir: PathBuf,
@@ -80,8 +79,8 @@ pub struct Session {
 
     compactor: ContextCompactor,
     hooks_executor: Arc<HooksExecutor>,
-    instruction_ctx: InstructionContext,
     memory_store: MemoryStore,
+    hook: SessionPromptHook,
 
     // 为了避免连接因为 drop 而释放
     #[allow(dead_code)]
@@ -189,7 +188,7 @@ impl Session {
         )
         .with_lsp_client(self.lsp_client.clone())
         .with_extensions(self.extensions.clone())
-        .build(self.tool_server_handle.clone())
+        .build(self.tool_server_handle.clone(), self.hook.clone())
         .await;
 
         self.agent = agent;
@@ -238,8 +237,7 @@ impl Session {
             history.push(system_reminder(reminder));
         }
         let final_res = {
-            let hook = self.session_hook();
-            let future = self.agent.prompt(prompt, history, hook);
+            let future = self.agent.prompt(prompt, history);
             pin!(future);
 
             let mut guard = self.receiver.lock().await;
@@ -403,9 +401,23 @@ impl Session {
             .await
             .with_context(|| format!("failed to initialize chat context for session {id}"))?;
 
+        let hooks_executor = Arc::new(HooksExecutor::new(extensions.hooks.clone()));
+        let mode = Mode::default();
+        let instruction_ctx = InstructionContext::new(cwd);
         let session_repo = SessionRepository::new(db.clone());
 
-        let mode = Mode::default();
+        let hook = SessionPromptHook::new(
+            hooks_executor.clone(),
+            &id,
+            cwd,
+            &transcript_path,
+            mode.id(),
+            mode.name(),
+            db.clone(),
+            instruction_ctx.clone(),
+            Notifier::clone(&notifier),
+        );
+
         let model = crate::create_model(&config);
         let agent = AgentBuilder::new(
             &id,
@@ -418,10 +430,9 @@ impl Session {
         )
         .with_lsp_client(lsp_client.clone())
         .with_extensions(extensions.clone())
-        .build(tool_server_handle.clone())
+        .build(tool_server_handle.clone(), hook.clone())
         .await;
 
-        let hooks_executor = Arc::new(HooksExecutor::new(extensions.hooks.clone()));
         let compactor = ContextCompactor::new(
             &id,
             cwd,
@@ -432,7 +443,6 @@ impl Session {
             Notifier::clone(&notifier),
         );
 
-        let instruction_ctx = InstructionContext::new(cwd);
         let input = SessionStartHookInput::new(&id, cwd, source, model.name(), mode);
         if let HookDecision::Continue { contexts } = hooks_executor.fire_session_start(input).await
         {
@@ -452,7 +462,6 @@ impl Session {
             lsp_client,
             chat_history,
             chat_context,
-            db,
             session_repo,
             session_dir: session_dir.to_owned(),
             transcript_path,
@@ -461,8 +470,8 @@ impl Session {
             notifier,
             receiver: Arc::new(Mutex::new(receiver)),
             hooks_executor,
-            instruction_ctx,
             memory_store,
+            hook,
             mcp_clients: Arc::new(mcp_clients),
             extensions,
             last_assistant_message: None,
@@ -487,20 +496,6 @@ impl Session {
         }
 
         None
-    }
-
-    fn session_hook(&self) -> SessionPromptHook {
-        SessionPromptHook::new(
-            self.hooks_executor.clone(),
-            &self.id,
-            &self.cwd,
-            &self.transcript_path,
-            self.mode.id(),
-            self.mode.name(),
-            self.db.clone(),
-            self.instruction_ctx.clone(),
-            Notifier::clone(&self.notifier),
-        )
     }
 
     async fn recall_context(&self, query: impl Into<String>) -> Option<String> {
