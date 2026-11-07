@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use agent_client_protocol::Agent;
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::v1::ConnectionTo;
 use agent_client_protocol::v1::schema::{
@@ -7,9 +8,10 @@ use agent_client_protocol::v1::schema::{
     ClientSessionCapabilities, CompactionCapabilities, Implementation, InitializeRequest,
     NoticeCapabilities, PlanCapabilities, SessionConfigOptionsCapabilities, SubagentCapabilities,
 };
-use agent_client_protocol::{Agent, Error};
 
-pub async fn request(connection: &ConnectionTo<Agent>) -> Result<AgentCapabilities, Error> {
+use crate::acp::requests::RequestError;
+
+pub async fn request(connection: &ConnectionTo<Agent>) -> Result<AgentCapabilities, RequestError> {
     let response = tokio::time::timeout(
         Duration::from_secs(30),
         connection
@@ -35,9 +37,9 @@ pub async fn request(connection: &ConnectionTo<Agent>) -> Result<AgentCapabiliti
             .block_task(),
     )
     .await
-    .map_err(|_| Error::internal_error().data("初始化 Agent 超时"))??;
+    .map_err(|source| RequestError::Timeout { message: "初始化 Agent 超时", source })??;
     if response.protocol_version != ProtocolVersion::V1 {
-        return Err(Error::internal_error().data("Agent 未协商 ACP v1"));
+        return Err(RequestError::UnsupportedVersion);
     }
     Ok(response.agent_capabilities)
 }

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::io;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -11,6 +12,31 @@ use agent_client_protocol::v1::schema::{
 use tokio::io::AsyncReadExt;
 use tokio::process::{Child, Command};
 use tokio::sync::{mpsc, watch};
+
+#[derive(Debug, thiserror::Error)]
+pub enum TerminalError {
+    #[error("终端工作目录必须为绝对路径")]
+    InvalidCwd,
+    #[error("{0}")]
+    Spawn(#[source] io::Error),
+    #[error("终端不存在或已释放")]
+    NotFound,
+    #[error("终端连接已关闭")]
+    Closed(#[from] watch::error::RecvError),
+}
+
+impl From<TerminalError> for Error {
+    fn from(error: TerminalError) -> Self {
+        match error {
+            TerminalError::InvalidCwd | TerminalError::NotFound => {
+                Self::invalid_params().data(error.to_string())
+            }
+            TerminalError::Spawn(_) | TerminalError::Closed(_) => {
+                Self::internal_error().data(error.to_string())
+            }
+        }
+    }
+}
 
 #[derive(Debug)]
 struct Terminal {
@@ -34,9 +60,9 @@ impl Terminals {
         }
     }
 
-    pub fn create(&self, request: CreateTerminalRequest) -> Result<TerminalId, Error> {
+    pub fn create(&self, request: CreateTerminalRequest) -> Result<TerminalId, TerminalError> {
         if request.cwd.as_ref().is_some_and(|path| !path.is_absolute()) {
-            return Err(Error::invalid_params().data("终端工作目录必须为绝对路径"));
+            return Err(TerminalError::InvalidCwd);
         }
         let mut command = Command::new(&request.command);
         command
@@ -51,8 +77,7 @@ impl Terminals {
         }
         #[cfg(unix)]
         command.process_group(0);
-        let child =
-            command.spawn().map_err(|error| Error::internal_error().data(error.to_string()))?;
+        let child = command.spawn().map_err(TerminalError::Spawn)?;
         let process = Process { group: child.id(), child };
         let id = TerminalId::new(format!(
             "orbit-terminal-{}-{}",
@@ -77,57 +102,57 @@ impl Terminals {
         &self,
         session: &SessionId,
         id: &TerminalId,
-    ) -> Result<TerminalOutputResponse, Error> {
+    ) -> Result<TerminalOutputResponse, TerminalError> {
         let entries = self.entries.lock().expect("terminal entries lock poisoned");
         entries
             .get(session)
             .and_then(|terminals| terminals.get(id))
             .map(|terminal| terminal.output.borrow().clone())
-            .ok_or_else(|| Error::invalid_params().data("终端不存在或已释放"))
+            .ok_or(TerminalError::NotFound)
     }
 
     fn receiver(
         &self,
         session: &SessionId,
         id: &TerminalId,
-    ) -> Result<watch::Receiver<TerminalOutputResponse>, Error> {
+    ) -> Result<watch::Receiver<TerminalOutputResponse>, TerminalError> {
         self.entries
             .lock()
             .expect("terminal entries lock poisoned")
             .get(session)
             .and_then(|terminals| terminals.get(id))
             .map(|terminal| terminal.output.clone())
-            .ok_or_else(|| Error::invalid_params().data("终端不存在或已释放"))
+            .ok_or(TerminalError::NotFound)
     }
 
     pub async fn wait(
         &self,
         session: &SessionId,
         id: &TerminalId,
-    ) -> Result<TerminalExitStatus, Error> {
+    ) -> Result<TerminalExitStatus, TerminalError> {
         let mut receiver = self.receiver(session, id)?;
         loop {
             if let Some(status) = receiver.borrow().exit_status.clone() {
                 return Ok(status);
             }
-            receiver.changed().await.map_err(|_| Error::internal_error().data("终端连接已关闭"))?;
+            receiver.changed().await?;
         }
     }
 
-    pub async fn kill(&self, session: &SessionId, id: &TerminalId) -> Result<(), Error> {
+    pub async fn kill(&self, session: &SessionId, id: &TerminalId) -> Result<(), TerminalError> {
         {
             let entries = self.entries.lock().expect("terminal entries lock poisoned");
             let terminal = entries
                 .get(session)
                 .and_then(|terminals| terminals.get(id))
-                .ok_or_else(|| Error::invalid_params().data("终端不存在或已释放"))?;
+                .ok_or(TerminalError::NotFound)?;
             let _ = terminal.kill.send(());
         }
         self.wait(session, id).await?;
         Ok(())
     }
 
-    pub async fn release(&self, session: &SessionId, id: &TerminalId) -> Result<(), Error> {
+    pub async fn release(&self, session: &SessionId, id: &TerminalId) -> Result<(), TerminalError> {
         self.kill(session, id).await?;
         let mut entries = self.entries.lock().expect("terminal entries lock poisoned");
         if let Some(terminals) = entries.get_mut(session) {

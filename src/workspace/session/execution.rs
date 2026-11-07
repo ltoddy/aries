@@ -6,6 +6,7 @@ use agent_client_protocol::v1::schema::{
     SessionNotification, SessionUpdate, StopReason,
 };
 use agent_client_protocol::{AcpAgentConfig, Error};
+use anyhow::Context as _;
 use gpui_kit::component::WindowExt;
 use gpui_kit::component::notification::Notification;
 use gpui_kit::*;
@@ -19,6 +20,14 @@ use crate::workspace::session::configuration::Configuration;
 use crate::workspace::session::model::{SessionDeletion, SessionLoad};
 use crate::workspace::sidebar::Sidebar;
 use crate::workspace::{SessionRenderMode, SessionView, WorkspaceView};
+
+#[derive(Debug, thiserror::Error)]
+enum ValidateDirectoryError {
+    #[error("无法访问目录 {}", path.display())]
+    Access { path: PathBuf, source: std::io::Error },
+    #[error("请选择文件夹：{}", .0.display())]
+    NotDirectory(PathBuf),
+}
 
 pub struct Execution {
     cwd: PathBuf,
@@ -737,7 +746,11 @@ impl Execution {
         });
         cx.spawn_in(window, async move |view, cx| {
             let result: anyhow::Result<Option<PathBuf>> = async {
-                let Some(path) = selection.await??.and_then(|paths| paths.into_iter().next())
+                let Some(path) = selection
+                    .await
+                    .context("等待目录选择结果失败")?
+                    .context("打开目录选择窗口失败")?
+                    .and_then(|paths| paths.into_iter().next())
                 else {
                     return Ok(None);
                 };
@@ -763,7 +776,7 @@ impl Execution {
                     Ok(None) => {}
                     Err(error) => {
                         window.push_notification(
-                            Notification::error(format!("无法选择项目目录：{error}")),
+                            Notification::error(format!("无法选择项目目录：{error:#}")),
                             cx,
                         );
                     }
@@ -806,8 +819,9 @@ impl Execution {
                     }
                     Err(error) => window.push_notification(
                         Notification::error(format!(
-                            "无法在目录 {} 新建会话：{error}。请检查目录是否存在且可访问。",
-                            directory.display()
+                            "无法在目录 {} 新建会话：{:#}。请检查目录是否存在且可访问。",
+                            directory.display(),
+                            anyhow::Error::from(error)
                         )),
                         cx,
                     ),
@@ -885,10 +899,15 @@ impl Execution {
         cx.notify();
     }
 }
-fn validate_directory(path: &Path) -> std::io::Result<PathBuf> {
-    let directory = path.canonicalize()?;
-    if !directory.is_dir() {
-        return Err(std::io::Error::new(std::io::ErrorKind::NotADirectory, "请选择文件夹"));
+fn validate_directory(path: &Path) -> Result<PathBuf, ValidateDirectoryError> {
+    let directory = path
+        .canonicalize()
+        .map_err(|source| ValidateDirectoryError::Access { path: path.to_owned(), source })?;
+    let metadata = directory
+        .metadata()
+        .map_err(|source| ValidateDirectoryError::Access { path: directory.to_owned(), source })?;
+    if !metadata.is_dir() {
+        return Err(ValidateDirectoryError::NotDirectory(directory));
     }
     Ok(directory)
 }

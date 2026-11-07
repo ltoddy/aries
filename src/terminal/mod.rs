@@ -152,7 +152,7 @@ impl TerminalView {
         self.status = Status::Starting;
         match Session::start(&self.directory, self.dimensions, self.notifications.clone()) {
             Ok(session) => self.session = Some(session),
-            Err(error) => self.status = Status::Failed(format!("{error:#}")),
+            Err(error) => self.status = Status::Failed(error.to_string()),
         }
     }
 

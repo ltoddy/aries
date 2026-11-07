@@ -4,6 +4,7 @@ mod terminal;
 mod terminal_command;
 mod workspace;
 
+use anyhow::Context as _;
 use gpui_kit::assets::AllAssets;
 use gpui_kit::*;
 
@@ -26,7 +27,10 @@ gpui_kit::actions!(
 );
 
 fn main() -> anyhow::Result<()> {
-    let cwd = std::env::current_dir()?.canonicalize()?;
+    let directory = std::env::current_dir().context("无法读取启动目录")?;
+    let cwd = directory
+        .canonicalize()
+        .with_context(|| format!("无法访问启动目录 {}", directory.display()))?;
     gpui_kit::application().with_assets(AllAssets).run(move |cx| {
         gpui_kit::init(cx);
         crate::terminal::init(cx);

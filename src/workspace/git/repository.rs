@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+use anyhow::Context;
 use git2::{DiffFindOptions, DiffOptions, Patch, Repository, Status, StatusOptions};
 use gpui_kit::assets::IconName;
 use gpui_kit::component::ActiveTheme;
@@ -130,17 +131,17 @@ pub struct GitInfo {
 }
 
 impl GitInfo {
-    pub fn read(cwd: &Path) -> Result<Option<Self>, String> {
+    pub fn read(cwd: &Path) -> anyhow::Result<Option<Self>> {
         let repository = match Repository::discover(cwd) {
             Ok(repository) => repository,
             Err(error) if error.code() == git2::ErrorCode::NotFound => return Ok(None),
-            Err(error) => return Err(error.to_string()),
+            Err(error) => return Err(error).context("discovering Git repository"),
         };
-        let head = repository.find_reference("HEAD").map_err(|error| error.to_string())?;
-        let branch = match head.symbolic_target().map_err(|error| error.to_string())? {
+        let head = repository.find_reference("HEAD").context("reading HEAD reference")?;
+        let branch = match head.symbolic_target().context("reading HEAD symbolic target")? {
             Some(target) => target.strip_prefix("refs/heads/").unwrap_or(target).to_owned(),
             None => {
-                format!("游离 HEAD · {}", &head.target().ok_or("HEAD 没有目标")?.to_string()[..7])
+                format!("游离 HEAD · {}", &head.target().context("HEAD 没有目标")?.to_string()[..7])
             }
         };
         let mut options = StatusOptions::new();
@@ -153,8 +154,7 @@ impl GitInfo {
         let staged_lines = read_line_changes(&repository, ChangeGroup::Staged).ok();
         let unstaged_lines = read_line_changes(&repository, ChangeGroup::Unstaged).ok();
         let changed_files = Some({
-            let statuses =
-                repository.statuses(Some(&mut options)).map_err(|error| error.to_string())?;
+            let statuses = repository.statuses(Some(&mut options)).context("reading Git status")?;
             let mut files: Vec<_> = statuses
                 .iter()
                 .map(|entry| {

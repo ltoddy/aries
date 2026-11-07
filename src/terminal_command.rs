@@ -49,7 +49,10 @@ pub fn init(cx: &mut App) {
 }
 
 fn install() -> anyhow::Result<()> {
-    let executable = env::current_exe().context("无法定位应用")?.canonicalize()?;
+    let executable = env::current_exe().context("无法定位应用")?;
+    let executable = executable
+        .canonicalize()
+        .with_context(|| format!("无法访问应用路径 {}", executable.display()))?;
     let bundle = executable
         .parent()
         .and_then(Path::parent)

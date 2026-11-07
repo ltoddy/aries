@@ -12,6 +12,7 @@ pub async fn handle(
 ) -> Result<(), Error> {
     connection.spawn(async move {
         let result = terminals.kill(&request.session_id, &request.terminal_id).await;
-        responder.respond_with_result(result.map(|()| KillTerminalResponse::new()))
+        responder
+            .respond_with_result(result.map(|()| KillTerminalResponse::new()).map_err(Error::from))
     })
 }

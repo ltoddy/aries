@@ -13,6 +13,7 @@ use crate::workspace::git::index::{IndexAction, update_index};
 use crate::workspace::git::list::GitChangeList;
 use crate::workspace::git::motion::{GitMotion, accept_result};
 use crate::workspace::git::repository::{ChangeGroup, GitInfo};
+use crate::workspace::git::watch::GitWatch;
 
 pub struct GitPanel {
     cwd: PathBuf,
@@ -331,7 +332,7 @@ impl GitPanel {
 
     pub fn sync_info(
         &mut self,
-        result: Result<Option<GitInfo>, String>,
+        result: anyhow::Result<Option<GitInfo>>,
         animate: bool,
         cx: &mut Context<SessionView>,
     ) {
@@ -345,7 +346,7 @@ impl GitPanel {
                 (None, Some("项目不再是可读取的 Git 仓库".into()))
             }
             Ok(info) => (info, None),
-            Err(error) => (None, Some(error)),
+            Err(error) => (None, Some(format!("{error:#}"))),
         };
         let changed = self.info != info || self.read_error != error;
         let tokens = cx.theme().motion_tokens();
@@ -437,7 +438,11 @@ impl GitPanel {
                             IndexAction::Unstage => "无法取消暂存",
                         };
                         window.push_notification(
-                            Notification::error(format!("{label} {}：{error}", result.2.display())),
+                            Notification::error(format!(
+                                "{label} {}：{:#}",
+                                result.2.display(),
+                                anyhow::Error::from(error)
+                            )),
                             cx,
                         );
                     }
@@ -465,16 +470,14 @@ impl GitPanel {
             let (sender, receiver) = async_channel::bounded(1);
             let executor = cx.background_executor().clone();
             let watcher = cx
-                .background_spawn(async move {
-                    crate::workspace::git::watch::GitWatch::start(&directory, sender, executor)
-                })
+                .background_spawn(async move { GitWatch::start(&directory, sender, executor) })
                 .await;
             let watcher = match watcher {
                 Ok(watcher) => watcher,
                 Err(error) => {
                     let _ = view.update(cx, |this, cx| {
                         this.with_git_panel(|panel| {
-                            panel.watch_error = Some(error);
+                            panel.watch_error = Some(format!("{error:#}"));
                             panel.refresh_info(cx);
                         });
                     });
@@ -495,7 +498,8 @@ impl GitPanel {
                     .update(cx, |this, cx| {
                         this.with_git_panel(|panel| {
                             if let Some(error) = error {
-                                panel.watch_error = Some(error);
+                                panel.watch_error =
+                                    Some(format!("{:#}", anyhow::Error::from(error)));
                             }
                             panel.refresh_info(cx);
                         });
@@ -529,12 +533,8 @@ impl GitPanel {
                     .await;
                 let again = view.update(cx, |this, cx| {
                     this.with_git_panel(|panel| {
-                        if crate::workspace::git::motion::accept_result(
-                            &panel.cwd,
-                            panel.revision,
-                            &directory,
-                            revision,
-                        ) && !panel.index_busy
+                        if accept_result(&panel.cwd, panel.revision, &directory, revision)
+                            && !panel.index_busy
                         {
                             panel.sync_info(info, true, cx);
                         }

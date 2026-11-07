@@ -125,7 +125,7 @@ impl AgentConnection {
                     let session_id = request.session_id.clone();
                     self.cancel.send_replace(false);
                     let result = if self.capabilities.load_session {
-                        load_session::request(&self.client, *request).await
+                        load_session::request(&self.client, *request).await.map_err(Error::from)
                     } else {
                         Err(Error::internal_error().data("Agent 不支持加载会话"))
                     };
@@ -139,7 +139,9 @@ impl AgentConnection {
                 Command::SetSessionConfigOption(request) => {
                     let session_id = request.session_id.clone();
                     let config_id = request.config_id.clone();
-                    let result = set_session_config_option::request(&self.client, *request).await;
+                    let result = set_session_config_option::request(&self.client, *request)
+                        .await
+                        .map_err(Error::from);
                     self.emit(Event::SessionConfigSet { session_id, config_id, result }).await;
                 }
                 Command::Cancel => {}
@@ -225,7 +227,7 @@ pub async fn connect(
                             Err(_) => return Ok(()),
                         },
                         _ = client.incoming_closed() => return Err(closed()),
-                        result = &mut setup => break result?,
+                        result = &mut setup => break result.map_err(Error::from)?,
                     }
                 }
             };

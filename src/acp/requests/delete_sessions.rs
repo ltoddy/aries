@@ -5,6 +5,8 @@ use agent_client_protocol::v1::ConnectionTo;
 use agent_client_protocol::v1::schema::{DeleteSessionRequest, SessionId};
 use agent_client_protocol::{Agent, Error};
 
+use crate::acp::requests::RequestError;
+
 #[derive(Debug, Default)]
 pub struct DeletionReport {
     deleted: Vec<SessionId>,
@@ -33,11 +35,14 @@ pub async fn request(connection: &ConnectionTo<Agent>, ids: Vec<SessionId>) -> D
             connection.send_request(DeleteSessionRequest::new(id.clone())).block_task(),
         )
         .await
-        .map_err(|_| Error::internal_error().data("删除会话超时，刷新列表以确认结果"))
-        .and_then(|response| response);
+        .map_err(|source| RequestError::Timeout {
+            message: "删除会话超时，刷新列表以确认结果",
+            source,
+        })
+        .and_then(|response| response.map_err(RequestError::from));
         match response {
             Ok(_) => result.deleted.push(id),
-            Err(error) => result.failed.push((id, error)),
+            Err(error) => result.failed.push((id, error.into())),
         }
     }
     result

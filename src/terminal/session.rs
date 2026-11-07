@@ -14,7 +14,8 @@ use alacritty_terminal::grid::Dimensions as GridDimensions;
 use alacritty_terminal::term::{Config, Osc52};
 #[cfg(unix)]
 use alacritty_terminal::vte::ansi::Processor;
-use anyhow::{Context as _, Result, bail};
+#[cfg(unix)]
+use anyhow::Context as _;
 #[cfg(unix)]
 use portable_pty::{CommandBuilder, PtySize, native_pty_system};
 
@@ -42,6 +43,71 @@ impl GridDimensions for Dimensions {
     fn columns(&self) -> usize {
         self.columns
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error(
+    "终端尺寸超出允许范围：{columns} 列、{lines} 行（列数须为 2–1000，行数须为 1–1000）",
+    columns = .dimensions.columns,
+    lines = .dimensions.lines
+)]
+pub struct InvalidDimensions {
+    pub dimensions: Dimensions,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum StartError {
+    #[error(transparent)]
+    InvalidDimensions(#[from] InvalidDimensions),
+    #[error("启动终端工作线程失败：{source}")]
+    WorkerSpawn {
+        #[source]
+        source: std::io::Error,
+    },
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum WriteError {
+    #[error("终端输入不能超过 64 KiB（当前为 {size} 字节）")]
+    TooLarge { size: usize },
+    #[error("终端未运行")]
+    NotRunning,
+    #[error("终端输入队列已满，请稍后重试")]
+    QueueFull,
+    #[error("终端输入队列已关闭，请重启 shell")]
+    QueueClosed,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ResizeError {
+    #[error(transparent)]
+    InvalidDimensions(#[from] InvalidDimensions),
+    #[error("终端尺寸调整队列已满，请稍后重试")]
+    QueueFull,
+    #[error("终端尺寸调整队列已关闭，请重启 shell")]
+    QueueClosed,
+}
+
+#[derive(Debug, thiserror::Error)]
+enum WorkerError {
+    #[cfg(not(unix))]
+    #[error("terminal PTY worker currently requires Unix")]
+    UnsupportedPlatform,
+    #[cfg(unix)]
+    #[error("terminal directory is not a directory: {path}", path = .0.display())]
+    NotDirectory(PathBuf),
+    #[cfg(unix)]
+    #[error("PTY has no file descriptor")]
+    MissingFileDescriptor,
+    #[cfg(unix)]
+    #[error("shell has no process identifier")]
+    MissingProcessId,
+    #[cfg(unix)]
+    #[error("terminal response queue overflow")]
+    ResponseQueueOverflow,
+    #[cfg(unix)]
+    #[error("PTY write returned zero")]
+    WriteZero,
 }
 
 #[cfg_attr(not(unix), allow(dead_code))]
@@ -92,7 +158,7 @@ impl Session {
         directory: &Path,
         dimensions: Dimensions,
         notifications: async_channel::Sender<()>,
-    ) -> Result<Self> {
+    ) -> Result<Self, StartError> {
         validate_dimensions(dimensions)?;
         let responses = Arc::new(Mutex::new(VecDeque::new()));
         let overflow = Arc::new(AtomicBool::new(false));
@@ -147,7 +213,7 @@ impl Session {
                 let _ = notifications.try_send(());
                 let _ = completed.try_send(());
             })
-            .context("starting terminal worker")?;
+            .map_err(|source| StartError::WorkerSpawn { source })?;
         Ok(session)
     }
 
@@ -164,24 +230,38 @@ impl Session {
         self.status.lock().expect("terminal status lock poisoned").clone()
     }
 
-    pub fn write(&self, bytes: Vec<u8>) -> Result<()> {
+    pub fn write(&self, bytes: Vec<u8>) -> Result<(), WriteError> {
         if bytes.is_empty() {
             return Ok(());
         }
         if bytes.len() > 65536 {
-            bail!("终端输入不能超过 64 KiB");
+            return Err(WriteError::TooLarge { size: bytes.len() });
         }
-        if !matches!(self.status(), Status::Starting | Status::Running) {
-            bail!("终端未运行");
+        if !matches!(
+            *self.status.lock().expect("terminal status lock poisoned"),
+            Status::Starting | Status::Running
+        ) {
+            return Err(WriteError::NotRunning);
         }
-        self.commands.try_send(Command::Write(bytes)).context("终端输入队列已满或已关闭")
+        self.commands.try_send(Command::Write(bytes)).map_err(|error| match error {
+            mpsc::TrySendError::Full(_) => WriteError::QueueFull,
+            mpsc::TrySendError::Disconnected(_) => WriteError::QueueClosed,
+        })
     }
 
-    pub fn resize(&self, dimensions: Dimensions, cell_width: u16, cell_height: u16) -> Result<()> {
+    pub fn resize(
+        &self,
+        dimensions: Dimensions,
+        cell_width: u16,
+        cell_height: u16,
+    ) -> Result<(), ResizeError> {
         validate_dimensions(dimensions)?;
-        self.commands
-            .try_send(Command::Resize(dimensions, cell_width, cell_height))
-            .context("终端尺寸调整队列已满或已关闭")
+        self.commands.try_send(Command::Resize(dimensions, cell_width, cell_height)).map_err(
+            |error| match error {
+                mpsc::TrySendError::Full(_) => ResizeError::QueueFull,
+                mpsc::TrySendError::Disconnected(_) => ResizeError::QueueClosed,
+            },
+        )
     }
 }
 
@@ -191,9 +271,9 @@ impl Drop for Session {
     }
 }
 
-fn validate_dimensions(dimensions: Dimensions) -> Result<()> {
+fn validate_dimensions(dimensions: Dimensions) -> Result<(), InvalidDimensions> {
     if !(2..=1000).contains(&dimensions.columns) || !(1..=1000).contains(&dimensions.lines) {
-        bail!("终端尺寸超出允许范围");
+        return Err(InvalidDimensions { dimensions });
     }
     Ok(())
 }
@@ -330,12 +410,12 @@ struct Worker {
 }
 
 #[cfg(not(unix))]
-fn run(_: PathBuf, _: Dimensions, _: Worker) -> Result<()> {
-    bail!("terminal PTY worker currently requires Unix")
+fn run(_: PathBuf, _: Dimensions, _: Worker) -> anyhow::Result<()> {
+    Err(WorkerError::UnsupportedPlatform.into())
 }
 
 #[cfg(unix)]
-fn run(directory: PathBuf, dimensions: Dimensions, worker: Worker) -> Result<()> {
+fn run(directory: PathBuf, dimensions: Dimensions, worker: Worker) -> anyhow::Result<()> {
     let Worker { terminal, status, receiver, cancelled, responses, size, overflow, notifications } =
         worker;
     if cancelled.load(Ordering::Acquire) {
@@ -345,7 +425,7 @@ fn run(directory: PathBuf, dimensions: Dimensions, worker: Worker) -> Result<()>
     }
     let directory = std::fs::canonicalize(directory).context("resolving terminal directory")?;
     if !directory.is_dir() {
-        bail!("terminal directory is not a directory");
+        return Err(WorkerError::NotDirectory(directory).into());
     }
     let pair = native_pty_system()
         .openpty(PtySize {
@@ -354,14 +434,14 @@ fn run(directory: PathBuf, dimensions: Dimensions, worker: Worker) -> Result<()>
             ..PtySize::default()
         })
         .context("opening PTY")?;
-    let mut reader = pair.master.try_clone_reader()?;
-    let mut writer = pair.master.take_writer()?;
+    let mut reader = pair.master.try_clone_reader().context("cloning PTY reader")?;
+    let mut writer = pair.master.take_writer().context("taking PTY writer")?;
     #[cfg(unix)]
     {
-        let fd = pair.master.as_raw_fd().context("PTY has no file descriptor")?;
+        let fd = pair.master.as_raw_fd().ok_or(WorkerError::MissingFileDescriptor)?;
         let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
         if flags < 0 || unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0 {
-            return Err(std::io::Error::last_os_error().into());
+            return Err(std::io::Error::last_os_error()).context("setting PTY nonblocking mode");
         }
     }
     let mut command = CommandBuilder::new(shell());
@@ -379,7 +459,7 @@ fn run(directory: PathBuf, dimensions: Dimensions, worker: Worker) -> Result<()>
     let Some(pid) = child.process_id() else {
         let _ = child.kill();
         child.wait().context("waiting for shell without process identifier")?;
-        bail!("shell has no process identifier");
+        return Err(WorkerError::MissingProcessId.into());
     };
     *status.lock().expect("terminal status lock poisoned") = Status::Running;
     let _ = notifications.try_send(());
@@ -394,7 +474,7 @@ fn run(directory: PathBuf, dimensions: Dimensions, worker: Worker) -> Result<()>
             break;
         }
         if overflow.load(Ordering::Acquire) {
-            failure = Some(anyhow::anyhow!("terminal response queue overflow"));
+            failure = Some(WorkerError::ResponseQueueOverflow.into());
             break;
         }
         if pending.len() < 128 {
@@ -402,16 +482,19 @@ fn run(directory: PathBuf, dimensions: Dimensions, worker: Worker) -> Result<()>
                 match receiver.try_recv() {
                     Ok(Command::Write(bytes)) => pending.push_back(bytes),
                     Ok(Command::Resize(dimensions, width, height)) => {
-                        let result = pair.master.resize(PtySize {
-                            rows: dimensions.lines as u16,
-                            cols: dimensions.columns as u16,
-                            pixel_width: (dimensions.columns * width as usize)
-                                .min(u16::MAX as usize)
-                                as u16,
-                            pixel_height: (dimensions.lines * height as usize)
-                                .min(u16::MAX as usize)
-                                as u16,
-                        });
+                        let result = pair
+                            .master
+                            .resize(PtySize {
+                                rows: dimensions.lines as u16,
+                                cols: dimensions.columns as u16,
+                                pixel_width: (dimensions.columns * width as usize)
+                                    .min(u16::MAX as usize)
+                                    as u16,
+                                pixel_height: (dimensions.lines * height as usize)
+                                    .min(u16::MAX as usize)
+                                    as u16,
+                            })
+                            .context("resizing PTY");
                         if let Err(error) = result {
                             failure = Some(error);
                             break;
@@ -447,7 +530,7 @@ fn run(directory: PathBuf, dimensions: Dimensions, worker: Worker) -> Result<()>
             };
             match writer.write(&bytes[offset..]) {
                 Ok(0) => {
-                    failure = Some(anyhow::anyhow!("PTY write returned zero"));
+                    failure = Some(WorkerError::WriteZero.into());
                     break;
                 }
                 Ok(count) => {
@@ -466,7 +549,7 @@ fn run(directory: PathBuf, dimensions: Dimensions, worker: Worker) -> Result<()>
                     break;
                 }
                 Err(error) => {
-                    failure = Some(error.into());
+                    failure = Some(anyhow::Error::new(error).context("writing PTY input"));
                     break;
                 }
             }
@@ -498,7 +581,7 @@ fn run(directory: PathBuf, dimensions: Dimensions, worker: Worker) -> Result<()>
                     break;
                 }
                 Err(error) => {
-                    failure = Some(error.into());
+                    failure = Some(anyhow::Error::new(error).context("reading PTY output"));
                     break;
                 }
             }
@@ -520,7 +603,7 @@ fn run(directory: PathBuf, dimensions: Dimensions, worker: Worker) -> Result<()>
             }
             Ok(false) => {}
             Err(error) => {
-                failure = Some(error.into());
+                failure = Some(anyhow::Error::new(error).context("checking shell exit status"));
                 break;
             }
         }

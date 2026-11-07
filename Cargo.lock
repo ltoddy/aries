@@ -303,6 +303,7 @@ dependencies = [
  "serde",
  "serde_json",
  "similar 3.2.1",
+ "thiserror 2.0.21",
  "tokio",
  "toml 1.1.8+spec-1.1.0",
 ]

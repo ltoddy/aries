@@ -12,6 +12,8 @@ pub async fn handle(
 ) -> Result<(), Error> {
     connection.spawn(async move {
         let result = terminals.release(&request.session_id, &request.terminal_id).await;
-        responder.respond_with_result(result.map(|()| ReleaseTerminalResponse::new()))
+        responder.respond_with_result(
+            result.map(|()| ReleaseTerminalResponse::new()).map_err(Error::from),
+        )
     })
 }

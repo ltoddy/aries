@@ -9,5 +9,7 @@ pub async fn handle(
     responder: Responder<TerminalOutputResponse>,
     terminals: &Terminals,
 ) -> Result<(), Error> {
-    responder.respond_with_result(terminals.output(&request.session_id, &request.terminal_id))
+    responder.respond_with_result(
+        terminals.output(&request.session_id, &request.terminal_id).map_err(Error::from),
+    )
 }

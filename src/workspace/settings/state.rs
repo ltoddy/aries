@@ -159,7 +159,7 @@ impl SettingsState {
             if let Some(previous) = previous {
                 previous.await;
             }
-            let result = cx.background_spawn(async move { settings.save(&path) }).await;
+            let result = cx.background_spawn(async move { settings.save(path) }).await;
             let _ = view.update(cx, |this, cx| {
                 if this.save_revision == revision {
                     this.settings_saving = false;
