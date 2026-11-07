@@ -1,4 +1,5 @@
 mod acp;
+mod terminal;
 #[cfg(target_os = "macos")]
 mod terminal_command;
 mod workspace;
@@ -12,16 +13,29 @@ use crate::workspace::settings::Preferences;
 
 gpui_kit::actions!(
     orbit,
-    [Quit, NewSession, CloseTab, PreviousTab, NextTab, PreviousUserMessage, NextUserMessage,]
+    [
+        Quit,
+        NewSession,
+        CloseTab,
+        PreviousTab,
+        NextTab,
+        PreviousUserMessage,
+        NextUserMessage,
+        ToggleTerminal,
+    ]
 );
 
 fn main() -> anyhow::Result<()> {
     let cwd = std::env::current_dir()?.canonicalize()?;
     gpui_kit::application().with_assets(AllAssets).run(move |cx| {
         gpui_kit::init(cx);
+        crate::terminal::init(cx);
         cx.bind_keys([KeyBinding::new("cmd-q", Quit, None), KeyBinding::new("ctrl-q", Quit, None)]);
         #[cfg(target_os = "macos")]
-        cx.bind_keys([KeyBinding::new("cmd-n", NewSession, None)]);
+        cx.bind_keys([
+            KeyBinding::new("cmd-n", NewSession, None),
+            KeyBinding::new("cmd-f", ToggleTerminal, None),
+        ]);
         cx.on_action(|_: &Quit, cx| cx.quit());
         #[cfg(target_os = "macos")]
         cx.bind_keys([

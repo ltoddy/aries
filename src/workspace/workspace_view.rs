@@ -10,10 +10,14 @@ use gpui_kit::component::{ActiveTheme, Icon, Sizable, h_resizable, resizable_pan
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
+use crate::terminal::TerminalView;
 use crate::workspace::settings::palette::Palette;
 use crate::workspace::settings::{Preferences, SettingsState};
 use crate::workspace::{SessionRenderMode, SessionView};
-use crate::{CloseTab, NewSession, NextTab, NextUserMessage, PreviousTab, PreviousUserMessage};
+use crate::{
+    CloseTab, NewSession, NextTab, NextUserMessage, PreviousTab, PreviousUserMessage,
+    ToggleTerminal,
+};
 
 struct SessionTab {
     id: usize,
@@ -32,6 +36,9 @@ pub struct WorkspaceView {
     next_id: usize,
     tab_scroll: ScrollHandle,
     focus_handle: FocusHandle,
+    terminal: Option<Entity<TerminalView>>,
+    terminal_visible: bool,
+    terminal_previous_focus: Option<FocusHandle>,
 }
 
 impl fmt::Debug for WorkspaceView {
@@ -69,6 +76,9 @@ impl WorkspaceView {
             next_id: 0,
             tab_scroll: ScrollHandle::new(),
             focus_handle,
+            terminal: None,
+            terminal_visible: false,
+            terminal_previous_focus: None,
         }
     }
 }
@@ -82,6 +92,9 @@ impl Render for WorkspaceView {
         div()
             .size_full()
             .track_focus(&self.focus_handle)
+            .on_action(cx.listener(|this, _: &ToggleTerminal, window, cx| {
+                this.toggle_terminal(window, cx);
+            }))
             .on_action(cx.listener(|this, _: &CloseTab, window, cx| {
                 if let Some(tab) = this.tabs.get(this.active) {
                     let id = tab.id;
@@ -143,7 +156,10 @@ impl Render for WorkspaceView {
                                             }
                                             None => self.render_empty_main(p),
                                         })
-                                        .children(git_info),
+                                        .children(git_info)
+                                        .when(self.terminal_visible, |view| {
+                                            view.child(self.render_terminal(cx))
+                                        }),
                                 ),
                         ),
                     ),
@@ -152,6 +168,91 @@ impl Render for WorkspaceView {
 }
 
 impl WorkspaceView {
+    fn toggle_terminal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.terminal_visible {
+            self.terminal_visible = false;
+            let focus =
+                self.terminal_previous_focus.take().unwrap_or_else(|| self.focus_handle.clone());
+            window.focus(&focus, cx);
+        } else {
+            self.terminal_previous_focus = window.focused(cx);
+            if self.terminal.is_none() {
+                let directory = self
+                    .active_view()
+                    .map(|view| view.read(cx).execution().directory().to_path_buf())
+                    .unwrap_or_else(|| self.cwd.clone());
+                self.terminal = Some(cx.new(|cx| TerminalView::new(directory, window, cx)));
+            }
+            if let Some(terminal) = &self.terminal {
+                window.focus(&terminal.read(cx).focus_handle(cx), cx);
+            }
+            self.terminal_visible = true;
+        }
+        if let Some(terminal) = &self.terminal {
+            terminal.update(cx, |terminal, cx| terminal.set_visible(self.terminal_visible, cx));
+        }
+        cx.notify();
+    }
+
+    fn render_terminal(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let terminal = self.terminal.as_ref().expect("visible terminal has a retained entity");
+        let directory = terminal.read(cx).directory().display().to_string();
+        div()
+            .id("floating-terminal")
+            .absolute()
+            .inset_0()
+            .p_4()
+            .flex()
+            .items_center()
+            .justify_center()
+            .child(
+                div()
+                    .w_full()
+                    .h(relative(0.8))
+                    .max_w(rems(64.))
+                    .min_w_0()
+                    .min_h_0()
+                    .flex()
+                    .flex_col()
+                    .bg(cx.theme().background.opacity(0.9))
+                    .text_color(cx.theme().foreground)
+                    .border_1()
+                    .border_color(cx.theme().border)
+                    .rounded(cx.theme().radius)
+                    .shadow_lg()
+                    .overflow_hidden()
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .px_3()
+                            .py_2()
+                            .border_b_1()
+                            .border_color(cx.theme().border)
+                            .child("终端")
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .truncate()
+                                    .text_color(cx.theme().muted_foreground)
+                                    .child(directory),
+                            )
+                            .child(
+                                Button::new("hide-floating-terminal")
+                                    .small()
+                                    .ghost()
+                                    .label("隐藏 ⌘F")
+                                    .on_click(cx.listener(|this, _, window, cx| {
+                                        this.toggle_terminal(window, cx)
+                                    })),
+                            ),
+                    )
+                    .child(div().flex_1().min_h_0().min_w_0().p_2().child(terminal.clone())),
+            )
+    }
+
     pub fn active_view(&self) -> Option<&Entity<SessionView>> {
         self.tabs.get(self.active).map(|tab| &tab.view)
     }
