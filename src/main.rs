@@ -1,15 +1,14 @@
 mod acp;
-mod chat;
-mod preferences;
 #[cfg(target_os = "macos")]
 mod terminal_command;
+mod workspace;
 
 use gpui_kit::assets::AllAssets;
 use gpui_kit::*;
 
 use crate::acp::aries_config;
-use crate::chat::view::TabsView;
-use crate::preferences::Preferences;
+use crate::workspace::WorkspaceView;
+use crate::workspace::settings::Preferences;
 
 gpui_kit::actions!(
     orbit,
@@ -64,7 +63,7 @@ fn main() -> anyhow::Result<()> {
                 cx.quit();
                 false
             });
-            cx.new(|cx| TabsView::new(cwd, Preferences::path(), aries_config(), window, cx))
+            cx.new(|cx| WorkspaceView::new(cwd, Preferences::path(), aries_config(), window, cx))
         }) {
             eprintln!("无法创建窗口：{error:#}");
             cx.quit();
