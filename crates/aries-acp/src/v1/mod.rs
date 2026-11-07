@@ -1,5 +1,4 @@
-pub mod auth_status;
-pub mod authenticate;
+pub mod auth;
 pub mod cancel;
 pub mod initialize;
 pub mod logout;
@@ -15,8 +14,7 @@ use aries_init::{GlobalContext, Setting};
 use aries_session::{SessionArgs, SessionRegistry};
 use tokio::sync::Mutex;
 
-use self::auth_status::auth_status;
-use self::authenticate::authenticate;
+use self::auth::{auth_status, authenticate};
 use self::cancel::{cancel, cancel_request};
 use self::initialize::initialize;
 use self::logout::logout;
@@ -43,6 +41,7 @@ pub async fn run(
         .on_receive_request(initialize, on_receive_request!())
         .on_receive_request(authenticate, on_receive_request!())
         .on_receive_request(auth_status, on_receive_request!())
+        .on_receive_request(logout, on_receive_request!())
         .on_receive_request(list_providers, on_receive_request!())
         .on_receive_request(set_provider, on_receive_request!())
         .on_receive_request(disable_provider, on_receive_request!())
@@ -78,18 +77,12 @@ pub async fn run(
             {
                 let registry = registry.clone();
                 async move |req, responder, cx| {
-                    delete_session(req, responder, cx, registry.clone()).await
+                    fork_session(req, responder, cx, registry.clone()).await
                 }
             },
             on_receive_request!(),
         )
-        .on_receive_request(
-            {
-                let registry = registry.clone();
-                async move |req, responder, cx| prompt(req, responder, cx, registry.clone()).await
-            },
-            on_receive_request!(),
-        )
+        .on_receive_request(resume_session, on_receive_request!())
         .on_receive_request(
             {
                 let registry = registry.clone();
@@ -99,18 +92,25 @@ pub async fn run(
             },
             on_receive_request!(),
         )
-        .on_receive_request(logout, on_receive_request!())
+        .on_receive_request(
+            {
+                let registry = registry.clone();
+                async move |req, responder, cx| {
+                    delete_session(req, responder, cx, registry.clone()).await
+                }
+            },
+            on_receive_request!(),
+        )
         .on_receive_request(archive_session, on_receive_request!())
         .on_receive_request(unarchive_session, on_receive_request!())
         .on_receive_request(session_status, on_receive_request!())
         .on_receive_request(set_session_title, on_receive_request!())
-        .on_receive_request(resume_session, on_receive_request!())
         .on_receive_request(set_session_mode, on_receive_request!())
         .on_receive_request(
             {
                 let registry = registry.clone();
                 async move |req, responder, cx| {
-                    fork_session(req, responder, cx, registry.clone()).await
+                    set_session_config_option(req, responder, cx, registry.clone()).await
                 }
             },
             on_receive_request!(),
@@ -118,9 +118,7 @@ pub async fn run(
         .on_receive_request(
             {
                 let registry = registry.clone();
-                async move |req, responder, cx| {
-                    set_session_config_option(req, responder, cx, registry.clone()).await
-                }
+                async move |req, responder, cx| prompt(req, responder, cx, registry.clone()).await
             },
             on_receive_request!(),
         )

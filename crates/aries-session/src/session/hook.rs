@@ -9,7 +9,7 @@ use aries_extension::hook::input::{
     SubagentStopHookInput,
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
-use aries_persistence::ToolCallRepository;
+use aries_persistence::{TokenUsageRepository, ToolCallRepository};
 use rig::agent::{
     AgentHook, CompletionCall, CompletionCallAction, CompletionCallEvent, DispatchAction,
     DispatchEvent, HookContext, InvalidToolCallAction, InvalidToolCallContext, ModelSelection,
@@ -43,6 +43,7 @@ pub struct SessionPromptHook {
     last_tool_call_at: Arc<Mutex<Option<time::Instant>>>,
 
     tool_call_repo: ToolCallRepository,
+    token_usage_repo: TokenUsageRepository,
     instruction_ctx: InstructionContext,
     window: ContextWindow,
     notifier: Notifier,
@@ -67,7 +68,8 @@ impl SessionPromptHook {
         let agent_id = agent_id.into();
         let agent_type = agent_type.into();
 
-        let tool_call_repo = ToolCallRepository::new(db);
+        let tool_call_repo = ToolCallRepository::new(db.clone());
+        let token_usage_repo = TokenUsageRepository::new(db.clone());
         let window = ContextWindow::new();
 
         Self {
@@ -79,6 +81,7 @@ impl SessionPromptHook {
             agent_type,
             last_tool_call_at: Default::default(),
             tool_call_repo,
+            token_usage_repo,
             instruction_ctx,
             window,
             notifier,
@@ -179,6 +182,29 @@ impl AgentHook for SessionPromptHook {
         _ctx: &HookContext,
         event: ModelTurnFinished<'_>,
     ) -> ModelTurnAction {
+        let usage = event.usage;
+
+        let cwd = self.cwd.display().to_string();
+        let input_tokens = usage.input_tokens.unwrap_or(0);
+        let output_tokens = usage.output_tokens.unwrap_or(0);
+        let total_tokens = usage.total_tokens.unwrap_or(0);
+        let cached_input_tokens = usage.cached_input_tokens.unwrap_or(0);
+        let reasoning_tokens = usage.reasoning_tokens.unwrap_or(0);
+
+        let mut repo = self.token_usage_repo.clone();
+        tokio::task::spawn(async move {
+            let _ = repo
+                .create(
+                    cwd,
+                    input_tokens,
+                    output_tokens,
+                    total_tokens,
+                    cached_input_tokens,
+                    reasoning_tokens,
+                )
+                .await;
+        });
+
         self.notifier.send_stream_item(MultiTurnStreamItem::CompletionCall(CompletionCall::new(
             event.turn,
             event.usage,

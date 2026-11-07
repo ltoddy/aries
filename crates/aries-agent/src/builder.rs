@@ -8,6 +8,7 @@ use aries_lspclient::SharedLspClient;
 use aries_mode::Mode;
 use itertools::Itertools;
 use rig::Model;
+use rig::agent::AgentHook;
 use rig::providers::openai::wire::OpenAiWire;
 use rig::tool::server::ToolServerHandle;
 
@@ -63,7 +64,10 @@ impl AgentBuilder {
         self
     }
 
-    pub async fn build(self, tool_server_handle: ToolServerHandle) -> AriesAgent {
+    pub async fn build<P>(self, tool_server_handle: ToolServerHandle, hook: P) -> AriesAgent
+    where
+        P: AgentHook + 'static,
+    {
         let mode = self.mode;
         let name = mode.name();
         let model_name = self.model.name();
@@ -92,6 +96,7 @@ impl AgentBuilder {
             .description(mode.description())
             .preamble(&preamble)
             .tool_server_handle(tool_server_handle)
+            .add_hook(hook)
             .default_max_turns(AGENT_LOOP_MAX_TURNS);
 
         let inner = builder.build();
