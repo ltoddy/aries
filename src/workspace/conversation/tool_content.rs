@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use agent_client_protocol::v1::schema::{SessionUpdate, ToolCallContent};
 use gpui_kit::assets::IconName;
+use gpui_kit::base::SelectableText;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::text::TextView;
 use gpui_kit::component::{ActiveTheme, Icon, Sizable};
@@ -99,7 +100,9 @@ impl RenderOnce for ToolDiff {
                 })
                 .text_sm()
                 .into_any_element(),
-            DiffContent::Path(path) => div().w_full().child(path).into_any_element(),
+            DiffContent::Path(path) => {
+                div().w_full().child(SelectableText::new(id, path)).into_any_element()
+            }
         }
     }
 }

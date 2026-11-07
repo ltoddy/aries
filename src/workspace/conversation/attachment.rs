@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use agent_client_protocol::v1::schema::{ContentBlock, EmbeddedResourceResource};
 use gpui_kit::assets::IconName;
+use gpui_kit::base::SelectableText;
 use gpui_kit::component::Icon;
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::prelude::*;
@@ -212,8 +213,20 @@ impl RenderOnce for Attachment {
                 div()
                     .flex_1()
                     .min_w_0()
-                    .child(div().truncate().font_weight(FontWeight::MEDIUM).child(name))
-                    .child(div().mt_1().truncate().text_xs().text_color(p.muted()).child(subtitle)),
+                    .child(
+                        div()
+                            .truncate()
+                            .font_weight(FontWeight::MEDIUM)
+                            .child(SelectableText::new("attachment-name", name)),
+                    )
+                    .child(
+                        div()
+                            .mt_1()
+                            .truncate()
+                            .text_xs()
+                            .text_color(p.muted())
+                            .child(SelectableText::new("attachment-subtitle", subtitle)),
+                    ),
             )
             .into_any_element()
     }

@@ -1,3 +1,4 @@
+use gpui_kit::base::SelectableText;
 use gpui_kit::component::{Icon, IconName, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
@@ -104,7 +105,12 @@ impl RenderOnce for UserMessage {
                     .gap_2()
                     .children(attachments)
                     .when(!text.is_empty(), |bubble| {
-                        bubble.child(div().whitespace_normal().line_height(rems(1.5)).child(text))
+                        bubble.child(
+                            div()
+                                .whitespace_normal()
+                                .line_height(rems(1.5))
+                                .child(SelectableText::new(("user-message-text", index), text)),
+                        )
                     }),
             )
             .into_any_element()

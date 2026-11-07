@@ -1,3 +1,4 @@
+use gpui_kit::base::SelectableText;
 use gpui_kit::component::Sizable;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::prelude::*;
@@ -22,7 +23,7 @@ pub fn render_session_actions(owner: &SessionView, p: Palette) -> impl IntoEleme
                     .p_2()
                     .text_xs()
                     .text_color(p.danger())
-                    .child(error),
+                    .child(SelectableText::new("session-deletion-error-text", error)),
             )
         })
 }

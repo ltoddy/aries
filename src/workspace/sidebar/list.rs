@@ -1,3 +1,4 @@
+use gpui_kit::base::SelectableText;
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -65,7 +66,13 @@ impl<'a> SessionListView<'a> {
                         },
                     )
                     .when_some(list.error().map(str::to_owned), |list, error| {
-                        list.child(div().p_3().text_xs().text_color(p.danger()).child(error))
+                        list.child(
+                            div()
+                                .p_3()
+                                .text_xs()
+                                .text_color(p.danger())
+                                .child(SelectableText::new("session-list-error-text", error)),
+                        )
                     }),
             )
     }

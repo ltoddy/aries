@@ -1,4 +1,5 @@
 use gpui_kit::assets::IconName;
+use gpui_kit::base::SelectableText;
 use gpui_kit::base::motion::{self, Transition};
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::tooltip::Tooltip;
@@ -123,14 +124,18 @@ pub fn render_execution_context(
                     .build(window, cx)
                 })
                 .child(Icon::new(IconName::Folder).size_3().flex_shrink_0())
-                .child(div().min_w_0().truncate().child(project))
+                .child(
+                    div()
+                        .min_w_0()
+                        .truncate()
+                        .child(SelectableText::new("execution-project-text", project)),
+                )
                 .when_some(branch, |row, branch| {
                     row.child(
-                        div()
-                            .min_w_0()
-                            .max_w(relative(0.5))
-                            .truncate()
-                            .child(format!("· {branch}")),
+                        div().min_w_0().max_w(relative(0.5)).truncate().child(SelectableText::new(
+                            "execution-branch-text",
+                            format!("· {branch}"),
+                        )),
                     )
                 }),
         )

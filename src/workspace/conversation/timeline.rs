@@ -4,6 +4,7 @@ use std::time::Duration;
 use agent_client_protocol::schema::MaybeUndefined;
 use agent_client_protocol::v1::schema::{CompactionStatus, SessionId};
 use gpui_kit::assets::IconName;
+use gpui_kit::base::SelectableText;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::text::{TextView, TextViewState, TextViewStyle};
 use gpui_kit::component::{ActiveTheme, Disableable, Icon, Sizable};
@@ -197,12 +198,13 @@ impl Timeline {
                                                 .border_1()
                                                 .border_color(p.border())
                                                 .text_color(p.danger())
-                                                .child(
+                                                .child(SelectableText::new(
+                                                    "chat-error-text",
                                                     conversation
                                                         .error()
                                                         .unwrap_or_default()
                                                         .to_owned(),
-                                                )
+                                                ))
                                                 .into_any_element()
                                         },
                                     ))
@@ -544,7 +546,10 @@ impl Timeline {
                                     .child(Icon::new(IconName::Activity).size(rems(0.875)))
                             },
                         )
-                        .child(message.title().to_owned()),
+                        .child(SelectableText::new(
+                            ("message-title", index),
+                            message.title().to_owned(),
+                        )),
                 )
             })
             .children(

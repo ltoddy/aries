@@ -1,5 +1,6 @@
 use agent_client_protocol::v1::schema::{SessionId, ToolCallStatus, ToolKind};
 use gpui_kit::assets::IconName;
+use gpui_kit::base::SelectableText;
 use gpui_kit::base::motion::{self, Transition};
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::tooltip::Tooltip;
@@ -166,9 +167,16 @@ impl RenderOnce for ToolMessage {
                                     .when(show_status, |status_row| status_row.child(status)),
                             )
                             .child(Icon::new(icon).size(px(14.)).flex_shrink_0())
-                            .child(div().flex_1().min_w_0().child(
-                                div().w_full().min_w_0().text_left().truncate().child(title),
-                            )),
+                            .child(
+                                div().flex_1().min_w_0().child(
+                                    div()
+                                        .w_full()
+                                        .min_w_0()
+                                        .text_left()
+                                        .truncate()
+                                        .child(SelectableText::new(("tool-title", index), title)),
+                                ),
+                            ),
                     ),
             )
             .child(content)

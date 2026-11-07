@@ -3,6 +3,7 @@ use agent_client_protocol::v1::schema::{
     SessionConfigSelectOptions, SessionId, SetSessionConfigOptionRequest,
 };
 use gpui_kit::assets::IconName;
+use gpui_kit::base::SelectableText;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::menu::{DropdownMenu, PopupMenuItem};
 use gpui_kit::component::{ActiveTheme, Disableable, Icon, Sizable};
@@ -37,7 +38,13 @@ pub fn render_session_config(
             },
         ))
         .when_some(owner.configuration().error().map(str::to_owned), |view, error| {
-            view.child(div().px_2().text_xs().text_color(p.danger()).child(error))
+            view.child(
+                div()
+                    .px_2()
+                    .text_xs()
+                    .text_color(p.danger())
+                    .child(SelectableText::new("session-config-error-text", error)),
+            )
         })
 }
 
