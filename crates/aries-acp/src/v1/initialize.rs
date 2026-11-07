@@ -1,10 +1,11 @@
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::v1::schema::{
-    AgentCapabilities, Implementation, InitializeRequest, InitializeResponse, McpCapabilities,
-    PromptCapabilities, ProvidersCapabilities, SessionAdditionalDirectoriesCapabilities,
-    SessionCapabilities, SessionCloseCapabilities, SessionDeleteCapabilities,
-    SessionForkCapabilities, SessionListCapabilities, SessionResumeCapabilities,
-    SessionSystemPromptCapabilities,
+    AgentAuthCapabilities, AgentCapabilities, AuthMethod, AuthMethodTerminal,
+    AuthStatusCapabilities, Implementation, InitializeRequest, InitializeResponse,
+    LogoutCapabilities, McpCapabilities, PromptCapabilities, ProvidersCapabilities,
+    SessionAdditionalDirectoriesCapabilities, SessionCapabilities, SessionCloseCapabilities,
+    SessionDeleteCapabilities, SessionForkCapabilities, SessionListCapabilities,
+    SessionResumeCapabilities, SessionSystemPromptCapabilities,
 };
 use agent_client_protocol::v1::{ConnectionTo, Responder};
 use agent_client_protocol::{Client, Error};
@@ -17,7 +18,6 @@ pub async fn initialize(
 ) -> Result<(), Error> {
     info!("Received initialize request {req:?}");
 
-    let info = Implementation::new("Aries", "0.0.1").title("Aries Agent");
     let capabilities = AgentCapabilities::new()
         .load_session(true)
         .prompt_capabilities(
@@ -34,11 +34,23 @@ pub async fn initialize(
                 .fork(SessionForkCapabilities::new())
                 .resume(SessionResumeCapabilities::new())
                 .close(SessionCloseCapabilities::new()),
+        )
+        .auth(
+            AgentAuthCapabilities::new()
+                .status(AuthStatusCapabilities::new())
+                .logout(LogoutCapabilities::new()),
         );
+    let auth_methods = vec![AuthMethod::Terminal(
+        AuthMethodTerminal::new("aries-setup", "Set up Aries")
+            .description("Configure your model provider and API key in a terminal")
+            .args(vec!["--setup".into()]),
+    )];
+    let info = Implementation::new("Aries", "0.0.1").title("Aries Agent");
 
     let resp = InitializeResponse::new(ProtocolVersion::V1)
-        .agent_info(info)
-        .agent_capabilities(capabilities);
+        .agent_capabilities(capabilities)
+        .auth_methods(auth_methods)
+        .agent_info(info);
 
     responder.respond(resp)
 }
