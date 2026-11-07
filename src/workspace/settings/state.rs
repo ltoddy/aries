@@ -70,7 +70,7 @@ impl SettingsState {
         cx: &mut Context<Self>,
     ) -> Self {
         let (settings, settings_error) = match preferences_path.as_deref() {
-            Some(path) => Preferences::load_or_migrate(path, Preferences::legacy_path().as_deref()),
+            Some(path) => Preferences::load_or_default(path),
             None => (Preferences::default(), Some("未找到用户主目录，设置无法保存".into())),
         };
         let default_font_family = cx.theme().font_family.clone();

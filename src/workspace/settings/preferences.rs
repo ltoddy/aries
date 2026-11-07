@@ -18,8 +18,6 @@ pub enum LoadPreferencesError {
     Read { path: PathBuf, source: io::Error },
     #[error("无法解析设置文件 {}：{source}", path.display())]
     Toml { path: PathBuf, source: toml::de::Error },
-    #[error("无法解析旧设置文件 {}：{source}", path.display())]
-    Json { path: PathBuf, source: serde_json::Error },
     #[error("设置文件 {} 无效：{source}", path.display())]
     Validation { path: PathBuf, source: ValidatePreferencesError },
 }
@@ -127,10 +125,6 @@ impl Preferences {
         dirs::home_dir().map(|path| path.join(".local/share/aries-orbit/settings.toml"))
     }
 
-    pub fn legacy_path() -> Option<PathBuf> {
-        dirs::config_dir().map(|path| path.join("aries-orbit/preferences.json"))
-    }
-
     pub fn load(path: impl AsRef<Path>) -> Result<Self, LoadPreferencesError> {
         let path = path.as_ref();
         let text = fs::read_to_string(path)
@@ -154,48 +148,18 @@ impl Preferences {
         Ok(())
     }
 
-    pub fn load_or_migrate(path: &Path, legacy: Option<&Path>) -> (Self, Option<String>) {
+    pub fn load_or_default(path: &Path) -> (Self, Option<String>) {
         match Self::load(path) {
-            Ok(settings) => return (settings, None),
-            Err(LoadPreferencesError::Read { source, .. })
-                if source.kind() == io::ErrorKind::NotFound => {}
-            Err(error) => {
-                return (
-                    Self::default(),
-                    Some(format!("无法读取设置，已使用默认值；原文件未修改：{error}")),
-                );
-            }
-        }
-        let Some(legacy) = legacy else {
-            return (Self::default(), None);
-        };
-        #[derive(Deserialize)]
-        struct LegacyPreferences {
-            appearance: Appearance,
-        }
-        let migrated = (|| {
-            let text = fs::read_to_string(legacy)
-                .map_err(|source| LoadPreferencesError::Read { path: legacy.to_owned(), source })?;
-            let old: LegacyPreferences = serde_json::from_str(&text)
-                .map_err(|source| LoadPreferencesError::Json { path: legacy.to_owned(), source })?;
-            let mut settings = Self::default();
-            settings.set_appearance(old.appearance);
-            Ok::<_, LoadPreferencesError>(settings)
-        })();
-        match migrated {
-            Ok(settings) => {
-                let error = settings
-                    .save(path)
-                    .err()
-                    .map(|error| format!("旧设置已加载，但迁移保存失败：{error}"));
-                (settings, error)
-            }
+            Ok(settings) => (settings, None),
             Err(LoadPreferencesError::Read { source, .. })
                 if source.kind() == io::ErrorKind::NotFound =>
             {
                 (Self::default(), None)
             }
-            Err(error) => (Self::default(), Some(format!("无法读取旧设置，已使用默认值：{error}"))),
+            Err(error) => (
+                Self::default(),
+                Some(format!("无法读取设置，已使用默认值；原文件未修改：{error}")),
+            ),
         }
     }
 
