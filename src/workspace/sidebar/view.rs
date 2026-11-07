@@ -9,7 +9,6 @@ use gpui_kit::component::{ActiveTheme, Disableable, Icon};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
-use crate::NewSession;
 use crate::workspace::session::model::SessionList;
 use crate::workspace::settings::SettingsButton;
 use crate::workspace::settings::palette::Palette;
@@ -105,8 +104,8 @@ impl Sidebar {
             .child(
                 div().p_3().child(
                     Button::new("new-chat")
-                        .label("新建会话")
-                        .tooltip_with_action("新建会话", &NewSession, None)
+                        .label("新建会话…")
+                        .tooltip("选择项目目录并新建会话")
                         .icon(Icon::new(IconName::Plus).size(rems(0.9375)))
                         .w_full()
                         .h(rems(2.375))

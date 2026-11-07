@@ -258,13 +258,9 @@ impl WorkspaceView {
     }
 
     pub fn new_session(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(view) = self.active_view() {
-            view.update(cx, |view, cx| {
-                view.new_chat_in_current_directory(window, cx);
-            });
-        } else {
-            self.sidebar.update(cx, |view, cx| view.new_chat(window, cx));
-        }
+        self.active_view().unwrap_or(&self.sidebar).update(cx, |view, cx| {
+            view.new_chat_in_current_directory(window, cx);
+        });
     }
 
     pub fn new_tab_in_directory(
@@ -443,7 +439,7 @@ impl WorkspaceView {
                             .text_xs()
                             .line_height(rems(1.25))
                             .text_color(p.muted())
-                            .child("从左侧选择一个会话，或点击左侧顶部“新建会话”按钮或按 ⌘N 选择项目并新建会话。"),
+                            .child("从左侧选择一个会话，点击“新建会话…”选择项目目录，或按 ⌘N 使用当前目录直接新建会话。"),
                     ),
             )
             .into_any_element()
@@ -533,7 +529,9 @@ impl WorkspaceView {
     ) -> Subscription {
         cx.observe_in(view, window, |this, view, window, cx| {
             if view.update(cx, |view, _| view.take_new_tab_request()) {
-                this.new_session(window, cx);
+                this.active_view().unwrap_or(&this.sidebar).update(cx, |view, cx| {
+                    view.new_chat(window, cx);
+                });
             } else if let Some(session) = view.update(cx, |view, _| view.take_session_tab_request())
             {
                 this.open_session(session, window, cx);

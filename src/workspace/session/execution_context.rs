@@ -92,7 +92,7 @@ pub fn render_execution_context(
     let mut directory = if selected {
         format!("执行目录：{}", owner.execution().directory().display())
     } else {
-        "请通过左侧新建会话按钮或 ⌘N 选择项目目录".into()
+        "通过左侧“新建会话…”按钮选择项目目录，或按 ⌘N 使用当前目录新建会话".into()
     };
     let branch =
         selected.then_some(owner.git_panel().info()).flatten().map(|info| info.branch().to_owned());
