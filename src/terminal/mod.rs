@@ -10,7 +10,7 @@ use gpui_kit::component::ActiveTheme;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    App, Bounds, Context, FocusHandle, Focusable, KeyDownEvent, Pixels, Subscription, Task, Window,
+    App, Bounds, Context, FocusHandle, Focusable, Keystroke, Pixels, Subscription, Task, Window,
     canvas, div, px, size,
 };
 
@@ -31,6 +31,7 @@ pub struct TerminalView {
     notifications: async_channel::Sender<()>,
     _task: Task<()>,
     _quit_subscription: Subscription,
+    _keystroke_subscription: Subscription,
     dimensions: Dimensions,
     cell_size: gpui_kit::Size<Pixels>,
     bounds: Bounds<Pixels>,
@@ -71,6 +72,15 @@ impl TerminalView {
                 }
             }
         });
+        let entity = cx.weak_entity();
+        let keystroke_subscription = cx.intercept_keystrokes(move |event, window, cx| {
+            let Some(entity) = entity.upgrade() else {
+                return;
+            };
+            if entity.read(cx).focus_handle.is_focused(window) {
+                entity.update(cx, |this, cx| this.key_down(&event.keystroke, cx));
+            }
+        });
         let dimensions = Dimensions { columns: 80, lines: 24 };
         let mut view = Self {
             directory,
@@ -80,6 +90,7 @@ impl TerminalView {
             notifications,
             _task: task,
             _quit_subscription: quit_subscription,
+            _keystroke_subscription: keystroke_subscription,
             dimensions,
             cell_size: size(px(8.), px(18.)),
             bounds: Bounds::default(),
@@ -161,13 +172,13 @@ impl TerminalView {
         }
     }
 
-    fn key_down(&mut self, event: &KeyDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
-        if event.keystroke.modifiers.platform || !self.preedit.is_empty() {
+    fn key_down(&mut self, key: &Keystroke, cx: &mut Context<Self>) {
+        if key.modifiers.platform || key.is_modifier_key() || !self.preedit.is_empty() {
             return;
         }
         let mode =
             self.session.as_ref().map_or(TermMode::empty(), |session| *session.terminal().mode());
-        if let Some(bytes) = self::input::key_bytes(&event.keystroke, mode) {
+        if let Some(bytes) = self::input::key_bytes(key, mode) {
             self.send(bytes, cx);
             cx.stop_propagation();
         }
@@ -237,7 +248,6 @@ impl Render for TerminalView {
                     this.paste(&text, cx);
                 }
             }))
-            .on_key_down(cx.listener(Self::key_down))
             .on_mouse_down(
                 gpui_kit::MouseButton::Left,
                 cx.listener(|this, _, window, cx| {
