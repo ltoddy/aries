@@ -21,7 +21,7 @@ pub struct SubagentState {
     session_id: SessionId,
     title: Option<String>,
     description: Option<String>,
-    state: Option<String>,
+    state: Option<StateUpdate>,
     messages: Vec<SubagentMessage>,
 }
 
@@ -43,7 +43,11 @@ impl SubagentState {
     }
 
     pub fn state(&self) -> Option<&str> {
-        self.state.as_deref()
+        self.state.as_ref().map(state_text)
+    }
+
+    pub fn is_idle(&self) -> bool {
+        matches!(self.state, Some(StateUpdate::Idle(_)))
     }
 
     pub fn messages(&self) -> &[SubagentMessage] {
@@ -70,7 +74,7 @@ impl SubagentState {
     pub fn update_metadata(&mut self, update: SubagentUpdate) {
         update.title.update_to(&mut self.title);
         update.description.update_to(&mut self.description);
-        update.state.map_value(|state| state_text(&state).into()).update_to(&mut self.state);
+        update.state.update_to(&mut self.state);
     }
 }
 

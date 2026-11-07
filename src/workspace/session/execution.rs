@@ -600,6 +600,9 @@ impl Execution {
             ui.composer.reset_menu();
         }
         if let Some(index) = self.conversation.receive(notification) {
+            if let Some(subagent) = self.conversation.messages()[index].subagent() {
+                ui.timeline.sync_subagent(subagent);
+            }
             if index < ui.timeline.list().item_count() {
                 ui.timeline.list().remeasure_items(index..index + 1);
             }
@@ -691,6 +694,11 @@ impl Execution {
                 ui.composer.input().update(cx, |input, cx| input.set_value(draft, window, cx));
                 ui.timeline.rebuild_images();
                 ui.timeline.rebuild_tool_diffs(&self.conversation);
+                for message in self.conversation.messages() {
+                    if let Some(subagent) = message.subagent() {
+                        ui.timeline.sync_subagent(subagent);
+                    }
+                }
                 ui.timeline
                     .list()
                     .reset_with_uniform_height(self.conversation.messages().len(), px(96.));

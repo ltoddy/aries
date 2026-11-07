@@ -13,6 +13,7 @@ use gpui_kit::*;
 use crate::workspace::SessionView;
 use crate::workspace::conversation::media::MessageImages;
 use crate::workspace::conversation::model::display::UpdateDisplay;
+use crate::workspace::conversation::model::subagent::SubagentState;
 use crate::workspace::conversation::model::{Conversation, Role};
 use crate::workspace::conversation::subagent_message::SubagentMessage;
 use crate::workspace::conversation::thought_message::ThoughtMessage;
@@ -45,6 +46,7 @@ pub struct Timeline {
     expanded_thoughts: HashSet<usize>,
     collapsed_streaming_thoughts: HashSet<usize>,
     collapsed_subagents: HashSet<SessionId>,
+    idle_subagents: HashSet<SessionId>,
     images: MessageImages,
     tool_diffs: ToolDiffs,
 }
@@ -63,6 +65,7 @@ impl Timeline {
             expanded_thoughts: HashSet::new(),
             collapsed_streaming_thoughts: HashSet::new(),
             collapsed_subagents: HashSet::new(),
+            idle_subagents: HashSet::new(),
             images: MessageImages::new(),
             tool_diffs: ToolDiffs::new(),
         }
@@ -75,6 +78,7 @@ impl Timeline {
         self.expanded_thoughts.clear();
         self.collapsed_streaming_thoughts.clear();
         self.collapsed_subagents.clear();
+        self.idle_subagents.clear();
         self.tool_diffs.clear();
         self.images.rebuild_images();
         self.list.reset(0);
@@ -102,6 +106,17 @@ impl Timeline {
             toggled.insert(index);
         }
     }
+    pub fn sync_subagent(&mut self, subagent: &SubagentState) {
+        let id = subagent.session_id();
+        if subagent.is_idle() {
+            if self.idle_subagents.insert(id.clone()) {
+                self.collapsed_subagents.insert(id.clone());
+            }
+        } else {
+            self.idle_subagents.remove(id);
+        }
+    }
+
     pub fn toggle_subagent(&mut self, id: &SessionId) {
         if !self.collapsed_subagents.remove(id) {
             self.collapsed_subagents.insert(id.clone());
