@@ -14,6 +14,5 @@ categories.workspace = true
 aries-extension = { version = "0.1.0", path = "../aries-extension" }
 aries-filesystem = { version = "0.1.0", path = "../aries-filesystem" }
 aries-init = { version = "0.1.0", path = "../aries-init" }
-git2.workspace = true
 itertools.workspace = true
 jiff.workspace = true

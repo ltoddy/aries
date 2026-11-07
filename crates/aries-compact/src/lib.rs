@@ -76,6 +76,9 @@ impl ContextCompactor {
         let mut history = self.chat_context.history().await.clone();
         if micro_compact(&mut history, KEEP_RECENT) {
             self.chat_context.overwrite(history).await;
+
+            let id = format!("micro-compression-{}", nanoid!());
+            self.notifier.send_compaction(id, CompactionStatus::Completed, "上下文微压缩已完成");
         }
 
         let window = ContextWindow::new();
@@ -87,7 +90,7 @@ impl ContextCompactor {
         };
 
         if estimated_tokens >= compact_threshold {
-            let compaction_id = format!("micra-compression-{}", nanoid!());
+            let compaction_id = format!("abstract-compression-{}", nanoid!());
             let text = format!(
                 "预估 tokens {estimated_tokens} 已达到摘要压缩阈值 {compact_threshold}（上下文窗口 {}），开始自动摘要压缩。",
                 window.total
