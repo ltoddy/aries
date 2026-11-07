@@ -449,6 +449,7 @@ impl Execution {
         window: &mut Window,
         cx: &mut Context<SessionView>,
     ) {
+        let mut sidebar_synced = false;
         match event {
             Event::Connected { list_sessions, load_session } => {
                 ui.sidebar.list_mut().connected(list_sessions);
@@ -468,14 +469,13 @@ impl Execution {
                 let received = ui.sidebar.list_mut().is_loading() && result.is_ok();
                 ui.sidebar.list_mut().receive(result);
                 if received {
-                    let entries = ui.sidebar.list().entries().to_vec();
-                    ui.sidebar.motion_mut().receive(entries, cx.background_executor().now());
-                    ui.sidebar.sync_sidebar_rows(
+                    ui.sidebar.receive_sidebar_rows(
                         self.session_id.as_ref(),
                         &self.cwd,
                         self.conversation.title(),
                         cx,
                     );
+                    sidebar_synced = true;
                 }
                 if ui.sidebar.list_mut().take_refresh_request() {
                     self.refresh_sessions(ui, cx);
@@ -579,7 +579,7 @@ impl Execution {
                 self.conversation.finish(Some(format!("{error}\n请新建对话重新连接 Aries。")));
             }
         }
-        if ui.render_mode != crate::workspace::SessionRenderMode::Main {
+        if !sidebar_synced && ui.render_mode != crate::workspace::SessionRenderMode::Main {
             ui.sidebar.sync_sidebar_rows(
                 self.session_id.as_ref(),
                 &self.cwd,

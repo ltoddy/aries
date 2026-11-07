@@ -1,5 +1,5 @@
-use std::collections::{BTreeSet, HashSet};
-use std::path::{Path, PathBuf};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::path::Path;
 use std::time::{Duration, Instant};
 
 use agent_client_protocol::v1::schema::{SessionId, SessionInfo};
@@ -7,6 +7,8 @@ use gpui_kit::base::motion::{self, Presence, Transition};
 use gpui_kit::component::ActiveTheme;
 use gpui_kit::prelude::*;
 use gpui_kit::*;
+
+use crate::workspace::SessionView;
 
 #[derive(Clone)]
 pub struct SidebarRow {
@@ -50,9 +52,12 @@ pub struct SidebarMotion {
 }
 
 impl SidebarMotion {
-    pub fn receive(&mut self, sessions: Vec<SessionInfo>, now: Instant) {
-        let confirmed: HashSet<_> =
-            sessions.iter().map(|session| session.session_id.clone()).collect();
+    pub fn receive(
+        &mut self,
+        sessions: Vec<SessionInfo>,
+        confirmed: &HashSet<SessionId>,
+        now: Instant,
+    ) {
         self.reconcile(sessions, now);
         for row in &mut self.rows {
             if confirmed.contains(&row.session.session_id) {
@@ -63,14 +68,18 @@ impl SidebarMotion {
     }
 
     pub fn reconcile(&mut self, sessions: Vec<SessionInfo>, now: Instant) {
-        let mut ids = HashSet::new();
-        let mut rows = Vec::new();
+        let mut previous_rows = HashMap::with_capacity(self.rows.len());
+        for row in &self.rows {
+            previous_rows.entry(&row.session.session_id).or_insert(row);
+        }
+        let mut ids = HashSet::with_capacity(sessions.len());
+        let mut rows = Vec::with_capacity(sessions.len());
         for session in sessions {
             let id = &session.session_id;
             if self.deleted.contains(id) || !ids.insert(id.clone()) {
                 continue;
             }
-            let previous = self.rows.iter().find(|row| &row.session.session_id == id);
+            let previous = previous_rows.get(id).copied();
             let entered_at = previous.map_or_else(
                 || (self.seen.insert(id.clone()) && self.initialized).then_some(now),
                 |row| row.entered_at,
@@ -141,12 +150,12 @@ impl SidebarMotion {
         }
     }
 
-    pub fn projects(&self) -> BTreeSet<PathBuf> {
-        self.rows.iter().map(|row| row.session.cwd.clone()).collect()
-    }
-
-    pub fn project_rows(&self, cwd: &Path) -> Vec<&SidebarRow> {
-        self.rows.iter().filter(|row| row.session.cwd == cwd).collect()
+    pub fn projects(&self) -> BTreeMap<&Path, Vec<&SidebarRow>> {
+        let mut projects = BTreeMap::new();
+        for row in &self.rows {
+            projects.entry(row.session.cwd.as_path()).or_insert_with(Vec::new).push(row);
+        }
+        projects
     }
 
     pub fn session_ids(&self, cwd: Option<&Path>) -> Vec<SessionId> {
@@ -162,39 +171,30 @@ impl SidebarMotion {
     }
 }
 
-#[derive(IntoElement)]
-pub struct ProjectBody {
+pub fn project_body(
     id: ElementId,
     expanded: bool,
-    child: AnyElement,
-}
-
-impl ProjectBody {
-    pub fn new(id: ElementId, expanded: bool, child: AnyElement) -> Self {
-        Self { id, expanded, child }
+    window: &mut Window,
+    cx: &mut Context<SessionView>,
+    render: impl FnOnce(&mut Context<SessionView>) -> AnyElement,
+) -> AnyElement {
+    let tokens = cx.theme().motion_tokens();
+    let transition = Transition::new(tokens.duration_fast).easing(tokens.easing_enter.clone());
+    let expanded_before = window.use_keyed_state(
+        ElementId::NamedChild(id.clone().into(), "expanded-before".into()),
+        cx,
+        |_, _| false,
+    );
+    let animate = expanded || *expanded_before.read(cx);
+    if expanded && !*expanded_before.read(cx) {
+        expanded_before.update(cx, |expanded, _| *expanded = true);
     }
-}
-
-impl RenderOnce for ProjectBody {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let tokens = cx.theme().motion_tokens();
-        let transition = Transition::new(tokens.duration_fast).easing(tokens.easing_enter.clone());
-        let expanded_before = window.use_keyed_state(
-            ElementId::NamedChild(self.id.clone().into(), "expanded-before".into()),
-            cx,
-            |_, _| false,
-        );
-        let animate = self.expanded || *expanded_before.read(cx);
-        if self.expanded && !*expanded_before.read(cx) {
-            expanded_before.update(cx, |expanded, _| *expanded = true);
-        }
-        let presence = Presence::new((self.id, "body"), self.expanded)
-            .transition(if animate { transition } else { Transition::new(Duration::ZERO) })
-            .sample(window, cx);
-        div().when(presence.should_render(), |body| {
-            body.opacity(presence.progress).child(self.child)
-        })
-    }
+    let presence = Presence::new((id, "body"), expanded)
+        .transition(if animate { transition } else { Transition::new(Duration::ZERO) })
+        .sample(window, cx);
+    div()
+        .when(presence.should_render(), |body| body.opacity(presence.progress).child(render(cx)))
+        .into_any_element()
 }
 
 #[derive(IntoElement)]

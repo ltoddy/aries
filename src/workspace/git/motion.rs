@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -172,11 +173,19 @@ impl GitMotion {
             self.summary = Fade::new(from, 1.0, now, short, easing.clone());
         }
         self.cleanup(now, false);
+        let changes = [ChangeGroup::Staged, ChangeGroup::Unstaged].map(|group| {
+            let mut changes = HashMap::with_capacity(files.len());
+            for file in files.iter().filter_map(|file| file.change(group)) {
+                changes.entry(file.path()).or_insert(file);
+            }
+            changes
+        });
         for row in &mut self.rows {
-            let next = files
-                .iter()
-                .filter_map(|file| file.change(row.group))
-                .find(|file| file.path() == row.file.path());
+            let group_ix = match row.group {
+                ChangeGroup::Staged => 0,
+                ChangeGroup::Unstaged => 1,
+            };
+            let next = changes[group_ix].get(row.file.path()).copied();
             if let Some(file) = next {
                 if row.exiting {
                     row.exiting = false;
@@ -224,13 +233,19 @@ impl GitMotion {
                     }
                 })
                 .collect();
+            let mut previous_indices: HashMap<PathBuf, Vec<usize>> = HashMap::new();
+            for (ix, row) in previous.iter().enumerate().rev() {
+                if let Some(row) = row.as_ref().filter(|row| row.group == group) {
+                    previous_indices.entry(row.file.path().to_owned()).or_default().push(ix);
+                }
+            }
             let mut rows = Vec::new();
             for file in files.iter().filter_map(|file| file.change(group)) {
-                let existing = previous.iter_mut().find(|row| {
-                    row.as_ref()
-                        .is_some_and(|row| row.group == group && row.file.path() == file.path())
-                });
-                rows.push(existing.and_then(Option::take).unwrap_or_else(|| GitRow {
+                let existing = previous_indices
+                    .get_mut(file.path())
+                    .and_then(Vec::pop)
+                    .and_then(|ix| previous[ix].take());
+                rows.push(existing.unwrap_or_else(|| GitRow {
                     group,
                     file: file.clone(),
                     visibility: if animate {

@@ -84,6 +84,7 @@ impl Sidebar {
         owner: &SessionView,
         tab_host: Option<WeakEntity<WorkspaceView>>,
         p: Palette,
+        window: &mut Window,
         cx: &mut Context<SessionView>,
     ) -> impl IntoElement {
         let new_enabled = tab_host
@@ -120,7 +121,7 @@ impl Sidebar {
                         })),
                 ),
             )
-            .child(SessionListView::new(self, owner).render_sessions(p, cx))
+            .child(SessionListView::new(self, owner).render_sessions(p, window, cx))
             .child(
                 div()
                     .flex_shrink_0()
@@ -138,6 +139,29 @@ impl Sidebar {
         title: String,
         cx: &mut Context<SessionView>,
     ) {
+        let sessions = self.sidebar_sessions(current, cwd, title);
+        self.motion.reconcile(sessions, cx.background_executor().now());
+    }
+
+    pub fn receive_sidebar_rows(
+        &mut self,
+        current: Option<&SessionId>,
+        cwd: &Path,
+        title: String,
+        cx: &mut Context<SessionView>,
+    ) {
+        let confirmed: HashSet<_> =
+            self.list.entries().iter().map(|session| session.session_id.clone()).collect();
+        let sessions = self.sidebar_sessions(current, cwd, title);
+        self.motion.receive(sessions, &confirmed, cx.background_executor().now());
+    }
+
+    fn sidebar_sessions(
+        &self,
+        current: Option<&SessionId>,
+        cwd: &Path,
+        title: String,
+    ) -> Vec<SessionInfo> {
         let mut sessions: Vec<_> =
             self.list.projects().flat_map(|cwd| self.list.project_sessions(cwd).cloned()).collect();
         if let Some(id) = current
@@ -145,7 +169,7 @@ impl Sidebar {
         {
             sessions.insert(0, SessionInfo::new(id.clone(), cwd.to_path_buf()).title(title));
         }
-        self.motion.reconcile(sessions, cx.background_executor().now());
+        sessions
     }
 
     pub fn begin_sidebar_exit(

@@ -545,7 +545,9 @@ impl WorkspaceView {
                             sidebar.receive_created_sidebar_session(session, cx);
                         });
                     }
-                    this.sync_sidebar_active_session(cx);
+                    if this.active_view() == Some(&view) {
+                        this.sync_sidebar_active_session(cx);
+                    }
                 }
                 cx.notify();
             }

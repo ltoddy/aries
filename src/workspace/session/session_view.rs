@@ -448,8 +448,13 @@ impl SessionView {
         .find_map(|(active, state)| active.then_some(state))
         .unwrap_or(ExecutionState::Idle)
     }
-    fn render_sidebar(&self, p: Palette, cx: &mut Context<Self>) -> impl IntoElement {
-        self.sidebar.render(self, self.tab_host.clone(), p, cx)
+    fn render_sidebar(
+        &self,
+        p: Palette,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        self.sidebar.render(self, self.tab_host.clone(), p, window, cx)
     }
     fn render_main_area(&mut self, p: Palette, cx: &mut Context<Self>) -> impl IntoElement {
         let timeline = self.timeline.render_timeline(
@@ -462,7 +467,7 @@ impl SessionView {
             self.composer.render(self, self.send_key(cx), self.commands_available(), p, cx);
         div().flex_1().min_w_0().h_full().flex().flex_col().child(timeline).child(composer)
     }
-    fn render_layout(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_layout(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let p = Palette::new(cx.theme().mode);
         div()
             .size_full()
@@ -477,19 +482,19 @@ impl SessionView {
                         resizable_panel()
                             .size(cx.theme().font_size * 18.)
                             .size_range(cx.theme().font_size * 12.5..cx.theme().font_size * 32.5)
-                            .child(self.render_sidebar(p, cx)),
+                            .child(self.render_sidebar(p, window, cx)),
                     )
                     .child(resizable_panel().child(self.render_main_area(p, cx))),
             )
     }
 }
 impl Render for SessionView {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.sidebar.cleanup(cx);
         let p = Palette::new(cx.theme().mode);
         match self.render_mode {
-            SessionRenderMode::Full => self.render_layout(cx).into_any_element(),
-            SessionRenderMode::Sidebar => self.render_sidebar(p, cx).into_any_element(),
+            SessionRenderMode::Full => self.render_layout(window, cx).into_any_element(),
+            SessionRenderMode::Sidebar => self.render_sidebar(p, window, cx).into_any_element(),
             SessionRenderMode::Main => self.render_main_area(p, cx).into_any_element(),
         }
     }

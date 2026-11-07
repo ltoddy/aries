@@ -1,6 +1,6 @@
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
-use gpui_kit::component::{ActiveTheme, Disableable, Icon, WindowExt};
+use gpui_kit::component::{ActiveTheme, Disableable, Icon};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -44,63 +44,58 @@ impl RenderOnce for SettingsButton {
     }
 }
 
-pub fn open_shortcut_help(send_key: SendKey, window: &mut Window, cx: &mut App) {
-    window.open_dialog(cx, move |dialog, _, cx| {
-        dialog.title("快捷键").centered().width(cx.theme().font_size * 30.).content(
-            move |content, _, cx| {
-                let modifier = if cfg!(target_os = "macos") { "⌘" } else { "Ctrl" };
-                let mut sessions = vec![
-                    ("关闭当前标签", format!("{modifier} + W")),
-                    ("下一个标签", "Ctrl + Tab".into()),
-                    ("上一个标签", "Ctrl + Shift + Tab".into()),
-                    ("下一个标签（替代）", format!("{modifier} + Shift + ]")),
-                    ("上一个标签（替代）", format!("{modifier} + Shift + [")),
-                    ("退出应用", format!("{modifier} + Q")),
-                ];
-                if cfg!(target_os = "macos") {
-                    sessions.insert(0, ("新建会话", "⌘ + N".into()));
-                }
-                let groups = [
-                    ("会话与标签", sessions),
-                    (
-                        "消息导航",
-                        vec![
-                            ("上一条用户消息", format!("{modifier} + Alt + ↑")),
-                            ("下一条用户消息", format!("{modifier} + Alt + ↓")),
-                        ],
-                    ),
-                    (
-                        "输入与弹框",
-                        vec![
-                            ("发送消息", send_key.send_label().into()),
-                            ("输入框换行", send_key.newline_label().into()),
-                            ("关闭弹框", "Esc".into()),
-                        ],
-                    ),
-                ];
-                content.gap_4().children(groups.into_iter().map(|(title, rows)| {
-                    div()
-                        .flex()
-                        .flex_col()
-                        .gap_2()
-                        .child(div().font_weight(FontWeight::MEDIUM).child(title))
-                        .children(rows.into_iter().map(|(label, keys)| {
-                            div()
-                                .flex()
-                                .items_center()
-                                .justify_between()
-                                .gap_4()
-                                .text_sm()
-                                .child(div().flex_1().min_w_0().child(label))
-                                .child(
-                                    div()
-                                        .flex_shrink_0()
-                                        .font_family(cx.theme().mono_font_family.clone())
-                                        .child(keys),
-                                )
-                        }))
-                }))
-            },
-        )
-    });
+pub fn render_shortcuts(send_key: SendKey, cx: &App) -> impl IntoElement {
+    let modifier = if cfg!(target_os = "macos") { "⌘" } else { "Ctrl" };
+    let mut sessions = vec![
+        ("关闭当前标签", format!("{modifier} + W")),
+        ("下一个标签", "Ctrl + Tab".into()),
+        ("上一个标签", "Ctrl + Shift + Tab".into()),
+        ("下一个标签（替代）", format!("{modifier} + Shift + ]")),
+        ("上一个标签（替代）", format!("{modifier} + Shift + [")),
+        ("退出应用", format!("{modifier} + Q")),
+    ];
+    if cfg!(target_os = "macos") {
+        sessions.insert(0, ("新建会话", "⌘ + N".into()));
+        sessions.insert(1, ("显示/隐藏终端", "⌘ + F".into()));
+    }
+    let groups = [
+        ("会话与标签", sessions),
+        (
+            "消息导航",
+            vec![
+                ("上一条用户消息", format!("{modifier} + Alt + ↑")),
+                ("下一条用户消息", format!("{modifier} + Alt + ↓")),
+            ],
+        ),
+        (
+            "输入与弹框",
+            vec![
+                ("发送消息", send_key.send_label().into()),
+                ("输入框换行", send_key.newline_label().into()),
+                ("关闭弹框", "Esc".into()),
+            ],
+        ),
+    ];
+    div().flex().flex_col().gap_4().children(groups.into_iter().map(|(title, rows)| {
+        div()
+            .flex()
+            .flex_col()
+            .gap_2()
+            .child(div().font_weight(FontWeight::MEDIUM).child(title))
+            .children(rows.into_iter().map(|(label, keys)| {
+                div()
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .gap_4()
+                    .text_sm()
+                    .child(div().flex_1().min_w_0().child(label))
+                    .child(
+                        div()
+                            .flex_shrink_0()
+                            .font_family(cx.theme().mono_font_family.clone())
+                            .child(keys),
+                    )
+            }))
+    }))
 }

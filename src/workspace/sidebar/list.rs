@@ -17,7 +17,12 @@ impl<'a> SessionListView<'a> {
     pub fn new(sidebar: &'a Sidebar, owner: &'a SessionView) -> Self {
         Self { sidebar, owner }
     }
-    pub fn render_sessions(&self, p: Palette, cx: &mut Context<SessionView>) -> impl IntoElement {
+    pub fn render_sessions(
+        &self,
+        p: Palette,
+        window: &mut Window,
+        cx: &mut Context<SessionView>,
+    ) -> impl IntoElement {
         let list = &self.sidebar.list();
         let groups = self.sidebar.motion().projects();
         let empty = groups.is_empty();
@@ -37,8 +42,9 @@ impl<'a> SessionListView<'a> {
                     .overflow_y_scroll()
                     .track_scroll(self.sidebar.scroll())
                     .pb_3()
-                    .children(groups.into_iter().map(|cwd| {
-                        ProjectView::new(self.sidebar, self.owner).render_project(&cwd, p, cx)
+                    .children(groups.into_iter().map(|(cwd, sessions)| {
+                        ProjectView::new(self.sidebar, self.owner)
+                            .render_project(cwd, &sessions, p, window, cx)
                     }))
                     .when(list.is_loading(), |list| {
                         list.child(

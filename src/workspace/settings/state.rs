@@ -1,19 +1,46 @@
 use std::path::PathBuf;
 
 use gpui_kit::assets::IconName;
-use gpui_kit::component::button::Button;
+use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::radio::{Radio, RadioGroup};
+use gpui_kit::component::scroll::ScrollableElement;
 use gpui_kit::component::searchable_list::SearchableVec;
 use gpui_kit::component::select::{Select, SelectEvent, SelectState};
-use gpui_kit::component::{ActiveTheme, Disableable, Sizable, Theme, WindowExt};
+use gpui_kit::component::{ActiveTheme, Disableable, Selectable, Sizable, Theme, WindowExt};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
 use crate::workspace::WorkspaceView;
-use crate::workspace::settings::ui::open_shortcut_help;
+use crate::workspace::settings::ui::render_shortcuts;
 use crate::workspace::settings::{Appearance, Preferences, SendKey, palette};
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SettingsPage {
+    Appearance,
+    MessageInput,
+    Shortcuts,
+}
+
+impl SettingsPage {
+    fn id(self) -> &'static str {
+        match self {
+            Self::Appearance => "settings-page-appearance",
+            Self::MessageInput => "settings-page-message-input",
+            Self::Shortcuts => "settings-page-shortcuts",
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Appearance => "外观",
+            Self::MessageInput => "消息输入",
+            Self::Shortcuts => "快捷键",
+        }
+    }
+}
+
 pub struct SettingsState {
+    page: SettingsPage,
     preferences_path: Option<PathBuf>,
     settings: Preferences,
     settings_error: Option<String>,
@@ -93,6 +120,7 @@ impl SettingsState {
             }
         });
         Self {
+            page: SettingsPage::Appearance,
             preferences_path,
             settings,
             settings_error,
@@ -184,12 +212,13 @@ impl SettingsState {
         let view = cx.weak_entity();
         window.open_dialog(cx, move |dialog, _, cx| {
             let view = view.clone();
-            dialog.title("设置").centered().width(cx.theme().font_size * 28.).content(
+            dialog.title("设置").centered().width(cx.theme().font_size * 44.).content(
                 move |content, _, cx| {
                     let Some(owner) = view.upgrade() else {
                         return content;
                     };
                     let this = owner.read(cx);
+                    let page = this.page;
                     let appearance = this.settings.appearance();
                     let send_key = this.settings.send_key();
                     let send_keys = [SendKey::Enter, SendKey::ShiftEnter];
@@ -206,133 +235,195 @@ impl SettingsState {
                     let font_smaller = view.clone();
                     let font_larger = view.clone();
                     let font_reset = view.clone();
-                    content
+                    let navigation = div().flex().flex_col().gap_2().children(
+                        [
+                            SettingsPage::Appearance,
+                            SettingsPage::MessageInput,
+                            SettingsPage::Shortcuts,
+                        ]
+                        .into_iter()
+                        .map(|target| {
+                            let view = view.clone();
+                            Button::new(target.id())
+                                .ghost()
+                                .label(target.label())
+                                .w_full()
+                                .justify_start()
+                                .selected(page == target)
+                                .on_click(move |_, _, cx| {
+                                    let _ = view.update(cx, |this, cx| {
+                                        this.page = target;
+                                        cx.notify();
+                                    });
+                                    cx.refresh_windows();
+                                })
+                        }),
+                    );
+                    let page_content = div()
+                        .flex()
+                        .flex_col()
                         .gap_4()
-                        .child(div().font_weight(FontWeight::MEDIUM).child("外观"))
-                        .child(
-                            div().flex().flex_col().gap_2().child("主题").child(
-                                RadioGroup::new("settings-theme")
-                                    .selected_index(
-                                        appearances.iter().position(|value| *value == appearance),
-                                    )
-                                    .children([
-                                        Radio::new("theme-system").label("跟随系统"),
-                                        Radio::new("theme-light").label("浅色"),
-                                        Radio::new("theme-dark").label("深色"),
-                                    ])
-                                    .on_change(move |index, _, cx| {
-                                        if let Some(appearance) = appearances.get(*index) {
-                                            let _ = theme_view.update(cx, |this, cx| {
-                                                this.set_appearance(*appearance, cx)
-                                            });
-                                        }
-                                    }),
-                            ),
-                        )
-                        .child(
-                            div().flex().flex_col().gap_2().child("字体").child(
-                                Select::new(&font_select)
-                                    .id("settings-font-family")
-                                    .accessibility_label("字体")
-                                    .search_placeholder("搜索字体")
-                                    .menu_max_h(rems(16.))
-                                    .w_full(),
-                            ),
-                        )
-                        .child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .justify_between()
-                                .gap_3()
-                                .child("字号")
+                        .p_4()
+                        .child(div().font_weight(FontWeight::MEDIUM).child(page.label()))
+                        .when(page == SettingsPage::Appearance, |content| {
+                            content
+                                .child(
+                                    div().flex().flex_col().gap_2().child("主题").child(
+                                        RadioGroup::new("settings-theme")
+                                            .selected_index(
+                                                appearances
+                                                    .iter()
+                                                    .position(|value| *value == appearance),
+                                            )
+                                            .children([
+                                                Radio::new("theme-system").label("跟随系统"),
+                                                Radio::new("theme-light").label("浅色"),
+                                                Radio::new("theme-dark").label("深色"),
+                                            ])
+                                            .on_change(move |index, _, cx| {
+                                                if let Some(appearance) = appearances.get(*index) {
+                                                    let _ = theme_view.update(cx, |this, cx| {
+                                                        this.set_appearance(*appearance, cx)
+                                                    });
+                                                }
+                                            }),
+                                    ),
+                                )
+                                .child(
+                                    div().flex().flex_col().gap_2().child("字体").child(
+                                        Select::new(&font_select)
+                                            .id("settings-font-family")
+                                            .accessibility_label("字体")
+                                            .search_placeholder("搜索字体")
+                                            .menu_max_h(rems(16.))
+                                            .w_full(),
+                                    ),
+                                )
                                 .child(
                                     div()
                                         .flex()
                                         .items_center()
-                                        .gap_2()
+                                        .justify_between()
+                                        .gap_3()
+                                        .child("字号")
                                         .child(
-                                            Button::new("settings-font-smaller")
-                                                .icon(IconName::Minus)
-                                                .small()
-                                                .disabled(font_size <= 12.0)
-                                                .accessibility_label("减小字号")
-                                                .on_click(move |_, _, cx| {
-                                                    let _ = font_smaller.update(cx, |this, cx| {
-                                                        this.change_font_size(-1, cx)
-                                                    });
-                                                }),
-                                        )
-                                        .child(
-                                            Button::new("settings-font-reset")
-                                                .label(format!("{font_size} px"))
-                                                .small()
-                                                .tooltip("恢复默认字号（16 px）")
-                                                .accessibility_label("恢复默认字号")
-                                                .on_click(move |_, _, cx| {
-                                                    let _ = font_reset.update(cx, |this, cx| {
-                                                        this.change_font_size(0, cx)
-                                                    });
-                                                }),
-                                        )
-                                        .child(
-                                            Button::new("settings-font-larger")
-                                                .icon(IconName::Plus)
-                                                .small()
-                                                .disabled(font_size >= 24.0)
-                                                .accessibility_label("增大字号")
-                                                .on_click(move |_, _, cx| {
-                                                    let _ = font_larger.update(cx, |this, cx| {
-                                                        this.change_font_size(1, cx)
-                                                    });
-                                                }),
+                                            div()
+                                                .flex()
+                                                .items_center()
+                                                .gap_2()
+                                                .child(
+                                                    Button::new("settings-font-smaller")
+                                                        .icon(IconName::Minus)
+                                                        .small()
+                                                        .disabled(font_size <= 12.0)
+                                                        .accessibility_label("减小字号")
+                                                        .on_click(move |_, _, cx| {
+                                                            let _ = font_smaller.update(
+                                                                cx,
+                                                                |this, cx| {
+                                                                    this.change_font_size(-1, cx)
+                                                                },
+                                                            );
+                                                        }),
+                                                )
+                                                .child(
+                                                    Button::new("settings-font-reset")
+                                                        .label(format!("{font_size} px"))
+                                                        .small()
+                                                        .tooltip("恢复默认字号（16 px）")
+                                                        .accessibility_label("恢复默认字号")
+                                                        .on_click(move |_, _, cx| {
+                                                            let _ = font_reset.update(
+                                                                cx,
+                                                                |this, cx| {
+                                                                    this.change_font_size(0, cx)
+                                                                },
+                                                            );
+                                                        }),
+                                                )
+                                                .child(
+                                                    Button::new("settings-font-larger")
+                                                        .icon(IconName::Plus)
+                                                        .small()
+                                                        .disabled(font_size >= 24.0)
+                                                        .accessibility_label("增大字号")
+                                                        .on_click(move |_, _, cx| {
+                                                            let _ = font_larger.update(
+                                                                cx,
+                                                                |this, cx| {
+                                                                    this.change_font_size(1, cx)
+                                                                },
+                                                            );
+                                                        }),
+                                                ),
                                         ),
+                                )
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .text_color(cx.theme().muted_foreground)
+                                        .child("字号范围为 12–24 px。"),
+                                )
+                        })
+                        .when(page == SettingsPage::MessageInput, |content| {
+                            content.child(
+                                div().flex().flex_col().gap_2().child("发送消息按键").child(
+                                    RadioGroup::new("settings-send-key")
+                                        .selected_index(
+                                            send_keys.iter().position(|key| *key == send_key),
+                                        )
+                                        .children([
+                                            Radio::new("send-key-enter")
+                                                .label("Enter 发送，Shift + Enter 换行"),
+                                            Radio::new("send-key-shift-enter")
+                                                .label("Shift + Enter 发送，Enter 换行"),
+                                        ])
+                                        .on_change(move |index, _, cx| {
+                                            if let Some(send_key) = send_keys.get(*index) {
+                                                let _ = send_key_view.update(cx, |this, cx| {
+                                                    this.set_send_key(*send_key, cx);
+                                                });
+                                            }
+                                        }),
+                                ),
+                            )
+                        })
+                        .when(page == SettingsPage::Shortcuts, |content| {
+                            content.child(render_shortcuts(send_key, cx))
+                        });
+                    content
+                        .gap_4()
+                        .child(
+                            div()
+                                .flex()
+                                .items_stretch()
+                                .h(rems(25.))
+                                .min_h_0()
+                                .child(
+                                    div()
+                                        .w(rems(9.))
+                                        .flex_shrink_0()
+                                        .border_r_1()
+                                        .border_color(cx.theme().border)
+                                        .pr_3()
+                                        .py_4()
+                                        .child(navigation),
+                                )
+                                .child(
+                                    div()
+                                        .flex_1()
+                                        .min_w_0()
+                                        .min_h_0()
+                                        .child(page_content)
+                                        .overflow_y_scrollbar()
+                                        .id(page.id()),
                                 ),
                         )
                         .child(
                             div()
                                 .text_sm()
                                 .text_color(cx.theme().muted_foreground)
-                                .child("修改即时生效并自动保存。字号范围为 12–24 px。"),
-                        )
-                        .child(div().font_weight(FontWeight::MEDIUM).child("消息输入"))
-                        .child(
-                            div().flex().flex_col().gap_2().child("发送消息按键").child(
-                                RadioGroup::new("settings-send-key")
-                                    .selected_index(
-                                        send_keys.iter().position(|key| *key == send_key),
-                                    )
-                                    .children([
-                                        Radio::new("send-key-enter")
-                                            .label("Enter 发送，Shift + Enter 换行"),
-                                        Radio::new("send-key-shift-enter")
-                                            .label("Shift + Enter 发送，Enter 换行"),
-                                    ])
-                                    .on_change(move |index, _, cx| {
-                                        if let Some(send_key) = send_keys.get(*index) {
-                                            let _ = send_key_view.update(cx, |this, cx| {
-                                                this.set_send_key(*send_key, cx);
-                                            });
-                                        }
-                                    }),
-                            ),
-                        )
-                        .child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .justify_between()
-                                .gap_3()
-                                .child("快捷键")
-                                .child(
-                                    Button::new("shortcut-help")
-                                        .label("快捷键…")
-                                        .small()
-                                        .accessibility_label("查看快捷键说明")
-                                        .on_click(move |_, window, cx| {
-                                            open_shortcut_help(send_key, window, cx)
-                                        }),
-                                ),
+                                .child("修改即时生效并自动保存。"),
                         )
                         .when(saving, |content| {
                             content.child(

@@ -10,7 +10,7 @@ use gpui_kit::*;
 use crate::workspace::SessionView;
 use crate::workspace::settings::palette::Palette;
 use crate::workspace::sidebar::Sidebar;
-use crate::workspace::sidebar::motion::ProjectBody;
+use crate::workspace::sidebar::motion::{SidebarRow, project_body};
 use crate::workspace::sidebar::session::SessionRowView;
 
 pub struct ProjectView<'a> {
@@ -25,12 +25,13 @@ impl<'a> ProjectView<'a> {
     pub fn render_project(
         &self,
         cwd: &Path,
+        sessions: &[&SidebarRow],
         p: Palette,
+        window: &mut Window,
         cx: &mut Context<SessionView>,
     ) -> AnyElement {
         let list = &self.sidebar.list();
 
-        let sessions = self.sidebar.motion().project_rows(cwd);
         let expanded = list.is_project_expanded(cwd);
         let count = sessions.len();
         let directory = cwd.file_name().unwrap_or(cwd.as_os_str()).to_string_lossy();
@@ -141,20 +142,24 @@ impl<'a> ProjectView<'a> {
                             ),
                     ),
             )
-            .child(ProjectBody::new(
+            .child(project_body(
                 SharedString::from(format!("project:{}", cwd.display())).into(),
                 expanded,
-                div()
-                    .mt_1()
-                    .ml_2()
-                    .pl_2()
-                    .border_l_1()
-                    .border_color(p.border())
-                    .children(sessions.into_iter().map(|row| {
-                        SessionRowView::new(self.sidebar, self.owner)
-                            .render_session_row(row, expanded, p, cx)
-                    }))
-                    .into_any_element(),
+                window,
+                cx,
+                |cx| {
+                    div()
+                        .mt_1()
+                        .ml_2()
+                        .pl_2()
+                        .border_l_1()
+                        .border_color(p.border())
+                        .children(sessions.iter().map(|row| {
+                            SessionRowView::new(self.sidebar, self.owner)
+                                .render_session_row(row, expanded, p, cx)
+                        }))
+                        .into_any_element()
+                },
             ))
             .into_any_element()
     }
