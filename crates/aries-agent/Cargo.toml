@@ -22,4 +22,5 @@ futures.workspace = true
 itertools.workspace = true
 rig.workspace = true
 thiserror.workspace = true
+toasty.workspace = true
 tokio = { workspace = true, features = ["fs", "process"] }

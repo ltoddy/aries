@@ -31,9 +31,9 @@ itertools.workspace = true
 jiff.workspace = true
 nanoid.workspace = true
 parking_lot.workspace = true
+reqwest.workspace = true
 reqwest-middleware.workspace = true
 reqwest-retry.workspace = true
-reqwest.workspace = true
 rig = { workspace = true, features = ["reqwest-middleware"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
