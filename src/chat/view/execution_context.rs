@@ -82,7 +82,63 @@ impl ChatView {
             self.git_info_collapsed = true;
         }
         self.git_revision += 1;
+        self.git_refresh_task = None;
+        self.git_refreshing = false;
+        self.git_refresh_pending = false;
+        self.git_watch_error = None;
+        let directory = self.cwd.clone();
         self.git_info_task = Some(cx.spawn(async move |view, cx| {
+            let (sender, receiver) = async_channel::bounded(1);
+            let executor = cx.background_executor().clone();
+            let watcher = cx
+                .background_spawn(async move {
+                    crate::chat::view::git_info::watch::GitWatch::start(
+                        &directory, sender, executor,
+                    )
+                })
+                .await;
+            let watcher = match watcher {
+                Ok(watcher) => watcher,
+                Err(error) => {
+                    let _ = view.update(cx, |this, cx| {
+                        this.git_watch_error = Some(error);
+                        this.refresh_git_info(cx);
+                    });
+                    return;
+                }
+            };
+            if view.update(cx, |this, cx| this.refresh_git_info(cx)).is_err() {
+                return;
+            }
+            while receiver.recv().await.is_ok() {
+                cx.background_executor().timer(Duration::from_millis(300)).await;
+                while receiver.try_recv().is_ok() {}
+                let error = watcher.take_error();
+                if view
+                    .update(cx, |this, cx| {
+                        if let Some(error) = error {
+                            this.git_watch_error = Some(error);
+                        }
+                        this.refresh_git_info(cx);
+                    })
+                    .is_err()
+                {
+                    return;
+                }
+            }
+            drop(watcher);
+        }));
+        cx.notify();
+    }
+
+    pub fn refresh_git_info(&mut self, cx: &mut Context<Self>) {
+        if self.git_refreshing || self.git_index_busy {
+            self.git_refresh_pending = true;
+            return;
+        }
+        self.git_refreshing = true;
+        self.git_refresh_pending = false;
+        self.git_refresh_task = Some(cx.spawn(async move |view, cx| {
             loop {
                 let Ok((directory, revision)) =
                     view.read_with(cx, |this, _| (this.cwd.clone(), this.git_revision))
@@ -92,25 +148,31 @@ impl ChatView {
                 let (info, directory) = cx
                     .background_spawn(async move { (GitInfo::read(&directory), directory) })
                     .await;
-                if view
-                    .update(cx, |this, cx| {
-                        if crate::chat::view::git_info::motion::accept_result(
-                            &this.cwd,
-                            this.git_revision,
-                            &directory,
-                            revision,
-                        ) && !this.git_index_busy
-                        {
-                            this.sync_git_info(info, true, cx);
-                        }
-                    })
-                    .is_err()
-                {
+                let again = view.update(cx, |this, cx| {
+                    if crate::chat::view::git_info::motion::accept_result(
+                        &this.cwd,
+                        this.git_revision,
+                        &directory,
+                        revision,
+                    ) && !this.git_index_busy
+                    {
+                        this.sync_git_info(info, true, cx);
+                    }
+                    let again = this.git_refresh_pending && !this.git_index_busy;
+                    if again {
+                        this.git_refresh_pending = false;
+                    } else {
+                        this.git_refreshing = false;
+                    }
+                    cx.notify();
+                    again
+                });
+                if !matches!(again, Ok(true)) {
                     return;
                 }
-                cx.background_executor().timer(Duration::from_secs(2)).await;
             }
         }));
+        cx.notify();
     }
 
     pub fn execution_state(&self) -> ExecutionState {

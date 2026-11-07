@@ -1,4 +1,5 @@
 pub mod motion;
+pub mod watch;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -26,7 +27,7 @@ pub fn render_git_info(
         chat.git_motion.cleanup(cx.background_executor().now(), cx.reduce_motion());
     });
     let chat = view.read(cx);
-    if chat.git_info.is_none() && chat.git_read_error.is_none() {
+    if chat.git_info.is_none() && chat.git_read_error.is_none() && chat.git_watch_error.is_none() {
         return None;
     }
     let summary = chat
@@ -133,30 +134,56 @@ pub fn render_git_info(
                 .items_center()
                 .justify_between()
                 .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).child("Git 变更"))
-                .child(if !expanded {
+                .child(
                     div()
-                        .size_6()
                         .flex()
                         .items_center()
-                        .justify_center()
-                        .child(Icon::new(IconName::ChevronUp).size_4())
-                        .into_any_element()
-                } else {
-                    let view = view.clone();
-                    let label = "缩小为悬浮球";
-                    Button::new("toggle-git-info")
-                        .track_focus(&chat.git_panel_focus)
-                        .disabled(!expanded)
-                        .ghost()
-                        .small()
-                        .icon(IconName::ChevronUp)
-                        .accessibility_label(label)
-                        .tooltip(label)
-                        .on_click(move |_, window, cx| {
-                            view.update(cx, |this, cx| this.set_git_collapsed(true, window, cx));
+                        .gap_1()
+                        .when(expanded, |actions| {
+                            let view = view.clone();
+                            actions.child(
+                                Button::new("refresh-git-info")
+                                    .ghost()
+                                    .small()
+                                    .icon(IconName::RefreshCw)
+                                    .loading(chat.git_refreshing)
+                                    .disabled(chat.git_index_busy)
+                                    .accessibility_label("刷新 Git 变更")
+                                    .tooltip("刷新 Git 变更")
+                                    .on_click(move |_, _, cx| {
+                                        view.update(cx, |this, cx| {
+                                            this.watch_git_info(cx);
+                                        });
+                                    }),
+                            )
                         })
-                        .into_any_element()
-                }),
+                        .child(if !expanded {
+                            div()
+                                .size_6()
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .child(Icon::new(IconName::ChevronUp).size_4())
+                                .into_any_element()
+                        } else {
+                            let view = view.clone();
+                            let label = "缩小为悬浮球";
+                            Button::new("toggle-git-info")
+                                .track_focus(&chat.git_panel_focus)
+                                .disabled(!expanded)
+                                .ghost()
+                                .small()
+                                .icon(IconName::ChevronUp)
+                                .accessibility_label(label)
+                                .tooltip(label)
+                                .on_click(move |_, window, cx| {
+                                    view.update(cx, |this, cx| {
+                                        this.set_git_collapsed(true, window, cx)
+                                    });
+                                })
+                                .into_any_element()
+                        }),
+                ),
         );
     let summary_opacity = chat.git_motion.summary.sample(now);
     panel = panel.child(
@@ -178,6 +205,15 @@ pub fn render_git_info(
                 )
             }),
     );
+    if let Some(error) = &chat.git_watch_error {
+        panel = panel.child(
+            div()
+                .text_xs()
+                .text_color(cx.theme().warning)
+                .whitespace_normal()
+                .child(format!("自动刷新不可用：{error}。请手动刷新重试。")),
+        );
+    }
     if !chat.git_motion.rows.is_empty() {
         panel = panel
             .child(render_change_group(view, ChangeGroup::Staged, window.rem_size() * 2., cx))
@@ -536,6 +572,9 @@ impl ChatView {
                     }
                 }
                 this.git_revision += 1;
+                if this.git_refresh_pending || !current {
+                    this.refresh_git_info(cx);
+                }
                 if let Err(error) = result.0 {
                     let label = match action {
                         IndexAction::Stage => "无法暂存",
@@ -704,6 +743,7 @@ impl GitInfo {
         };
         let mut options = StatusOptions::new();
         options
+            .update_index(false)
             .include_untracked(true)
             .recurse_untracked_dirs(true)
             .renames_head_to_index(true)

@@ -272,6 +272,7 @@ dependencies = [
  "git2",
  "gpui-kit",
  "libc",
+ "notify",
  "serde",
  "serde_json",
  "similar 3.2.1",

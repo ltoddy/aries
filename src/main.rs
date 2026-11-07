@@ -1,6 +1,8 @@
 mod acp;
 mod chat;
 mod preferences;
+#[cfg(target_os = "macos")]
+mod terminal_command;
 
 use gpui_kit::assets::AllAssets;
 use gpui_kit::*;
@@ -42,6 +44,8 @@ fn main() -> anyhow::Result<()> {
             KeyBinding::new("ctrl-tab", NextTab, None),
             KeyBinding::new("ctrl-shift-tab", PreviousTab, None),
         ]);
+        #[cfg(target_os = "macos")]
+        crate::terminal_command::init(cx);
         let options = WindowOptions {
             window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
                 None,

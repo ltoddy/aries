@@ -31,8 +31,9 @@ build: check-macos
 app: build
 	@test -n "$(VERSION)" || { printf '%s\n' '无法读取 Cargo.toml 中的应用版本。' >&2; exit 1; }
 	rm -rf "$(APP_BUNDLE)"
-	mkdir -p "$(APP_BUNDLE)/Contents/MacOS" "$(APP_BUNDLE)/Contents/Resources"
+	mkdir -p "$(APP_BUNDLE)/Contents/MacOS" "$(APP_BUNDLE)/Contents/Resources/bin"
 	install -m 755 "$(BINARY_PATH)" "$(APP_BUNDLE)/Contents/MacOS/$(BINARY_NAME)"
+	install -m 755 "scripts/aries-orbit" "$(APP_BUNDLE)/Contents/Resources/bin/$(BINARY_NAME)"
 	plutil -create xml1 "$(INFO_PLIST)"
 	plutil -insert CFBundleName -string "$(APP_NAME)" "$(INFO_PLIST)"
 	plutil -insert CFBundleDisplayName -string "$(APP_NAME)" "$(INFO_PLIST)"
