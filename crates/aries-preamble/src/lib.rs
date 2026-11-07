@@ -1,7 +1,6 @@
 pub mod agentsmd;
 pub mod env;
 pub mod memory;
-pub mod repository;
 pub mod skill;
 
 use std::path::Path;
@@ -21,7 +20,6 @@ pub async fn sections(
     vec![
         skill::section(skills),
         env::section(cwd, model),
-        repository::section(cwd),
         memory::section(gctx.memory_root_dir().join(aries_filesystem::path_to_slug(cwd))),
         agentsmd::section(cwd),
     ]

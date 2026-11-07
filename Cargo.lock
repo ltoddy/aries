@@ -445,7 +445,6 @@ dependencies = [
  "aries-extension",
  "aries-filesystem",
  "aries-init",
- "git2",
  "itertools 0.15.0",
  "jiff",
 ]
