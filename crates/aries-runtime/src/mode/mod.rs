@@ -73,7 +73,7 @@ impl Mode {
     pub const fn name(self) -> &'static str {
         match self {
             Self::Build => "Builder",
-            Self::General => "Assistant",
+            Self::General => "General",
             Self::Explore => "Explorer",
         }
     }

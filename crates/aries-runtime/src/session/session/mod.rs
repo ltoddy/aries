@@ -293,6 +293,10 @@ impl Session {
         &self.setting
     }
 
+    pub fn agents(&self) -> &[aries_extension::AgentDefinition] {
+        &self.extensions.agents
+    }
+
     pub async fn context(&self) -> Vec<Message> {
         self.chat_context.history().await.to_vec()
     }
