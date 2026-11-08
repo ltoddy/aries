@@ -47,10 +47,6 @@
 
 > 详见 [docs/web-tool.md](docs/web-tool.md)
 
-## Aries Island（macOS 菜单栏助手）
-
-> 详见 [docs/mac-island.md](docs/mac-island.md)
-
 ## 评测
 
 评测相关脚本位于 [scripts](scripts/) 目录下，目前包含 SWE-bench 评测等工具。

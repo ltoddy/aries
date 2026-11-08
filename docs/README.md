@@ -18,7 +18,6 @@
 | 网络访问            | [web-tool.md](web-tool.md)       |
 | 持久化与统计        | [persistence.md](persistence.md) |
 | ACP 协议            | [acp.md](acp.md)                 |
-| macOS Island        | [mac-island.md](mac-island.md)   |
 | 评测                | [evaluation.md](evaluation.md)   |
 | 日志                | [logging.md](logging.md)         |
 
