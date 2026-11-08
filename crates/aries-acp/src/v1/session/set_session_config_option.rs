@@ -50,6 +50,7 @@ pub async fn set_session_config_option(
                 let resp = SetSessionConfigOptionResponse::new(config_options(
                     session.setting(),
                     session.mode(),
+                    session.agents(),
                 ));
                 registry.lock().await.putback_session(session);
                 responder.respond(resp)
@@ -61,6 +62,7 @@ pub async fn set_session_config_option(
                 let resp = SetSessionConfigOptionResponse::new(config_options(
                     session.setting(),
                     session.mode(),
+                    session.agents(),
                 ));
                 registry.lock().await.putback_session(session);
                 responder.respond(resp)
@@ -68,7 +70,10 @@ pub async fn set_session_config_option(
         };
     }
 
-    let resp =
-        SetSessionConfigOptionResponse::new(config_options(session.setting(), session.mode()));
+    let resp = SetSessionConfigOptionResponse::new(config_options(
+        session.setting(),
+        session.mode(),
+        session.agents(),
+    ));
     responder.respond(resp)
 }

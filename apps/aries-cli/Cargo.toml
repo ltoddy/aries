@@ -17,26 +17,26 @@ path = "src/main.rs"
 [dependencies]
 agent-client-protocol = { workspace = true, features = ["stdio"] }
 anyhow.workspace = true
-aries-acp = { version = "0.1.0", path = "../aries-acp" }
-aries-communicate = { version = "0.1.0", path = "../aries-communicate" }
-aries-extension = { version = "0.1.0", path = "../aries-extension" }
-aries-init = { version = "0.1.0", path = "../aries-init" }
-aries-logger = { version = "0.1.0", path = "../aries-logger" }
-aries-persistence = { version = "0.1.0", path = "../aries-persistence" }
-aries-runtime = { version = "0.1.0", path = "../aries-runtime" }
-clap = { workspace = true, features = ["derive"] }
+aries-acp = { version = "0.1.0", path = "../../crates/aries-acp" }
+aries-communicate = { version = "0.1.0", path = "../../crates/aries-communicate" }
+aries-extension = { version = "0.1.0", path = "../../crates/aries-extension" }
+aries-init = { version = "0.1.0", path = "../../crates/aries-init" }
+aries-logger = { version = "0.1.0", path = "../../crates/aries-logger" }
+aries-persistence = { version = "0.1.0", path = "../../crates/aries-persistence" }
+aries-runtime = { version = "0.1.0", path = "../../crates/aries-runtime" }
+clap = { version = "4.6", features = ["derive"] }
 colored.workspace = true
-dialoguer.workspace = true
-ferris-says.workspace = true
+dialoguer = "0.12"
+ferris-says = "0.3"
 futures.workspace = true
 itertools.workspace = true
 jiff.workspace = true
-mimalloc.workspace = true
+mimalloc = "0.1"
 nanoid.workspace = true
 prettytable.workspace = true
 rig.workspace = true
-rustyline.workspace = true
-rustyline-derive.workspace = true
+rustyline = "19.0"
+rustyline-derive = "0.13"
 serde_json.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "fs", "process"] }
 tracing.workspace = true

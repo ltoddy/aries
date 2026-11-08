@@ -5,6 +5,7 @@ use agent_client_protocol::v1::schema::{
     SessionConfigId, SessionConfigOption, SessionConfigOptionCategory, SessionConfigSelectOption,
     SessionConfigSelectOptions,
 };
+use aries_extension::AgentDefinition;
 use aries_init::Setting;
 use aries_runtime::mode::Mode;
 
@@ -66,18 +67,32 @@ impl FromStr for SessionConfig {
     }
 }
 
-pub(super) fn config_options(setting: &Setting, current_mode: Mode) -> Vec<SessionConfigOption> {
-    vec![mode_option(current_mode), model_option(setting)]
+pub(super) fn config_options(
+    setting: &Setting,
+    current_mode: Mode,
+    agents: &[AgentDefinition],
+) -> Vec<SessionConfigOption> {
+    vec![mode_option(current_mode, agents), model_option(setting)]
 }
 
-fn mode_option(current: Mode) -> SessionConfigOption {
-    let options = [Mode::Build, Mode::General, Mode::Explore]
+fn mode_option(current: Mode, agents: &[AgentDefinition]) -> SessionConfigOption {
+    let mut options: Vec<_> = [Mode::Build, Mode::General, Mode::Explore]
         .into_iter()
         .map(|agent| {
             SessionConfigSelectOption::new(agent.id(), agent.name())
                 .description(Some(agent.description().to_owned()))
         })
-        .collect::<Vec<_>>();
+        .collect();
+
+    for agent in agents {
+        options.push(
+            SessionConfigSelectOption::new(
+                agent.frontmatter.name.clone(),
+                agent.frontmatter.name.clone(),
+            )
+            .description(Some(agent.frontmatter.description.clone())),
+        );
+    }
 
     SessionConfigOption::select(
         SessionConfig::Mode,

@@ -66,7 +66,7 @@ pub async fn load_session(
         SessionUpdate::AvailableCommandsUpdate(AvailableCommandsUpdate::new(available_commands)),
     ));
 
-    let config_options = config_options(session.setting(), session.mode());
+    let config_options = config_options(session.setting(), session.mode(), session.agents());
     let resp = LoadSessionResponse::new().config_options(config_options);
     responder.respond(resp)
 }

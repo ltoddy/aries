@@ -25,7 +25,7 @@
 
 如果没有 just 命令，可以通过:
 
-> cargo install --path crates/aries-cli --force --locked
+> cargo install --path apps/aries-cli --force --locked
 
 ## 使用
 
