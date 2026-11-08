@@ -1,5 +1,5 @@
 use agent_client_protocol::v1::schema;
-use aries_tools::update_plan::{self, PlanEntryPriority, PlanEntryStatus};
+use aries_runtime::update_plan::{self, PlanEntryPriority, PlanEntryStatus};
 
 #[derive(Debug, Clone)]
 pub struct PlanEntry(update_plan::PlanEntry);

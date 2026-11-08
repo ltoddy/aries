@@ -221,38 +221,16 @@ name = "aries-acp"
 version = "0.1.0"
 dependencies = [
  "agent-client-protocol",
- "aries-event",
+ "aries-communicate",
  "aries-extension",
  "aries-init",
- "aries-mode",
- "aries-session",
- "aries-tools",
+ "aries-runtime",
  "base64 0.23.1",
  "itertools 0.15.0",
  "rig",
  "serde_json",
  "tokio",
- "tokio-util",
  "tracing",
-]
-
-[[package]]
-name = "aries-agent"
-version = "0.1.0"
-dependencies = [
- "aries-event",
- "aries-extension",
- "aries-init",
- "aries-lspclient",
- "aries-mode",
- "aries-preamble",
- "aries-tools",
- "futures",
- "itertools 0.15.0",
- "rig",
- "thiserror 2.0.21",
- "toasty",
- "tokio",
 ]
 
 [[package]]
@@ -262,13 +240,12 @@ dependencies = [
  "agent-client-protocol",
  "anyhow",
  "aries-acp",
- "aries-event",
+ "aries-communicate",
  "aries-extension",
  "aries-init",
  "aries-logger",
  "aries-persistence",
- "aries-session",
- "aries-tools",
+ "aries-runtime",
  "clap",
  "colored",
  "dialoguer",
@@ -291,41 +268,6 @@ dependencies = [
 
 [[package]]
 name = "aries-communicate"
-version = "0.1.0"
-
-[[package]]
-name = "aries-compact"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aries-context",
- "aries-event",
- "aries-extension",
- "aries-filesystem",
- "aries-tools",
- "futures",
- "nanoid",
- "parking_lot 0.13.0",
- "regex-lite",
- "rig",
- "serde_json",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
-]
-
-[[package]]
-name = "aries-context"
-version = "0.1.0"
-dependencies = [
- "aries-filesystem",
- "rig",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "aries-event"
 version = "0.1.0"
 dependencies = [
  "rig",
@@ -402,37 +344,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aries-lspclient"
-version = "0.1.0"
-dependencies = [
- "aries-filesystem",
- "parking_lot 0.13.0",
- "serde",
- "serde_json",
- "serde_repr",
- "thiserror 2.0.21",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "aries-memory"
-version = "0.1.0"
-dependencies = [
- "aries-filesystem",
- "itertools 0.15.0",
- "rig",
- "schemars 1.2.3",
- "serde",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "aries-mode"
-version = "0.1.0"
-
-[[package]]
 name = "aries-persistence"
 version = "0.1.0"
 dependencies = [
@@ -443,69 +354,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "aries-preamble"
-version = "0.1.0"
-dependencies = [
- "aries-extension",
- "aries-filesystem",
- "aries-init",
- "itertools 0.15.0",
- "jiff",
-]
-
-[[package]]
 name = "aries-runtime"
-version = "0.1.0"
-
-[[package]]
-name = "aries-session"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aries-agent",
- "aries-compact",
- "aries-context",
- "aries-event",
+ "aries-communicate",
  "aries-extension",
  "aries-filesystem",
  "aries-init",
  "aries-logger",
- "aries-lspclient",
- "aries-memory",
- "aries-mode",
  "aries-persistence",
- "aries-preamble",
- "aries-tools",
- "http",
- "itertools 0.15.0",
- "jiff",
- "nanoid",
- "parking_lot 0.13.0",
- "reqwest 0.13.5",
- "reqwest-middleware",
- "reqwest-retry",
- "rig",
- "serde",
- "serde_json",
- "toasty",
- "tokio",
- "tokio-util",
- "toml",
- "tracing",
-]
-
-[[package]]
-name = "aries-tools"
-version = "0.1.0"
-dependencies = [
- "aries-event",
- "aries-extension",
- "aries-filesystem",
- "aries-init",
- "aries-lspclient",
- "aries-mode",
- "aries-persistence",
- "aries-preamble",
  "criterion",
  "firecrawl",
  "futures",
@@ -513,6 +371,7 @@ dependencies = [
  "globset",
  "grep-regex",
  "grep-searcher",
+ "http",
  "ignore",
  "itertools 0.15.0",
  "jiff",
@@ -520,14 +379,21 @@ dependencies = [
  "parking_lot 0.13.0",
  "regex-lite",
  "reqwest 0.13.5",
+ "reqwest-middleware",
+ "reqwest-retry",
  "rig",
+ "schemars 1.2.3",
  "serde",
  "serde_json",
+ "serde_repr",
  "similar",
  "tempfile",
  "thiserror 2.0.21",
  "toasty",
  "tokio",
+ "tokio-util",
+ "toml",
+ "tracing",
  "tree-sitter",
  "tree-sitter-bash",
 ]
@@ -5798,7 +5664,6 @@ checksum = "e464cf451ba96ebfc6f9b6542f17ee8b8956e33f1e40d9690624e59d7a7f8a4b"
 dependencies = [
  "bytes",
  "futures-core",
- "futures-io",
  "futures-sink",
  "libc",
  "pin-project-lite",

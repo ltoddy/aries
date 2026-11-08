@@ -6,7 +6,7 @@ use agent_client_protocol::v1::schema::{
     SessionConfigSelectOptions,
 };
 use aries_init::Setting;
-use aries_mode::Mode;
+use aries_runtime::mode::Mode;
 
 #[derive(Debug, Copy, Clone)]
 pub(super) enum SessionConfig {

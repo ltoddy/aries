@@ -18,13 +18,12 @@ path = "src/main.rs"
 agent-client-protocol = { workspace = true, features = ["stdio"] }
 anyhow.workspace = true
 aries-acp = { version = "0.1.0", path = "../aries-acp" }
-aries-event = { version = "0.1.0", path = "../aries-event" }
+aries-communicate = { version = "0.1.0", path = "../aries-communicate" }
 aries-extension = { version = "0.1.0", path = "../aries-extension" }
 aries-init = { version = "0.1.0", path = "../aries-init" }
 aries-logger = { version = "0.1.0", path = "../aries-logger" }
 aries-persistence = { version = "0.1.0", path = "../aries-persistence" }
-aries-session = { version = "0.1.0", path = "../aries-session" }
-aries-tools = { version = "0.1.0", path = "../aries-tools" }
+aries-runtime = { version = "0.1.0", path = "../aries-runtime" }
 clap = { workspace = true, features = ["derive"] }
 colored.workspace = true
 dialoguer.workspace = true

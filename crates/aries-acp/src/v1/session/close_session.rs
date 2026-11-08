@@ -1,7 +1,7 @@
 use agent_client_protocol::v1::schema::{CloseSessionRequest, CloseSessionResponse};
 use agent_client_protocol::v1::{ConnectionTo, Responder};
 use agent_client_protocol::{Client, Error};
-use aries_session::SharedRegistry;
+use aries_runtime::session::SharedRegistry;
 use tracing::{info, instrument};
 
 #[instrument(name = "acp.close_session", skip_all, fields(session_id = %req.session_id))]

@@ -3,8 +3,8 @@ use agent_client_protocol::v2::schema::{
     SessionInfoUpdate, SessionUpdate, ToolCallContent, ToolCallId, ToolCallLocation,
     ToolCallStatus, ToolCallUpdate, ToolKind, UsageUpdate,
 };
-use aries_event::AgentEvent;
-use aries_tools::{
+use aries_communicate::AgentEvent;
+use aries_runtime::tools::{
     agent, bash, batch, codesearch, edit, glob, grep, lsp, monitor, multiedit, read, skill,
     task_output, task_stop, update_plan, webfetch, websearch, write,
 };
@@ -140,12 +140,12 @@ impl SessionUpdates {
         vec![SessionUpdate::PlanUpdate(PlanUpdate::new(PlanUpdateContent::items("main", entries)))]
     }
 
-    fn from_compaction(compaction: aries_event::Compaction) -> SessionUpdate {
+    fn from_compaction(compaction: aries_communicate::Compaction) -> SessionUpdate {
         let status = match compaction.status {
-            aries_event::CompactionStatus::InProgress => CompactionStatus::InProgress,
-            aries_event::CompactionStatus::Completed => CompactionStatus::Completed,
-            aries_event::CompactionStatus::Failed => CompactionStatus::Failed,
-            aries_event::CompactionStatus::Cancelled => CompactionStatus::Failed,
+            aries_communicate::CompactionStatus::InProgress => CompactionStatus::InProgress,
+            aries_communicate::CompactionStatus::Completed => CompactionStatus::Completed,
+            aries_communicate::CompactionStatus::Failed => CompactionStatus::Failed,
+            aries_communicate::CompactionStatus::Cancelled => CompactionStatus::Failed,
         };
 
         SessionUpdate::CompactionUpdate(

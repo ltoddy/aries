@@ -4,8 +4,8 @@ use agent_client_protocol::v1::schema::{
     SubagentUpdate, Terminal, TextContent, ToolCall as AcpToolCall, ToolCallContent, ToolCallId,
     ToolCallLocation, ToolCallStatus, ToolCallUpdate, ToolCallUpdateFields, ToolKind, UsageUpdate,
 };
-use aries_event::AgentEvent;
-use aries_tools::{
+use aries_communicate::AgentEvent;
+use aries_runtime::tools::{
     agent, bash, batch, codesearch, edit, glob, grep, lsp, monitor, multiedit, read, skill,
     task_output, task_stop, update_plan, webfetch, websearch, write,
 };
@@ -215,12 +215,12 @@ impl SessionUpdates {
         SessionUpdate::ToolCall(tc)
     }
 
-    fn from_compaction(compaction: aries_event::Compaction) -> SessionUpdate {
+    fn from_compaction(compaction: aries_communicate::Compaction) -> SessionUpdate {
         let status = match compaction.status {
-            aries_event::CompactionStatus::InProgress => CompactionStatus::InProgress,
-            aries_event::CompactionStatus::Completed => CompactionStatus::Completed,
-            aries_event::CompactionStatus::Failed => CompactionStatus::Failed,
-            aries_event::CompactionStatus::Cancelled => CompactionStatus::Cancelled,
+            aries_communicate::CompactionStatus::InProgress => CompactionStatus::InProgress,
+            aries_communicate::CompactionStatus::Completed => CompactionStatus::Completed,
+            aries_communicate::CompactionStatus::Failed => CompactionStatus::Failed,
+            aries_communicate::CompactionStatus::Cancelled => CompactionStatus::Cancelled,
         };
 
         SessionUpdate::CompactionUpdate(
@@ -229,7 +229,7 @@ impl SessionUpdates {
         )
     }
 
-    fn from_subagent_update(subagent_update: aries_event::SubagentUpdate) -> SessionUpdate {
+    fn from_subagent_update(subagent_update: aries_communicate::SubagentUpdate) -> SessionUpdate {
         SessionUpdate::SubagentUpdate(
             SubagentUpdate::new(subagent_update.session_id)
                 .title(subagent_update.title)
@@ -237,7 +237,7 @@ impl SessionUpdates {
         )
     }
 
-    fn from_session_message(message: aries_event::SessionMessage) -> SessionUpdate {
+    fn from_session_message(message: aries_communicate::SessionMessage) -> SessionUpdate {
         SessionUpdate::SessionMessage(
             SessionMessage::new(message.message_id)
                 .sender_session_id(SessionId::new(message.sender_session_id))
@@ -247,7 +247,7 @@ impl SessionUpdates {
         )
     }
 
-    fn from_session_message_chunk(chunk: aries_event::SessionMessageChunk) -> SessionUpdate {
+    fn from_session_message_chunk(chunk: aries_communicate::SessionMessageChunk) -> SessionUpdate {
         let content: ContentBlock =
             if let MultiTurnStreamItem::StreamAssistantItem(Item::Event(StreamEvent::Text {
                 part: _,

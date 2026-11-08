@@ -12,16 +12,13 @@ categories.workspace = true
 
 [dependencies]
 agent-client-protocol = { workspace = true, features = ["unstable_protocol_v2", "unstable"] }
-aries-event = { version = "0.1.0", path = "../aries-event" }
+aries-communicate = { version = "0.1.0", path = "../aries-communicate" }
 aries-extension = { version = "0.1.0", path = "../aries-extension" }
 aries-init = { version = "0.1.0", path = "../aries-init" }
-aries-mode = { version = "0.1.0", path = "../aries-mode" }
-aries-session = { version = "0.1.0", path = "../aries-session" }
-aries-tools = { version = "0.1.0", path = "../aries-tools" }
+aries-runtime = { version = "0.1.0", path = "../aries-runtime" }
 base64.workspace = true
 itertools.workspace = true
 rig.workspace = true
 serde_json.workspace = true
 tokio = { workspace = true, features = ["net", "sync"] }
-tokio-util = { workspace = true, features = ["compat"] }
 tracing.workspace = true

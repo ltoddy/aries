@@ -6,8 +6,8 @@ use agent_client_protocol::v2::schema::{
 };
 use agent_client_protocol::v2::{ConnectionTo, Responder};
 use agent_client_protocol::{Client, Error};
-use aries_mode::Mode;
-use aries_session::SharedRegistry;
+use aries_runtime::mode::Mode;
+use aries_runtime::session::SharedRegistry;
 use tracing::info;
 
 use super::config::{SessionConfig, config_options};

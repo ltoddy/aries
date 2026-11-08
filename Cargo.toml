@@ -1,24 +1,14 @@
 [workspace]
 members = [
     "crates/aries-acp",
-    "crates/aries-agent",
     "crates/aries-cli",
     "crates/aries-communicate",
-    "crates/aries-compact",
-    "crates/aries-context",
-    "crates/aries-event",
     "crates/aries-extension",
     "crates/aries-filesystem",
     "crates/aries-init",
     "crates/aries-logger",
-    "crates/aries-lspclient",
-    "crates/aries-memory",
-    "crates/aries-mode",
     "crates/aries-persistence",
-    "crates/aries-preamble",
     "crates/aries-runtime",
-    "crates/aries-session",
-    "crates/aries-tools",
 ]
 default-members = ["crates/aries-cli"]
 resolver = "3"

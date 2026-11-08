@@ -1,0 +1,134 @@
+use std::hint::black_box;
+use std::path::{Path, PathBuf};
+
+use aries_runtime::ToolContext as AriesToolContext;
+use aries_runtime::grep::{GrepArgs, GrepTool, OutputMode};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use rig::tool::{Tool, ToolContext};
+use tempfile::TempDir;
+
+struct BenchRepo {
+    _tempdir: TempDir,
+    root: PathBuf,
+}
+
+impl BenchRepo {
+    fn new(files: usize, lines_per_file: usize) -> Self {
+        let tempdir = TempDir::new().expect("benchmark setup should succeed");
+        let root = tempdir.path().to_path_buf();
+        std::fs::create_dir_all(root.join("src")).expect("benchmark setup should succeed");
+        std::fs::create_dir_all(root.join("docs")).expect("benchmark setup should succeed");
+        std::fs::create_dir_all(root.join("vendor")).expect("benchmark setup should succeed");
+
+        for i in 0..files {
+            let dir = match i % 3 {
+                0 => root.join("src"),
+                1 => root.join("docs"),
+                _ => root.join("vendor"),
+            };
+            let ext = if i % 3 == 0 { "rs" } else { "txt" };
+            let path = dir.join(format!("file_{i}.{ext}"));
+            write_fixture_file(&path, i, lines_per_file);
+        }
+
+        Self { _tempdir: tempdir, root }
+    }
+}
+
+fn write_fixture_file(path: &Path, file_index: usize, lines_per_file: usize) {
+    let mut content = String::new();
+    for line in 0..lines_per_file {
+        if line % 17 == 0 {
+            content.push_str(&format!(
+                "fn hot_path_{file_index}_{line}() {{ let needle = {line}; }}\n"
+            ));
+        } else if line % 29 == 0 {
+            content.push_str(&format!("Needle appears in mixed case at {file_index}:{line}\n"));
+        } else {
+            content
+                .push_str(&format!("line {line} filler content for benchmark file {file_index}\n"));
+        }
+    }
+    std::fs::write(path, content).expect("benchmark setup should succeed");
+}
+
+fn grep_args(pattern: &str) -> GrepArgs {
+    GrepArgs {
+        pattern: pattern.to_string(),
+        include: None,
+        output_mode: OutputMode::FilesWithMatches,
+        case_insensitive: false,
+        show_line_numbers: true,
+        context: 0,
+        hidden: false,
+        respect_ignore: false,
+        limit: 0,
+    }
+}
+
+fn run_grep(tool: &GrepTool, args: GrepArgs) {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("benchmark setup should succeed");
+    runtime.block_on(async {
+        let mut context = ToolContext::new();
+        let output = tool.call(&mut context, args).await.expect("benchmark setup should succeed");
+        black_box(output);
+    });
+}
+
+fn bench_grep(c: &mut Criterion) {
+    let repo = BenchRepo::new(180, 240);
+    let (notifier, _) = aries_communicate::Notifier::channel();
+    let tool = GrepTool::new(AriesToolContext::new("test", None, notifier, &repo.root));
+
+    let scenarios = [
+        ("files_with_matches", {
+            let mut args = grep_args("needle");
+            args.output_mode = OutputMode::FilesWithMatches;
+            args
+        }),
+        ("content_include_rs", {
+            let mut args = grep_args("hot_path");
+            args.output_mode = OutputMode::Content;
+            args.include = Some("src/**/*.rs".to_string());
+            args
+        }),
+        ("count_case_insensitive", {
+            let mut args = grep_args("needle");
+            args.output_mode = OutputMode::Count;
+            args.case_insensitive = true;
+            args
+        }),
+    ];
+
+    let total_bytes: u64 = std::fs::read_dir(&repo.root)
+        .expect("benchmark setup should succeed")
+        .flat_map(|entry| {
+            std::fs::read_dir(entry.expect("benchmark setup should succeed").path())
+                .expect("benchmark setup should succeed")
+        })
+        .map(|entry| {
+            entry
+                .expect("benchmark setup should succeed")
+                .metadata()
+                .expect("benchmark setup should succeed")
+                .len()
+        })
+        .sum();
+
+    let mut group = c.benchmark_group("grep_tool");
+    group.throughput(Throughput::Bytes(total_bytes));
+
+    for (name, args) in scenarios {
+        group.bench_with_input(BenchmarkId::from_parameter(name), &args, |b, args| {
+            b.iter(|| run_grep(&tool, args.clone()));
+        });
+    }
+
+    group.finish();
+}
+
+criterion_group!(benches, bench_grep);
+criterion_main!(benches);

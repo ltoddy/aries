@@ -11,3 +11,53 @@ readme.workspace = true
 repository.workspace = true
 
 [dependencies]
+anyhow.workspace = true
+aries-communicate = { version = "0.1.0", path = "../aries-communicate" }
+aries-extension = { version = "0.1.0", path = "../aries-extension" }
+aries-filesystem = { version = "0.1.0", path = "../aries-filesystem" }
+aries-init = { version = "0.1.0", path = "../aries-init" }
+aries-logger = { version = "0.1.0", path = "../aries-logger" }
+aries-persistence = { version = "0.1.0", path = "../aries-persistence" }
+firecrawl.workspace = true
+futures.workspace = true
+git2.workspace = true
+globset.workspace = true
+grep-regex.workspace = true
+grep-searcher.workspace = true
+http.workspace = true
+ignore.workspace = true
+itertools.workspace = true
+jiff = { workspace = true, features = ["serde"] }
+nanoid.workspace = true
+parking_lot.workspace = true
+regex-lite.workspace = true
+reqwest.workspace = true
+reqwest-middleware.workspace = true
+reqwest-retry.workspace = true
+rig = { workspace = true, features = ["reqwest-middleware"] }
+schemars.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_repr.workspace = true
+similar.workspace = true
+thiserror.workspace = true
+toasty.workspace = true
+tokio = { workspace = true, features = ["fs", "process", "sync", "time", "io-util"] }
+tokio-util.workspace = true
+toml.workspace = true
+tracing.workspace = true
+tree-sitter.workspace = true
+tree-sitter-bash.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+tempfile.workspace = true
+tokio = { workspace = true, features = ["fs", "macros", "net", "process", "rt-multi-thread"] }
+
+[[bench]]
+name = "grep"
+harness = false
+
+[[bench]]
+name = "glob"
+harness = false

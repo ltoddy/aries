@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use aries_extension::McpDefinition;
 use aries_init::{GlobalContext, SettingLoader};
-use aries_session::{SessionArgs, SessionRegistry};
+use aries_runtime::session::{SessionArgs, SessionRegistry};
 use colored::Colorize;
 use rustyline::error::ReadlineError;
 use tracing::info_span;
