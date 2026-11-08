@@ -63,7 +63,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2.9.3
 
-      - run: cargo +nightly install --path crates/aries-cli --locked
+      - run: cargo +nightly install --path apps/aries-cli --locked
 
   security:
     name: security

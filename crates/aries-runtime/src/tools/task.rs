@@ -15,8 +15,7 @@ use tokio::process::Command;
 use tokio::sync::{oneshot, watch};
 use tokio::task::JoinHandle;
 
-use super::queue::BoundedQueue;
-
+use crate::tools::queue::BoundedQueue;
 const MAX_TASK_OUTPUT_BYTES: usize = 256 * 1024;
 const MAX_FINISHED_TASKS: usize = 50;
 const STOP_GRACE_PERIOD: Duration = Duration::from_secs(2);

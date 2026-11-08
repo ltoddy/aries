@@ -13,11 +13,10 @@ use toasty::Db;
 
 use crate::agent::{AGENT_LOOP_MAX_TURNS, AriesAgent};
 use crate::lspclient::SharedLspClient;
-use crate::mode::Mode;
 
 pub struct AgentBuilder {
     model: Model<OpenAiWire>,
-    mode: Mode,
+    name: String,
     root_dir: PathBuf,
     cwd: PathBuf,
     gctx: GlobalContext,
@@ -35,7 +34,7 @@ impl AgentBuilder {
     pub fn new(
         session_id: impl Into<String>,
         model: Model<OpenAiWire>,
-        mode: Mode,
+        name: impl Into<String>,
         root_dir: impl AsRef<Path>,
         cwd: impl AsRef<Path>,
         gctx: GlobalContext,
@@ -47,7 +46,7 @@ impl AgentBuilder {
 
         Self {
             model,
-            mode,
+            name: name.into(),
             root_dir: root_dir.to_owned(),
             cwd: cwd.to_owned(),
             gctx,
@@ -73,18 +72,16 @@ impl AgentBuilder {
     where
         P: AgentHook + 'static,
     {
-        let mode = self.mode;
-        let name = mode.name();
+        let name = &self.name;
         let model_name = self.model.name();
-        let current_dir = self.cwd;
 
-        let tools = crate::create_tools_from_mode(
+        let tools = crate::create_tools(
             &self.session_id,
             self.gctx.clone(),
-            self.mode,
+            crate::ALL_TOOL_NAMES,
             self.model.clone(),
             &self.root_dir,
-            &current_dir,
+            &self.cwd,
             self.lsp_client.clone(),
             self.extensions.clone(),
             Notifier::clone(&self.notifier),
@@ -93,13 +90,14 @@ impl AgentBuilder {
         tool_server_handle.add_tools(tools);
 
         let sections =
-            crate::preamble::sections(self.gctx, &current_dir, model_name, &self.extensions.skills)
+            crate::preamble::sections(self.gctx, &self.cwd, model_name, &self.extensions.skills)
                 .await;
-        let preamble = iter::once(mode.bare_preamble().to_owned()).chain(sections).join("\n");
+        let preamble =
+            iter::once(String::from("You are a helpful AI assistant.")).chain(sections).join("\n");
 
         let builder = rig::agent::AgentBuilder::new(self.model)
             .name(name)
-            .description(mode.description())
+            .description(format!("{name} agent"))
             .preamble(&preamble)
             .tool_server_handle(tool_server_handle)
             .add_hook(hook)
@@ -107,6 +105,6 @@ impl AgentBuilder {
 
         let inner = builder.build();
 
-        AriesAgent::new(inner, name, preamble, self.notifier)
+        AriesAgent::new(inner, name.to_owned(), preamble, self.notifier)
     }
 }

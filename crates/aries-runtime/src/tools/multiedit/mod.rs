@@ -16,11 +16,11 @@ use crate::tools::diff;
 pub const NAME: &str = "MultiEdit";
 
 pub struct MultiEditTool {
-    ctx: crate::context::ToolContext,
+    ctx: crate::tools::ToolContext,
 }
 
 impl MultiEditTool {
-    pub fn new(ctx: crate::context::ToolContext) -> Self {
+    pub fn new(ctx: crate::tools::ToolContext) -> Self {
         Self { ctx }
     }
 }

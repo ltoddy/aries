@@ -39,7 +39,6 @@ use crate::chat_context::{ChatContext, ChatHistory};
 use crate::compact::ContextCompactor;
 use crate::lspclient::{LspServerInfo, SharedLspClient, warm_up};
 use crate::memory::{MemoryRetriever, MemoryStore};
-use crate::mode::Mode;
 
 pub enum PromptOutcome {
     Completed(String),
@@ -56,7 +55,7 @@ pub struct Session {
     cwd: PathBuf,
     model: Model<OpenAiWire>,
     agent: AriesAgent,
-    mode: Mode,
+    mode: String,
 
     lsp_client: Option<SharedLspClient>,
     chat_history: ChatHistory,
@@ -160,7 +159,8 @@ impl Session {
         Ok(())
     }
 
-    pub async fn set_mode(&mut self, mode: Mode) -> anyhow::Result<()> {
+    pub async fn set_mode(&mut self, mode: impl AsRef<str>) -> anyhow::Result<()> {
+        let mode = mode.as_ref();
         // 不同的模式, 注册的工具是不同的，所以先删除全部内置的，然后再重新添加
         for tool_name in crate::ALL_TOOL_NAMES {
             self.tool_server_handle.remove_tool(tool_name);
@@ -182,7 +182,7 @@ impl Session {
         .await;
 
         self.agent = agent;
-        self.mode = mode;
+        self.mode = mode.to_string();
         Ok(())
     }
 
@@ -285,8 +285,8 @@ impl Session {
         self.id.clone()
     }
 
-    pub fn mode(&self) -> Mode {
-        self.mode
+    pub fn mode(&self) -> &str {
+        &self.mode
     }
 
     pub fn setting(&self) -> &Setting {
@@ -390,7 +390,7 @@ impl Session {
             .with_context(|| format!("failed to initialize chat context for session {id}"))?;
 
         let hooks_executor = Arc::new(HooksExecutor::new(extensions.hooks.clone()));
-        let mode = Mode::default();
+        let mode = String::from("build");
         let instruction_ctx = InstructionContext::new(cwd);
         let session_repo = SessionRepository::new(db.clone());
 
@@ -399,8 +399,8 @@ impl Session {
             &id,
             cwd,
             &transcript_path,
-            mode.id(),
-            mode.name(),
+            "build",
+            "Build",
             db.clone(),
             instruction_ctx.clone(),
             Notifier::clone(&notifier),
@@ -410,7 +410,7 @@ impl Session {
         let agent = AgentBuilder::new(
             &id,
             model.clone(),
-            mode,
+            &mode,
             &session_dir,
             cwd,
             gctx.clone(),
@@ -432,7 +432,7 @@ impl Session {
             Notifier::clone(&notifier),
         );
 
-        let input = SessionStartHookInput::new(&id, cwd, source, model.name(), mode);
+        let input = SessionStartHookInput::new(&id, cwd, source, model.name(), &mode);
         if let HookDecision::Continue { contexts } = hooks_executor.fire_session_start(input).await
         {
             chat_context.append(&system_reminders(contexts)).await;

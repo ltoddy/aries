@@ -6,8 +6,8 @@ use rig::tool::Tool;
 use tempfile::TempDir;
 
 use super::*;
-use crate::context::ToolContext;
 use crate::multiedit::WriteKind;
+use crate::tools::ToolContext;
 
 /// 写入文件并在共享 ctx 中登记一次完整读取，模拟“先 Read 后 MultiEdit”。
 async fn seed_file(ctx: &ToolContext, path: &std::path::Path, content: &str) {

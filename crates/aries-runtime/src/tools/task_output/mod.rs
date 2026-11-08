@@ -8,7 +8,7 @@ use serde_json::Value;
 pub use self::args::TaskOutputArgs;
 pub use self::error::TaskOutputError;
 pub use self::output::TaskOutputOutput;
-use crate::context::ToolContext as AriesToolContext;
+use crate::tools::ToolContext as AriesToolContext;
 
 pub const NAME: &str = "TaskOutput";
 

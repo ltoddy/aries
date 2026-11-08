@@ -60,7 +60,8 @@ pub async fn new_session(
         session.id(),
         SessionUpdate::SessionInfoUpdate(SessionInfoUpdate::new()),
     ));
-    let config_options = config_options(session.setting(), session.mode(), session.agents());
+    let config_options =
+        config_options(session.setting(), session.mode().to_string(), session.agents());
     let resp = NewSessionResponse::new(session.id()).config_options(config_options);
     responder.respond(resp)
 }

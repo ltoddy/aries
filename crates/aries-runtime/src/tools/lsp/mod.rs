@@ -16,11 +16,11 @@ pub const NAME: &str = "Lsp";
 
 pub struct LspTool {
     client: SharedLspClient,
-    ctx: crate::context::ToolContext,
+    ctx: crate::tools::ToolContext,
 }
 
 impl LspTool {
-    pub fn new(client: SharedLspClient, ctx: crate::context::ToolContext) -> Self {
+    pub fn new(client: SharedLspClient, ctx: crate::tools::ToolContext) -> Self {
         Self { client, ctx }
     }
 
