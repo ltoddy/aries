@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use anyhow::Context;
 use aries_init::GlobalContext;
 use aries_persistence::ToolCallRepository;
-use aries_tools::bash;
+use aries_runtime::bash;
 use clap::Parser;
 use itertools::Itertools;
 use jiff::{Span, Timestamp, Zoned};

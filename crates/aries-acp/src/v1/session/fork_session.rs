@@ -1,7 +1,7 @@
 use agent_client_protocol::v1::schema::{ForkSessionRequest, ForkSessionResponse};
 use agent_client_protocol::v1::{ConnectionTo, Responder};
 use agent_client_protocol::{Client, Error};
-use aries_session::SharedRegistry;
+use aries_runtime::session::SharedRegistry;
 use tracing::info;
 
 use super::config::config_options;

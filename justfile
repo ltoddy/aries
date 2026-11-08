@@ -35,4 +35,3 @@ fix:
     @cargo +nightly fmt
 
 lint: fmt-check clippy
-

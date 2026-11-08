@@ -11,3 +11,5 @@ readme.workspace = true
 repository.workspace = true
 
 [dependencies]
+rig.workspace = true
+tokio.workspace = true

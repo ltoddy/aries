@@ -1,14 +1,246 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
+pub mod agent;
+pub mod chat_context;
+pub mod compact;
+mod context;
+mod hook;
+pub mod lspclient;
+pub mod memory;
+pub mod mode;
+pub mod preamble;
+pub mod session;
+pub mod tools;
+
+use std::path::Path;
+
+use aries_communicate::Notifier;
+use aries_extension::AgentExtensions;
+use aries_init::GlobalContext;
+use git2::Repository;
+use itertools::Itertools;
+use rig::Model;
+use rig::providers::openai::wire::OpenAiWire;
+use rig::tool::ToolSet;
+use toasty::Db;
+
+pub use self::context::ToolContext;
+use self::tools::agent as agent_tool;
+pub use self::tools::{
+    bash, batch, codesearch, edit, enter_worktree, exit_worktree, format_tool_output, glob, grep,
+    lsp, monitor, multiedit, read, skill, task_output, task_stop, update_plan, webfetch, websearch,
+    write,
+};
+use crate::mode::Mode;
+
+pub const ALL_TOOL_NAMES: &[&str] = &[
+    agent_tool::NAME,
+    bash::NAME,
+    batch::NAME,
+    codesearch::NAME,
+    edit::NAME,
+    enter_worktree::NAME,
+    exit_worktree::NAME,
+    glob::NAME,
+    grep::NAME,
+    lsp::NAME,
+    monitor::NAME,
+    multiedit::NAME,
+    read::NAME,
+    skill::NAME,
+    task_output::NAME,
+    task_stop::NAME,
+    update_plan::NAME,
+    webfetch::NAME,
+    websearch::NAME,
+    write::NAME,
+];
+
+pub fn is_builtin_tool(tool_name: &str) -> bool {
+    ALL_TOOL_NAMES.contains(&tool_name)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[allow(clippy::too_many_arguments)]
+pub fn create_tools_from_mode(
+    session_id: impl Into<String>,
+    gctx: GlobalContext,
+    mode: Mode,
+    model: Model<OpenAiWire>,
+    parent_dir: impl AsRef<Path>,
+    cwd: impl AsRef<Path>,
+    lsp_client: Option<crate::lspclient::SharedLspClient>,
+    extensions: AgentExtensions,
+    notifier: Notifier,
+    db: Db,
+) -> ToolSet {
+    let session_id = session_id.into();
+    let tool_names = tool_names_from_mode(mode);
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+    create_tools_from_tool_names(
+        session_id,
+        gctx,
+        &tool_names,
+        model,
+        parent_dir,
+        cwd,
+        lsp_client,
+        extensions,
+        notifier,
+        db,
+    )
+}
+
+pub fn tool_names_from_mode(mode: Mode) -> Vec<&'static str> {
+    let mut tool_names = vec![
+        read::NAME,
+        glob::NAME,
+        grep::NAME,
+        codesearch::NAME,
+        webfetch::NAME,
+        websearch::NAME,
+        task_output::NAME,
+    ];
+
+    match mode {
+        Mode::Build | Mode::General => tool_names.extend_from_slice(&[
+            agent_tool::NAME,
+            bash::NAME,
+            batch::NAME,
+            edit::NAME,
+            enter_worktree::NAME,
+            exit_worktree::NAME,
+            lsp::NAME,
+            multiedit::NAME,
+            skill::NAME,
+            update_plan::NAME,
+            write::NAME,
+            monitor::NAME,
+            task_stop::NAME,
+        ]),
+        Mode::Plan | Mode::Explore => {},
     }
+
+    tool_names
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn create_tools_from_tool_names(
+    session_id: impl Into<String>,
+    gctx: GlobalContext,
+    tool_names: &[&str],
+    model: Model<OpenAiWire>,
+    parent_dir: impl AsRef<Path>,
+    cwd: impl AsRef<Path>,
+    lsp_client: Option<crate::lspclient::SharedLspClient>,
+    extensions: AgentExtensions,
+    notifier: Notifier,
+    db: Db,
+) -> ToolSet {
+    let session_id = session_id.into();
+    let parent_dir = parent_dir.as_ref();
+    let cwd = cwd.as_ref();
+    let tool_names = tool_names.iter().unique().collect_vec();
+    let mut tool_set = ToolSet::default();
+
+    let ctx = ToolContext::new(session_id, lsp_client.clone(), Notifier::clone(&notifier), cwd);
+
+    for &tool_name in tool_names {
+        match tool_name {
+            agent_tool::NAME => {
+                tool_set.add_tool(agent_tool::AgentTool::new(
+                    gctx.clone(),
+                    ctx.clone(),
+                    model.clone(),
+                    parent_dir,
+                    Notifier::clone(&notifier),
+                    extensions.clone(),
+                    db.clone(),
+                ));
+            },
+            bash::NAME => {
+                tool_set.add_tool(bash::BashTool::new(ctx.clone()));
+            },
+            batch::NAME => {
+                tool_set.add_tool(batch::BatchTool::new(
+                    gctx.clone(),
+                    ctx.clone(),
+                    model.clone(),
+                    parent_dir,
+                    Notifier::clone(&notifier),
+                    extensions.clone(),
+                    db.clone(),
+                ));
+            },
+            codesearch::NAME => {
+                tool_set.add_tool(codesearch::CodeSearchTool::new());
+            },
+            edit::NAME => {
+                tool_set.add_tool(edit::EditTool::new(ctx.clone()));
+            },
+            enter_worktree::NAME => {
+                if let Some(repository) =
+                    Repository::discover(cwd).ok().filter(|repo| repo.workdir().is_some())
+                {
+                    tool_set.add_tool(enter_worktree::EnterGitWorktreeTool::new(
+                        ctx.clone(),
+                        repository,
+                        gctx.worktree_dir(),
+                    ));
+                }
+            },
+            exit_worktree::NAME => {
+                if let Some(repository) =
+                    Repository::discover(cwd).ok().filter(|repo| repo.workdir().is_some())
+                {
+                    tool_set
+                        .add_tool(exit_worktree::ExitGitWorktreeTool::new(ctx.clone(), repository));
+                }
+            },
+            glob::NAME => {
+                tool_set.add_tool(glob::GlobTool::new(ctx.clone()));
+            },
+            grep::NAME => {
+                tool_set.add_tool(grep::GrepTool::new(ctx.clone()));
+            },
+            lsp::NAME => {
+                if let Some(lsp_client) = lsp_client.clone() {
+                    tool_set.add_tool(lsp::LspTool::new(lsp_client, ctx.clone()));
+                }
+            },
+            monitor::NAME => {
+                tool_set.add_tool(monitor::MonitorTool::new(ctx.clone()));
+            },
+            multiedit::NAME => {
+                tool_set.add_tool(multiedit::MultiEditTool::new(ctx.clone()));
+            },
+            read::NAME => {
+                tool_set.add_tool(read::ReadTool::new(ctx.clone()));
+            },
+            skill::NAME => {
+                if extensions.skills.is_empty() {
+                    continue;
+                }
+                tool_set.add_tool(skill::SkillTool::new(extensions.skills.clone()));
+            },
+            task_output::NAME => {
+                tool_set.add_tool(task_output::TaskOutputTool::new(ctx.clone()));
+            },
+            task_stop::NAME => {
+                tool_set.add_tool(task_stop::TaskStopTool::new(ctx.clone()));
+            },
+            update_plan::NAME => {
+                tool_set.add_tool(update_plan::UpdatePlanTool::new());
+            },
+            webfetch::NAME => {
+                tool_set.add_tool(webfetch::WebFetchTool::new());
+            },
+            websearch::NAME => {
+                tool_set.add_tool(websearch::WebSearchTool::new());
+            },
+            write::NAME => {
+                tool_set.add_tool(write::WriteTool::new(ctx.clone()));
+            },
+            _ => {},
+        };
+    }
+
+    tool_set
 }
