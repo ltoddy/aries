@@ -1,0 +1,51 @@
+[package]
+name = "aries-orbit"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+agent-client-protocol = { version = "5.0", features = ["process", "unstable"] }
+alacritty_terminal = "0.26"
+anyhow = "1.0"
+async-channel = "2.5"
+base64 = "0.23"
+dirs = "7.0"
+git2 = { version = "0.21", default-features = false }
+gpui-kit = { version = "0.9", features = [
+    "tree-sitter",
+    "tree-sitter-bash",
+    "tree-sitter-c",
+    "tree-sitter-cpp",
+    "tree-sitter-css",
+    "tree-sitter-diff",
+    "tree-sitter-go",
+    "tree-sitter-html",
+    "tree-sitter-java",
+    "tree-sitter-javascript",
+    "tree-sitter-markdown",
+    "tree-sitter-python",
+    "tree-sitter-rust",
+    "tree-sitter-toml",
+    "tree-sitter-tsx",
+    "tree-sitter-typescript",
+    "tree-sitter-yaml",
+] }
+libc = "0.2"
+notify = "8.2"
+portable-pty = "0.9"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+similar = "3.2"
+thiserror = "2.0"
+tokio = { version = "1", features = ["rt", "macros", "time", "sync", "process", "io-util"] }
+toml = "1.1"
+
+[profile.dev]
+debug = 0
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+opt-level = "z"
+strip = true
