@@ -20,22 +20,15 @@ pub const AGENT_LOOP_MAX_TURNS: usize = 512;
 #[derive(Clone)]
 pub struct AriesAgent {
     inner: Agent,
-    name: String,
     preamble: String,
     notifier: Notifier,
 }
 
 impl AriesAgent {
-    pub fn new(
-        inner: Agent,
-        name: impl Into<String>,
-        preamble: impl Into<String>,
-        notifier: Notifier,
-    ) -> Self {
-        let name = name.into();
+    pub fn new(inner: Agent, preamble: impl Into<String>, notifier: Notifier) -> Self {
         let bare_preamble = preamble.into();
 
-        Self { inner, name, preamble: bare_preamble, notifier }
+        Self { inner, preamble: bare_preamble, notifier }
     }
 
     pub async fn prompt<I, T>(
@@ -69,10 +62,6 @@ impl AriesAgent {
 
     pub fn preamble(&self) -> &str {
         &self.preamble
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
     }
 
     pub fn set_model(&mut self, model: Model<OpenAiWire>) {

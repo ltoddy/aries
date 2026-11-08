@@ -273,13 +273,8 @@ async fn executor_adds_plain_stdout_for_session_start() {
         HookEvent::SessionStart,
         vec![command_hook("printf startup-context")],
     )]);
-    let input = SessionStartHookInput::new(
-        "session-1",
-        "/tmp",
-        SessionStartSource::Startup,
-        "model",
-        "default",
-    );
+    let input =
+        SessionStartHookInput::new("session-1", "/tmp", SessionStartSource::Startup, "model");
 
     let decision = executor.fire_session_start(input).await;
 

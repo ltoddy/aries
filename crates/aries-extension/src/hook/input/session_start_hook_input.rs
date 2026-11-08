@@ -17,7 +17,6 @@ pub struct SessionStartHookInput {
     hook_event_name: String,
     pub source: SessionStartSource,
     pub model: String,
-    pub agent_type: String,
     /// Current session title, if one is already set.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub session_title: Option<String>,
@@ -29,14 +28,12 @@ impl SessionStartHookInput {
         cwd: impl AsRef<Path>,
         source: SessionStartSource,
         model: impl Into<String>,
-        agent_type: impl Into<String>,
     ) -> Self {
         let session_id = session_id.into();
         let cwd = cwd.as_ref().to_owned();
         let model = model.into();
-        let agent_type = agent_type.into();
 
-        Self { session_id, cwd, source, model, agent_type, ..Default::default() }
+        Self { session_id, cwd, source, model, ..Default::default() }
     }
 
     pub fn transcript_path(mut self, transcript_path: impl AsRef<Path>) -> Self {

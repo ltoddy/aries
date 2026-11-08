@@ -10,8 +10,6 @@ pub async fn unarchive_session(
 ) -> Result<(), Error> {
     info!("Received unarchive session request {req:?}");
 
-    // TODO: Unarchive the requested session.
-    responder.respond_with_error(
-        Error::internal_error().data("session/unarchive is not implemented yet"),
-    )
+    let resp = UnarchiveSessionResponse::new();
+    responder.respond(resp)
 }

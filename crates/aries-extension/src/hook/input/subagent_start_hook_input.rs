@@ -15,7 +15,6 @@ pub struct SubagentStartHookInput {
     #[serde(serialize_with = "serialize_hook_event_name")]
     hook_event_name: String,
     pub agent_id: String,
-    pub agent_type: String,
 }
 
 impl SubagentStartHookInput {
@@ -23,14 +22,12 @@ impl SubagentStartHookInput {
         session_id: impl Into<String>,
         cwd: impl AsRef<Path>,
         agent_id: impl Into<String>,
-        agent_type: impl Into<String>,
     ) -> Self {
         let session_id = session_id.into();
         let cwd = cwd.as_ref().to_owned();
         let agent_id = agent_id.into();
-        let agent_type = agent_type.into();
 
-        Self { session_id, cwd, agent_id, agent_type, ..Default::default() }
+        Self { session_id, cwd, agent_id, ..Default::default() }
     }
 
     pub fn transcript_path(mut self, transcript_path: impl AsRef<Path>) -> Self {

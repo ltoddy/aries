@@ -4,7 +4,7 @@ use agent_client_protocol::{Client, Error};
 use aries_runtime::session::SharedRegistry;
 use tracing::info;
 
-use super::config::config_options;
+use super::config::{config_options, modes};
 use crate::v1::mcp::McpServers;
 
 pub async fn fork_session(
@@ -20,8 +20,9 @@ pub async fn fork_session(
     let mut registry = registry.lock().await;
     let session = registry.fork_session(session_id, req.cwd, mcp_servers.into()).await?;
 
+    let modes = modes("build", session.agents());
     let config_options =
         config_options(session.setting(), session.mode().to_string(), session.agents());
-    let resp = ForkSessionResponse::new(session.id()).config_options(config_options);
+    let resp = ForkSessionResponse::new(session.id()).modes(modes).config_options(config_options);
     responder.respond(resp)
 }
