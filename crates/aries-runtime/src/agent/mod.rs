@@ -1,52 +1,81 @@
-mod agent;
 mod builder;
+mod error;
 
-use rig::ProviderError;
-use rig::completion::PromptError;
+use aries_communicate::Notifier;
+use futures::StreamExt;
+use rig::agent::{MultiTurnStreamItem, PromptResponse};
+use rig::completion::Message;
+use rig::providers::openai::wire::OpenAiWire;
+use rig::{Agent, Model};
 
-pub use self::agent::{AGENT_LOOP_MAX_TURNS, AriesAgent};
 pub use self::builder::AgentBuilder;
-
-#[derive(Debug, thiserror::Error)]
-pub enum AriesError {
-    #[error("{0}")]
-    Streaming(#[source] Box<PromptError>),
-
-    #[error("hook terminated: {0}")]
-    HookTerminated(String),
-}
-
-impl From<PromptError> for AriesError {
-    fn from(err: PromptError) -> Self {
-        Self::Streaming(Box::new(err))
-    }
-}
-
-impl AriesError {
-    pub fn hook_terminated(reason: impl Into<String>) -> Self {
-        let reason = reason.into();
-        Self::HookTerminated(reason)
-    }
-
-    pub fn is_context_exceeded(&self) -> bool {
-        const PATTERNS: [&str; 6] = [
-            "prompt_too_long",
-            "context_length_exceeded",
-            "maximum context length",
-            "context length exceeded",
-            "too many tokens",
-            "input is too long",
-        ];
-
-        if let AriesError::Streaming(err) = self
-            && let PromptError::Provider(
-                ProviderError::Provider(message) | ProviderError::Response(message),
-            ) = err.as_ref()
-        {
-            return PATTERNS.iter().any(|p| message.contains(p));
-        }
-        false
-    }
-}
+pub use self::error::AriesError;
 
 pub type AriesResult<T, E = AriesError> = Result<T, E>;
+
+// 随着上下文管理的优化,长程任务逐渐变得可能,所以不断提高 turns 的上限
+// 提高 turns 的上限可能是一个错误,也许对于长程任务,使用 handoff 的方式更好.
+pub const AGENT_LOOP_MAX_TURNS: usize = 512;
+
+#[derive(Clone)]
+pub struct AriesAgent {
+    inner: Agent,
+    name: String,
+    preamble: String,
+    notifier: Notifier,
+}
+
+impl AriesAgent {
+    pub fn new(
+        inner: Agent,
+        name: impl Into<String>,
+        preamble: impl Into<String>,
+        notifier: Notifier,
+    ) -> Self {
+        let name = name.into();
+        let bare_preamble = preamble.into();
+
+        Self { inner, name, preamble: bare_preamble, notifier }
+    }
+
+    pub async fn prompt<I, T>(
+        &self,
+        prompt: impl Into<Message> + Send,
+        history: I,
+    ) -> AriesResult<PromptResponse>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Message>,
+    {
+        let stream = self.inner.prompt(prompt).history(history).stream();
+        tokio::pin!(stream);
+
+        let mut final_res = PromptResponse::empty();
+        while let Some(chunk) = stream.next().await {
+            match chunk {
+                Ok(item) => {
+                    self.notifier.send_stream_item(item.clone());
+
+                    if let MultiTurnStreamItem::FinalResponse(res) = item {
+                        final_res = res;
+                    }
+                },
+                Err(err) => return Err(err.into()),
+            }
+        }
+
+        Ok(final_res)
+    }
+
+    pub fn preamble(&self) -> &str {
+        &self.preamble
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn set_model(&mut self, model: Model<OpenAiWire>) {
+        self.inner.set_model(model);
+    }
+}

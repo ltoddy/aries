@@ -1,4 +1,4 @@
-use crate::context::StopTaskError;
+use crate::tools::task::StopTaskError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum TaskStopError {

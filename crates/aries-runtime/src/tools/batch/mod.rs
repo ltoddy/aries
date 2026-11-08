@@ -17,8 +17,7 @@ use toasty::Db;
 pub use self::args::{BatchArgs, BatchCall, NAME};
 pub use self::error::BatchError;
 pub use self::output::{BatchOutput, ToolOutput};
-use crate::context::ToolContext;
-use crate::tools::agent;
+use crate::tools::{ToolContext, agent};
 use crate::{codesearch, glob, grep, read, task_output, webfetch, websearch};
 
 const MAX_BATCH_CALLS: usize = 25;

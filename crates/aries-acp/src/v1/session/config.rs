@@ -7,10 +7,9 @@ use agent_client_protocol::v1::schema::{
 };
 use aries_extension::AgentDefinition;
 use aries_init::Setting;
-use aries_runtime::mode::Mode;
 
 #[derive(Debug, Copy, Clone)]
-pub(super) enum SessionConfig {
+pub enum SessionConfig {
     Mode,
     Model,
 }
@@ -43,7 +42,7 @@ impl From<SessionConfig> for String {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct ParseSessionConfigError;
+pub struct ParseSessionConfigError;
 
 impl Display for ParseSessionConfigError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -67,22 +66,16 @@ impl FromStr for SessionConfig {
     }
 }
 
-pub(super) fn config_options(
+pub fn config_options(
     setting: &Setting,
-    current_mode: Mode,
+    current_mode: String,
     agents: &[AgentDefinition],
 ) -> Vec<SessionConfigOption> {
     vec![mode_option(current_mode, agents), model_option(setting)]
 }
 
-fn mode_option(current: Mode, agents: &[AgentDefinition]) -> SessionConfigOption {
-    let mut options: Vec<_> = [Mode::Build, Mode::General, Mode::Explore]
-        .into_iter()
-        .map(|agent| {
-            SessionConfigSelectOption::new(agent.id(), agent.name())
-                .description(Some(agent.description().to_owned()))
-        })
-        .collect();
+fn mode_option(current: String, agents: &[AgentDefinition]) -> SessionConfigOption {
+    let mut options: Vec<_> = vec![];
 
     for agent in agents {
         options.push(
@@ -97,10 +90,12 @@ fn mode_option(current: Mode, agents: &[AgentDefinition]) -> SessionConfigOption
     SessionConfigOption::select(
         SessionConfig::Mode,
         SessionConfig::Mode,
-        current.id(),
+        current,
         SessionConfigSelectOptions::Ungrouped(options),
     )
-    .description("Agent mode determines how Aries processes your requests — Build (coding), General (multi-step), Explore (codebase search).")
+    .description(
+        "Agent mode determines how Aries processes your requests — configured via extensions.",
+    )
     .category(SessionConfigOptionCategory::Mode)
 }
 

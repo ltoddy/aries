@@ -20,8 +20,6 @@ pub use self::args::AgentArgs;
 pub use self::error::AgentError;
 pub use self::output::AgentOutput;
 use crate::hooks::TokenUsageHook;
-use crate::mode::Mode;
-use crate::{create_tools_from_mode, create_tools_from_tool_names, tool_names_from_mode};
 
 pub const NAME: &str = "Agent";
 pub const DEFAULT_MAX_TURNS: usize = 100;
@@ -31,7 +29,7 @@ const DESCRIPTION_TAIL: &str = include_str!("description-tail.md");
 
 pub struct AgentTool {
     gctx: GlobalContext,
-    ctx: crate::context::ToolContext,
+    ctx: crate::tools::ToolContext,
     model: Model<OpenAiWire>,
     parent_dir: PathBuf,
     notifier: Notifier,
@@ -43,7 +41,7 @@ pub struct AgentTool {
 impl AgentTool {
     pub fn new(
         gctx: GlobalContext,
-        ctx: crate::context::ToolContext,
+        ctx: crate::tools::ToolContext,
         model: Model<OpenAiWire>,
         parent_dir: impl AsRef<Path>,
         notifier: Notifier,
@@ -54,15 +52,6 @@ impl AgentTool {
         let hook = TokenUsageHook::new(gctx.current_dir(), db.clone());
 
         Self { gctx, ctx, model, parent_dir: parent_dir.to_owned(), notifier, extensions, hook, db }
-    }
-
-    fn find_agent(&self, mode: impl Into<String>) -> Option<&AgentDefinition> {
-        let mode = mode.into();
-
-        self.extensions
-            .agents
-            .iter()
-            .find(|agent| agent.frontmatter.name.eq_ignore_ascii_case(&mode))
     }
 }
 
@@ -76,7 +65,7 @@ impl Tool for AgentTool {
         let mut description = vec![DESCRIPTION_HEAD.to_owned()];
 
         if !self.extensions.agents.is_empty() {
-            description.push("\n可用的自定义子智能体（把名字填入 `mode`）：\n".to_owned());
+            description.push("\n可用的自定义子智能体（把名字填入 `name`）：\n".to_owned());
 
             for AgentDefinition { location: _, frontmatter, body: _ } in &self.extensions.agents {
                 let desc = format!(
@@ -105,12 +94,12 @@ impl Tool for AgentTool {
                     "type": "string",
                     "description": "Self-contained task brief: goal, relevant context and paths, constraints, whether edits are allowed, expected deliverable and validation."
                 },
-                "mode": {
+                "name": {
                     "type": "string",
                     "description": "Built-in build/general allow shell commands and file edits; explore is read-only research; plan is read-only analysis and planning. Also accepts listed custom names, matched case-insensitively before built-ins. Unknown values fall back to general."
                 }
             },
-            "required": ["description", "prompt", "mode"]
+            "required": ["description", "prompt", "name"]
         })
     }
 
@@ -120,47 +109,30 @@ impl Tool for AgentTool {
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
         let task_id = nanoid::nanoid!();
-        let (name, preamble, tools) = match self.find_agent(&args.mode) {
-            Some(AgentDefinition { location: _, frontmatter, body }) => {
-                let name = frontmatter.name.clone();
-                let preamble = body.clone();
-                let universe = tool_names_from_mode(Mode::General);
-                let tool_names = frontmatter.filter_tool_names(&universe);
-                let cwd = self.ctx.cwd();
-                let tools = create_tools_from_tool_names(
-                    self.ctx.session_id(),
-                    self.gctx.clone(),
-                    &tool_names,
-                    self.model.clone(),
-                    &self.parent_dir,
-                    &cwd,
-                    None,
-                    AgentExtensions::empty(),
-                    Notifier::clone(&self.notifier),
-                    self.db.clone(),
-                );
-                (name, preamble, tools)
-            },
-            None => {
-                let mode = args.mode.parse::<Mode>().unwrap_or(Mode::General);
-                (
-                    mode.name().to_owned(),
-                    mode.bare_preamble().to_owned(),
-                    create_tools_from_mode(
-                        self.ctx.session_id(),
-                        self.gctx.clone(),
-                        mode,
-                        self.model.clone(),
-                        &self.parent_dir,
-                        self.ctx.cwd(),
-                        None,
-                        AgentExtensions::empty(),
-                        Notifier::clone(&self.notifier),
-                        self.db.clone(),
-                    ),
-                )
-            },
+
+        let Some(extension) = self
+            .extensions
+            .agents
+            .iter()
+            .find(|agent| agent.frontmatter.name.eq_ignore_ascii_case(&args.name))
+        else {
+            return Err(AgentError::AgentNotFound(args.name));
         };
+
+        let tool_names = extension.frontmatter.filter_tool_names(crate::ALL_TOOL_NAMES);
+        let cwd = self.ctx.cwd();
+        let tools = crate::create_tools(
+            self.ctx.session_id(),
+            self.gctx.clone(),
+            &tool_names,
+            self.model.clone(),
+            &self.parent_dir,
+            &cwd,
+            None,
+            AgentExtensions::empty(),
+            Notifier::clone(&self.notifier),
+            self.db.clone(),
+        );
 
         let tool_server_handle = ToolServer::new().run();
         tool_server_handle.add_tools(tools);
@@ -170,8 +142,8 @@ impl Tool for AgentTool {
             .worktree()
             .map_or_else(|| self.ctx.cwd(), |worktree| worktree.path().to_owned());
         let agent = rig::agent::AgentBuilder::new(self.model.clone())
-            .name(&name)
-            .preamble(&preamble)
+            .name(&extension.frontmatter.name)
+            .preamble(&extension.body)
             .append_preamble(&crate::preamble::env::section(cwd, self.model.name()))
             .tool_server_handle(tool_server_handle)
             .add_hook(self.hook.clone())

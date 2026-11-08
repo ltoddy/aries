@@ -44,7 +44,6 @@ thiserror.workspace = true
 toasty.workspace = true
 tokio = { workspace = true, features = ["fs", "process", "sync", "time", "io-util"] }
 tokio-util.workspace = true
-toml.workspace = true
 tracing.workspace = true
 tree-sitter.workspace = true
 tree-sitter-bash.workspace = true

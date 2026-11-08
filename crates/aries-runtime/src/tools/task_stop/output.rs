@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::context::{TaskKind, TaskStatus};
+use crate::tools::task::{TaskKind, TaskStatus};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TaskStopOutput {

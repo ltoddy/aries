@@ -1,9 +1,3 @@
-mod error;
-mod queue;
-mod read_state;
-mod task;
-mod worktree;
-
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::UNIX_EPOCH;
@@ -11,12 +5,9 @@ use std::time::UNIX_EPOCH;
 use aries_communicate::Notifier;
 use tokio::fs;
 
-pub use self::error::GuardWriteError;
-pub use self::read_state::SharedReadState;
-pub use self::task::{
-    SpawnTaskError, StopTaskError, TaskKind, TaskRegistry, TaskSnapshot, TaskStatus,
-};
-pub use self::worktree::Worktree;
+use super::read_state::SharedReadState;
+use super::task::TaskRegistry;
+use super::worktree::Worktree;
 use crate::lspclient::SharedLspClient;
 
 #[derive(Clone)]
@@ -38,6 +29,17 @@ impl std::fmt::Debug for ToolContext {
             .field("read_state", &self.read_state)
             .finish()
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum GuardWriteError {
+    #[error("file has not been read yet. read it first before writing to it")]
+    NotRead,
+
+    #[error(
+        "file has been modified since read, either by the user or by a linter. read it again before attempting to write it"
+    )]
+    ModifiedSinceRead,
 }
 
 impl ToolContext {

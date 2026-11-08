@@ -10,7 +10,7 @@ fn bash_args(command: &str) -> BashArgs {
 }
 
 fn tool(cwd: impl AsRef<std::path::Path>) -> BashTool {
-    BashTool::new(crate::context::ToolContext::new(
+    BashTool::new(crate::tools::ToolContext::new(
         "test",
         None,
         {
@@ -75,7 +75,7 @@ async fn test_bash_runs_in_cwd() {
 #[tokio::test]
 async fn test_bash_background() {
     let mut context = ToolContext::new();
-    let ctx = crate::context::ToolContext::new(
+    let ctx = crate::tools::ToolContext::new(
         "test",
         None,
         {

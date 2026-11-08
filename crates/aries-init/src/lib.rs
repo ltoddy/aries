@@ -1,3 +1,4 @@
+pub mod agents;
 pub mod global;
 pub mod setting;
 
@@ -16,6 +17,22 @@ pub async fn init(root_dir: impl AsRef<Path>) {
         .await
         .expect("Unable to connect to local aries database");
     let _ = aries_persistence::migrate(&mut db).await;
+
+    const GENERAL: &str = include_str!("agents/general.md");
+    const EXPLORE: &str = include_str!("agents/explore.md");
+    const BUILD: &str = include_str!("agents/build.md");
+
+    let agents_dir = root_dir.join("agents");
+    tokio::fs::create_dir_all(&agents_dir).await.expect("Unable to create agents directory");
+
+    let (f1, f2, f3) = tokio::join!(
+        tokio::fs::write(agents_dir.join("build.md"), BUILD),
+        tokio::fs::write(agents_dir.join("explore.md"), EXPLORE),
+        tokio::fs::write(agents_dir.join("general.md"), GENERAL),
+    );
+    f1.expect("Unable to write build.md");
+    f2.expect("Unable to write explore.md");
+    f3.expect("Unable to write general.md");
 }
 
 pub async fn gc(root_dir: impl AsRef<Path>) {

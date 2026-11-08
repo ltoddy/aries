@@ -1,5 +1,5 @@
-mod chat_context;
-mod chat_history;
+mod context;
+mod history;
 
-pub use self::chat_context::ChatContext;
-pub use self::chat_history::ChatHistory;
+pub use self::context::ChatContext;
+pub use self::history::ChatHistory;

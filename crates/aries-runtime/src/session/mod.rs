@@ -1,5 +1,6 @@
 mod commands;
 mod registry;
+#[allow(clippy::module_inception)]
 mod session;
 
 use std::sync::Arc;
@@ -21,7 +22,7 @@ pub use crate::session::session::{PromptOutcome, Session};
 
 pub type SharedRegistry = Arc<Mutex<SessionRegistry>>;
 
-pub(crate) fn create_model(config: &ModelConfig) -> Model<OpenAiWire> {
+pub fn create_model(config: &ModelConfig) -> Model<OpenAiWire> {
     let mut default_headers = HeaderMap::new();
     default_headers.insert("HTTP-Referer", header::HeaderValue::from_static("")); // TODO
     default_headers.insert("X-Title", header::HeaderValue::from_static("Aries"));

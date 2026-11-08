@@ -14,17 +14,18 @@ use tree_sitter::{Language, Node, Parser};
 pub use self::args::BashArgs;
 pub use self::error::BashError;
 pub use self::output::BashOutput;
-use crate::context::{self, TaskKind};
+use crate::tools::ToolContext as AriesToolContext;
+use crate::tools::task::TaskKind;
 
 pub const NAME: &str = "Bash";
 
 pub struct BashTool {
-    ctx: context::ToolContext,
+    ctx: AriesToolContext,
     language: Language,
 }
 
 impl BashTool {
-    pub fn new(ctx: context::ToolContext) -> Self {
+    pub fn new(ctx: AriesToolContext) -> Self {
         let language = tree_sitter_bash::LANGUAGE.into();
 
         Self { ctx, language }

@@ -20,7 +20,8 @@ pub async fn fork_session(
     let mut registry = registry.lock().await;
     let session = registry.fork_session(session_id, req.cwd, mcp_servers.into()).await?;
 
-    let config_options = config_options(session.setting(), session.mode(), session.agents());
+    let config_options =
+        config_options(session.setting(), session.mode().to_string(), session.agents());
     let resp = ForkSessionResponse::new(session.id()).config_options(config_options);
     responder.respond(resp)
 }

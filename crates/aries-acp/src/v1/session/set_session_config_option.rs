@@ -1,11 +1,8 @@
-use std::str::FromStr;
-
 use agent_client_protocol::v1::schema::{
     self, SetSessionConfigOptionRequest, SetSessionConfigOptionResponse,
 };
 use agent_client_protocol::v1::{ConnectionTo, Responder};
 use agent_client_protocol::{Client, Error};
-use aries_runtime::mode::Mode;
 use aries_runtime::session::SharedRegistry;
 use tracing::{info, instrument};
 
@@ -43,13 +40,13 @@ pub async fn set_session_config_option(
     if let Ok(session_config) = config_id.parse::<SessionConfig>() {
         return match session_config {
             SessionConfig::Mode => {
-                let mode = Mode::from_str(&value).unwrap_or_default();
-                if let Err(err) = session.set_mode(mode).await {
+                let mode = value;
+                if let Err(err) = session.set_mode(&mode).await {
                     return responder.respond_with_internal_error(err.to_string());
                 }
                 let resp = SetSessionConfigOptionResponse::new(config_options(
                     session.setting(),
-                    session.mode(),
+                    session.mode().to_string(),
                     session.agents(),
                 ));
                 registry.lock().await.putback_session(session);
@@ -61,7 +58,7 @@ pub async fn set_session_config_option(
                 };
                 let resp = SetSessionConfigOptionResponse::new(config_options(
                     session.setting(),
-                    session.mode(),
+                    session.mode().to_string(),
                     session.agents(),
                 ));
                 registry.lock().await.putback_session(session);
@@ -72,7 +69,7 @@ pub async fn set_session_config_option(
 
     let resp = SetSessionConfigOptionResponse::new(config_options(
         session.setting(),
-        session.mode(),
+        session.mode().to_string(),
         session.agents(),
     ));
     responder.respond(resp)

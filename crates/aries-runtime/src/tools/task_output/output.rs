@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 
 use serde::{Deserialize, Serialize};
 
-use crate::context::{TaskKind, TaskSnapshot, TaskStatus};
+use crate::tools::task::{TaskKind, TaskSnapshot, TaskStatus};
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
