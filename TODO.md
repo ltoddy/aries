@@ -16,7 +16,6 @@
         2. RL 训练, 使用更强大模型，批量生成高质量的 Agent 执行轨迹, 清洗压缩成训练数据，然后使用 GRPO 算法训练小模型.
     - GEP 架构 参考项目: https://github.com/EvoMap/evolver
 - [ ] 遥测与 tracing (记录每个工具调用预估耗费的 token, 用于统计，针对工具做优化)
-- [ ] 优化 island，展示 token 消耗与类似 Github 的活跃图
 - [ ] 长程任务
 - [ ] 对环境进行感知
 - [ ] 实现 MoA (Mixture of Agent)

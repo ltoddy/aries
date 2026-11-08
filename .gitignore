@@ -17,13 +17,3 @@ target/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 .idea/
 .openidea/
-
-### Xcode / macOS (mac-extensions/island)
-build/
-DerivedData/
-*.xcuserdata
-*.xcuserstate
-*.app
-*.dSYM.zip
-*.dSYM
-.DS_Store
