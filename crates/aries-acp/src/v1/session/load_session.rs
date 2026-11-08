@@ -9,7 +9,7 @@ use aries_runtime::session::SharedRegistry;
 use itertools::Itertools;
 use tracing::{info, instrument};
 
-use super::config::config_options;
+use super::config::{config_options, modes};
 use crate::v1::mcp::McpServers;
 use crate::v1::prompt::session_update::SessionUpdates;
 
@@ -66,8 +66,9 @@ pub async fn load_session(
         SessionUpdate::AvailableCommandsUpdate(AvailableCommandsUpdate::new(available_commands)),
     ));
 
+    let modes = modes("build", session.agents());
     let config_options =
         config_options(session.setting(), session.mode().to_string(), session.agents());
-    let resp = LoadSessionResponse::new().config_options(config_options);
+    let resp = LoadSessionResponse::new().modes(modes).config_options(config_options);
     responder.respond(resp)
 }

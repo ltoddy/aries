@@ -130,7 +130,7 @@ impl SessionRegistry {
         self.active_sessions.insert(session.id(), session.clone());
         self.session_repo
             .create(
-                &session.id(),
+                session.id(),
                 cwd.display().to_string(),
                 session.session_dir().display().to_string(),
                 session.transcript_path().display().to_string(),

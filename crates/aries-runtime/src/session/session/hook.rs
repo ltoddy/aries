@@ -39,7 +39,6 @@ pub struct SessionPromptHook {
     cwd: PathBuf,
     transcript_path: PathBuf,
     agent_id: String,
-    agent_type: String,
     last_tool_call_at: Arc<Mutex<Option<time::Instant>>>,
 
     tool_call_repo: ToolCallRepository,
@@ -57,7 +56,6 @@ impl SessionPromptHook {
         cwd: impl AsRef<Path>,
         transcript_path: impl AsRef<Path>,
         agent_id: impl Into<String>,
-        agent_type: impl Into<String>,
         db: Db,
         instruction_ctx: InstructionContext,
         notifier: Notifier,
@@ -66,7 +64,6 @@ impl SessionPromptHook {
         let cwd = cwd.as_ref();
         let transcript_path = transcript_path.as_ref().to_owned();
         let agent_id = agent_id.into();
-        let agent_type = agent_type.into();
 
         let tool_call_repo = ToolCallRepository::new(db.clone());
         let token_usage_repo = TokenUsageRepository::new(db.clone());
@@ -78,7 +75,6 @@ impl SessionPromptHook {
             cwd: cwd.to_owned(),
             transcript_path,
             agent_id,
-            agent_type,
             last_tool_call_at: Default::default(),
             tool_call_repo,
             token_usage_repo,
@@ -259,13 +255,9 @@ impl AgentHook for SessionPromptHook {
 
         match name.as_str() {
             crate::tools::agent::NAME => {
-                let input = SubagentStartHookInput::new(
-                    &self.session_id,
-                    &self.cwd,
-                    &self.agent_id,
-                    &self.agent_type,
-                )
-                .transcript_path(&self.transcript_path);
+                let input =
+                    SubagentStartHookInput::new(&self.session_id, &self.cwd, &self.agent_id)
+                        .transcript_path(&self.transcript_path);
 
                 match self.executor.fire_subagent_start(input).await {
                     HookDecision::Continue { contexts } => {
@@ -311,8 +303,7 @@ impl AgentHook for SessionPromptHook {
             call_id.to_string(),
         )
         .transcript_path(&self.transcript_path)
-        .agent_id(&self.agent_id)
-        .agent_type(&self.agent_type);
+        .agent_id(&self.agent_id);
 
         match self.executor.fire_pre_tool_use(input).await {
             HookDecision::Continue { contexts } => {
@@ -376,7 +367,6 @@ impl AgentHook for SessionPromptHook {
                         &self.cwd,
                         false,
                         &self.agent_id,
-                        &self.agent_type,
                     )
                     .transcript_path(&self.transcript_path);
 
@@ -400,8 +390,7 @@ impl AgentHook for SessionPromptHook {
                     call_id.to_string(),
                 )
                 .transcript_path(&self.transcript_path)
-                .agent_id(&self.agent_id)
-                .agent_type(&self.agent_type);
+                .agent_id(&self.agent_id);
                 let input = match duration_ms {
                     Some(duration_ms) => input.duration_ms(duration_ms),
                     None => input,

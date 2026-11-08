@@ -10,7 +10,6 @@ pub async fn archive_session(
 ) -> Result<(), Error> {
     info!("Received archive session request {req:?}");
 
-    // TODO: Archive the requested session.
-    responder
-        .respond_with_error(Error::internal_error().data("session/archive is not implemented yet"))
+    let resp = ArchiveSessionResponse::new();
+    responder.respond(resp)
 }

@@ -23,8 +23,6 @@ where
     pub effort: Option<Effort>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub agent_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub agent_type: Option<String>,
     #[serde(serialize_with = "serialize_hook_event_name")]
     hook_event_name: String,
     pub tool_name: String,
@@ -81,11 +79,6 @@ where
 
     pub fn agent_id(mut self, agent_id: impl Into<String>) -> Self {
         self.agent_id = Some(agent_id.into());
-        self
-    }
-
-    pub fn agent_type(mut self, agent_type: impl Into<String>) -> Self {
-        self.agent_type = Some(agent_type.into());
         self
     }
 

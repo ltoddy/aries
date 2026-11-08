@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use agent_client_protocol::v1::schema::{
     SessionConfigId, SessionConfigOption, SessionConfigOptionCategory, SessionConfigSelectOption,
-    SessionConfigSelectOptions,
+    SessionConfigSelectOptions, SessionMode, SessionModeId, SessionModeState,
 };
 use aries_extension::AgentDefinition;
 use aries_init::Setting;
@@ -117,4 +117,22 @@ fn model_option(setting: &Setting) -> SessionConfigOption {
     )
     .description("The language model that powers this session. Switch models to change providers, capabilities, or context window size.")
     .category(SessionConfigOptionCategory::Model)
+}
+
+pub fn modes(current: impl AsRef<str>, agents: &[AgentDefinition]) -> SessionModeState {
+    let current = current.as_ref();
+    let agent = agents.iter().find(|agent| agent.frontmatter.name == current).expect("");
+
+    let available_modes = agents
+        .iter()
+        .map(|agent| {
+            SessionMode::new(
+                SessionModeId::new(agent.frontmatter.name.clone()),
+                &agent.frontmatter.name,
+            )
+            .description(&agent.frontmatter.description)
+        })
+        .collect::<Vec<_>>();
+
+    SessionModeState::new(SessionModeId::new(agent.frontmatter.name.clone()), available_modes)
 }

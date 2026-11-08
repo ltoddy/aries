@@ -9,7 +9,7 @@ use aries_runtime::session::SharedRegistry;
 use itertools::Itertools;
 use tracing::info;
 
-use super::config::config_options;
+use super::config::{config_options, modes};
 use crate::v1::mcp::McpServers;
 
 pub async fn new_session(
@@ -30,13 +30,7 @@ pub async fn new_session(
         },
     };
 
-    let setting = session.setting();
-    let greeting = if setting.nickname.is_empty() {
-        format!("Welcome! [session id: {}]", session.id())
-    } else {
-        format!("Welcome, {}! [session id: {}]", setting.nickname, session.id())
-    };
-
+    let greeting = format!("Welcome! [session id: {}]", session.id());
     let _ = cx.send_notification(SessionNotification::new(
         session.id(),
         SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::from(greeting))),
@@ -60,8 +54,10 @@ pub async fn new_session(
         session.id(),
         SessionUpdate::SessionInfoUpdate(SessionInfoUpdate::new()),
     ));
+
+    let modes = modes("build", session.agents());
     let config_options =
         config_options(session.setting(), session.mode().to_string(), session.agents());
-    let resp = NewSessionResponse::new(session.id()).config_options(config_options);
+    let resp = NewSessionResponse::new(session.id()).modes(modes).config_options(config_options);
     responder.respond(resp)
 }

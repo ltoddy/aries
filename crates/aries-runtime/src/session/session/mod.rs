@@ -45,6 +45,8 @@ pub enum PromptOutcome {
     Cancelled(String),
 }
 
+pub const DEFAULT_AGENT_NAME: &str = "build";
+
 #[derive(Clone)]
 pub struct Session {
     id: String,
@@ -98,9 +100,6 @@ impl Session {
     ) -> anyhow::Result<Self> {
         let id = id.into();
         let cwd = cwd.as_ref();
-        let session_dir = gctx.root_dir().join(format!("session-{id}"));
-
-        tokio::fs::create_dir_all(&session_dir).await.ok();
 
         Self::build(
             id,
@@ -166,10 +165,18 @@ impl Session {
             self.tool_server_handle.remove_tool(tool_name);
         }
 
+        let agent = self
+            .extensions
+            .agents
+            .iter()
+            .find(|agent| agent.frontmatter.name.eq_ignore_ascii_case(mode))
+            .cloned()
+            .with_context(|| format!("Agent '{mode}' not found"))?;
+
         let agent = AgentBuilder::new(
             &self.id,
             self.model.clone(),
-            mode,
+            agent,
             &self.session_dir,
             &self.cwd,
             self.gctx.clone(),
@@ -367,6 +374,9 @@ impl Session {
         let session_dir = gctx.root_dir().join(format!("session-{id}"));
         let transcript_path = session_dir.join("transcripts");
 
+        let _ = tokio::fs::create_dir_all(&session_dir).await;
+        let _ = tokio::fs::create_dir_all(&transcript_path).await;
+
         aries_logger::register(&id, &session_dir);
 
         let (notifier, receiver) = Notifier::channel();
@@ -390,7 +400,6 @@ impl Session {
             .with_context(|| format!("failed to initialize chat context for session {id}"))?;
 
         let hooks_executor = Arc::new(HooksExecutor::new(extensions.hooks.clone()));
-        let mode = String::from("build");
         let instruction_ctx = InstructionContext::new(cwd);
         let session_repo = SessionRepository::new(db.clone());
 
@@ -399,18 +408,23 @@ impl Session {
             &id,
             cwd,
             &transcript_path,
-            "build",
-            "Build",
+            DEFAULT_AGENT_NAME,
             db.clone(),
             instruction_ctx.clone(),
             Notifier::clone(&notifier),
         );
 
         let model = crate::session::create_model(&config);
+        let agent = extensions
+            .agents
+            .iter()
+            .find(|agent| agent.frontmatter.name.eq_ignore_ascii_case(DEFAULT_AGENT_NAME))
+            .cloned()
+            .with_context(|| format!("Agent '{DEFAULT_AGENT_NAME}' not found"))?;
         let agent = AgentBuilder::new(
             &id,
             model.clone(),
-            &mode,
+            agent,
             &session_dir,
             cwd,
             gctx.clone(),
@@ -432,7 +446,7 @@ impl Session {
             Notifier::clone(&notifier),
         );
 
-        let input = SessionStartHookInput::new(&id, cwd, source, model.name(), &mode);
+        let input = SessionStartHookInput::new(&id, cwd, source, model.name());
         if let HookDecision::Continue { contexts } = hooks_executor.fire_session_start(input).await
         {
             chat_context.append(&system_reminders(contexts)).await;
@@ -446,7 +460,7 @@ impl Session {
             cwd: cwd.to_owned(),
             model,
             agent,
-            mode,
+            mode: DEFAULT_AGENT_NAME.to_owned(),
             lsp_client,
             chat_history,
             chat_context,

@@ -22,7 +22,6 @@ pub struct SubagentStopHookInput {
     /// `true` when already continuing as a result of a stop hook.
     pub stop_hook_active: bool,
     pub agent_id: String,
-    pub agent_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub agent_transcript_path: Option<PathBuf>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -35,14 +34,12 @@ impl SubagentStopHookInput {
         cwd: impl AsRef<Path>,
         stop_hook_active: bool,
         agent_id: impl Into<String>,
-        agent_type: impl Into<String>,
     ) -> Self {
         let session_id = session_id.into();
         let cwd = cwd.as_ref().to_owned();
         let agent_id = agent_id.into();
-        let agent_type = agent_type.into();
 
-        Self { session_id, cwd, stop_hook_active, agent_id, agent_type, ..Default::default() }
+        Self { session_id, cwd, stop_hook_active, agent_id, ..Default::default() }
     }
 
     pub fn transcript_path(mut self, transcript_path: impl AsRef<Path>) -> Self {
