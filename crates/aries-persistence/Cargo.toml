@@ -13,7 +13,7 @@ categories.workspace = true
 [dependencies]
 jiff.workspace = true
 toasty = { workspace = true, features = ["jiff", "sqlite"] }
-toasty-driver-sqlite.workspace = true
+toasty-driver-sqlite = "0.11"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt"] }

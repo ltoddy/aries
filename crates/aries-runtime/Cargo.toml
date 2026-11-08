@@ -11,19 +11,18 @@ readme.workspace = true
 repository.workspace = true
 
 [dependencies]
-anyhow.workspace = true
 aries-communicate = { version = "0.1.0", path = "../aries-communicate" }
 aries-extension = { version = "0.1.0", path = "../aries-extension" }
 aries-filesystem = { version = "0.1.0", path = "../aries-filesystem" }
 aries-init = { version = "0.1.0", path = "../aries-init" }
 aries-logger = { version = "0.1.0", path = "../aries-logger" }
 aries-persistence = { version = "0.1.0", path = "../aries-persistence" }
-firecrawl.workspace = true
+firecrawl = "2.21"
 futures.workspace = true
-git2.workspace = true
-globset.workspace = true
-grep-regex.workspace = true
-grep-searcher.workspace = true
+git2 = "0.21"
+globset = "0.4"
+grep-regex = "0.1"
+grep-searcher = "0.1"
 http.workspace = true
 ignore.workspace = true
 itertools.workspace = true
@@ -32,24 +31,24 @@ nanoid.workspace = true
 parking_lot.workspace = true
 regex-lite.workspace = true
 reqwest.workspace = true
-reqwest-middleware.workspace = true
-reqwest-retry.workspace = true
+reqwest-middleware = "0.5"
+reqwest-retry = "0.9"
 rig = { workspace = true, features = ["reqwest-middleware"] }
-schemars.workspace = true
+schemars = "1.2"
 serde.workspace = true
 serde_json.workspace = true
-serde_repr.workspace = true
-similar.workspace = true
+serde_repr = "0.1"
+similar = "3.2"
 thiserror.workspace = true
 toasty.workspace = true
 tokio = { workspace = true, features = ["fs", "process", "sync", "time", "io-util"] }
-tokio-util.workspace = true
+tokio-util = "0.7"
 tracing.workspace = true
 tree-sitter.workspace = true
 tree-sitter-bash.workspace = true
 
 [dev-dependencies]
-criterion.workspace = true
+criterion = "0.8"
 tempfile.workspace = true
 tokio = { workspace = true, features = ["fs", "macros", "net", "process", "rt-multi-thread"] }
 
