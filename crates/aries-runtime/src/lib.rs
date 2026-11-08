@@ -1,8 +1,8 @@
 pub mod agent;
 pub mod chat_context;
 pub mod compact;
-mod context;
-mod hook;
+pub mod context;
+pub mod hooks;
 pub mod lspclient;
 pub mod memory;
 pub mod mode;
@@ -115,7 +115,7 @@ pub fn tool_names_from_mode(mode: Mode) -> Vec<&'static str> {
             monitor::NAME,
             task_stop::NAME,
         ]),
-        Mode::Plan | Mode::Explore => {},
+        Mode::Explore => {},
     }
 
     tool_names

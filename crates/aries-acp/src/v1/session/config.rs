@@ -71,7 +71,7 @@ pub(super) fn config_options(setting: &Setting, current_mode: Mode) -> Vec<Sessi
 }
 
 fn mode_option(current: Mode) -> SessionConfigOption {
-    let options = [Mode::Build, Mode::Plan, Mode::General, Mode::Explore]
+    let options = [Mode::Build, Mode::General, Mode::Explore]
         .into_iter()
         .map(|agent| {
             SessionConfigSelectOption::new(agent.id(), agent.name())
@@ -85,7 +85,7 @@ fn mode_option(current: Mode) -> SessionConfigOption {
         current.id(),
         SessionConfigSelectOptions::Ungrouped(options),
     )
-    .description("Agent mode determines how Aries processes your requests — Build (coding), Plan (no edits), General (multi-step), Explore (codebase search).")
+    .description("Agent mode determines how Aries processes your requests — Build (coding), General (multi-step), Explore (codebase search).")
     .category(SessionConfigOptionCategory::Mode)
 }
 
