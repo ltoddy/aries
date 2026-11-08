@@ -1,7 +1,6 @@
 pub mod acp;
 pub mod agent;
 pub mod command;
-pub mod exec;
 pub mod gc;
 pub mod hook;
 pub mod mcp;
@@ -18,7 +17,6 @@ use prompt::PromptArgs;
 use crate::cli::acp::AcpArgs;
 use crate::cli::agent::AgentCommand;
 use crate::cli::command::CommandCommand;
-use crate::cli::exec::ExecArgs;
 use crate::cli::hook::HookCommand;
 use crate::cli::mcp::McpCommand;
 use crate::cli::model::ModelCommand;
@@ -50,8 +48,6 @@ pub enum Subcommands {
         #[command(subcommand)]
         command: CommandCommand,
     },
-    #[command(about = "Execute a shell command")]
-    Exec(ExecArgs),
     #[command(about = "Garbage collect stale database records")]
     Gc,
     #[command(about = "Manage lifecycle hooks")]
