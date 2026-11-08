@@ -8,7 +8,7 @@ use aries_persistence::SessionRepository;
 use toasty::Db;
 use tracing::{Instrument, info_span};
 
-use crate::session::{Session, SessionArgs};
+use crate::session::Session;
 
 pub struct SessionRegistry {
     gctx: GlobalContext,
@@ -81,7 +81,6 @@ impl SessionRegistry {
         &mut self,
         cwd: impl AsRef<Path>,
         session_id: impl Into<String>,
-        args: SessionArgs,
     ) -> anyhow::Result<Session> {
         let cwd = cwd.as_ref();
         let session_id = session_id.into();
@@ -92,7 +91,7 @@ impl SessionRegistry {
         let mcp_config = McpDefinition::empty();
         match self.session_repo.find_last_by_session_id(&session_id).await {
             Ok(_) => self.load_session(session_id, mcp_config).await,
-            Err(_) => self.new_session(cwd, mcp_config, args).await,
+            Err(_) => self.new_session(cwd, mcp_config).await,
         }
     }
 
@@ -110,7 +109,6 @@ impl SessionRegistry {
         &mut self,
         cwd: impl AsRef<Path>,
         external_mcp_config: McpDefinition,
-        args: SessionArgs,
     ) -> anyhow::Result<Session> {
         let cwd = cwd.as_ref();
         let session_id = nanoid::nanoid!();
@@ -124,7 +122,6 @@ impl SessionRegistry {
             self.setting.clone(),
             self.db.clone(),
             external_mcp_config,
-            args,
         )
         .instrument(info_span!("session_init", session_id = %session_id))
         .await
@@ -203,7 +200,6 @@ impl SessionRegistry {
             self.setting.clone(),
             self.db.clone(),
             external_mcp_config,
-            parent_session.args(),
         )
         .instrument(info_span!("session_init", session_id = %session_id))
         .await

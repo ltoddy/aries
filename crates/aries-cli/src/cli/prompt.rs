@@ -1,6 +1,6 @@
 use aries_communicate::AgentEvent;
 use aries_init::{GlobalContext, SettingLoader};
-use aries_runtime::session::{SessionArgs, SessionRegistry};
+use aries_runtime::session::SessionRegistry;
 use clap::Parser;
 use colored::Colorize;
 use tracing::info_span;
@@ -28,8 +28,7 @@ pub async fn execute(args: PromptArgs, gctx: GlobalContext) -> anyhow::Result<()
 
     let current_dir = gctx.current_dir();
 
-    let session_args = SessionArgs::default();
-    let mut session = registry.try_session(current_dir, &session_id, session_args).await?;
+    let mut session = registry.try_session(current_dir, &session_id).await?;
     let session_id = session.id();
     let _session_span = info_span!("session", session_id = %session_id).entered();
 

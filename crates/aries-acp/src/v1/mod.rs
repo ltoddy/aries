@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use agent_client_protocol::{Agent, ConnectTo, on_receive_notification, on_receive_request};
 use aries_init::{GlobalContext, Setting};
-use aries_runtime::session::{SessionArgs, SessionRegistry};
+use aries_runtime::session::SessionRegistry;
 use tokio::sync::Mutex;
 
 use self::auth::{auth_status, authenticate};
@@ -30,7 +30,6 @@ pub async fn run(
     gctx: GlobalContext,
     setting: Setting,
     transport: impl ConnectTo<Agent> + 'static,
-    bare: bool,
 ) -> Result<(), agent_client_protocol::Error> {
     let registry: aries_runtime::session::SharedRegistry =
         Arc::new(Mutex::new(SessionRegistry::new(gctx, setting).await?));
@@ -49,8 +48,7 @@ pub async fn run(
             {
                 let register = registry.clone();
                 async move |req, responder, cx| {
-                    let session_args = SessionArgs::new(bare);
-                    new_session(req, responder, cx, register.clone(), session_args).await
+                    new_session(req, responder, cx, register.clone()).await
                 }
             },
             on_receive_request!(),

@@ -1,5 +1,3 @@
-mod args;
-mod config;
 mod hook;
 mod instruction;
 
@@ -34,8 +32,6 @@ use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_util::sync::CancellationToken;
 
-pub use self::args::SessionArgs;
-use self::config::SessionConfig;
 use self::hook::SessionPromptHook;
 use self::instruction::InstructionContext;
 use crate::agent::{AgentBuilder, AriesAgent};
@@ -61,7 +57,6 @@ pub struct Session {
     model: Model<OpenAiWire>,
     agent: AriesAgent,
     mode: Mode,
-    args: SessionArgs,
 
     lsp_client: Option<SharedLspClient>,
     chat_history: ChatHistory,
@@ -101,14 +96,12 @@ impl Session {
         setting: Setting,
         db: Db,
         external_mcp_config: McpDefinition,
-        args: SessionArgs,
     ) -> anyhow::Result<Self> {
         let id = id.into();
         let cwd = cwd.as_ref();
         let session_dir = gctx.root_dir().join(format!("session-{id}"));
 
-        let session_config = SessionConfig::new(args.bare);
-        session_config.save(&session_dir).await;
+        tokio::fs::create_dir_all(&session_dir).await.ok();
 
         Self::build(
             id,
@@ -119,7 +112,6 @@ impl Session {
             db,
             external_mcp_config,
             SessionStartSource::Startup,
-            args,
         )
         .await
     }
@@ -136,9 +128,6 @@ impl Session {
     ) -> anyhow::Result<Self> {
         let id = id.into();
         let cwd = cwd.as_ref();
-        let session_dir = gctx.root_dir().join(format!("session-{id}"));
-
-        let session_config = SessionConfig::load(&session_dir).await;
 
         Self::build(
             id,
@@ -149,7 +138,6 @@ impl Session {
             db,
             external_mcp_config,
             SessionStartSource::Resume,
-            SessionArgs::new(session_config.bare),
         )
         .await
     }
@@ -305,10 +293,6 @@ impl Session {
         &self.setting
     }
 
-    pub fn args(&self) -> SessionArgs {
-        self.args.clone()
-    }
-
     pub async fn context(&self) -> Vec<Message> {
         self.chat_context.history().await.to_vec()
     }
@@ -373,7 +357,6 @@ impl Session {
         db: Db,
         external_mcp_config: McpDefinition,
         source: SessionStartSource,
-        args: SessionArgs,
     ) -> anyhow::Result<Self> {
         let id = id.into();
         let cwd = cwd.as_ref();
@@ -386,8 +369,7 @@ impl Session {
 
         let lsp_client = Self::warm_up_lsp(cwd).await;
 
-        let mut extensions =
-            if args.bare { AgentExtensions::empty() } else { AgentExtensions::new(cwd).await };
+        let mut extensions = AgentExtensions::new(cwd, gctx.root_dir()).await;
         extensions.mcps.push(external_mcp_config);
         let tool_server_handle = ToolServer::new().run();
         let mcp_clients = mcp::connect(&extensions.mcps, tool_server_handle.clone()).await;
@@ -461,7 +443,6 @@ impl Session {
             model,
             agent,
             mode,
-            args,
             lsp_client,
             chat_history,
             chat_context,

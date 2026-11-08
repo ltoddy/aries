@@ -16,14 +16,19 @@ pub struct SkillsLoader {
 impl SkillsLoader {
     pub const FILENAME: &str = "SKILL.md";
 
-    pub fn new(cwd: impl AsRef<Path>, home_dir: impl AsRef<Path>) -> Self {
+    pub fn new(
+        cwd: impl AsRef<Path>,
+        home_dir: impl AsRef<Path>,
+        root_dir: impl AsRef<Path>,
+    ) -> Self {
         let cwd = cwd.as_ref();
         let home_dir = home_dir.as_ref();
+        let root_dir = root_dir.as_ref();
 
         let roots = vec![
             home_dir.join(".agents").join("skills"),
-            home_dir.join(".agents").join("plugins").join("skills"),
             cwd.join(".agents").join("skills"),
+            root_dir.join("skills"),
         ]
         .into_iter()
         .unique()

@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use aries_extension::McpDefinition;
 use aries_init::{GlobalContext, SettingLoader};
-use aries_runtime::session::{SessionArgs, SessionRegistry};
+use aries_runtime::session::SessionRegistry;
 use colored::Colorize;
 use rustyline::error::ReadlineError;
 use tracing::info_span;
@@ -11,7 +11,7 @@ use super::display_elapsed;
 use crate::display::print_agent_event;
 use crate::{commands, input, welcome};
 
-pub async fn execute(gctx: GlobalContext, bare: bool) -> anyhow::Result<()> {
+pub async fn execute(gctx: GlobalContext) -> anyhow::Result<()> {
     let loader = SettingLoader::new(gctx.root_dir());
     let setting = loader.load().await?;
     let model_config = setting.active_model()?;
@@ -22,9 +22,7 @@ pub async fn execute(gctx: GlobalContext, bare: bool) -> anyhow::Result<()> {
 
     let current_dir = gctx.current_dir();
 
-    let session_args = SessionArgs::new(bare);
-    let mut session =
-        registry.new_session(&current_dir, McpDefinition::empty(), session_args).await?;
+    let mut session = registry.new_session(&current_dir, McpDefinition::empty()).await?;
     let session_id = session.id();
     let _session_span = info_span!("session", session_id = %session_id).entered();
 

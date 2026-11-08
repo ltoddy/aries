@@ -30,15 +30,16 @@ pub struct AgentExtensions {
 }
 
 impl AgentExtensions {
-    pub async fn new(cwd: impl AsRef<Path>) -> Self {
+    pub async fn new(cwd: impl AsRef<Path>, root_dir: impl AsRef<Path>) -> Self {
         let cwd = cwd.as_ref();
+        let root_dir = root_dir.as_ref();
         let home_dir = std::env::home_dir().unwrap_or_else(|| PathBuf::from("~"));
 
-        let agent_loader = AgentsLoader::new(cwd, &home_dir);
+        let agent_loader = AgentsLoader::new(cwd, &home_dir, root_dir);
         let command_loader = CommandsLoader::new(cwd, &home_dir);
         let hook_loader = HooksLoader::new(cwd, &home_dir);
         let mcp_loader = McpsLoader::new(cwd, &home_dir);
-        let skill_loader = SkillsLoader::new(cwd, &home_dir);
+        let skill_loader = SkillsLoader::new(cwd, &home_dir, root_dir);
 
         let (agents, commands, hooks, mcps, skills) = tokio::join!(
             agent_loader.load(),

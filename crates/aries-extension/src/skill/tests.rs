@@ -221,7 +221,7 @@ async fn load_finds_skills_from_home_and_cwd() {
     write_skill(&home, "fix-typo", "fix typos");
     write_skill(&cwd, "review", "review code");
 
-    let loader = SkillsLoader::new(&cwd, &home);
+    let loader = SkillsLoader::new(&cwd, &home, tmp.path());
     let skills = loader.load().await;
 
     let names: Vec<_> = skills.iter().map(|s| s.frontmatter.name.as_str()).sorted().collect_vec();
@@ -243,7 +243,7 @@ async fn load_ignores_non_skill_files() {
     fs::write(dir.join("notes.md"), "---\nname: ignored\ndescription: ignored\n---\n")
         .expect("test operation should succeed");
 
-    let loader = SkillsLoader::new(&cwd, &home);
+    let loader = SkillsLoader::new(&cwd, &home, tmp.path());
     let skills = loader.load().await;
     assert_eq!(skills.len(), 1);
     assert_eq!(skills[0].frontmatter.name, "fix-typo");
@@ -257,7 +257,7 @@ async fn load_returns_empty_when_no_roots_exist() {
     fs::create_dir_all(&home).expect("test operation should succeed");
     fs::create_dir_all(&cwd).expect("test operation should succeed");
 
-    let loader = SkillsLoader::new(&cwd, &home);
+    let loader = SkillsLoader::new(&cwd, &home, tmp.path());
     let skills = loader.load().await;
     assert!(skills.is_empty());
 }

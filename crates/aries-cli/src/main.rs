@@ -63,6 +63,6 @@ async fn main() -> anyhow::Result<()> {
         Some(cli::Subcommands::Skill { command }) => match command {
             SkillCommand::List(args) => skill::list::execute(args, gctx).await,
         },
-        _ => session::run::execute(gctx, args.bare).await,
+        _ => session::run::execute(gctx).await,
     }
 }

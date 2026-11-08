@@ -13,14 +13,19 @@ pub struct AgentsLoader {
 }
 
 impl AgentsLoader {
-    pub fn new(cwd: impl AsRef<Path>, home_dir: impl AsRef<Path>) -> Self {
+    pub fn new(
+        cwd: impl AsRef<Path>,
+        home_dir: impl AsRef<Path>,
+        root_dir: impl AsRef<Path>,
+    ) -> Self {
         let cwd = cwd.as_ref();
         let home_dir = home_dir.as_ref();
+        let root_dir = root_dir.as_ref();
 
         let roots = vec![
             home_dir.join(".agents").join("agents"),
-            home_dir.join(".agents").join("plugins").join("agents"),
             cwd.join(".agents").join("agents"),
+            root_dir.join("agents"),
         ]
         .into_iter()
         .unique()
