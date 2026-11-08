@@ -18,7 +18,10 @@ pub async fn fork_session(
     let mcp_servers = McpServers(req.mcp_servers);
 
     let mut registry = registry.lock().await;
-    let session = registry.fork_session(session_id, req.cwd, mcp_servers.into()).await?;
+    let session = registry
+        .fork_session(session_id, req.cwd, mcp_servers.into())
+        .await
+        .map_err(|e| Error::internal_error().data(e.to_string()))?;
 
     let modes = modes("build", session.agents());
     let config_options =

@@ -7,7 +7,6 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use anyhow::Context;
 use aries_communicate::{AgentEvent, Notifier};
 use aries_extension::hook::input::{
     SessionEndHookInput, SessionEndReason, SessionStartHookInput, SessionStartSource,
@@ -15,7 +14,7 @@ use aries_extension::hook::input::{
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
 use aries_extension::{AgentExtensions, McpDefinition, SkillExecutor, SlashCommandsExecutor, mcp};
-use aries_init::{GlobalContext, ModelConfig, Setting, SettingLoader};
+use aries_init::{GlobalContext, ModelConfig, Setting, SettingError, SettingLoader};
 use aries_persistence::SessionRepository;
 use itertools::Itertools;
 use jiff::Zoned;
@@ -39,6 +38,24 @@ use crate::chat_context::{ChatContext, ChatHistory};
 use crate::compact::ContextCompactor;
 use crate::lspclient::{LspServerInfo, SharedLspClient, warm_up};
 use crate::memory::{MemoryRetriever, MemoryStore};
+
+#[derive(Debug, thiserror::Error)]
+pub enum SessionError {
+    #[error("agent not found: {0}")]
+    AgentNotFound(String),
+
+    #[error("{0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("{0}")]
+    Setting(#[from] SettingError),
+}
+
+impl SessionError {
+    pub fn agent_not_found(name: impl Into<String>) -> Self {
+        Self::AgentNotFound(name.into())
+    }
+}
 
 pub enum PromptOutcome {
     Completed(String),
@@ -97,7 +114,7 @@ impl Session {
         setting: Setting,
         db: Db,
         external_mcp_config: McpDefinition,
-    ) -> anyhow::Result<Self> {
+    ) -> Result<Self, SessionError> {
         let id = id.into();
         let cwd = cwd.as_ref();
 
@@ -123,7 +140,7 @@ impl Session {
         setting: Setting,
         db: Db,
         external_mcp_config: McpDefinition,
-    ) -> anyhow::Result<Self> {
+    ) -> Result<Self, SessionError> {
         let id = id.into();
         let cwd = cwd.as_ref();
 
@@ -140,7 +157,7 @@ impl Session {
         .await
     }
 
-    pub async fn set_model(&mut self, alias: impl Into<String>) -> anyhow::Result<()> {
+    pub async fn set_model(&mut self, alias: impl Into<String>) -> Result<(), SessionError> {
         let alias = alias.into();
 
         let config = self.setting.activate(&alias)?;
@@ -158,7 +175,7 @@ impl Session {
         Ok(())
     }
 
-    pub async fn set_mode(&mut self, mode: impl AsRef<str>) -> anyhow::Result<()> {
+    pub async fn set_mode(&mut self, mode: impl AsRef<str>) -> Result<(), SessionError> {
         let mode = mode.as_ref();
         // 不同的模式, 注册的工具是不同的，所以先删除全部内置的，然后再重新添加
         for tool_name in crate::ALL_TOOL_NAMES {
@@ -171,7 +188,7 @@ impl Session {
             .iter()
             .find(|agent| agent.frontmatter.name.eq_ignore_ascii_case(mode))
             .cloned()
-            .with_context(|| format!("Agent '{mode}' not found"))?;
+            .ok_or_else(|| SessionError::agent_not_found(mode))?;
 
         let agent = AgentBuilder::new(
             &self.id,
@@ -368,7 +385,7 @@ impl Session {
         db: Db,
         external_mcp_config: McpDefinition,
         source: SessionStartSource,
-    ) -> anyhow::Result<Self> {
+    ) -> Result<Self, SessionError> {
         let id = id.into();
         let cwd = cwd.as_ref();
         let session_dir = gctx.root_dir().join(format!("session-{id}"));
@@ -392,12 +409,8 @@ impl Session {
             MemoryStore::new(gctx.memory_root_dir().join(aries_filesystem::path_to_slug(cwd)))
                 .await;
 
-        let chat_history = ChatHistory::new(&session_dir)
-            .await
-            .with_context(|| format!("failed to initialize chat history for session {id}"))?;
-        let chat_context = ChatContext::new(&session_dir)
-            .await
-            .with_context(|| format!("failed to initialize chat context for session {id}"))?;
+        let chat_history = ChatHistory::new(&session_dir).await?;
+        let chat_context = ChatContext::new(&session_dir).await?;
 
         let hooks_executor = Arc::new(HooksExecutor::new(extensions.hooks.clone()));
         let instruction_ctx = InstructionContext::new(cwd);
@@ -420,7 +433,7 @@ impl Session {
             .iter()
             .find(|agent| agent.frontmatter.name.eq_ignore_ascii_case(DEFAULT_AGENT_NAME))
             .cloned()
-            .with_context(|| format!("Agent '{DEFAULT_AGENT_NAME}' not found"))?;
+            .ok_or_else(|| SessionError::agent_not_found(DEFAULT_AGENT_NAME))?;
         let agent = AgentBuilder::new(
             &id,
             model.clone(),

@@ -11,7 +11,6 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
-anyhow.workspace = true
 aries-filesystem = { version = "0.1.0", path = "../aries-filesystem" }
 aries-persistence = { version = "0.1.0", path = "../aries-persistence" }
 parking_lot.workspace = true
@@ -19,6 +18,6 @@ prettytable.workspace = true
 serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
 tokio = { workspace = true, features = ["fs"] }
-toml.workspace = true
+toml = "1.1"
 tracing.workspace = true
-whoami.workspace = true
+whoami = "2.1"

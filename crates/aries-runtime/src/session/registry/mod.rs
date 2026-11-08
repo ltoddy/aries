@@ -1,14 +1,29 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use anyhow::Context;
 use aries_extension::McpDefinition;
-use aries_init::{GlobalContext, Setting};
+use aries_init::{GlobalContext, Setting, SettingError};
 use aries_persistence::SessionRepository;
 use toasty::Db;
 use tracing::{Instrument, info_span};
 
 use crate::session::Session;
+use crate::session::session::SessionError;
+
+#[derive(Debug, thiserror::Error)]
+pub enum RegistryError {
+    #[error("{0}")]
+    Db(#[from] toasty::Error),
+
+    #[error("{0}")]
+    Setting(#[from] SettingError),
+
+    #[error("{0}")]
+    Session(#[from] SessionError),
+
+    #[error("parent session {0} is not active")]
+    SessionNotActive(String),
+}
 
 pub struct SessionRegistry {
     gctx: GlobalContext,
@@ -20,11 +35,9 @@ pub struct SessionRegistry {
 }
 
 impl SessionRegistry {
-    pub async fn new(gctx: GlobalContext, setting: Setting) -> anyhow::Result<Self> {
+    pub async fn new(gctx: GlobalContext, setting: Setting) -> Result<Self, RegistryError> {
         let root_dir = gctx.root_dir();
-        let db = aries_persistence::connect(&root_dir)
-            .await
-            .with_context(|| format!("connecting to database at {}", root_dir.display()))?;
+        let db = aries_persistence::connect(&root_dir).await?;
         let session_repo = SessionRepository::new(db.clone());
 
         Ok(Self { gctx, setting, db, active_sessions: Default::default(), session_repo })
@@ -33,15 +46,11 @@ impl SessionRegistry {
     pub async fn list_sessions(
         &mut self,
         cwd: Option<PathBuf>,
-    ) -> anyhow::Result<Vec<aries_persistence::Session>> {
+    ) -> Result<Vec<aries_persistence::Session>, RegistryError> {
         let sessions = match &cwd {
             Some(cwd) => self.session_repo.find_by_cwd(cwd.display().to_string()).await,
             None => self.session_repo.find().await,
-        }
-        .with_context(|| match &cwd {
-            Some(cwd) => format!("failed to find session info for cwd {}", cwd.display()),
-            None => "failed to find session info".to_string(),
-        })?;
+        }?;
 
         let sessions = sessions
             .into_iter()
@@ -59,7 +68,10 @@ impl SessionRegistry {
         };
     }
 
-    pub async fn delete_session(&mut self, session_id: impl Into<String>) -> anyhow::Result<()> {
+    pub async fn delete_session(
+        &mut self,
+        session_id: impl Into<String>,
+    ) -> Result<(), RegistryError> {
         let session_id = session_id.into();
 
         if let Some(removed) = self.active_sessions.remove(&session_id) {
@@ -67,10 +79,7 @@ impl SessionRegistry {
         }
 
         if let Ok(session) = self.session_repo.find_last_by_session_id(&session_id).await {
-            self.session_repo
-                .delete_by_session_id(&session_id)
-                .await
-                .with_context(|| format!("failed to delete session {session_id} from database"))?;
+            self.session_repo.delete_by_session_id(&session_id).await?;
             let _ = tokio::fs::remove_dir_all(&session.root_dir).await;
         }
 
@@ -81,7 +90,7 @@ impl SessionRegistry {
         &mut self,
         cwd: impl AsRef<Path>,
         session_id: impl Into<String>,
-    ) -> anyhow::Result<Session> {
+    ) -> Result<Session, RegistryError> {
         let cwd = cwd.as_ref();
         let session_id = session_id.into();
         if let Some(session) = self.active_sessions.get(&session_id) {
@@ -109,7 +118,7 @@ impl SessionRegistry {
         &mut self,
         cwd: impl AsRef<Path>,
         external_mcp_config: McpDefinition,
-    ) -> anyhow::Result<Session> {
+    ) -> Result<Session, RegistryError> {
         let cwd = cwd.as_ref();
         let session_id = nanoid::nanoid!();
         let model_config = self.setting.active_model()?;
@@ -124,8 +133,7 @@ impl SessionRegistry {
             external_mcp_config,
         )
         .instrument(info_span!("session_init", session_id = %session_id))
-        .await
-        .with_context(|| format!("failed to create session {}", session_id))?;
+        .await?;
 
         self.active_sessions.insert(session.id(), session.clone());
         self.session_repo
@@ -135,10 +143,7 @@ impl SessionRegistry {
                 session.session_dir().display().to_string(),
                 session.transcript_path().display().to_string(),
             )
-            .await
-            .with_context(|| {
-                format!("failed to create session info in local storage for session {session_id}")
-            })?;
+            .await?;
 
         Ok(session)
     }
@@ -147,14 +152,10 @@ impl SessionRegistry {
         &mut self,
         session_id: impl Into<String>,
         external_mcp_config: McpDefinition,
-    ) -> anyhow::Result<Session> {
+    ) -> Result<Session, RegistryError> {
         let session_id = session_id.into();
 
-        let session = self
-            .session_repo
-            .find_last_by_session_id(&session_id)
-            .await
-            .with_context(|| format!("failed to load session {session_id} from database"))?;
+        let session = self.session_repo.find_last_by_session_id(&session_id).await?;
 
         let model_config = self.setting.active_model()?;
 
@@ -168,8 +169,7 @@ impl SessionRegistry {
             external_mcp_config,
         )
         .instrument(info_span!("session_init", session_id = %session_id))
-        .await
-        .with_context(|| format!("failed to load session {session_id}"))?;
+        .await?;
 
         self.active_sessions.insert(session.id(), session.clone());
 
@@ -181,7 +181,7 @@ impl SessionRegistry {
         parent_session_id: impl Into<String>,
         cwd: impl AsRef<Path>,
         external_mcp_config: McpDefinition,
-    ) -> anyhow::Result<Session> {
+    ) -> Result<Session, RegistryError> {
         let parent_session_id = parent_session_id.into();
         let cwd = cwd.as_ref();
         let session_id = nanoid::nanoid!();
@@ -189,7 +189,7 @@ impl SessionRegistry {
         let parent_session = self
             .active_sessions
             .get(&parent_session_id)
-            .with_context(|| format!("parent session {parent_session_id} is not active"))?;
+            .ok_or_else(|| RegistryError::SessionNotActive(parent_session_id.clone()))?;
 
         let model_config = self.setting.active_model()?;
         let session = Session::new(
@@ -202,8 +202,7 @@ impl SessionRegistry {
             external_mcp_config,
         )
         .instrument(info_span!("session_init", session_id = %session_id))
-        .await
-        .with_context(|| format!("failed to fork session {session_id} from {parent_session_id}"))?;
+        .await?;
 
         let parent_context = parent_session.context().await;
         session.overwrite_context(parent_context).await;
@@ -216,10 +215,7 @@ impl SessionRegistry {
                 session.session_dir().display().to_string(),
                 session.transcript_path().display().to_string(),
             )
-            .await
-            .with_context(|| {
-                format!("failed to create session info in local storage for session {session_id}")
-            })?;
+            .await?;
 
         Ok(session)
     }

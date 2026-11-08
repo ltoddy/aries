@@ -16,7 +16,7 @@ path = "src/main.rs"
 
 [dependencies]
 agent-client-protocol = { workspace = true, features = ["stdio"] }
-anyhow.workspace = true
+anyhow = "1"
 aries-acp = { version = "0.1.0", path = "../../crates/aries-acp" }
 aries-communicate = { version = "0.1.0", path = "../../crates/aries-communicate" }
 aries-extension = { version = "0.1.0", path = "../../crates/aries-extension" }

@@ -1,8 +1,8 @@
+use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::Context;
 use aries_filesystem::jsonl;
 use futures::StreamExt;
 use regex_lite::Regex;
@@ -107,19 +107,16 @@ impl CompactAgent {
         CompactOutcome::Success((resume_prompt(&compact_summary, &file_path), compact_summary))
     }
 
-    async fn save_transcript(&mut self, messages: &[Message]) -> anyhow::Result<PathBuf> {
+    async fn save_transcript(&mut self, messages: &[Message]) -> io::Result<PathBuf> {
         #[rustfmt::skip]
         tokio::fs::create_dir_all(&self.transcript_path)
-            .await
-            .with_context(|| format!("failed to create transcript directory `{}`", self.transcript_path.display()))?;
+            .await?;
 
         let now = SystemTime::now();
         let ts = now.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
         let file_path = self.transcript_path.join(format!("transcript_{ts}.json"));
 
-        jsonl::write(&file_path, messages)
-            .await
-            .with_context(|| format!("failed to write transcript file {}", file_path.display()))?;
+        jsonl::write(&file_path, messages).await?;
 
         Ok(file_path)
     }

@@ -318,7 +318,6 @@ dependencies = [
 name = "aries-init"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "aries-filesystem",
  "aries-persistence",
  "parking_lot 0.13.0",
@@ -357,7 +356,6 @@ dependencies = [
 name = "aries-runtime"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "aries-communicate",
  "aries-extension",
  "aries-filesystem",

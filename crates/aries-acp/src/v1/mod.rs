@@ -31,8 +31,11 @@ pub async fn run(
     setting: Setting,
     transport: impl ConnectTo<Agent> + 'static,
 ) -> Result<(), agent_client_protocol::Error> {
-    let registry: aries_runtime::session::SharedRegistry =
-        Arc::new(Mutex::new(SessionRegistry::new(gctx, setting).await?));
+    let registry: aries_runtime::session::SharedRegistry = Arc::new(Mutex::new(
+        SessionRegistry::new(gctx, setting)
+            .await
+            .map_err(|e| agent_client_protocol::Error::internal_error().data(e.to_string()))?,
+    ));
 
     Agent
         .v1()

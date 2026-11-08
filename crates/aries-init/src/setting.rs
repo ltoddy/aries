@@ -1,18 +1,26 @@
 use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 
-use anyhow::Context;
 use prettytable::{Cell, Row, Table, row};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Error)]
 pub enum SettingError {
     #[error("model alias `{0}` already exists")]
     DuplicateModelAlias(String),
 
     #[error("active model `{0}` not found in configuration")]
     ActiveModelNotFound(String),
+
+    #[error("io error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("toml parse error: {0}")]
+    TomlParse(#[from] toml::de::Error),
+
+    #[error("toml serialize error: {0}")]
+    TomlSerialize(#[from] toml::ser::Error),
 }
 
 impl SettingError {
@@ -40,26 +48,22 @@ impl SettingLoader {
         Self { file_path }
     }
 
-    pub async fn load(&self) -> anyhow::Result<Setting> {
+    pub async fn load(&self) -> Result<Setting, SettingError> {
         let file_path = &self.file_path;
 
-        let content = tokio::fs::read_to_string(file_path)
-            .await
-            .with_context(|| format!("failed to read setting from {}", file_path.display()))?;
+        let content = tokio::fs::read_to_string(file_path).await.map_err(SettingError::Io)?;
 
-        let setting = toml::from_str(&content).context("failed to parse setting from TOML")?;
+        let setting = toml::from_str(&content).map_err(SettingError::TomlParse)?;
 
         Ok(setting)
     }
 
-    pub async fn save(&self, s: &Setting) -> anyhow::Result<()> {
+    pub async fn save(&self, s: &Setting) -> Result<(), SettingError> {
         let file_path = &self.file_path;
 
-        let content = toml::to_string_pretty(s).context("failed to serialize setting to TOML")?;
+        let content = toml::to_string_pretty(s).map_err(SettingError::TomlSerialize)?;
 
-        tokio::fs::write(file_path, &content)
-            .await
-            .with_context(|| format!("failed to write setting to {}", file_path.display()))?;
+        tokio::fs::write(file_path, &content).await.map_err(SettingError::Io)?;
         Ok(())
     }
 
