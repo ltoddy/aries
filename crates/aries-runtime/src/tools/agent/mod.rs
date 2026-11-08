@@ -19,7 +19,7 @@ use toasty::Db;
 pub use self::args::AgentArgs;
 pub use self::error::AgentError;
 pub use self::output::AgentOutput;
-use crate::hook::TokenUsageHook;
+use crate::hooks::TokenUsageHook;
 use crate::mode::Mode;
 use crate::{create_tools_from_mode, create_tools_from_tool_names, tool_names_from_mode};
 
