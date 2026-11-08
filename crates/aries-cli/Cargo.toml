@@ -24,7 +24,6 @@ aries-init = { version = "0.1.0", path = "../aries-init" }
 aries-logger = { version = "0.1.0", path = "../aries-logger" }
 aries-persistence = { version = "0.1.0", path = "../aries-persistence" }
 aries-session = { version = "0.1.0", path = "../aries-session" }
-aries-tokenopt = { version = "0.1.0", path = "../aries-tokenopt" }
 aries-tools = { version = "0.1.0", path = "../aries-tools" }
 clap = { workspace = true, features = ["derive"] }
 colored.workspace = true
