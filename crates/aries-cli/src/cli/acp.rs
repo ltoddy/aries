@@ -13,15 +13,9 @@ pub enum AcpVersion {
 pub struct AcpArgs {
     #[arg(value_enum, default_value = "v1", help = "ACP protocol version (v1 or v2)")]
     pub version: AcpVersion,
-
-    #[arg(long, help = "Run in bare mode")]
-    pub bare: bool,
 }
 
-pub async fn execute(
-    AcpArgs { version, bare }: AcpArgs,
-    gctx: GlobalContext,
-) -> anyhow::Result<()> {
+pub async fn execute(AcpArgs { version }: AcpArgs, gctx: GlobalContext) -> anyhow::Result<()> {
     let loader = SettingLoader::new(gctx.root_dir());
     let setting = loader.load().await?;
 
@@ -29,7 +23,7 @@ pub async fn execute(
 
     let transport = Stdio::new();
     match version {
-        AcpVersion::V1 => aries_acp::v1::run(gctx, setting, transport, bare).await?,
+        AcpVersion::V1 => aries_acp::v1::run(gctx, setting, transport).await?,
         AcpVersion::V2 => aries_acp::v2::run(gctx, setting, transport).await?,
     }
 

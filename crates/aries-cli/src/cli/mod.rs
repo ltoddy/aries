@@ -29,9 +29,6 @@ use crate::cli::stats::StatsCommand;
 pub struct Args {
     #[command(subcommand)]
     pub command: Option<Subcommands>,
-
-    #[arg(long, help = "Run in bare mode")]
-    pub bare: bool,
 }
 
 #[derive(Subcommand, Debug, Clone)]

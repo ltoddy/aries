@@ -5,7 +5,7 @@ use agent_client_protocol::v1::schema::{
 };
 use agent_client_protocol::v1::{ConnectionTo, Responder};
 use agent_client_protocol::{Client, Error};
-use aries_runtime::session::{SessionArgs, SharedRegistry};
+use aries_runtime::session::SharedRegistry;
 use itertools::Itertools;
 use tracing::info;
 
@@ -17,14 +17,13 @@ pub async fn new_session(
     responder: Responder<NewSessionResponse>,
     cx: ConnectionTo<Client>,
     registry: SharedRegistry,
-    args: SessionArgs,
 ) -> Result<(), Error> {
     info!("Received new session request {req:?}");
 
     let mcp_servers = McpServers(req.mcp_servers);
     let mcp_config = mcp_servers.into();
     let mut registry = registry.lock().await;
-    let session = match registry.new_session(req.cwd, mcp_config, args).await {
+    let session = match registry.new_session(req.cwd, mcp_config).await {
         Ok(session) => session,
         Err(err) => {
             return responder.respond_with_internal_error(err.to_string());
