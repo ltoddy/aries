@@ -155,7 +155,7 @@ impl Preferences {
                 if source.kind() == io::ErrorKind::NotFound =>
             {
                 (Self::default(), None)
-            }
+            },
             Err(error) => (
                 Self::default(),
                 Some(format!("无法读取设置，已使用默认值；原文件未修改：{error}")),

@@ -27,8 +27,8 @@ jobs:
 
       - run: cargo +nightly fmt --all -- --check
 
-  clippy:
-    name: clippy
+  lint-cli:
+    name: lint (cli)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
@@ -39,10 +39,10 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2.9.3
 
-      - run: cargo +nightly clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo +nightly clippy -p aries-cli --all-targets --locked -- -D warnings
 
-  test:
-    name: test
+  test-cli:
+    name: test (cli)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
@@ -51,11 +51,25 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2.9.3
 
-      - run: cargo +nightly test --workspace --lib --bins --tests --locked
+      - run: cargo +nightly test -p aries-cli --lib --bins --tests --locked
 
-  install:
-    name: install
-    runs-on: ubuntu-latest
+  lint-orbit:
+    name: lint (orbit)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2.9.3
+
+      - run: cargo +nightly clippy -p aries-orbit --all-targets --locked -- -D warnings
+
+  test-orbit:
+    name: test (orbit)
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v7.0.1
 
@@ -63,7 +77,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2.9.3
 
-      - run: cargo +nightly install --path apps/aries-cli --locked
+      - run: cargo +nightly test -p aries-orbit --lib --bins --tests --locked
 
   security:
     name: security

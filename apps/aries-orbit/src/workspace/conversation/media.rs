@@ -23,14 +23,14 @@ fn images(update: &SessionUpdate) -> Vec<Arc<Image>> {
         | SessionUpdate::AgentMessageChunk(chunk)
         | SessionUpdate::AgentThoughtChunk(chunk) => {
             content_image(&chunk.content).into_iter().collect()
-        }
+        },
         SessionUpdate::CompactionUpdate(update) => match &update.summary {
             MaybeUndefined::Value(summary) => summary.iter().filter_map(content_image).collect(),
             _ => Vec::new(),
         },
         SessionUpdate::CompactionSummaryChunk(chunk) => {
             content_image(&chunk.content).into_iter().collect()
-        }
+        },
         _ => Vec::new(),
     }
 }
@@ -108,7 +108,7 @@ impl MessageImages {
             match &compaction.summary {
                 MaybeUndefined::Value(summary) => {
                     summary.iter().filter_map(content_image).collect()
-                }
+                },
                 _ => Vec::new(),
             }
         } else {

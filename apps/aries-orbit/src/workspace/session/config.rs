@@ -74,7 +74,7 @@ fn render_config_option(
     let supported = match &option.kind {
         SessionConfigKind::Select(select) => {
             config::select_options(&select.options).next().is_some()
-        }
+        },
         SessionConfigKind::Boolean(_) => true,
         _ => false,
     };
@@ -114,7 +114,7 @@ fn render_config_option(
                         SessionConfigSelectOptions::Ungrouped(options) => vec![(None, options)],
                         SessionConfigSelectOptions::Grouped(groups) => {
                             groups.iter().map(|group| (Some(&group.name), &group.options)).collect()
-                        }
+                        },
                         _ => Vec::new(),
                     };
                     for (name, choices) in groups {
@@ -134,7 +134,7 @@ fn render_config_option(
                             ));
                         }
                     }
-                }
+                },
                 SessionConfigKind::Boolean(current) => {
                     for (value, name) in [(true, "开启"), (false, "关闭")] {
                         menu = menu.item(config_item(
@@ -148,8 +148,8 @@ fn render_config_option(
                             value == current.current_value,
                         ));
                     }
-                }
-                _ => {}
+                },
+                _ => {},
             }
             menu
         })

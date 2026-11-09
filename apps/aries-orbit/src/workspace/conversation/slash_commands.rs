@@ -119,7 +119,7 @@ impl RenderOnce for CommandMenu {
                         let hint = match &command.input {
                             Some(AvailableCommandInput::Unstructured(input)) => {
                                 Some(input.hint.as_str())
-                            }
+                            },
                             _ => None,
                         };
                         let details = SharedString::from(format!(

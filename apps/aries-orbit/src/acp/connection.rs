@@ -74,7 +74,7 @@ impl AgentConnection {
                         "请等待当前回复结束后再删除会话",
                     )))
                     .await;
-            }
+            },
             Command::LoadSession(request) => {
                 let _ = self
                     .events
@@ -83,7 +83,7 @@ impl AgentConnection {
                         result: Err(Error::internal_error().data("请等待当前回复结束后再加载会话")),
                     })
                     .await;
-            }
+            },
             Command::SetSessionConfigOption(request) => {
                 self.emit(Event::SessionConfigSet {
                     session_id: request.session_id,
@@ -91,8 +91,8 @@ impl AgentConnection {
                     result: Err(Error::internal_error().data("请等待当前操作结束后再修改配置")),
                 })
                 .await;
-            }
-            Command::NewSession(_) | Command::Prompt { .. } | Command::Cancel => {}
+            },
+            Command::NewSession(_) | Command::Prompt { .. } | Command::Cancel => {},
         }
     }
 
@@ -115,12 +115,12 @@ impl AgentConnection {
                         break;
                     };
                     self.emit(Event::Ready(Box::new(response))).await;
-                }
+                },
                 Command::ListSessions => self.request_sessions().await,
                 Command::DeleteSessions(ids) => {
                     let result = delete_sessions::request(&self.client, ids).await;
                     let _ = self.events.send(Event::SessionsDeleted(result)).await;
-                }
+                },
                 Command::LoadSession(request) => {
                     let session_id = request.session_id.clone();
                     self.cancel.send_replace(false);
@@ -130,12 +130,12 @@ impl AgentConnection {
                         Err(Error::internal_error().data("Agent 不支持加载会话"))
                     };
                     let _ = self.events.send(Event::SessionLoaded { session_id, result }).await;
-                }
+                },
                 Command::Prompt { session_id, text } => {
                     if prompt::request(self, session_id, text).await? == ControlFlow::Break(()) {
                         break;
                     }
-                }
+                },
                 Command::SetSessionConfigOption(request) => {
                     let session_id = request.session_id.clone();
                     let config_id = request.config_id.clone();
@@ -143,8 +143,8 @@ impl AgentConnection {
                         .await
                         .map_err(Error::from);
                     self.emit(Event::SessionConfigSet { session_id, config_id, result }).await;
-                }
-                Command::Cancel => {}
+                },
+                Command::Cancel => {},
             }
         }
         Ok(())

@@ -9,7 +9,19 @@
 
 本项目命名为 **Aries**（白羊座），因为项目创建时正值白羊座时期（3月21日 - 4月19日）。象征着全新的开始与充满活力的探索。
 
-![terminal](docs/assets/terminal.png)
+## Apps
+
+### Aries CLI (`aries`)
+
+终端 AI 助手，通过 Agent Client Protocol 与各类 IDE 集成，支持模型管理、网络访问等功能。
+
+![terminal](docs/assets/aries-cli-terminal.png)
+
+### Aries Orbit (`aries-orbit`)
+
+原生 macOS 终端模拟器，内置 AI 能力。基于 GPUI 构建，提供高性能的原生体验。
+
+![orbit](docs/assets/aries-orbit.png)
 
 ## Rust toolchain
 
@@ -19,13 +31,27 @@
 
 目前仅支持源码安装，还未发布到 crates.io 上。
 
-安装命令, 如果有 just 命令的情况下可以通过:
+### Aries CLI
 
-> just install
+> just install-cli
 
-如果没有 just 命令，可以通过:
+或:
 
 > cargo install --path apps/aries-cli --force --locked
+
+### Aries Orbit
+
+仅支持 macOS。
+
+源码安装:
+
+> cargo install --path apps/aries-orbit --force --locked
+
+DMG 安装:
+
+> just orbit-dmg
+>
+> open target/bundle/Aries-Orbit-*.dmg
 
 ## 使用
 

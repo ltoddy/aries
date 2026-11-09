@@ -148,7 +148,7 @@ impl SessionList {
                 self.entries = sessions;
                 self.rebuild_projects();
                 self.error = None;
-            }
+            },
             Err(error) => self.error = Some(error.to_string()),
         }
     }

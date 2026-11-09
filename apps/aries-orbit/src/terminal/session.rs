@@ -128,10 +128,10 @@ impl EventListener for Listener {
             Event::PtyWrite(text) => Some(text),
             Event::ColorRequest(index, format) if index < 256 => {
                 Some(format(crate::terminal::paint::indexed_rgb(index)))
-            }
+            },
             Event::TextAreaSizeRequest(format) => {
                 Some(format(*self.size.lock().expect("terminal size lock poisoned")))
-            }
+            },
             _ => None,
         };
         if let Some(response) = response {
@@ -507,7 +507,7 @@ fn run(directory: PathBuf, dimensions: Dimensions, worker: Worker) -> anyhow::Re
                             cell_height: height,
                         };
                         let _ = notifications.try_send(());
-                    }
+                    },
                     Err(_) => break,
                 }
             }
@@ -532,14 +532,14 @@ fn run(directory: PathBuf, dimensions: Dimensions, worker: Worker) -> anyhow::Re
                 Ok(0) => {
                     failure = Some(WorkerError::WriteZero.into());
                     break;
-                }
+                },
                 Ok(count) => {
                     offset += count;
                     if offset == bytes.len() {
                         pending.pop_front();
                         offset = 0;
                     }
-                }
+                },
                 Err(error)
                     if matches!(
                         error.kind(),
@@ -547,11 +547,11 @@ fn run(directory: PathBuf, dimensions: Dimensions, worker: Worker) -> anyhow::Re
                     ) =>
                 {
                     break;
-                }
+                },
                 Err(error) => {
                     failure = Some(anyhow::Error::new(error).context("writing PTY input"));
                     break;
-                }
+                },
             }
         }
         let mut eof = false;
@@ -560,14 +560,14 @@ fn run(directory: PathBuf, dimensions: Dimensions, worker: Worker) -> anyhow::Re
                 Ok(0) => {
                     eof = true;
                     break;
-                }
+                },
                 Ok(count) => {
                     parser.advance(
                         &mut *terminal.lock().expect("terminal screen lock poisoned"),
                         &buffer[..count],
                     );
                     let _ = notifications.try_send(());
-                }
+                },
                 Err(error)
                     if matches!(
                         error.kind(),
@@ -575,15 +575,15 @@ fn run(directory: PathBuf, dimensions: Dimensions, worker: Worker) -> anyhow::Re
                     ) =>
                 {
                     break;
-                }
+                },
                 Err(error) if error.raw_os_error() == Some(libc::EIO) => {
                     eof = true;
                     break;
-                }
+                },
                 Err(error) => {
                     failure = Some(anyhow::Error::new(error).context("reading PTY output"));
                     break;
-                }
+                },
             }
         }
         if failure.is_some() {
@@ -600,12 +600,12 @@ fn run(directory: PathBuf, dimensions: Dimensions, worker: Worker) -> anyhow::Re
                 if eof || Instant::now() >= *deadline {
                     break;
                 }
-            }
-            Ok(false) => {}
+            },
+            Ok(false) => {},
             Err(error) => {
                 failure = Some(anyhow::Error::new(error).context("checking shell exit status"));
                 break;
-            }
+            },
         }
         if eof {
             thread::sleep(Duration::from_millis(10));

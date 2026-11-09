@@ -36,7 +36,7 @@ impl Composer {
             InputEvent::Change => self.command_menu.reset(),
             InputEvent::Focus => self.command_menu.focus(),
             InputEvent::Blur => self.command_menu.blur(),
-            _ => {}
+            _ => {},
         }
     }
 
@@ -121,13 +121,13 @@ impl Composer {
         match action {
             CommandMenuAction::Previous if count > 0 => {
                 self.command_menu.move_selection(action, count);
-            }
+            },
             CommandMenuAction::Next if count > 0 => {
                 self.command_menu.move_selection(action, count);
-            }
+            },
             CommandMenuAction::Complete if count > 0 => {
                 self.complete_selected_command(commands, available, window, cx);
-            }
+            },
             CommandMenuAction::Dismiss => self.command_menu.dismiss(),
             _ => return,
         }

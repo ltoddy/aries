@@ -58,10 +58,10 @@ impl<'a> From<&'a ContentBlock> for AttachmentInfo<'a> {
                 let (uri, mime_type, icon) = match &resource.resource {
                     EmbeddedResourceResource::TextResourceContents(resource) => {
                         (resource.uri.as_str(), resource.mime_type.as_deref(), IconName::FileText)
-                    }
+                    },
                     EmbeddedResourceResource::BlobResourceContents(resource) => {
                         (resource.uri.as_str(), resource.mime_type.as_deref(), IconName::File)
-                    }
+                    },
                     _ => ("", None, IconName::File),
                 };
                 Self {
@@ -72,7 +72,7 @@ impl<'a> From<&'a ContentBlock> for AttachmentInfo<'a> {
                     uri: Some(uri),
                     description: None,
                 }
-            }
+            },
             _ => Self {
                 name: "附件",
                 kind: "附件",

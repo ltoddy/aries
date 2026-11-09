@@ -92,11 +92,11 @@ impl SessionDeletion {
             DeletionState::Confirming(pending) => {
                 self.deletion = DeletionState::Deleting;
                 Some(pending.ids)
-            }
+            },
             other => {
                 self.deletion = other;
                 None
-            }
+            },
         }
     }
 

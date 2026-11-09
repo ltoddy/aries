@@ -19,7 +19,7 @@ aries-logger = { version = "0.1.0", path = "../aries-logger" }
 aries-persistence = { version = "0.1.0", path = "../aries-persistence" }
 firecrawl = "2.21"
 futures.workspace = true
-git2 = "0.21"
+git2 = { workspace = true }
 globset = "0.4"
 grep-regex = "0.1"
 grep-searcher = "0.1"
@@ -35,10 +35,10 @@ reqwest-middleware = "0.5"
 reqwest-retry = "0.9"
 rig = { workspace = true, features = ["reqwest-middleware"] }
 schemars = "1.2"
-serde.workspace = true
+serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 serde_repr = "0.1"
-similar = "3.2"
+similar = { workspace = true }
 thiserror.workspace = true
 toasty.workspace = true
 tokio = { workspace = true, features = ["fs", "process", "sync", "time", "io-util"] }

@@ -2,15 +2,21 @@
 name = "aries-orbit"
 version = "0.1.0"
 edition = "2024"
+license.workspace = true
+authors.workspace = true
+description.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [dependencies]
-agent-client-protocol = { version = "5.0", features = ["process", "unstable"] }
+agent-client-protocol = { workspace = true, features = ["process"] }
 alacritty_terminal = "0.26"
 anyhow = "1.0"
 async-channel = "2.5"
-base64 = "0.23"
+base64.workspace = true
 dirs = "7.0"
-git2 = { version = "0.21", default-features = false }
+git2 = { workspace = true, default-features = false }
 gpui-kit = { version = "0.9", features = [
     "tree-sitter",
     "tree-sitter-bash",
@@ -33,19 +39,9 @@ gpui-kit = { version = "0.9", features = [
 libc = "0.2"
 notify = "8.2"
 portable-pty = "0.9"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-similar = "3.2"
-thiserror = "2.0"
-tokio = { version = "1", features = ["rt", "macros", "time", "sync", "process", "io-util"] }
-toml = "1.1"
-
-[profile.dev]
-debug = 0
-
-[profile.release]
-lto = true
-codegen-units = 1
-panic = "abort"
-opt-level = "z"
-strip = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+similar.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["rt", "macros", "time", "sync", "process", "io-util"] }
+toml.workspace = true

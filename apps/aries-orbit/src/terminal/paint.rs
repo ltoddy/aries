@@ -22,11 +22,11 @@ pub fn indexed_rgb(index: usize) -> Rgb {
             let component = |value: usize| if value == 0 { 0 } else { 55 + value * 40 };
             ((component(index / 36) << 16) | (component(index / 6 % 6) << 8) | component(index % 6))
                 as u32
-        }
+        },
         232..=255 => {
             let gray = (8 + (index - 232) * 10) as u32;
             (gray << 16) | (gray << 8) | gray
-        }
+        },
         _ => 0,
     };
     Rgb { r: (value >> 16) as u8, g: (value >> 8) as u8, b: value as u8 }
@@ -39,7 +39,7 @@ fn color(value: Color, colors: &Colors, foreground: Hsla, background: Hsla, bold
                 | (u32::from(value.g) << 8)
                 | u32::from(value.b))
             .into();
-        }
+        },
         Color::Indexed(value) => usize::from(value),
         Color::Named(value) => {
             if bold {
@@ -47,7 +47,7 @@ fn color(value: Color, colors: &Colors, foreground: Hsla, background: Hsla, bold
             } else {
                 value as usize
             }
-        }
+        },
     };
     if let Some(value) = colors[index] {
         return rgb((u32::from(value.r) << 16) | (u32::from(value.g) << 8) | u32::from(value.b))
@@ -59,11 +59,11 @@ fn color(value: Color, colors: &Colors, foreground: Hsla, background: Hsla, bold
         258 => foreground,
         259..=266 => {
             color(Color::Indexed((index - 259) as u8), colors, foreground, background, false)
-        }
+        },
         _ => {
             let value = indexed_rgb(index);
             rgb((u32::from(value.r) << 16) | (u32::from(value.g) << 8) | u32::from(value.b)).into()
-        }
+        },
     }
 }
 
@@ -345,7 +345,7 @@ pub fn paint(
                 let geometry = match (focused, cursor.shape) {
                     (true, CursorShape::Beam) => {
                         Some(Bounds::new(cell_bounds.origin, size(px(2.), cell_size.height)))
-                    }
+                    },
                     (true, CursorShape::Underline) => Some(Bounds::new(
                         cell_bounds.origin + point(px(0.), cell_size.height - px(2.)),
                         size(width, px(2.)),

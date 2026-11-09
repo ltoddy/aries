@@ -344,7 +344,7 @@ impl GitPanel {
         let (info, error) = match result {
             Ok(None) if self.info.is_some() || self.read_error.is_some() => {
                 (None, Some("项目不再是可读取的 Git 仓库".into()))
-            }
+            },
             Ok(info) => (info, None),
             Err(error) => (None, Some(format!("{error:#}"))),
         };
@@ -482,7 +482,7 @@ impl GitPanel {
                         });
                     });
                     return;
-                }
+                },
             };
             if view
                 .update(cx, |this, cx| this.with_git_panel(|panel| panel.refresh_info(cx)))

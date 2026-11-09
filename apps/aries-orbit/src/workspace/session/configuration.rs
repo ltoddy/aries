@@ -75,7 +75,7 @@ impl Configuration {
             Ok(options) => {
                 execution.set_config_options(options);
                 self.error = None;
-            }
+            },
             Err(error) => self.error = Some(format!("无法更新会话配置：{error}")),
         }
         cx.notify();

@@ -40,7 +40,7 @@ pub fn key_bytes(key: &Keystroke, mode: TermMode) -> Option<Vec<u8>> {
             } else {
                 format!("\x1b[{code}")
             }
-        }
+        },
         "insert" | "delete" | "pageup" | "pagedown" | "f5" | "f6" | "f7" | "f8" | "f9" | "f10"
         | "f11" | "f12" => {
             let code = match key.key.as_str() {
@@ -58,7 +58,7 @@ pub fn key_bytes(key: &Keystroke, mode: TermMode) -> Option<Vec<u8>> {
                 _ => 24,
             };
             if modifier == 1 { format!("\x1b[{code}~") } else { format!("\x1b[{code};{modifier}~") }
-        }
+        },
         "f1" | "f2" | "f3" | "f4" => {
             let code = match key.key.as_str() {
                 "f1" => 'P',
@@ -67,7 +67,7 @@ pub fn key_bytes(key: &Keystroke, mode: TermMode) -> Option<Vec<u8>> {
                 _ => 'S',
             };
             if modifier == 1 { format!("\x1bO{code}") } else { format!("\x1b[1;{modifier}{code}") }
-        }
+        },
         _ if modifiers.control => {
             let character = if key.key == "space" { ' ' } else { key.key.chars().next()? };
             let byte = match character.to_ascii_lowercase() {
@@ -82,14 +82,14 @@ pub fn key_bytes(key: &Keystroke, mode: TermMode) -> Option<Vec<u8>> {
                 _ => return None,
             };
             return Some(if modifiers.alt { vec![27, byte] } else { vec![byte] });
-        }
+        },
         _ if modifiers.alt => {
             let text = key.key_char.as_deref().unwrap_or(&key.key);
             if text.chars().count() != 1 {
                 return None;
             }
             return Some(format!("\x1b{text}").into_bytes());
-        }
+        },
         _ => return None,
     };
     let prefix_alt =

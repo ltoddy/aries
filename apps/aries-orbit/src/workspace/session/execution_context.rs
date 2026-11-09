@@ -41,7 +41,7 @@ impl ExecutionState {
             ),
             Self::ChoosingProject => {
                 Some(Icon::new(IconName::Folder).size_3().text_color(p.muted()).into_any_element())
-            }
+            },
             _ => Some(Spinner::new().small().color(p.muted()).into_any_element()),
         };
         div()

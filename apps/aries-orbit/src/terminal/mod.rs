@@ -165,7 +165,7 @@ impl TerminalView {
                 Ok(()) => {
                     self.input_error = None;
                     session.terminal().scroll_display(Scroll::Bottom);
-                }
+                },
                 Err(error) => self.input_error = Some(error.to_string()),
             }
             cx.notify();

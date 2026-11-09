@@ -52,7 +52,7 @@ impl Message {
                     if !matches!(chunk.content, ContentBlock::Text(_)) =>
                 {
                     Some((index, &chunk.content))
-                }
+                },
                 _ => None,
             }
         })
@@ -269,11 +269,11 @@ impl Conversation {
                     }
                 }
                 subagent.upsert_message(msg.message_id.to_string(), text);
-            }
+            },
             MaybeUndefined::Null => {
                 subagent.upsert_message(msg.message_id.to_string(), String::new());
-            }
-            MaybeUndefined::Undefined => {}
+            },
+            MaybeUndefined::Undefined => {},
         }
         if let Some(pending) = self.pending_subagent_chunks.remove(&route_key) {
             for text in pending {
@@ -346,7 +346,7 @@ impl Conversation {
                 });
                 self.tools.insert(key, index);
                 index
-            }
+            },
         };
         let message = &mut self.messages[index];
         let tool = message.tool_call.as_mut().expect("tool entry has state");
@@ -406,14 +406,14 @@ impl Conversation {
                 if !patch.meta.is_undefined() {
                     state.meta = patch.meta.clone();
                 }
-            }
+            },
             SessionUpdate::CompactionSummaryChunk(chunk) => {
                 if let MaybeUndefined::Value(summary) = &mut state.summary {
                     summary.push(chunk.content.clone());
                 } else {
                     state.summary = MaybeUndefined::Value(vec![chunk.content.clone()]);
                 }
-            }
+            },
             _ => unreachable!(),
         }
         (message.title, message.text) = UpdateDisplay::from(&*state).into_parts();

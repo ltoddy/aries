@@ -57,7 +57,7 @@ fn read_line_changes(
                 Err(error) => return Err(error),
             };
             repository.diff_tree_to_index(tree.as_ref(), None, Some(&mut options))?
-        }
+        },
         ChangeGroup::Unstaged => repository.diff_index_to_workdir(None, Some(&mut options))?,
     };
     let mut find = DiffFindOptions::new();
@@ -77,7 +77,7 @@ fn read_line_changes(
                 } else {
                     LineChanges::Text { added: 0, deleted: 0 }
                 }
-            }
+            },
             Err(_) => LineChanges::Unavailable,
         };
         if let Some(delta) = diff.get_delta(ix) {
@@ -142,7 +142,7 @@ impl GitInfo {
             Some(target) => target.strip_prefix("refs/heads/").unwrap_or(target).to_owned(),
             None => {
                 format!("游离 HEAD · {}", &head.target().context("HEAD 没有目标")?.to_string()[..7])
-            }
+            },
         };
         let mut options = StatusOptions::new();
         options

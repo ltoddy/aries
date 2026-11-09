@@ -429,7 +429,7 @@ impl Execution {
                     });
                 }));
                 self.bridge = Some(bridge);
-            }
+            },
             Err(error) => {
                 self.apply_event(
                     ui,
@@ -437,7 +437,7 @@ impl Execution {
                     window,
                     cx,
                 );
-            }
+            },
         }
         cx.notify();
     }
@@ -464,7 +464,7 @@ impl Execution {
                 if ui.render_mode != crate::workspace::SessionRenderMode::Main {
                     self.refresh_sessions(ui, cx);
                 }
-            }
+            },
             Event::Sessions(result) => {
                 let received = ui.sidebar.list_mut().is_loading() && result.is_ok();
                 ui.sidebar.list_mut().receive(result);
@@ -480,14 +480,14 @@ impl Execution {
                 if ui.sidebar.list_mut().take_refresh_request() {
                     self.refresh_sessions(ui, cx);
                 }
-            }
+            },
             Event::SessionsDeleted(result) => self.finish_deletion(ui, result, window, cx),
             Event::SessionLoaded { session_id, result } => {
                 self.finish_session_load(ui, session_id, result, window, cx);
-            }
+            },
             Event::SessionConfigSet { session_id, config_id, result } => {
                 ui.configuration.finish_session_config(self, session_id, config_id, result, cx);
-            }
+            },
             Event::Ready(response) => {
                 let creating_session = std::mem::take(&mut self.creating_session);
                 self.session_id = Some(response.session_id.clone());
@@ -513,7 +513,7 @@ impl Execution {
                 if creating_session && ui.render_mode != crate::workspace::SessionRenderMode::Main {
                     self.refresh_sessions(ui, cx);
                 }
-            }
+            },
             Event::Update(notification) => {
                 if let SessionUpdate::SessionInfoUpdate(update) = &notification.update {
                     ui.sidebar.list_mut().update(&notification.session_id, update);
@@ -541,7 +541,7 @@ impl Execution {
                 } else {
                     self.receive_update(ui, *notification);
                 }
-            }
+            },
             Event::Permission(permission) => {
                 if self.stopping {
                     permission.respond(None);
@@ -549,7 +549,7 @@ impl Execution {
                     self.permissions.push_back(permission);
                     self.status = "等待你的选择".into();
                 }
-            }
+            },
             Event::Finished(result) => {
                 self.dismiss_permissions();
                 self.stopping = false;
@@ -563,7 +563,7 @@ impl Execution {
                 if ui.render_mode != crate::workspace::SessionRenderMode::Main {
                     self.refresh_sessions(ui, cx);
                 }
-            }
+            },
             Event::Disconnected(error) => {
                 self.dismiss_permissions();
                 self.stopping = false;
@@ -577,7 +577,7 @@ impl Execution {
                 ui.deletion.disconnect();
                 self.status = "连接已断开".into();
                 self.conversation.finish(Some(format!("{error}\n请新建对话重新连接 Aries。")));
-            }
+            },
         }
         if !sidebar_synced && ui.render_mode != crate::workspace::SessionRenderMode::Main {
             ui.sidebar.sync_sidebar_rows(
@@ -602,7 +602,7 @@ impl Execution {
                 SessionUpdate::AgentThoughtChunk(_) => self.status = "思考中…".into(),
                 SessionUpdate::AgentMessageChunk(_) => self.status = "正在回复…".into(),
                 SessionUpdate::ToolCall(tool) => self.status = tool.title.clone(),
-                _ => {}
+                _ => {},
             }
         }
         if matches!(&notification.update, SessionUpdate::AvailableCommandsUpdate(_)) {
@@ -712,11 +712,11 @@ impl Execution {
                     .list()
                     .reset_with_uniform_height(self.conversation.messages().len(), px(96.));
                 ui.timeline.list().scroll_to_end();
-            }
+            },
             Err(error) => {
                 self.status = "加载失败".into();
                 self.conversation.finish(Some(format!("无法加载会话：{error}")));
-            }
+            },
         }
         if ui.sidebar.list_mut().take_refresh_request() {
             self.refresh_sessions(ui, cx);
@@ -772,14 +772,14 @@ impl Execution {
                         } else {
                             this.start_new_chat(directory, window, cx);
                         }
-                    }
-                    Ok(None) => {}
+                    },
+                    Ok(None) => {},
                     Err(error) => {
                         window.push_notification(
                             Notification::error(format!("无法选择项目目录：{error:#}")),
                             cx,
                         );
-                    }
+                    },
                 }
                 cx.notify();
             });
@@ -816,7 +816,7 @@ impl Execution {
                         } else {
                             this.start_new_chat(directory, window, cx);
                         }
-                    }
+                    },
                     Err(error) => window.push_notification(
                         Notification::error(format!(
                             "无法在目录 {} 新建会话：{:#}。请检查目录是否存在且可访问。",

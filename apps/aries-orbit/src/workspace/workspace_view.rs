@@ -153,7 +153,7 @@ impl Render for WorkspaceView {
                                         .child(match active {
                                             Some(view) => {
                                                 div().size_full().child(view).into_any_element()
-                                            }
+                                            },
                                             None => self.render_empty_main(p),
                                         })
                                         .children(git_info)

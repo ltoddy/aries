@@ -38,10 +38,10 @@ pub fn can_select(option: &SessionConfigOption, value: &SessionConfigOptionValue
         (SessionConfigKind::Select(select), SessionConfigOptionValue::ValueId { value }) => {
             value != &select.current_value
                 && select_options(&select.options).any(|choice| &choice.value == value)
-        }
+        },
         (SessionConfigKind::Boolean(current), SessionConfigOptionValue::Boolean { value }) => {
             *value != current.current_value
-        }
+        },
         _ => false,
     }
 }

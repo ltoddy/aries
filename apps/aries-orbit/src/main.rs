@@ -1,7 +1,5 @@
 mod acp;
 mod terminal;
-#[cfg(target_os = "macos")]
-mod terminal_command;
 mod workspace;
 
 use anyhow::Context as _;
@@ -62,7 +60,9 @@ fn main() -> anyhow::Result<()> {
             KeyBinding::new("ctrl-shift-tab", PreviousTab, None),
         ]);
         #[cfg(target_os = "macos")]
-        crate::terminal_command::init(cx);
+        cx.set_menus(
+            [Menu::new("Aries Orbit").items([MenuItem::action("退出 Aries Orbit", Quit)])],
+        );
         let options = WindowOptions {
             window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
                 None,

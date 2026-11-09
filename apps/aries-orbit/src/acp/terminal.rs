@@ -30,10 +30,10 @@ impl From<TerminalError> for Error {
         match error {
             TerminalError::InvalidCwd | TerminalError::NotFound => {
                 Self::invalid_params().data(error.to_string())
-            }
+            },
             TerminalError::Spawn(_) | TerminalError::Closed(_) => {
                 Self::internal_error().data(error.to_string())
-            }
+            },
         }
     }
 }
@@ -202,7 +202,7 @@ fn append(
             Ok(_) => {
                 complete = pending.len();
                 break;
-            }
+            },
             Err(error) => {
                 complete += error.valid_up_to();
                 match error.error_len() {
@@ -212,9 +212,9 @@ fn append(
                             complete = pending.len();
                         }
                         break;
-                    }
+                    },
                 }
-            }
+            },
         }
     }
     if complete == 0 {

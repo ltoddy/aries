@@ -31,10 +31,10 @@ impl GitWatch {
                         {
                             return;
                         }
-                    }
+                    },
                     Err(error) => {
                         *watch_error.lock().expect("Git watch error lock poisoned") = Some(error);
-                    }
+                    },
                 }
                 let _ = sender.try_send(());
             })
@@ -98,7 +98,7 @@ fn watch_paths(cwd: &Path) -> anyhow::Result<(Vec<PathBuf>, Option<PathBuf>)> {
         Ok(repository) => repository,
         Err(error) if error.code() == ErrorCode::NotFound => {
             return Ok((vec![cwd.to_owned()], None));
-        }
+        },
         Err(error) => return Err(error).context("discovering Git watch repository"),
     };
     let mut paths = Vec::new();

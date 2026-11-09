@@ -66,7 +66,7 @@ fn content(value: &Value) -> String {
                     json(resource)
                 }
             )
-        }
+        },
         _ => json(value),
     }
 }
@@ -105,7 +105,7 @@ fn plan_content(value: &Value) -> String {
         "items" => format!("{}\n\n{}", string(value, "planId"), plan_entries(&value["entries"])),
         "file" => {
             format!("{}\n\n{}", string(value, "planId"), code_block("", string(value, "uri")))
-        }
+        },
         "markdown" => format!("{}\n\n{}", string(value, "planId"), string(value, "content")),
         _ => json(value),
     }
@@ -132,7 +132,7 @@ impl UpdateDisplay {
                     title: "会话更新".into(),
                     body: format!("无法解析会话更新：{error}\n\n{update:#?}"),
                 };
-            }
+            },
         };
         let kind = kind.unwrap_or_else(|| string(&value, "sessionUpdate"));
         let (title, body) = match kind {
@@ -150,7 +150,7 @@ impl UpdateDisplay {
             "plan_removed" => ("计划移除".into(), code_block("", string(&value, "planId"))),
             "current_mode_update" => {
                 ("会话模式".into(), code_block("", string(&value, "currentModeId")))
-            }
+            },
             "notice" => (
                 format!("通知 · {}", string(&value, "title")),
                 format!("{}\n\n{}", string(&value, "severity"), string(&value, "description")),
@@ -164,7 +164,7 @@ impl UpdateDisplay {
                     parts.push(json(error));
                 }
                 ("上下文压缩".into(), parts.join("\n\n"))
-            }
+            },
             "compaction_summary_chunk" => ("压缩摘要".into(), content(&value["content"])),
             "subagent_update" => {
                 let mut parts = vec![code_block("", string(&value, "sessionId"))];
@@ -178,7 +178,7 @@ impl UpdateDisplay {
                     parts.push(json(state));
                 }
                 ("子 Agent".into(), parts.join("\n\n"))
-            }
+            },
             "session_message" => {
                 let mut parts = vec![code_block("", string(&value, "messageId"))];
                 if let Some(sender) = value.get("senderSessionId").and_then(Value::as_str) {
@@ -191,7 +191,7 @@ impl UpdateDisplay {
                     parts.push(content_list(&value["content"]));
                 }
                 ("会话消息".into(), parts.join("\n\n"))
-            }
+            },
             "session_message_chunk" => (
                 "会话消息".into(),
                 format!(

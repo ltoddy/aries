@@ -32,7 +32,7 @@ impl Bridge {
                 }),
                 Err(error) => {
                     let _ = events_tx.try_send(Event::Disconnected(error.to_string()));
-                }
+                },
             }
             let _ = done_tx.try_send(());
         })?;

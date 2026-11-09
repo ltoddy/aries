@@ -45,9 +45,9 @@ pub fn update_index(cwd: &Path, path: &Path, action: IndexAction) -> Result<(), 
     match fs::symlink_metadata(workdir.join(path)) {
         Ok(metadata) if metadata.is_dir() => {
             return Err(UpdateIndexError::Directory);
-        }
-        Ok(_) => {}
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        },
+        Ok(_) => {},
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {},
         Err(error) => return Err(error.into()),
     }
 
@@ -89,7 +89,7 @@ pub fn update_index(cwd: &Path, path: &Path, action: IndexAction) -> Result<(), 
                 | Status::WT_DELETED
                 | Status::WT_RENAMED
                 | Status::WT_TYPECHANGE
-        }
+        },
         IndexAction::Unstage => {
             if status.is_index_renamed()
                 && let Some(delta) = entry.head_to_index()
@@ -105,7 +105,7 @@ pub fn update_index(cwd: &Path, path: &Path, action: IndexAction) -> Result<(), 
                 | Status::INDEX_DELETED
                 | Status::INDEX_RENAMED
                 | Status::INDEX_TYPECHANGE
-        }
+        },
     };
     if !status.intersects(required) {
         return Err(UpdateIndexError::NoChangesForAction);
@@ -124,22 +124,22 @@ pub fn update_index(cwd: &Path, path: &Path, action: IndexAction) -> Result<(), 
                 match fs::symlink_metadata(workdir.join(target)) {
                     Ok(metadata) if metadata.is_dir() => {
                         return Err(UpdateIndexError::Directory);
-                    }
+                    },
                     Ok(_) => index.add_path(target)?,
                     Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                         if index.get_path(target, 0).is_some() {
                             index.remove_path(target)?;
                         }
-                    }
+                    },
                     Err(error) => return Err(error.into()),
                 }
             }
-        }
+        },
         IndexAction::Unstage => {
             let mut head_index = Index::new()?;
             match repository.head() {
                 Ok(head) => head_index.read_tree(&head.peel_to_tree()?)?,
-                Err(error) if error.code() == ErrorCode::UnbornBranch => {}
+                Err(error) if error.code() == ErrorCode::UnbornBranch => {},
                 Err(error) => return Err(error.into()),
             }
             for target in &paths {
@@ -149,7 +149,7 @@ pub fn update_index(cwd: &Path, path: &Path, action: IndexAction) -> Result<(), 
                     index.remove_path(target)?;
                 }
             }
-        }
+        },
     }
     index.write()?;
     Ok(())

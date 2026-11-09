@@ -102,7 +102,7 @@ impl RenderOnce for ToolDiff {
                 .into_any_element(),
             DiffContent::Path(path) => {
                 div().w_full().child(SelectableText::new(id, path)).into_any_element()
-            }
+            },
         }
     }
 }
