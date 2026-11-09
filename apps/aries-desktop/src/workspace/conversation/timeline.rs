@@ -181,7 +181,7 @@ impl Timeline {
                                 div()
                                     .w_full()
                                     .pb(gap)
-                                    .child(div().max_w(rems(55.)).mx_auto().child(
+                                    .child(div().max_w(rems(72.)).mx_auto().child(
                                         if index < messages {
                                             timeline.timeline_item(
                                                 index,

@@ -7,11 +7,13 @@ use agent_client_protocol::v1::schema::{
 };
 use aries_extension::AgentDefinition;
 use aries_init::Setting;
+use rig::completion::Effort;
 
 #[derive(Debug, Copy, Clone)]
 pub enum SessionConfig {
     Mode,
     Model,
+    ThoughtLevel,
 }
 
 impl Display for SessionConfig {
@@ -19,6 +21,7 @@ impl Display for SessionConfig {
         match self {
             SessionConfig::Mode => write!(f, "mode"),
             SessionConfig::Model => write!(f, "model"),
+            SessionConfig::ThoughtLevel => write!(f, "thought level"),
         }
     }
 }
@@ -28,6 +31,7 @@ impl From<SessionConfig> for SessionConfigId {
         match val {
             SessionConfig::Mode => SessionConfigId::new("mode"),
             SessionConfig::Model => SessionConfigId::new("model"),
+            SessionConfig::ThoughtLevel => SessionConfigId::new("thought level"),
         }
     }
 }
@@ -37,6 +41,7 @@ impl From<SessionConfig> for String {
         match val {
             SessionConfig::Mode => String::from("mode"),
             SessionConfig::Model => String::from("model"),
+            SessionConfig::ThoughtLevel => String::from("thought level"),
         }
     }
 }
@@ -70,8 +75,13 @@ pub fn config_options(
     setting: &Setting,
     current_mode: String,
     agents: &[AgentDefinition],
+    thought_level: Effort,
 ) -> Vec<SessionConfigOption> {
-    vec![mode_option(current_mode, agents), model_option(setting)]
+    vec![
+        mode_option(current_mode, agents),
+        model_option(setting),
+        thought_level_option(thought_level),
+    ]
 }
 
 fn mode_option(current: String, agents: &[AgentDefinition]) -> SessionConfigOption {
@@ -119,9 +129,37 @@ fn model_option(setting: &Setting) -> SessionConfigOption {
     .category(SessionConfigOptionCategory::Model)
 }
 
-pub fn modes(current: impl AsRef<str>, agents: &[AgentDefinition]) -> SessionModeState {
+fn thought_level_option(current: Effort) -> SessionConfigOption {
+    let efforts =
+        [Effort::Minimal, Effort::Low, Effort::Medium, Effort::High, Effort::XHigh, Effort::Max];
+    let options = efforts
+        .iter()
+        .map(|e| SessionConfigSelectOption::new(e.as_str(), e.as_str()))
+        .collect::<Vec<_>>();
+
+    SessionConfigOption::select(
+        SessionConfig::ThoughtLevel,
+        SessionConfig::ThoughtLevel,
+        current.as_str(),
+        options,
+    )
+    .description("")
+    .category(SessionConfigOptionCategory::ThoughtLevel)
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("session mode `{0}` not found")]
+pub struct SessionModeError(String);
+
+pub fn modes(
+    current: impl AsRef<str>,
+    agents: &[AgentDefinition],
+) -> Result<SessionModeState, SessionModeError> {
     let current = current.as_ref();
-    let agent = agents.iter().find(|agent| agent.frontmatter.name == current).expect("");
+    let agent = agents
+        .iter()
+        .find(|agent| agent.frontmatter.name == current)
+        .ok_or_else(|| SessionModeError(current.to_owned()))?;
 
     let available_modes = agents
         .iter()
@@ -134,5 +172,5 @@ pub fn modes(current: impl AsRef<str>, agents: &[AgentDefinition]) -> SessionMod
         })
         .collect::<Vec<_>>();
 
-    SessionModeState::new(SessionModeId::new(agent.frontmatter.name.clone()), available_modes)
+    Ok(SessionModeState::new(SessionModeId::new(agent.frontmatter.name.clone()), available_modes))
 }

@@ -5,12 +5,12 @@ use agent_client_protocol::v1::schema::{
 };
 use agent_client_protocol::v1::{ConnectionTo, Responder};
 use agent_client_protocol::{Client, Error};
-use aries_runtime::session::SharedRegistry;
+use aries_runtime::session::{DEFAULT_AGENT_NAME, SharedRegistry};
 use itertools::Itertools;
 use tracing::info;
 
-use super::config::{config_options, modes};
 use crate::v1::mcp::McpServers;
+use crate::v1::session::config::{config_options, modes};
 
 pub async fn new_session(
     req: NewSessionRequest,
@@ -55,9 +55,16 @@ pub async fn new_session(
         SessionUpdate::SessionInfoUpdate(SessionInfoUpdate::new()),
     ));
 
-    let modes = modes("build", session.agents());
-    let config_options =
-        config_options(session.setting(), session.mode().to_string(), session.agents());
+    let modes = match modes(DEFAULT_AGENT_NAME, session.agents()) {
+        Ok(modes) => modes,
+        Err(err) => return responder.respond_with_internal_error(err.to_string()),
+    };
+    let config_options = config_options(
+        session.setting(),
+        session.mode().to_string(),
+        session.agents(),
+        session.thought_level(),
+    );
     let resp = NewSessionResponse::new(session.id()).modes(modes).config_options(config_options);
     responder.respond(resp)
 }

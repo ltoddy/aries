@@ -5,13 +5,13 @@ use agent_client_protocol::v1::schema::{
 };
 use agent_client_protocol::v1::{ConnectionTo, Responder};
 use agent_client_protocol::{Client, Error};
-use aries_runtime::session::SharedRegistry;
+use aries_runtime::session::{DEFAULT_AGENT_NAME, SharedRegistry};
 use itertools::Itertools;
 use tracing::{info, instrument};
 
-use super::config::{config_options, modes};
 use crate::v1::mcp::McpServers;
 use crate::v1::prompt::session_update::SessionUpdates;
+use crate::v1::session::config::{config_options, modes};
 
 #[instrument(name = "acp.load_session", skip_all, fields(session_id = %req.session_id))]
 pub async fn load_session(
@@ -66,9 +66,16 @@ pub async fn load_session(
         SessionUpdate::AvailableCommandsUpdate(AvailableCommandsUpdate::new(available_commands)),
     ));
 
-    let modes = modes("build", session.agents());
-    let config_options =
-        config_options(session.setting(), session.mode().to_string(), session.agents());
+    let modes = match modes(DEFAULT_AGENT_NAME, session.agents()) {
+        Ok(modes) => modes,
+        Err(err) => return responder.respond_with_internal_error(err.to_string()),
+    };
+    let config_options = config_options(
+        session.setting(),
+        session.mode().to_string(),
+        session.agents(),
+        session.thought_level(),
+    );
     let resp = LoadSessionResponse::new().modes(modes).config_options(config_options);
     responder.respond(resp)
 }

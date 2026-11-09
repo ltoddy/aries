@@ -5,6 +5,7 @@ use aries_extension::{AgentDefinition, AgentExtensions};
 use aries_init::GlobalContext;
 use rig::Model;
 use rig::agent::AgentHook;
+use rig::completion::Effort;
 use rig::providers::openai::wire::OpenAiWire;
 use rig::tool::server::ToolServerHandle;
 use toasty::Db;
@@ -15,6 +16,7 @@ use crate::lspclient::SharedLspClient;
 pub struct AgentBuilder {
     model: Model<OpenAiWire>,
     agent: AgentDefinition,
+    effort: Effort,
     root_dir: PathBuf,
     cwd: PathBuf,
     gctx: GlobalContext,
@@ -33,6 +35,7 @@ impl AgentBuilder {
         session_id: impl Into<String>,
         model: Model<OpenAiWire>,
         agent: AgentDefinition,
+        effort: Effort,
         root_dir: impl AsRef<Path>,
         cwd: impl AsRef<Path>,
         gctx: GlobalContext,
@@ -49,6 +52,7 @@ impl AgentBuilder {
             cwd: cwd.to_owned(),
             gctx,
             lsp_client: None,
+            effort,
             extensions: AgentExtensions::empty(),
             db,
             notifier,
@@ -95,6 +99,7 @@ impl AgentBuilder {
             .preamble(&self.agent.body)
             .tool_server_handle(tool_server_handle)
             .add_hook(hook)
+            .reasoning(self.effort)
             .default_max_turns(AGENT_LOOP_MAX_TURNS);
         for section in sections {
             builder = builder.append_preamble(&section);

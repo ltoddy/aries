@@ -178,7 +178,7 @@ impl Composer {
         div().flex_shrink_0().pl_8().pr_4().py_2().bg(p.background()).child(
             div()
                 .w_full()
-                .max_w(rems(55.))
+                .max_w(rems(72.))
                 .mx_auto()
                 .flex()
                 .flex_col()
