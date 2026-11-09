@@ -9,7 +9,7 @@ members = [
     "crates/aries-persistence",
     "crates/aries-runtime",
     "apps/aries-cli",
-    "apps/aries-orbit",
+    "apps/aries-desktop",
 ]
 resolver = "3"
 

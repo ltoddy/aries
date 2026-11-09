@@ -97,19 +97,19 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Build
-        run: cargo build --release --locked --target ${{ matrix.target }} -p aries-orbit
+        run: cargo build --release --locked --target ${{ matrix.target }} -p aries-desktop
 
       - name: Package
         run: |
           mkdir -p dist
-          cp "target/${{ matrix.target }}/release/aries-orbit" dist/aries-orbit
-          chmod +x dist/aries-orbit
-          tar -czf "aries-orbit-${{ matrix.platform }}.tar.gz" -C dist aries-orbit
+          cp "target/${{ matrix.target }}/release/aries-desktop" dist/aries-desktop
+          chmod +x dist/aries-desktop
+          tar -czf "aries-desktop-${{ matrix.platform }}.tar.gz" -C dist aries-desktop
 
       - uses: actions/upload-artifact@v7
         with:
-          name: aries-orbit-${{ matrix.platform }}
-          path: aries-orbit-${{ matrix.platform }}.*
+          name: aries-desktop-${{ matrix.platform }}
+          path: aries-desktop-${{ matrix.platform }}.*
           if-no-files-found: error
 
   release:
@@ -131,5 +131,5 @@ jobs:
         with:
           files: |
             dist/aries-*
-            dist/aries-orbit-*
+            dist/aries-desktop-*
             dist/SHA256SUMS

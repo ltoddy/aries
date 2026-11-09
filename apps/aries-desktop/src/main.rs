@@ -61,7 +61,7 @@ fn main() -> anyhow::Result<()> {
         ]);
         #[cfg(target_os = "macos")]
         cx.set_menus(
-            [Menu::new("Aries Orbit").items([MenuItem::action("退出 Aries Orbit", Quit)])],
+            [Menu::new("Aries Desktop").items([MenuItem::action("退出 Aries Desktop", Quit)])],
         );
         let options = WindowOptions {
             window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
@@ -71,7 +71,7 @@ fn main() -> anyhow::Result<()> {
             ))),
             window_min_size: Some(size(px(760.), px(520.))),
             titlebar: Some(TitlebarOptions {
-                title: Some("Aries Orbit".into()),
+                title: Some("Aries Desktop".into()),
                 ..Default::default()
             }),
             ..Default::default()

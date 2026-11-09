@@ -170,7 +170,7 @@ pub async fn connect(
     let updates = events.clone();
     let permissions = events.clone();
     agent_client_protocol::Client.v1()
-        .name("aries-orbit")
+        .name("aries-desktop")
         .on_receive_notification(
             async move |notification, _connection| {
                 session_update::handle(notification, &updates).await

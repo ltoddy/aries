@@ -1,5 +1,5 @@
 [package]
-name = "aries-orbit"
+name = "aries-desktop"
 version = "0.1.0"
 edition = "2024"
 license.workspace = true

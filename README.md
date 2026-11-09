@@ -17,11 +17,11 @@
 
 ![terminal](docs/assets/aries-cli-terminal.png)
 
-### Aries Orbit (`aries-orbit`)
+### Aries Desktop (`aries-desktop`)
 
 原生 macOS 终端模拟器，内置 AI 能力。基于 GPUI 构建，提供高性能的原生体验。
 
-![orbit](docs/assets/aries-orbit.png)
+![orbit](docs/assets/aries-desktop.png)
 
 ## Rust toolchain
 
@@ -39,19 +39,19 @@
 
 > cargo install --path apps/aries-cli --force --locked
 
-### Aries Orbit
+### Aries Desktop
 
 仅支持 macOS。
 
 源码安装:
 
-> cargo install --path apps/aries-orbit --force --locked
+> cargo install --path apps/aries-desktop --force --locked
 
 DMG 安装:
 
-> just orbit-dmg
+> just desktop-dmg
 >
-> open target/bundle/Aries-Orbit-*.dmg
+> open target/bundle/Aries-Desktop-*.dmg
 
 ## 使用
 

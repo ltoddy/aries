@@ -460,6 +460,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "aries-desktop"
+version = "0.1.0"
+dependencies = [
+ "agent-client-protocol",
+ "alacritty_terminal",
+ "anyhow",
+ "aries-persistence",
+ "async-channel",
+ "base64 0.23.1",
+ "dirs 7.0.0",
+ "git2",
+ "gpui-kit",
+ "jiff",
+ "libc",
+ "notify",
+ "portable-pty",
+ "serde",
+ "serde_json",
+ "similar 3.2.1",
+ "thiserror 2.0.21",
+ "tokio",
+ "toml 1.2.1+spec-1.1.0",
+]
+
+[[package]]
 name = "aries-extension"
 version = "0.1.0"
 dependencies = [
@@ -525,31 +550,6 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "aries-orbit"
-version = "0.1.0"
-dependencies = [
- "agent-client-protocol",
- "alacritty_terminal",
- "anyhow",
- "aries-persistence",
- "async-channel",
- "base64 0.23.1",
- "dirs 7.0.0",
- "git2",
- "gpui-kit",
- "jiff",
- "libc",
- "notify",
- "portable-pty",
- "serde",
- "serde_json",
- "similar 3.2.1",
- "thiserror 2.0.21",
- "tokio",
- "toml 1.2.1+spec-1.1.0",
 ]
 
 [[package]]
