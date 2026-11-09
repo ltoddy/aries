@@ -4,8 +4,8 @@ use std::time::Duration;
 
 use agent_client_protocol::v1::schema::{SessionId, SessionInfo};
 use gpui_kit::assets::IconName;
-use gpui_kit::component::button::Button;
-use gpui_kit::component::{ActiveTheme, Disableable, Icon};
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::{ActiveTheme, Disableable, Icon, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -93,6 +93,11 @@ impl Sidebar {
                 host.read(cx).active_view().map(|view| view.read(cx).can_start_new_chat())
             })
             .unwrap_or_else(|| owner.can_start_new_chat());
+        let usage_selected = tab_host
+            .as_ref()
+            .and_then(|host| host.upgrade())
+            .is_some_and(|host| host.read(cx).is_usage_visible());
+        let usage_host = tab_host.clone();
         div()
             .id("sidebar")
             .w_full()
@@ -127,7 +132,33 @@ impl Sidebar {
                     .p_3()
                     .border_t_1()
                     .border_color(p.border())
-                    .child(SettingsButton::new(tab_host.clone(), p)),
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .child(SettingsButton::new(tab_host.clone(), p))
+                    .child(
+                        Button::new("open-usage")
+                            .ghost()
+                            .small()
+                            .label("用量")
+                            .bg(if usage_selected { cx.theme().muted } else { cx.theme().sidebar })
+                            .text_color(if usage_selected {
+                                cx.theme().primary
+                            } else {
+                                cx.theme().muted_foreground
+                            })
+                            .disabled(usage_host.is_none())
+                            .on_click(cx.listener(move |_, _, window, cx| {
+                                if let Some(host) = usage_host.clone() {
+                                    cx.spawn_in(window, async move |_, cx| {
+                                        let _ = host.update_in(cx, |host, window, cx| {
+                                            host.open_usage(window, cx)
+                                        });
+                                    })
+                                    .detach();
+                                }
+                            })),
+                    ),
             )
     }
 

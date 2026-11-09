@@ -8,10 +8,11 @@ mod tool_call;
 use std::path::Path;
 
 use jiff::{Span, Timestamp, Zoned};
-pub use session::{Session, SessionRepository, UNTITLED_SESSION};
-pub use token_audit::{TokenAudit, TokenAuditRepository};
-pub use token_usage::{TokenUsage, TokenUsageRepository};
-pub use tool_call::{ToolCall, ToolCallRepository};
+
+pub use crate::session::{Session, SessionRepository, UNTITLED_SESSION};
+pub use crate::token_audit::{TokenAudit, TokenAuditRepository};
+pub use crate::token_usage::{TokenUsage, TokenUsageRepository};
+pub use crate::tool_call::{ToolCall, ToolCallRepository};
 
 pub async fn connect(dir: impl AsRef<Path>) -> toasty::Result<toasty::Db> {
     let file_path = dir.as_ref().join("aries.db");
@@ -62,17 +63,6 @@ pub async fn gc(db: toasty::Db) {
         for chunk in chunks {
             let ids = chunk.iter().map(|t| t.id).collect::<Vec<_>>();
             let _ = tool_call_repo.delete_by_id_in(ids).await;
-        }
-    }
-
-    let mut token_usage_repo = TokenUsageRepository::new(db.clone());
-    if let Ok(token_usages) =
-        token_usage_repo.find_by_created_at_less_than(Timestamp::from(&month_ago)).await
-    {
-        let chunks = token_usages.chunks(16).collect::<Vec<_>>();
-        for chunk in chunks {
-            let ids = chunk.iter().map(|t| t.id).collect::<Vec<_>>();
-            let _ = token_usage_repo.delete_by_id_in(ids).await;
         }
     }
 }

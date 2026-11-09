@@ -7,8 +7,8 @@ use gpui_kit::component::{ActiveTheme, Icon, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
-use crate::workspace::SessionView;
 use crate::workspace::settings::palette::Palette;
+use crate::workspace::{SessionView, number};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExecutionState {
@@ -158,10 +158,15 @@ struct TokenUsage {
 
 impl RenderOnce for TokenUsage {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let digits = self.tokens.to_string();
+        let digits = number::compact(self.tokens);
         let duration = cx.theme().motion_tokens().duration_normal;
         let mut number = div().flex().font_family(cx.theme().mono_font_family.clone());
         for (ix, digit) in digits.bytes().enumerate() {
+            if !digit.is_ascii_digit() {
+                number = number
+                    .child(div().h_4().line_height(rems(1.)).child(char::from(digit).to_string()));
+                continue;
+            }
             let place = digits.len() - ix - 1;
             let position = motion::transition(
                 (self.id.clone(), SharedString::from(format!("digit-{place}"))),
@@ -195,7 +200,7 @@ impl RenderOnce for TokenUsage {
             .flex()
             .items_center()
             .gap_1()
-            .aria_label(format!("{} tokens", self.tokens))
+            .aria_label(format!("{} tokens", digits))
             .child(number)
             .child("tokens")
     }

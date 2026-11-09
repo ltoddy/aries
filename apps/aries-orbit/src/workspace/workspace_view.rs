@@ -13,6 +13,7 @@ use gpui_kit::*;
 use crate::terminal::TerminalView;
 use crate::workspace::settings::palette::Palette;
 use crate::workspace::settings::{Preferences, SettingsState};
+use crate::workspace::usage::UsageView;
 use crate::workspace::{SessionRenderMode, SessionView};
 use crate::{
     CloseTab, NewSession, NextTab, NextUserMessage, PreviousTab, PreviousUserMessage,
@@ -39,6 +40,9 @@ pub struct WorkspaceView {
     terminal: Option<Entity<TerminalView>>,
     terminal_visible: bool,
     terminal_previous_focus: Option<FocusHandle>,
+    usage: Entity<UsageView>,
+    usage_visible: bool,
+    usage_previous_focus: Option<FocusHandle>,
 }
 
 impl fmt::Debug for WorkspaceView {
@@ -63,6 +67,7 @@ impl WorkspaceView {
         let settings = cx.new(|cx| SettingsState::new(preferences_path, host, window, cx));
         let sidebar = Self::create_chat_view(&cwd, &agent, SessionRenderMode::Sidebar, window, cx);
         let sidebar_subscription = Self::observe_tab(&sidebar, window, cx);
+        let usage = cx.new(|cx| UsageView::new(window, cx));
         let focus_handle = cx.focus_handle();
         focus_handle.focus(window, cx);
         Self {
@@ -79,6 +84,9 @@ impl WorkspaceView {
             terminal: None,
             terminal_visible: false,
             terminal_previous_focus: None,
+            usage,
+            usage_visible: false,
+            usage_previous_focus: None,
         }
     }
 }
@@ -88,7 +96,11 @@ impl Render for WorkspaceView {
         let p = Palette::new(cx.theme().mode);
         let active = self.active_view().cloned();
         let view = active.as_ref().unwrap_or(&self.sidebar);
-        let git_info = view.update(cx, |session, cx| session.git_panel().render(view, window, cx));
+        let git_info = if self.usage_visible {
+            None
+        } else {
+            view.update(cx, |session, cx| session.git_panel().render(view, window, cx))
+        };
         div()
             .size_full()
             .track_focus(&self.focus_handle)
@@ -96,7 +108,9 @@ impl Render for WorkspaceView {
                 this.toggle_terminal(window, cx);
             }))
             .on_action(cx.listener(|this, _: &CloseTab, window, cx| {
-                if let Some(tab) = this.tabs.get(this.active) {
+                if this.usage_visible {
+                    this.close_usage(window, cx);
+                } else if let Some(tab) = this.tabs.get(this.active) {
                     let id = tab.id;
                     this.close_tab(id, cx);
                     this.focus_handle.focus(window, cx);
@@ -150,11 +164,18 @@ impl Render for WorkspaceView {
                                         .flex_col()
                                         .flex_1()
                                         .min_h_0()
-                                        .child(match active {
-                                            Some(view) => {
-                                                div().size_full().child(view).into_any_element()
-                                            },
-                                            None => self.render_empty_main(p),
+                                        .child(if self.usage_visible {
+                                            div()
+                                                .size_full()
+                                                .child(self.usage.clone())
+                                                .into_any_element()
+                                        } else {
+                                            match active {
+                                                Some(view) => {
+                                                    div().size_full().child(view).into_any_element()
+                                                },
+                                                None => self.render_empty_main(p),
+                                            }
                                         })
                                         .children(git_info)
                                         .when(self.terminal_visible, |view| {
@@ -273,12 +294,16 @@ impl WorkspaceView {
     }
 
     fn create_tab(&mut self, directory: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
+        if self.usage_visible {
+            self.close_usage(window, cx);
+        }
         let id = self.next_id;
         self.next_id += 1;
         let view =
             Self::create_chat_view(&self.cwd, &self.agent, SessionRenderMode::Main, window, cx);
         let subscription = Self::observe_tab(&view, window, cx);
         self.tabs.push(SessionTab { id, view: view.clone(), _subscription: subscription });
+        self.usage_visible = false;
         self.active = self.tabs.len() - 1;
         self.tab_scroll.scroll_to_item(self.active);
         cx.spawn_in(window, async move |_, cx| {
@@ -296,6 +321,9 @@ impl WorkspaceView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if self.usage_visible {
+            self.close_usage(window, cx);
+        }
         let session_id = session.session_id.clone();
         if let Some(index) = self.find_session_tab(&session_id, cx) {
             self.select_tab(index, window, cx);
@@ -318,6 +346,7 @@ impl WorkspaceView {
         let subscription = Self::observe_tab(&view, window, cx);
         view.update(cx, |view, cx| view.queue_session_load(session, cx));
         self.tabs.push(SessionTab { id, view, _subscription: subscription });
+        self.usage_visible = false;
         self.active = self.tabs.len() - 1;
         self.tab_scroll.scroll_to_item(self.active);
         self.set_sidebar_session(session_id, cx);
@@ -360,6 +389,9 @@ impl WorkspaceView {
     pub fn select_tab(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         if index >= self.tabs.len() {
             return;
+        }
+        if self.usage_visible {
+            self.close_usage(window, cx);
         }
         self.active = index;
         self.tab_scroll.scroll_to_item(index);
@@ -415,6 +447,30 @@ impl WorkspaceView {
                             .map(|(index, tab)| self.render_tab(index, tab, can_close, p, cx)),
                     ),
             )
+            .when(self.usage_visible, |bar| {
+                bar.child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .px_2()
+                        .border_1()
+                        .border_color(cx.theme().primary)
+                        .rounded(cx.theme().radius)
+                        .text_color(cx.theme().primary)
+                        .child("用量")
+                        .child(
+                            Button::new("close-usage")
+                                .ghost()
+                                .small()
+                                .icon(Icon::new(IconName::X))
+                                .accessibility_label("关闭用量")
+                                .on_click(
+                                    cx.listener(|this, _, window, cx| this.close_usage(window, cx)),
+                                ),
+                        ),
+                )
+            })
             .into_any_element()
     }
 
@@ -454,7 +510,7 @@ impl WorkspaceView {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let id = tab.id;
-        let active = index == self.active;
+        let active = index == self.active && !self.usage_visible;
         let view = tab.view.read(cx);
         let title = view.tab_title();
         let state = view.execution_state();
@@ -587,6 +643,28 @@ impl WorkspaceView {
 
     pub fn settings_state(&self) -> &Entity<SettingsState> {
         &self.settings
+    }
+
+    pub fn is_usage_visible(&self) -> bool {
+        self.usage_visible
+    }
+
+    pub fn open_usage(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.usage_visible {
+            self.usage_previous_focus = window.focused(cx);
+        }
+        self.usage_visible = true;
+        self.usage.update(cx, |view, cx| view.open(window, cx));
+        self.sidebar.update(cx, |_, cx| cx.notify());
+        cx.notify();
+    }
+
+    fn close_usage(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.usage_visible = false;
+        let focus = self.usage_previous_focus.take().unwrap_or_else(|| self.focus_handle.clone());
+        focus.focus(window, cx);
+        self.sidebar.update(cx, |_, cx| cx.notify());
+        cx.notify();
     }
 
     pub fn open_settings(&self, window: &mut Window, cx: &mut Context<Self>) {
