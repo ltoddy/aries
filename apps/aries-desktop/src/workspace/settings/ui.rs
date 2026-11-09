@@ -4,6 +4,7 @@ use gpui_kit::component::{ActiveTheme, Disableable, Icon};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
+use crate::OpenSettings;
 use crate::workspace::WorkspaceView;
 use crate::workspace::settings::SendKey;
 use crate::workspace::settings::palette::Palette;
@@ -34,7 +35,11 @@ impl RenderOnce for SettingsButton {
             .size_8()
             .disabled(host.is_none())
             .text_color(if error.is_some() { p.danger() } else { p.muted() })
-            .tooltip(error.map(|error| format!("设置\n{error}")).unwrap_or_else(|| "设置".into()))
+            .tooltip_with_action(
+                error.map(|error| format!("设置\n{error}")).unwrap_or_else(|| "设置".into()),
+                &OpenSettings,
+                None,
+            )
             .accessibility_label("打开设置")
             .on_click(move |_, window, cx| {
                 if let Some(host) = &host {
@@ -57,6 +62,7 @@ pub fn render_shortcuts(send_key: SendKey, cx: &App) -> impl IntoElement {
     if cfg!(target_os = "macos") {
         sessions.insert(0, ("新建会话", "⌘ + N".into()));
         sessions.insert(1, ("显示/隐藏终端", "⌘ + F".into()));
+        sessions.push(("打开设置", "⌘ + ,".into()));
     }
     let groups = [
         ("会话与标签", sessions),

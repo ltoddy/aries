@@ -6,6 +6,7 @@ use anyhow::Context as _;
 use aries_persistence::{TokenUsage, TokenUsageRepository};
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::searchable_list::SearchableListItem;
 use gpui_kit::component::select::{Select, SelectEvent, SelectState};
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme, Disableable, Icon, IndexPath, Sizable};
@@ -72,6 +73,31 @@ impl UsageData {
     }
 }
 
+#[derive(Clone)]
+struct ProjectOption {
+    label: SharedString,
+    value: Option<String>,
+}
+
+impl ProjectOption {
+    fn new(value: Option<String>) -> Self {
+        let label = value.as_deref().unwrap_or("全部项目").to_owned().into();
+        Self { label, value }
+    }
+}
+
+impl SearchableListItem for ProjectOption {
+    type Value = Option<String>;
+
+    fn title(&self) -> SharedString {
+        self.label.clone()
+    }
+
+    fn value(&self) -> &Self::Value {
+        &self.value
+    }
+}
+
 enum LoadState {
     Idle,
     Loading,
@@ -85,7 +111,7 @@ pub struct UsageView {
     year: i16,
     project: Option<String>,
     selected: Date,
-    project_select: Entity<SelectState<Vec<String>>>,
+    project_select: Entity<SelectState<Vec<ProjectOption>>>,
     focus: FocusHandle,
     scroll: ScrollHandle,
     _subscriptions: Vec<Subscription>,
@@ -96,15 +122,17 @@ impl UsageView {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let today = Zoned::now().date();
         let project_select = cx.new(|cx| {
-            SelectState::new(vec!["全部项目".into()], Some(IndexPath::new(0)), window, cx)
+            SelectState::new(vec![ProjectOption::new(None)], Some(IndexPath::new(0)), window, cx)
                 .searchable(true)
         });
-        let subscriptions =
-            vec![cx.subscribe(&project_select, |this, _, event: &SelectEvent<Vec<String>>, cx| {
+        let subscriptions = vec![cx.subscribe(
+            &project_select,
+            |this, _, event: &SelectEvent<Vec<ProjectOption>>, cx| {
                 let SelectEvent::Confirm(value) = event;
-                this.project = value.as_ref().filter(|value| *value != "全部项目").cloned();
+                this.project = value.clone().flatten();
                 cx.notify();
-            })];
+            },
+        )];
         Self {
             data: None,
             state: LoadState::Idle,
@@ -144,20 +172,21 @@ impl UsageView {
             let _ = this.update_in(cx, |this, window, cx| {
                 match result {
                     Ok(data) => {
-                        let mut projects = vec!["全部项目".to_string()];
-                        projects.extend(data.projects.keys().cloned());
+                        let mut projects = vec![ProjectOption::new(None)];
+                        projects.extend(
+                            data.projects
+                                .keys()
+                                .cloned()
+                                .map(|project| ProjectOption::new(Some(project))),
+                        );
                         if let Some(project) = &this.project
                             && !data.projects.contains_key(project)
                         {
-                            projects.push(project.clone());
+                            projects.push(ProjectOption::new(Some(project.clone())));
                         }
                         this.project_select.update(cx, |select, cx| {
                             select.set_items(projects, window, cx);
-                            select.set_selected_value(
-                                &this.project.clone().unwrap_or_else(|| "全部项目".into()),
-                                window,
-                                cx,
-                            );
+                            select.set_selected_value(&this.project, window, cx);
                         });
                         this.data = Some(data);
                         this.state = LoadState::Ready;

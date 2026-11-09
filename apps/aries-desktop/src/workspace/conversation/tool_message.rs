@@ -60,8 +60,15 @@ impl ToolMessage {
         let details = SharedString::from(format!("{} · {status}", tool.title()));
         let status_icon = MessageStatusIcon {
             id: ElementId::NamedChild(
-                ElementId::from(("tool-status-motion", entity_id)).into(),
-                format!("{:?}-{}", session_id, tool.call().tool_call_id).into(),
+                ElementId::NamedChild(
+                    ElementId::from(("tool-status-motion", entity_id)).into(),
+                    match session_id {
+                        Some(id) => format!("session:{id}").into(),
+                        None => "no-session".into(),
+                    },
+                )
+                .into(),
+                tool.call().tool_call_id.to_string().into(),
             ),
             running: tool.call().status == ToolCallStatus::InProgress && !tool.is_interrupted(),
             completed: tool.call().status == ToolCallStatus::Completed && !tool.is_interrupted(),

@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::path::{Path, PathBuf};
 
 use anyhow::Context;
@@ -89,6 +90,37 @@ fn read_line_changes(
     Ok(changes)
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StatusKind {
+    Conflicted,
+    Renamed,
+    Deleted,
+    Untracked,
+    Added,
+    TypeChanged,
+    Modified,
+}
+
+impl StatusKind {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Conflicted => "冲突",
+            Self::Renamed => "重命名",
+            Self::Deleted => "删除",
+            Self::Untracked => "未跟踪",
+            Self::Added => "新增",
+            Self::TypeChanged => "类型变更",
+            Self::Modified => "修改",
+        }
+    }
+}
+
+impl Display for StatusKind {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> FmtResult {
+        formatter.write_str(self.label())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ChangedFile {
     path: String,
@@ -98,21 +130,21 @@ pub struct ChangedFile {
 }
 
 impl ChangedFile {
-    pub fn status_kind(status: Status) -> &'static str {
+    pub fn status_kind(status: Status) -> StatusKind {
         if status.is_conflicted() {
-            "冲突"
+            StatusKind::Conflicted
         } else if status.intersects(Status::INDEX_RENAMED | Status::WT_RENAMED) {
-            "重命名"
+            StatusKind::Renamed
         } else if status.intersects(Status::INDEX_DELETED | Status::WT_DELETED) {
-            "删除"
+            StatusKind::Deleted
         } else if status.is_wt_new() {
-            "未跟踪"
+            StatusKind::Untracked
         } else if status.is_index_new() {
-            "新增"
+            StatusKind::Added
         } else if status.intersects(Status::INDEX_TYPECHANGE | Status::WT_TYPECHANGE) {
-            "类型变更"
+            StatusKind::TypeChanged
         } else {
-            "修改"
+            StatusKind::Modified
         }
     }
 
@@ -120,6 +152,23 @@ impl ChangedFile {
         match group {
             ChangeGroup::Staged => self.staged.as_ref(),
             ChangeGroup::Unstaged => self.unstaged.as_ref(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GitSummary {
+    branch: String,
+    file_count: Option<usize>,
+}
+
+impl Display for GitSummary {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> FmtResult {
+        let branch = &self.branch;
+        match self.file_count {
+            Some(0) => write!(formatter, "{branch} · 工作区干净"),
+            Some(count) => write!(formatter, "{branch} · {count} 个文件变更"),
+            None => write!(formatter, "{branch} · 无法读取变更"),
         }
     }
 }
@@ -218,13 +267,15 @@ impl GitInfo {
         self.changed_files.as_deref()
     }
 
-    pub fn summary(&self) -> String {
-        let branch = &self.branch;
-        match self.changed_files.as_deref() {
-            Some([]) => format!("{branch} · 工作区干净"),
-            Some(files) => format!("{branch} · {} 个文件变更", files.len()),
-            None => format!("{branch} · 无法读取变更"),
+    pub fn summary_state(&self) -> GitSummary {
+        GitSummary {
+            branch: self.branch.clone(),
+            file_count: self.changed_files.as_ref().map(Vec::len),
         }
+    }
+
+    pub fn summary(&self) -> String {
+        self.summary_state().to_string()
     }
 }
 
@@ -268,20 +319,14 @@ impl LineChanges {
 
 impl ChangedFile {
     pub fn status_icon(status: Status) -> IconName {
-        if status.is_conflicted() {
-            IconName::FileExclamationPoint
-        } else if status.intersects(Status::INDEX_RENAMED | Status::WT_RENAMED) {
-            IconName::FileOutput
-        } else if status.intersects(Status::INDEX_DELETED | Status::WT_DELETED) {
-            IconName::FileMinus
-        } else if status.is_wt_new() {
-            IconName::FileQuestionMark
-        } else if status.is_index_new() {
-            IconName::FilePlusCorner
-        } else if status.intersects(Status::INDEX_TYPECHANGE | Status::WT_TYPECHANGE) {
-            IconName::FileType
-        } else {
-            IconName::FilePen
+        match Self::status_kind(status) {
+            StatusKind::Conflicted => IconName::FileExclamationPoint,
+            StatusKind::Renamed => IconName::FileOutput,
+            StatusKind::Deleted => IconName::FileMinus,
+            StatusKind::Untracked => IconName::FileQuestionMark,
+            StatusKind::Added => IconName::FilePlusCorner,
+            StatusKind::TypeChanged => IconName::FileType,
+            StatusKind::Modified => IconName::FilePen,
         }
     }
 }

@@ -46,7 +46,7 @@ pub struct Timeline {
     markdown: HashMap<usize, Entity<TextViewState>>,
     expanded_thoughts: HashSet<usize>,
     collapsed_streaming_thoughts: HashSet<usize>,
-    collapsed_subagents: HashSet<SessionId>,
+    expanded_subagents: HashSet<SessionId>,
     idle_subagents: HashSet<SessionId>,
     images: MessageImages,
     tool_diffs: ToolDiffs,
@@ -65,7 +65,7 @@ impl Timeline {
             markdown: HashMap::new(),
             expanded_thoughts: HashSet::new(),
             collapsed_streaming_thoughts: HashSet::new(),
-            collapsed_subagents: HashSet::new(),
+            expanded_subagents: HashSet::new(),
             idle_subagents: HashSet::new(),
             images: MessageImages::new(),
             tool_diffs: ToolDiffs::new(),
@@ -78,7 +78,7 @@ impl Timeline {
         self.markdown.clear();
         self.expanded_thoughts.clear();
         self.collapsed_streaming_thoughts.clear();
-        self.collapsed_subagents.clear();
+        self.expanded_subagents.clear();
         self.idle_subagents.clear();
         self.tool_diffs.clear();
         self.images.rebuild_images();
@@ -111,7 +111,7 @@ impl Timeline {
         let id = subagent.session_id();
         if subagent.is_idle() {
             if self.idle_subagents.insert(id.clone()) {
-                self.collapsed_subagents.insert(id.clone());
+                self.expanded_subagents.remove(id);
             }
         } else {
             self.idle_subagents.remove(id);
@@ -119,8 +119,8 @@ impl Timeline {
     }
 
     pub fn toggle_subagent(&mut self, id: &SessionId) {
-        if !self.collapsed_subagents.remove(id) {
-            self.collapsed_subagents.insert(id.clone());
+        if !self.expanded_subagents.remove(id) {
+            self.expanded_subagents.insert(id.clone());
         }
     }
 
@@ -421,8 +421,15 @@ impl Timeline {
                 self.expanded_thoughts.contains(&index)
             };
             let id = ElementId::NamedChild(
-                ElementId::from(("thought-motion", cx.entity_id())).into(),
-                format!("{session_id:?}-{index}").into(),
+                ElementId::NamedChild(
+                    ElementId::from(("thought-motion", cx.entity_id())).into(),
+                    match session_id {
+                        Some(id) => format!("session:{id}").into(),
+                        None => "no-session".into(),
+                    },
+                )
+                .into(),
+                index.to_string().into(),
             );
             let markdown = expanded.then(|| self.markdown_state(index, conversation, cx));
             return ThoughtMessage::from_message(
@@ -443,7 +450,7 @@ impl Timeline {
         }
         let message = &conversation.messages()[index];
         if let Some(subagent) = message.subagent() {
-            let collapsed = self.collapsed_subagents.contains(subagent.session_id());
+            let collapsed = !self.expanded_subagents.contains(subagent.session_id());
             let id = subagent.session_id().clone();
             return SubagentMessage::from_subagent(
                 subagent,
@@ -530,13 +537,19 @@ impl Timeline {
                                     })
                                     .child(MessageStatusIcon::new(
                                         ElementId::NamedChild(
-                                            ElementId::from((
-                                                "compaction-status-motion",
-                                                cx.entity_id(),
-                                            ))
-                                            .into(),
-                                            format!("{:?}-{}", session_id, state.compaction_id)
+                                            ElementId::NamedChild(
+                                                ElementId::from((
+                                                    "compaction-status-motion",
+                                                    cx.entity_id(),
+                                                ))
                                                 .into(),
+                                                match session_id {
+                                                    Some(id) => format!("session:{id}").into(),
+                                                    None => "no-session".into(),
+                                                },
+                                            )
+                                            .into(),
+                                            state.compaction_id.to_string().into(),
                                         ),
                                         state.status == CompactionStatus::InProgress,
                                         state.status == CompactionStatus::Completed,

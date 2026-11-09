@@ -14,6 +14,7 @@ gpui_kit::actions!(
     orbit,
     [
         Quit,
+        OpenSettings,
         NewSession,
         CloseTab,
         PreviousTab,
@@ -35,6 +36,7 @@ fn main() -> anyhow::Result<()> {
         cx.bind_keys([KeyBinding::new("cmd-q", Quit, None), KeyBinding::new("ctrl-q", Quit, None)]);
         #[cfg(target_os = "macos")]
         cx.bind_keys([
+            KeyBinding::new("cmd-,", OpenSettings, None),
             KeyBinding::new("cmd-n", NewSession, None),
             KeyBinding::new("cmd-f", ToggleTerminal, None),
         ]);
@@ -60,9 +62,11 @@ fn main() -> anyhow::Result<()> {
             KeyBinding::new("ctrl-shift-tab", PreviousTab, None),
         ]);
         #[cfg(target_os = "macos")]
-        cx.set_menus(
-            [Menu::new("Aries Desktop").items([MenuItem::action("退出 Aries Desktop", Quit)])],
-        );
+        cx.set_menus([Menu::new("Aries Desktop").items([
+            MenuItem::action("设置…", OpenSettings),
+            MenuItem::separator(),
+            MenuItem::action("退出 Aries Desktop", Quit),
+        ])]);
         let options = WindowOptions {
             window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
                 None,

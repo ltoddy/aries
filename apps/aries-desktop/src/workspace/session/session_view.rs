@@ -49,7 +49,6 @@ impl fmt::Debug for SessionView {
         f.debug_struct("SessionView")
             .field("cwd", &self.execution.directory())
             .field("session_id", &self.execution.session_id())
-            .field("status", &self.execution.status())
             .field("message_count", &self.execution.conversation().messages().len())
             .field("disconnected", &self.execution.is_disconnected())
             .finish_non_exhaustive()
