@@ -65,9 +65,24 @@ impl TokenUsageRepository {
         &mut self,
         created_at: Timestamp,
     ) -> toasty::Result<Vec<TokenUsage>> {
-        TokenUsage::filter(crate::token_usage::TokenUsage::fields().created_at().lt(created_at))
+        TokenUsage::filter(TokenUsage::fields().created_at().lt(created_at))
             .exec(&mut self.db)
             .await
+    }
+
+    pub async fn find_by_created_at_between(
+        &mut self,
+        low: Timestamp,
+        high: Timestamp,
+    ) -> toasty::Result<Vec<TokenUsage>> {
+        TokenUsage::filter(
+            TokenUsage::fields()
+                .created_at()
+                .ge(low)
+                .and(TokenUsage::fields().created_at().le(high)),
+        )
+        .exec(&mut self.db)
+        .await
     }
 
     pub async fn delete_by_id(&mut self, id: u64) -> toasty::Result<()> {

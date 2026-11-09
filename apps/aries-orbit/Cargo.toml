@@ -14,6 +14,7 @@ agent-client-protocol = { workspace = true, features = ["process"] }
 alacritty_terminal = "0.26"
 anyhow = "1.0"
 async-channel = "2.5"
+aries-persistence = { path = "../../crates/aries-persistence" }
 base64.workspace = true
 dirs = "7.0"
 git2 = { workspace = true, default-features = false }
@@ -36,6 +37,7 @@ gpui-kit = { version = "0.9", features = [
     "tree-sitter-typescript",
     "tree-sitter-yaml",
 ] }
+jiff.workspace = true
 libc = "0.2"
 notify = "8.2"
 portable-pty = "0.9"
