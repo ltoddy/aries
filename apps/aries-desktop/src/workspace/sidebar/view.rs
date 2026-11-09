@@ -5,7 +5,7 @@ use std::time::Duration;
 use agent_client_protocol::v1::schema::{SessionId, SessionInfo};
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
-use gpui_kit::component::{ActiveTheme, Disableable, Icon, Sizable};
+use gpui_kit::component::{ActiveTheme, Disableable, Icon};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -139,8 +139,10 @@ impl Sidebar {
                     .child(
                         Button::new("open-usage")
                             .ghost()
-                            .small()
-                            .label("用量")
+                            .icon(Icon::new(IconName::ChartNoAxesColumn).size(rems(1.125)))
+                            .size_8()
+                            .tooltip("统计")
+                            .accessibility_label("打开统计")
                             .bg(if usage_selected { cx.theme().muted } else { cx.theme().sidebar })
                             .text_color(if usage_selected {
                                 cx.theme().primary

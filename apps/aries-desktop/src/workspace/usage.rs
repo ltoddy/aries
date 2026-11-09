@@ -568,7 +568,7 @@ impl Render for UsageView {
             .bg(cx.theme().background).text_color(cx.theme().foreground)
             .child(div().p_6().flex().flex_col().gap_6()
                 .child(div().flex().items_center().gap_3()
-                    .child(div().flex_1().text_lg().font_weight(FontWeight::MEDIUM).child("用量"))
+                    .child(div().flex_1().text_lg().font_weight(FontWeight::MEDIUM).child("统计"))
                     .child(Button::new("refresh-usage").ghost().small().label(if loading { "加载中…" } else { "刷新" })
                         .icon(Icon::new(IconName::RefreshCw)).disabled(loading)
                         .on_click(cx.listener(|this, _, window, cx| this.refresh(window, cx)))))
