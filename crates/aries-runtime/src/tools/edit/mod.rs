@@ -103,7 +103,7 @@ impl Tool for EditTool {
             .await
             .map_err(|err| EditError::io(EditIoOperation::WriteFile, &file_path, err))?;
 
-        self.ctx.on_file_written(&file_path, &new_content).await;
+        self.ctx.on_file_read(&file_path).await;
 
         let (hunks, additions, deletions) = diff::diff(&content, &new_content);
 

@@ -12,7 +12,6 @@ fn bash_args(command: &str) -> BashArgs {
 fn tool(cwd: impl AsRef<std::path::Path>) -> BashTool {
     BashTool::new(crate::tools::ToolContext::new(
         "test",
-        None,
         {
             let (notifier, _) = aries_communicate::Notifier::channel();
             notifier
@@ -77,7 +76,6 @@ async fn test_bash_background() {
     let mut context = ToolContext::new();
     let ctx = crate::tools::ToolContext::new(
         "test",
-        None,
         {
             let (notifier, _) = aries_communicate::Notifier::channel();
             notifier

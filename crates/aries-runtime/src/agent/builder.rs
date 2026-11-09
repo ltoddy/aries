@@ -11,7 +11,6 @@ use rig::tool::server::ToolServerHandle;
 use toasty::Db;
 
 use crate::agent::{AGENT_LOOP_MAX_TURNS, AriesAgent};
-use crate::lspclient::SharedLspClient;
 
 pub struct AgentBuilder {
     model: Model<OpenAiWire>,
@@ -20,7 +19,6 @@ pub struct AgentBuilder {
     root_dir: PathBuf,
     cwd: PathBuf,
     gctx: GlobalContext,
-    lsp_client: Option<SharedLspClient>,
 
     extensions: AgentExtensions,
     db: Db,
@@ -51,18 +49,12 @@ impl AgentBuilder {
             root_dir: root_dir.to_owned(),
             cwd: cwd.to_owned(),
             gctx,
-            lsp_client: None,
             effort,
             extensions: AgentExtensions::empty(),
             db,
             notifier,
             session_id: session_id.into(),
         }
-    }
-
-    pub fn with_lsp_client(mut self, lsp_client: Option<SharedLspClient>) -> Self {
-        self.lsp_client = lsp_client;
-        self
     }
 
     pub fn with_extensions(mut self, extensions: AgentExtensions) -> Self {
@@ -83,7 +75,6 @@ impl AgentBuilder {
             self.model.clone(),
             &self.root_dir,
             &self.cwd,
-            self.lsp_client.clone(),
             self.extensions.clone(),
             Notifier::clone(&self.notifier),
             self.db.clone(),

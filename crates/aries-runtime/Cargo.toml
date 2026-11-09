@@ -37,7 +37,6 @@ rig = { workspace = true, features = ["reqwest-middleware"] }
 schemars = "1.2"
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
-serde_repr = "0.1"
 similar = { workspace = true }
 thiserror.workspace = true
 toasty.workspace = true

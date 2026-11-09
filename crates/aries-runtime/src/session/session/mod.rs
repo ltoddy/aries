@@ -38,7 +38,6 @@ use self::instruction::InstructionContext;
 use crate::agent::{AgentBuilder, AriesAgent};
 use crate::chat_context::{ChatContext, ChatHistory};
 use crate::compact::ContextCompactor;
-use crate::lspclient::{LspServerInfo, SharedLspClient, warm_up};
 use crate::memory::{MemoryRetriever, MemoryStore};
 
 pub enum PromptOutcome {
@@ -62,7 +61,6 @@ pub struct Session {
     mode: String,
     effort: Effort,
 
-    lsp_client: Option<SharedLspClient>,
     chat_history: ChatHistory,
     chat_context: ChatContext,
 
@@ -187,7 +185,6 @@ impl Session {
             Notifier::clone(&self.notifier),
             self.db.clone(),
         )
-        .with_lsp_client(self.lsp_client.clone())
         .with_extensions(self.extensions.clone())
         .build(self.tool_server_handle.clone(), self.hook.clone())
         .await;
@@ -228,7 +225,6 @@ impl Session {
             Notifier::clone(&self.notifier),
             self.db.clone(),
         )
-        .with_lsp_client(self.lsp_client.clone())
         .with_extensions(self.extensions.clone())
         .build(self.tool_server_handle.clone(), self.hook.clone())
         .await;
@@ -430,8 +426,6 @@ impl Session {
 
         let (notifier, receiver) = Notifier::channel();
 
-        let lsp_client = Self::warm_up_lsp(cwd).await;
-
         let mut extensions = AgentExtensions::new(cwd, gctx.root_dir()).await;
         extensions.mcps.push(external_mcp_config);
         let tool_server_handle = ToolServer::new().run();
@@ -477,7 +471,6 @@ impl Session {
             Notifier::clone(&notifier),
             db.clone(),
         )
-        .with_lsp_client(lsp_client.clone())
         .with_extensions(extensions.clone())
         .build(tool_server_handle.clone(), hook.clone())
         .await;
@@ -508,7 +501,6 @@ impl Session {
             agent,
             mode: DEFAULT_AGENT_NAME.to_owned(),
             effort: DEFAULT_EFFORT,
-            lsp_client,
             chat_history,
             chat_context,
             session_repo,
@@ -533,19 +525,6 @@ impl Session {
         let title = message_to_simple_text(prompt);
         let _ = self.session_repo.update_title_by_session_id(&self.id, &title).await;
         title
-    }
-
-    async fn warm_up_lsp(dir: impl AsRef<Path>) -> Option<SharedLspClient> {
-        let dir = dir.as_ref();
-
-        if let Some(info) = LspServerInfo::detect(dir)
-            && info.installed()
-            && let Ok(lsp) = warm_up(info, dir).await
-        {
-            return Some(lsp);
-        }
-
-        None
     }
 
     async fn recall_context(&self, query: impl Into<String>) -> Option<String> {

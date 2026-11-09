@@ -6,8 +6,8 @@ use agent_client_protocol::v1::schema::{
 };
 use aries_communicate::AgentEvent;
 use aries_runtime::tools::{
-    agent, bash, batch, codesearch, edit, glob, grep, lsp, monitor, multiedit, read, skill,
-    task_output, task_stop, update_plan, webfetch, websearch, write,
+    agent, bash, batch, codesearch, edit, glob, grep, monitor, multiedit, read, skill, task_output,
+    task_stop, update_plan, webfetch, websearch, write,
 };
 use rig::agent::{CompletionCall, MultiTurnStreamItem, PromptResponse};
 use rig::completion::Message;
@@ -300,9 +300,6 @@ fn parse_tool_call(t: ToolCall) -> (String, Vec<ToolCallContent>) {
         grep::NAME => serde_json::from_value::<grep::GrepArgs>(arguments)
             .map(|args| (args.title(), vec![]))
             .unwrap_or_else(|_| (default_title, vec![])),
-        lsp::NAME => serde_json::from_value::<lsp::LspArgs>(arguments)
-            .map(|args| (args.title(), vec![]))
-            .unwrap_or_else(|_| (default_title, vec![])),
         monitor::NAME => serde_json::from_value::<monitor::MonitorArgs>(arguments)
             .map(|args| (args.title(), vec![]))
             .unwrap_or_else(|_| (default_title, vec![])),
@@ -368,7 +365,7 @@ fn tool_kind(tool_name: &ToolName) -> ToolKind {
     match tool_name.as_str() {
         glob::NAME | read::NAME | task_output::NAME => ToolKind::Read,
         edit::NAME | multiedit::NAME | write::NAME => ToolKind::Edit,
-        grep::NAME | codesearch::NAME | lsp::NAME => ToolKind::Search,
+        grep::NAME | codesearch::NAME => ToolKind::Search,
         bash::NAME | batch::NAME | monitor::NAME | task_stop::NAME => ToolKind::Execute,
         webfetch::NAME | websearch::NAME => ToolKind::Fetch,
         agent::NAME | skill::NAME | update_plan::NAME => ToolKind::Think,
