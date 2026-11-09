@@ -48,6 +48,7 @@ pub async fn set_session_config_option(
                     session.setting(),
                     session.mode().to_string(),
                     session.agents(),
+                    session.thought_level(),
                 ));
                 registry.lock().await.putback_session(session);
                 responder.respond(resp)
@@ -60,8 +61,22 @@ pub async fn set_session_config_option(
                     session.setting(),
                     session.mode().to_string(),
                     session.agents(),
+                    session.thought_level(),
                 ));
                 registry.lock().await.putback_session(session);
+                responder.respond(resp)
+            },
+            SessionConfig::ThoughtLevel => {
+                if let Err(err) = session.set_thought_level(value).await {
+                    return responder.respond_with_internal_error(err.to_string());
+                }
+
+                let resp = SetSessionConfigOptionResponse::new(config_options(
+                    session.setting(),
+                    session.mode().to_string(),
+                    session.agents(),
+                    session.thought_level(),
+                ));
                 responder.respond(resp)
             },
         };
@@ -71,6 +86,7 @@ pub async fn set_session_config_option(
         session.setting(),
         session.mode().to_string(),
         session.agents(),
+        session.thought_level(),
     ));
     responder.respond(resp)
 }

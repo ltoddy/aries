@@ -1,3 +1,4 @@
+mod error;
 mod hook;
 mod instruction;
 
@@ -14,13 +15,13 @@ use aries_extension::hook::input::{
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
 use aries_extension::{AgentExtensions, McpDefinition, SkillExecutor, SlashCommandsExecutor, mcp};
-use aries_init::{GlobalContext, ModelConfig, Setting, SettingError, SettingLoader};
+use aries_init::{GlobalContext, ModelConfig, Setting, SettingLoader};
 use aries_persistence::SessionRepository;
 use itertools::Itertools;
 use jiff::Zoned;
 use rig::Model;
 use rig::agent::PromptResponse;
-use rig::completion::Message;
+use rig::completion::{Effort, Message};
 use rig::message::UserContent;
 use rig::providers::openai::wire::OpenAiWire;
 use rig::tool::rmcp::McpConnection;
@@ -31,6 +32,7 @@ use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_util::sync::CancellationToken;
 
+pub use self::error::SessionError;
 use self::hook::SessionPromptHook;
 use self::instruction::InstructionContext;
 use crate::agent::{AgentBuilder, AriesAgent};
@@ -39,30 +41,13 @@ use crate::compact::ContextCompactor;
 use crate::lspclient::{LspServerInfo, SharedLspClient, warm_up};
 use crate::memory::{MemoryRetriever, MemoryStore};
 
-#[derive(Debug, thiserror::Error)]
-pub enum SessionError {
-    #[error("agent not found: {0}")]
-    AgentNotFound(String),
-
-    #[error("{0}")]
-    Io(#[from] std::io::Error),
-
-    #[error("{0}")]
-    Setting(#[from] SettingError),
-}
-
-impl SessionError {
-    pub fn agent_not_found(name: impl Into<String>) -> Self {
-        Self::AgentNotFound(name.into())
-    }
-}
-
 pub enum PromptOutcome {
     Completed(String),
     Cancelled(String),
 }
 
 pub const DEFAULT_AGENT_NAME: &str = "build";
+pub const DEFAULT_EFFORT: Effort = Effort::High;
 
 #[derive(Clone)]
 pub struct Session {
@@ -75,6 +60,7 @@ pub struct Session {
     model: Model<OpenAiWire>,
     agent: AriesAgent,
     mode: String,
+    effort: Effort,
 
     lsp_client: Option<SharedLspClient>,
     chat_history: ChatHistory,
@@ -194,6 +180,7 @@ impl Session {
             &self.id,
             self.model.clone(),
             agent,
+            self.effort,
             &self.session_dir,
             &self.cwd,
             self.gctx.clone(),
@@ -207,6 +194,47 @@ impl Session {
 
         self.agent = agent;
         self.mode = mode.to_string();
+        Ok(())
+    }
+
+    pub async fn set_thought_level(&mut self, level: impl AsRef<str>) -> Result<(), SessionError> {
+        let level = level.as_ref();
+        let effort = match level {
+            "minimal" => Effort::Minimal,
+            "low" => Effort::Low,
+            "medium" => Effort::Medium,
+            "high" => Effort::High,
+            "xhigh" => Effort::XHigh,
+            "max" => Effort::Max,
+            _ => return Err(SessionError::invalid_thought_level(level)),
+        };
+
+        let agent = self
+            .extensions
+            .agents
+            .iter()
+            .find(|agent| agent.frontmatter.name.eq_ignore_ascii_case(&self.mode))
+            .cloned()
+            .ok_or_else(|| SessionError::agent_not_found(&self.mode))?;
+
+        let agent = AgentBuilder::new(
+            &self.id,
+            self.model.clone(),
+            agent,
+            effort,
+            &self.session_dir,
+            &self.cwd,
+            self.gctx.clone(),
+            Notifier::clone(&self.notifier),
+            self.db.clone(),
+        )
+        .with_lsp_client(self.lsp_client.clone())
+        .with_extensions(self.extensions.clone())
+        .build(self.tool_server_handle.clone(), self.hook.clone())
+        .await;
+
+        self.agent = agent;
+        self.effort = effort;
         Ok(())
     }
 
@@ -311,6 +339,10 @@ impl Session {
 
     pub fn mode(&self) -> &str {
         &self.mode
+    }
+
+    pub fn thought_level(&self) -> Effort {
+        self.effort
     }
 
     pub fn setting(&self) -> &Setting {
@@ -438,6 +470,7 @@ impl Session {
             &id,
             model.clone(),
             agent,
+            DEFAULT_EFFORT,
             &session_dir,
             cwd,
             gctx.clone(),
@@ -474,6 +507,7 @@ impl Session {
             model,
             agent,
             mode: DEFAULT_AGENT_NAME.to_owned(),
+            effort: DEFAULT_EFFORT,
             lsp_client,
             chat_history,
             chat_context,

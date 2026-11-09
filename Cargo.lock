@@ -414,6 +414,7 @@ dependencies = [
  "itertools 0.15.0",
  "rig",
  "serde_json",
+ "thiserror 2.0.21",
  "tokio",
  "tracing",
 ]

@@ -18,7 +18,7 @@ use tokio::sync::Mutex;
 
 pub use crate::session::commands::BUILTIN_COMMANDS;
 pub use crate::session::registry::SessionRegistry;
-pub use crate::session::session::{PromptOutcome, Session};
+pub use crate::session::session::{DEFAULT_AGENT_NAME, DEFAULT_EFFORT, PromptOutcome, Session};
 
 pub type SharedRegistry = Arc<Mutex<SessionRegistry>>;
 
