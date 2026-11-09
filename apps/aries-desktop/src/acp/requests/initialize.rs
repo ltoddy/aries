@@ -32,7 +32,7 @@ pub async fn request(connection: &ConnectionTo<Agent>) -> Result<AgentCapabiliti
                             .plan(PlanCapabilities::new())
                             .subagents(SubagentCapabilities::new()),
                     )
-                    .client_info(Implementation::new("aries-orbit", env!("CARGO_PKG_VERSION"))),
+                    .client_info(Implementation::new("aries-desktop", env!("CARGO_PKG_VERSION"))),
             )
             .block_task(),
     )

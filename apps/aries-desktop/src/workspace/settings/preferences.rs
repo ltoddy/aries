@@ -122,7 +122,7 @@ impl Preferences {
     }
 
     pub fn path() -> Option<PathBuf> {
-        dirs::home_dir().map(|path| path.join(".local/share/aries-orbit/settings.toml"))
+        dirs::home_dir().map(|path| path.join(".local/share/aries-desktop/settings.toml"))
     }
 
     pub fn load(path: impl AsRef<Path>) -> Result<Self, LoadPreferencesError> {

@@ -1,8 +1,8 @@
 install-cli:
     @cargo install --path apps/aries-cli --force --locked
 
-install-orbit:
-    @cargo install --path apps/aries-orbit --force --locked
+install-desktop:
+    @cargo install --path apps/aries-desktop --force --locked
 
 run:
     @cargo run
@@ -39,6 +39,6 @@ fix:
 
 lint: fmt-check clippy
 
-orbit-dmg:
-    @cargo build --release --locked --bin aries-orbit
-    @bash misc/orbit-dmg.sh
+desktop-dmg:
+    @cargo build --release --locked --bin aries-desktop
+    @bash misc/desktop-dmg.sh

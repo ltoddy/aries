@@ -3,19 +3,19 @@ set -euo pipefail
 
 VERSION=$(cargo metadata --no-deps --format-version 1 --locked | python3 -c 'import json,sys; print(json.load(sys.stdin)["packages"][0]["version"])')
 
-BINARY_PATH="target/release/aries-orbit"
-APP_BUNDLE="target/bundle/Aries Orbit.app"
+BINARY_PATH="target/release/aries-desktop"
+APP_BUNDLE="target/bundle/Aries Desktop.app"
 INFO_PLIST="$APP_BUNDLE/Contents/Info.plist"
 
 rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_BUNDLE/Contents/MacOS"
-install -m 755 "$BINARY_PATH" "$APP_BUNDLE/Contents/MacOS/aries-orbit"
+install -m 755 "$BINARY_PATH" "$APP_BUNDLE/Contents/MacOS/aries-desktop"
 
 plutil -create xml1 "$INFO_PLIST"
-plutil -insert CFBundleName -string "Aries Orbit" "$INFO_PLIST"
-plutil -insert CFBundleDisplayName -string "Aries Orbit" "$INFO_PLIST"
-plutil -insert CFBundleExecutable -string "aries-orbit" "$INFO_PLIST"
-plutil -insert CFBundleIdentifier -string "com.ltoddy.aries-orbit" "$INFO_PLIST"
+plutil -insert CFBundleName -string "Aries Desktop" "$INFO_PLIST"
+plutil -insert CFBundleDisplayName -string "Aries Desktop" "$INFO_PLIST"
+plutil -insert CFBundleExecutable -string "aries-desktop" "$INFO_PLIST"
+plutil -insert CFBundleIdentifier -string "com.ltoddy.aries-desktop" "$INFO_PLIST"
 plutil -insert CFBundlePackageType -string APPL "$INFO_PLIST"
 plutil -insert CFBundleInfoDictionaryVersion -string "6.0" "$INFO_PLIST"
 plutil -insert CFBundleShortVersionString -string "$VERSION" "$INFO_PLIST"
@@ -33,15 +33,15 @@ plutil -lint "$INFO_PLIST"
 codesign --force --sign - "$APP_BUNDLE"
 codesign --verify --strict --verbose=2 "$APP_BUNDLE"
 
-DMG_PATH="target/bundle/Aries-Orbit-$VERSION.dmg"
+DMG_PATH="target/bundle/Aries-Desktop-$VERSION.dmg"
 
 stage=$(mktemp -d "target/bundle/.dmg.XXXXXX")
 trap 'rm -rf "$stage"' EXIT
 
-ditto "$APP_BUNDLE" "$stage/Aries Orbit.app"
+ditto "$APP_BUNDLE" "$stage/Aries Desktop.app"
 ln -s /Applications "$stage/Applications"
 
-hdiutil create -volname "Aries Orbit" -srcfolder "$stage" -fs HFS+ -format UDZO -ov "$DMG_PATH"
+hdiutil create -volname "Aries Desktop" -srcfolder "$stage" -fs HFS+ -format UDZO -ov "$DMG_PATH"
 hdiutil verify "$DMG_PATH"
 
 printf 'DMG: %s\n' "$DMG_PATH"

@@ -39,7 +39,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2.9.3
 
-      - run: cargo +nightly clippy --workspace --exclude aries-cli --exclude aries-orbit --all-targets --locked -- -D warnings
+      - run: cargo +nightly clippy --workspace --exclude aries-cli --exclude aries-desktop --all-targets --locked -- -D warnings
 
   test-crates:
     name: test (crates)
@@ -51,7 +51,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2.9.3
 
-      - run: cargo +nightly test --workspace --exclude aries-cli --exclude aries-orbit --locked
+      - run: cargo +nightly test --workspace --exclude aries-cli --exclude aries-desktop --locked
 
   lint-cli:
     name: lint (cli)
@@ -91,7 +91,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2.9.3
 
-      - run: cargo +nightly clippy -p aries-orbit --all-targets --locked -- -D warnings
+      - run: cargo +nightly clippy -p aries-desktop --all-targets --locked -- -D warnings
 
   test-orbit:
     name: test (orbit)
@@ -103,7 +103,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2.9.3
 
-      - run: cargo +nightly test -p aries-orbit --bins --tests --locked
+      - run: cargo +nightly test -p aries-desktop --bins --tests --locked
 
   security:
     name: security
