@@ -21,7 +21,6 @@ async fn test_multiedit_basic() {
     let file_path = dir.path().join("test.txt");
     let ctx = ToolContext::new(
         "test",
-        None,
         {
             let (notifier, _) = aries_communicate::Notifier::channel();
             notifier
@@ -68,7 +67,6 @@ async fn test_multiedit_creates_file() {
     let mut context = rig::tool::ToolContext::new();
     let tool = MultiEditTool::new(ToolContext::new(
         "test",
-        None,
         {
             let (notifier, _) = aries_communicate::Notifier::channel();
             notifier
@@ -104,7 +102,6 @@ async fn test_multiedit_identical_text_error() {
     let file_path = dir.path().join("test.txt");
     let ctx = ToolContext::new(
         "test",
-        None,
         {
             let (notifier, _) = aries_communicate::Notifier::channel();
             notifier
@@ -142,7 +139,6 @@ async fn test_multiedit_rejects_unread_file() {
     let mut context = rig::tool::ToolContext::new();
     let tool = MultiEditTool::new(ToolContext::new(
         "test",
-        None,
         {
             let (notifier, _) = aries_communicate::Notifier::channel();
             notifier
@@ -186,7 +182,6 @@ async fn test_multiedit_rejects_empty_old_text_on_non_empty_file() {
     let file_path = dir.path().join("test.txt");
     let ctx = ToolContext::new(
         "test",
-        None,
         {
             let (notifier, _) = aries_communicate::Notifier::channel();
             notifier
@@ -224,7 +219,6 @@ async fn test_multiedit_allows_empty_old_text_on_empty_file() {
     let file_path = dir.path().join("test.txt");
     let ctx = ToolContext::new(
         "test",
-        None,
         {
             let (notifier, _) = aries_communicate::Notifier::channel();
             notifier

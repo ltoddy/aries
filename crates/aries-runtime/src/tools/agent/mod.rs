@@ -128,7 +128,6 @@ impl Tool for AgentTool {
             self.model.clone(),
             &self.parent_dir,
             &cwd,
-            None,
             AgentExtensions::empty(),
             Notifier::clone(&self.notifier),
             self.db.clone(),

@@ -7,7 +7,6 @@ use aries_runtime::codesearch::CodeSearchArgs;
 use aries_runtime::edit::EditArgs;
 use aries_runtime::glob::GlobArgs;
 use aries_runtime::grep::GrepArgs;
-use aries_runtime::lsp::LspArgs;
 use aries_runtime::monitor::MonitorArgs;
 use aries_runtime::multiedit::MultiEditArgs;
 use aries_runtime::read::ReadArgs;
@@ -21,7 +20,7 @@ use aries_runtime::webfetch::WebFetchArgs;
 use aries_runtime::websearch::WebSearchArgs;
 use aries_runtime::write::WriteArgs;
 use aries_runtime::{
-    bash, batch, codesearch, edit, glob, grep, lsp, monitor, multiedit, read, skill, task_output,
+    bash, batch, codesearch, edit, glob, grep, monitor, multiedit, read, skill, task_output,
     task_stop, update_plan, webfetch, websearch, write,
 };
 use colored::Colorize;
@@ -94,7 +93,6 @@ pub fn format_tool_call_args(tool_name: &str, args: &str) -> (String, Option<Str
         edit::NAME => EditArgs::render_args(args),
         glob::NAME => GlobArgs::render_args(args),
         grep::NAME => GrepArgs::render_args(args),
-        lsp::NAME => LspArgs::render_args(args),
         monitor::NAME => MonitorArgs::render_args(args),
         multiedit::NAME => MultiEditArgs::render_args(args),
         read::NAME => ReadArgs::render_args(args),

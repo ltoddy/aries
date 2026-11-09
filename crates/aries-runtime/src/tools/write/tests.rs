@@ -17,7 +17,6 @@ async fn test_write_empty_existing_file() {
 
     let ctx = ToolContext::new(
         "test",
-        None,
         {
             let (notifier, _) = aries_communicate::Notifier::channel();
             notifier
@@ -52,7 +51,6 @@ async fn test_write_new_file() {
     let mut context = rig::tool::ToolContext::new();
     let tool = WriteTool::new(ToolContext::new(
         "test",
-        None,
         {
             let (notifier, _) = aries_communicate::Notifier::channel();
             notifier
@@ -79,7 +77,6 @@ async fn test_write_rejects_unread_empty_file() {
 
     let ctx = ToolContext::new(
         "test",
-        None,
         {
             let (notifier, _) = aries_communicate::Notifier::channel();
             notifier
@@ -109,7 +106,6 @@ async fn test_write_rejects_non_empty_existing_file() {
 
     let ctx = ToolContext::new(
         "test",
-        None,
         {
             let (notifier, _) = aries_communicate::Notifier::channel();
             notifier
@@ -145,7 +141,6 @@ async fn test_write_empty_content() {
 
     let ctx = ToolContext::new(
         "test",
-        None,
         {
             let (notifier, _) = aries_communicate::Notifier::channel();
             notifier
@@ -172,7 +167,6 @@ async fn test_write_resolves_relative_path_against_cwd() {
     let mut context = rig::tool::ToolContext::new();
     let tool = WriteTool::new(ToolContext::new(
         "test",
-        None,
         {
             let (notifier, _) = aries_communicate::Notifier::channel();
             notifier

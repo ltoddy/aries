@@ -9,7 +9,6 @@ pub mod enter_worktree;
 pub mod exit_worktree;
 pub mod glob;
 pub mod grep;
-pub mod lsp;
 pub mod monitor;
 pub mod multiedit;
 pub mod queue;
@@ -48,7 +47,6 @@ use self::enter_worktree::EnterGitWorktreeOutput;
 use self::exit_worktree::ExitGitWorktreeOutput;
 use self::glob::GlobOutput;
 use self::grep::GrepOutput;
-use self::lsp::LspOutput;
 use self::monitor::MonitorOutput;
 use self::multiedit::MultiEditOutput;
 use self::read::ReadOutput;
@@ -71,7 +69,6 @@ pub fn format_tool_output(tool_name: &str, raw_json: serde_json::Value) -> Strin
         exit_worktree::NAME => ExitGitWorktreeOutput::render_output(raw_json),
         glob::NAME => GlobOutput::render_output(raw_json),
         grep::NAME => GrepOutput::render_output(raw_json),
-        lsp::NAME => LspOutput::render_output(raw_json),
         monitor::NAME => MonitorOutput::render_output(raw_json),
         multiedit::NAME => MultiEditOutput::render_output(raw_json),
         read::NAME => ReadOutput::render_output(raw_json),
@@ -98,7 +95,6 @@ pub const ALL_TOOL_NAMES: &[&str] = &[
     exit_worktree::NAME,
     glob::NAME,
     grep::NAME,
-    lsp::NAME,
     monitor::NAME,
     multiedit::NAME,
     read::NAME,
@@ -123,7 +119,6 @@ pub fn create_tools(
     model: Model<OpenAiWire>,
     parent_dir: impl AsRef<Path>,
     cwd: impl AsRef<Path>,
-    lsp_client: Option<crate::lspclient::SharedLspClient>,
     extensions: AgentExtensions,
     notifier: Notifier,
     db: Db,
@@ -134,7 +129,7 @@ pub fn create_tools(
     let tool_names = tool_names.iter().unique().collect_vec();
     let mut tool_set = ToolSet::default();
 
-    let ctx = ToolContext::new(session_id, lsp_client.clone(), Notifier::clone(&notifier), cwd);
+    let ctx = ToolContext::new(session_id, Notifier::clone(&notifier), cwd);
 
     for &tool_name in tool_names {
         match tool_name {
@@ -193,11 +188,6 @@ pub fn create_tools(
             },
             grep::NAME => {
                 tool_set.add_tool(grep::GrepTool::new(ctx.clone()));
-            },
-            lsp::NAME => {
-                if let Some(lsp_client) = lsp_client.clone() {
-                    tool_set.add_tool(lsp::LspTool::new(lsp_client, ctx.clone()));
-                }
             },
             monitor::NAME => {
                 tool_set.add_tool(monitor::MonitorTool::new(ctx.clone()));

@@ -88,7 +88,7 @@ impl Tool for WriteTool {
         fs::write(&file_path, &args.content)
             .await
             .map_err(|err| WriteError::io(WriteOperation::WriteFile, file_path.clone(), err))?;
-        self.ctx.on_file_written(&file_path, &args.content).await;
+        self.ctx.on_file_read(&file_path).await;
 
         let additions = args.content.lines().count();
         let output = WriteOutput::new(file_path, additions);

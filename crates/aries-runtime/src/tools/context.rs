@@ -5,15 +5,13 @@ use std::time::UNIX_EPOCH;
 use aries_communicate::Notifier;
 use tokio::fs;
 
-use super::read_state::SharedReadState;
-use super::task::TaskRegistry;
-use super::worktree::Worktree;
-use crate::lspclient::SharedLspClient;
+use crate::tools::read_state::SharedReadState;
+use crate::tools::task::TaskRegistry;
+use crate::tools::worktree::Worktree;
 
 #[derive(Clone)]
 pub struct ToolContext {
     session_id: String,
-    lsp_client: Option<SharedLspClient>,
     cwd: Arc<parking_lot::Mutex<PathBuf>>,
     worktree: Arc<parking_lot::Mutex<Option<Worktree>>>,
     pub task: TaskRegistry,
@@ -23,7 +21,6 @@ pub struct ToolContext {
 impl std::fmt::Debug for ToolContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ToolContext")
-            .field("has_lsp_client", &self.lsp_client.is_some())
             .field("cwd", &self.cwd)
             .field("task", &self.task)
             .field("read_state", &self.read_state)
@@ -43,19 +40,14 @@ pub enum GuardWriteError {
 }
 
 impl ToolContext {
-    pub fn new(
-        session_id: impl Into<String>,
-        lsp_client: Option<SharedLspClient>,
-        notifier: Notifier,
-        cwd: impl AsRef<Path>,
-    ) -> Self {
+    pub fn new(session_id: impl Into<String>, notifier: Notifier, cwd: impl AsRef<Path>) -> Self {
         let session_id = session_id.into();
         let task = TaskRegistry::new(notifier);
         let read_state = SharedReadState::new();
         let cwd = std::sync::Arc::new(parking_lot::Mutex::new(cwd.as_ref().to_owned()));
         let worktree_session = std::sync::Arc::new(parking_lot::Mutex::new(None));
 
-        Self { session_id, lsp_client, cwd, worktree: worktree_session, task, read_state }
+        Self { session_id, cwd, worktree: worktree_session, task, read_state }
     }
 
     pub fn session_id(&self) -> &str {
@@ -102,18 +94,6 @@ impl ToolContext {
             return Err(GuardWriteError::ModifiedSinceRead);
         }
         Ok(())
-    }
-
-    pub async fn on_file_written(&self, file_path: impl AsRef<Path>, content: impl Into<String>) {
-        let file_path = file_path.as_ref();
-        let content = content.into();
-
-        if let Some(client) = &self.lsp_client {
-            let _ = client.did_change(file_path, &content).await;
-            let _ = client.did_save(file_path, &content).await;
-        }
-
-        self.on_file_read(file_path).await;
     }
 
     async fn modified_at(file_path: impl AsRef<Path>) -> Option<u128> {

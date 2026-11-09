@@ -8,7 +8,6 @@ disallowed-tools:
   - Edit
   - EnterGitWorktree
   - ExitGitWorktree
-  - Lsp
   - MultiEdit
   - Skill
   - UpdatePlan

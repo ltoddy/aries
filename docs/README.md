@@ -14,7 +14,6 @@
 | 上下文管理          | [context.md](context.md)         |
 | 长期记忆            | [memory.md](memory.md)           |
 | 会话管理            | [session.md](session.md)         |
-| LSP 集成            | [lsp.md](lsp.md)                 |
 | 网络访问            | [web-tool.md](web-tool.md)       |
 | 持久化与统计        | [persistence.md](persistence.md) |
 | ACP 协议            | [acp.md](acp.md)                 |

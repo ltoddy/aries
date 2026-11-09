@@ -126,7 +126,7 @@ impl Tool for MultiEditTool {
         fs::write(&file_path, &content)
             .await
             .map_err(|err| MultiEditError::io(MultiEditIoOperation::WriteFile, &file_path, err))?;
-        self.ctx.on_file_written(&file_path, &content).await;
+        self.ctx.on_file_read(&file_path).await;
 
         match original_content {
             Some(original_content) => {

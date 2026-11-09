@@ -1,6 +1,6 @@
 # 内置工具 Tools
 
-aries 内置 16 个工具，按模式分配。
+aries 内置工具按模式分配。
 
 ## 基础工具（所有模式可用）
 
@@ -22,7 +22,6 @@ aries 内置 16 个工具，按模式分配。
 | `edit`        | 精确字符串替换编辑文件                                    |
 | `multiedit`   | 对同一文件依次执行多次查找替换                            |
 | `batch`       | 并发执行多个独立工具调用                                  |
-| `lsp`         | 与 LSP 服务器交互（定义跳转、引用查找、悬停等）           |
 | `question`    | 向用户提问（选择 / 多选 / 自由作答）                      |
 | `skill`       | 加载并执行 skill                                          |
 | `update_plan` | 推送 / 更新执行计划（支持 active_form、全部完成自动清空） |
@@ -39,7 +38,6 @@ aries 对工具实现做了一系列优化：
 
 - `SharedReadState`：记录每个文件被读取时的修改时间戳。
 - `SharedFileCheckpoint`：写前备份文件内容（超过 1 MB 跳过，避免占用内存），支持回滚。
-- LSP 客户端：可选，写入后用于通知 LSP 重建索引。
 
 ### 写前校验 guard_write
 
@@ -49,11 +47,6 @@ aries 对工具实现做了一系列优化：
 - 文件在读取后未被外部修改（否则报 `ModifiedSinceRead`）。
 
 `write` 工具则通过拒绝覆盖非空文件来保护已有内容（只允许创建新文件或覆盖空文件）。
-
-### 写后通知 LSP 重建索引
-
-`write` / `edit` / `multiedit` 写入后会调用 LSP 的 `did_change` + `did_save`，让语言服务器及时重建索引，随后更新
-`read_state`。
 
 ### 结构化 diff
 
