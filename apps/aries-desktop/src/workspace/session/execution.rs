@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use agent_client_protocol::v1::schema::{
     LoadSessionRequest, LoadSessionResponse, PermissionOptionId, SessionId, SessionInfo,
-    SessionNotification, SessionUpdate, StopReason,
+    SessionNotification, SessionUpdate,
 };
 use agent_client_protocol::{AcpAgentConfig, Error};
 use anyhow::Context as _;
@@ -44,7 +44,6 @@ pub struct Execution {
     load_supported: bool,
     disconnected: bool,
     stopping: bool,
-    status: String,
     tokens: Option<u64>,
     choosing_directory: bool,
     session_directory_selected: bool,
@@ -171,15 +170,11 @@ impl Execution {
             load_supported: false,
             disconnected: false,
             stopping: false,
-            status: "就绪".into(),
             tokens: None,
             choosing_directory: false,
             session_directory_selected: false,
             permissions: VecDeque::new(),
         }
-    }
-    pub fn status(&self) -> &str {
-        &self.status
     }
     pub fn conversation(&self) -> &Conversation {
         &self.conversation
@@ -296,9 +291,6 @@ impl Execution {
         if self.bridge.is_none() {
             self.connect(ui, window, cx);
         }
-        if !ui.sidebar.list_mut().is_connecting() && !self.disconnected {
-            self.status = "思考中…".into();
-        }
         if self
             .bridge
             .as_ref()
@@ -359,7 +351,6 @@ impl Execution {
         self.dismiss_permissions();
         if self.bridge.as_ref().is_some_and(|bridge| bridge.send(Command::Cancel).is_ok()) {
             self.stopping = true;
-            self.status = "正在停止…".into();
         } else {
             self.apply_event(ui, Event::Disconnected("连接已关闭，请新建对话".into()), window, cx);
         }
@@ -386,7 +377,6 @@ impl Execution {
         self.loading_session = None;
         self.creating_session = false;
         self.stopping = false;
-        self.status = "就绪".into();
         self.tokens = None;
         ui.configuration.reset();
         ui.timeline.list().reset(0);
@@ -405,7 +395,6 @@ impl Execution {
         self.disconnected = false;
         self.load_supported = false;
         ui.sidebar.list_mut().connect();
-        self.status = "正在连接 Aries…".into();
         match Bridge::start(self.agent.clone()) {
             Ok(bridge) => {
                 let events = bridge.events().clone();
@@ -454,10 +443,6 @@ impl Execution {
             Event::Connected { list_sessions, load_session } => {
                 ui.sidebar.list_mut().connected(list_sessions);
                 self.load_supported = load_session;
-                if !self.stopping && !self.creating_session {
-                    self.status =
-                        if self.conversation.is_busy() { "思考中…" } else { "就绪" }.into();
-                }
                 if let Some(session) = self.queued_session_load.take() {
                     self.load_session(ui, session, cx);
                 }
@@ -503,7 +488,6 @@ impl Execution {
                     ui.sidebar.set_created_session(session);
                 }
                 self.conversation.end_segment();
-                self.status = if self.conversation.is_busy() { "思考中…" } else { "就绪" }.into();
                 for notification in std::mem::take(&mut self.pending_updates) {
                     self.receive_update(ui, notification);
                 }
@@ -547,18 +531,11 @@ impl Execution {
                     permission.respond(None);
                 } else {
                     self.permissions.push_back(permission);
-                    self.status = "等待你的选择".into();
                 }
             },
             Event::Finished(result) => {
                 self.dismiss_permissions();
                 self.stopping = false;
-                self.status = match &result {
-                    Ok(StopReason::Cancelled) => "已停止",
-                    Ok(_) => "就绪",
-                    Err(_) => "回复失败",
-                }
-                .into();
                 self.conversation.finish(result.err().map(|error| error.to_string()));
                 if ui.render_mode != crate::workspace::SessionRenderMode::Main {
                     self.refresh_sessions(ui, cx);
@@ -575,7 +552,6 @@ impl Execution {
                 ui.configuration.disconnect();
                 ui.sidebar.list_mut().disconnect(error.clone());
                 ui.deletion.disconnect();
-                self.status = "连接已断开".into();
                 self.conversation.finish(Some(format!("{error}\n请新建对话重新连接 Aries。")));
             },
         }
@@ -597,14 +573,6 @@ impl Execution {
         if let SessionUpdate::UsageUpdate(usage) = &notification.update {
             self.tokens = Some(usage.used);
         }
-        if self.conversation.is_busy() && !self.stopping && self.permissions.is_empty() {
-            match &notification.update {
-                SessionUpdate::AgentThoughtChunk(_) => self.status = "思考中…".into(),
-                SessionUpdate::AgentMessageChunk(_) => self.status = "正在回复…".into(),
-                SessionUpdate::ToolCall(tool) => self.status = tool.title.clone(),
-                _ => {},
-            }
-        }
         if matches!(&notification.update, SessionUpdate::AvailableCommandsUpdate(_)) {
             ui.composer.reset_menu();
         }
@@ -624,8 +592,6 @@ impl Execution {
         if let Some(permission) = self.permissions.pop_front() {
             permission.respond(Some(option));
         }
-        self.status =
-            if self.permissions.is_empty() { "正在执行…" } else { "等待你的选择" }.into();
         cx.notify();
     }
 
@@ -657,7 +623,6 @@ impl Execution {
             .as_ref()
             .is_some_and(|bridge| bridge.send(Command::LoadSession(Box::new(request))).is_ok())
         {
-            self.status = "加载失败".into();
             self.conversation.finish(Some("无法发送加载请求，请重新连接后重试。".into()));
             cx.notify();
             return;
@@ -665,7 +630,6 @@ impl Execution {
         self.dismiss_permissions();
         self.conversation.finish(None);
         self.loading_session = Some(SessionLoad::new(session));
-        self.status = "正在加载会话…".into();
         cx.notify();
     }
 
@@ -714,7 +678,6 @@ impl Execution {
                 ui.timeline.list().scroll_to_end();
             },
             Err(error) => {
-                self.status = "加载失败".into();
                 self.conversation.finish(Some(format!("无法加载会话：{error}")));
             },
         }
@@ -861,7 +824,6 @@ impl Execution {
         });
         self.connect(ui, window, cx);
         self.creating_session = true;
-        self.status = "正在创建会话…".into();
         if !self
             .bridge
             .as_ref()

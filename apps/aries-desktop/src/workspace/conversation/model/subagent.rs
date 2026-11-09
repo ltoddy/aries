@@ -1,13 +1,13 @@
-use agent_client_protocol::v1::schema::{SessionId, StateUpdate, SubagentUpdate};
+use agent_client_protocol::v1::schema::{MessageId, SessionId, StateUpdate, SubagentUpdate};
 
 #[derive(Clone, Debug)]
 pub struct SubagentMessage {
-    message_id: String,
+    message_id: MessageId,
     text: String,
 }
 
 impl SubagentMessage {
-    pub fn message_id(&self) -> &str {
+    pub fn message_id(&self) -> &MessageId {
         &self.message_id
     }
 
@@ -54,7 +54,7 @@ impl SubagentState {
         &self.messages
     }
 
-    pub fn upsert_message(&mut self, message_id: String, text: String) {
+    pub fn upsert_message(&mut self, message_id: MessageId, text: String) {
         if let Some(msg) = self.messages.iter_mut().find(|m| m.message_id == message_id) {
             msg.text = text;
         } else {
@@ -62,12 +62,12 @@ impl SubagentState {
         }
     }
 
-    pub fn append_chunk(&mut self, message_id: &str, text: &str) {
-        if let Some(msg) = self.messages.iter_mut().find(|m| m.message_id == message_id) {
+    pub fn append_chunk(&mut self, message_id: &MessageId, text: &str) {
+        if let Some(msg) = self.messages.iter_mut().find(|m| &m.message_id == message_id) {
             msg.text.push_str(text);
         } else {
             self.messages
-                .push(SubagentMessage { message_id: message_id.into(), text: text.into() });
+                .push(SubagentMessage { message_id: message_id.clone(), text: text.into() });
         }
     }
 

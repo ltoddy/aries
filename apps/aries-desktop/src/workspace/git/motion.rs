@@ -5,7 +5,9 @@ use std::time::{Duration, Instant};
 use gpui_kit::UniformListScrollHandle;
 use gpui_kit::base::motion::Easing;
 
-use crate::workspace::git::repository::{ChangeGroup, ChangedFile, FileChange, GitInfo};
+use crate::workspace::git::repository::{
+    ChangeGroup, ChangedFile, FileChange, GitInfo, GitSummary,
+};
 
 #[derive(Clone)]
 pub struct Fade {
@@ -85,7 +87,7 @@ impl GitRow {
 pub struct GitMotion {
     rows: Vec<GitRow>,
     summary: Fade,
-    previous_summary: Option<String>,
+    previous_summary: Option<GitSummary>,
     scroll: [UniformListScrollHandle; 2],
     panel: Fade,
     cwd: Option<PathBuf>,
@@ -115,8 +117,8 @@ impl GitMotion {
     pub fn summary(&self) -> &Fade {
         &self.summary
     }
-    pub fn previous_summary(&self) -> Option<&String> {
-        self.previous_summary.as_ref()
+    pub fn previous_summary(&self) -> Option<String> {
+        self.previous_summary.as_ref().map(ToString::to_string)
     }
     pub fn scroll(&self, group: ChangeGroup) -> &UniformListScrollHandle {
         &self.scroll[match group {
@@ -161,15 +163,15 @@ impl GitMotion {
         };
         let animate = animate && self.initialized;
         let short = duration;
-        if animate && self.snapshot.as_ref().map(GitInfo::summary) != info.map(GitInfo::summary) {
-            let from = if self.summary.active(now)
-                && self.previous_summary.as_deref() == info.map(GitInfo::summary).as_deref()
-            {
+        let summary = info.map(GitInfo::summary_state);
+        let previous_summary = self.snapshot.as_ref().map(GitInfo::summary_state);
+        if animate && previous_summary != summary {
+            let from = if self.summary.active(now) && self.previous_summary == summary {
                 1. - self.summary.sample(now)
             } else {
                 0.
             };
-            self.previous_summary = self.snapshot.as_ref().map(GitInfo::summary);
+            self.previous_summary = previous_summary;
             self.summary = Fade::new(from, 1.0, now, short, easing.clone());
         }
         self.cleanup(now, false);

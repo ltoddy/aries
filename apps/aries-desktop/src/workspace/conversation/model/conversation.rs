@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use agent_client_protocol::schema::MaybeUndefined;
 use agent_client_protocol::v1::schema::{
-    AvailableCommand, CompactionStatus, CompactionUpdate, ContentBlock, ContentChunk,
+    AvailableCommand, CompactionStatus, CompactionUpdate, ContentBlock, ContentChunk, MessageId,
     SessionConfigOption, SessionId, SessionNotification, SessionUpdate, ToolCall, ToolCallId,
 };
 
@@ -91,8 +91,8 @@ pub struct Conversation {
     stream: Option<usize>,
     tools: HashMap<(SessionId, ToolCallId), usize>,
     subagents: HashMap<SessionId, usize>,
-    subagent_message_route: HashMap<(SessionId, String), MessageParticipants>,
-    pending_subagent_chunks: HashMap<(SessionId, String), Vec<String>>,
+    subagent_message_route: HashMap<(SessionId, MessageId), MessageParticipants>,
+    pending_subagent_chunks: HashMap<(SessionId, MessageId), Vec<String>>,
 }
 
 impl Conversation {
@@ -249,7 +249,7 @@ impl Conversation {
         let SessionUpdate::SessionMessage(msg) = notification.update else {
             return None;
         };
-        let route_key = (notification.session_id, msg.message_id.to_string());
+        let route_key = (notification.session_id, msg.message_id.clone());
         let participants = self.subagent_message_route.entry(route_key.clone()).or_default();
         msg.sender_session_id.update_to(&mut participants.sender);
         msg.recipient_session_id.update_to(&mut participants.recipient);
@@ -268,16 +268,16 @@ impl Conversation {
                         }
                     }
                 }
-                subagent.upsert_message(msg.message_id.to_string(), text);
+                subagent.upsert_message(msg.message_id.clone(), text);
             },
             MaybeUndefined::Null => {
-                subagent.upsert_message(msg.message_id.to_string(), String::new());
+                subagent.upsert_message(msg.message_id.clone(), String::new());
             },
             MaybeUndefined::Undefined => {},
         }
         if let Some(pending) = self.pending_subagent_chunks.remove(&route_key) {
             for text in pending {
-                subagent.append_chunk(&msg.message_id.0, &text);
+                subagent.append_chunk(&msg.message_id, &text);
             }
         }
         Some(index)
@@ -294,7 +294,7 @@ impl Conversation {
         if text.is_empty() {
             return None;
         }
-        let route_key = (notification.session_id, chunk.message_id.to_string());
+        let route_key = (notification.session_id, chunk.message_id.clone());
         let Some(subagent_session_id) = self
             .subagent_message_route
             .get(&route_key)
@@ -306,7 +306,7 @@ impl Conversation {
         };
         let index = self.ensure_subagent_message(subagent_session_id)?;
         let subagent = self.messages[index].subagent.as_mut()?;
-        subagent.append_chunk(&chunk.message_id.0, &text);
+        subagent.append_chunk(&chunk.message_id, &text);
         Some(index)
     }
 

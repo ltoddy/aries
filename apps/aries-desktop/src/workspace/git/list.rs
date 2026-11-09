@@ -161,7 +161,7 @@ impl<'a> GitChangeList<'a> {
                                         Icon::new(ChangedFile::status_icon(file.status())).size_4(),
                                     )
                                     .tooltip(move |window, cx| {
-                                        Tooltip::new(status).build(window, cx)
+                                        Tooltip::new(status.label()).build(window, cx)
                                     }),
                             )
                             .child(

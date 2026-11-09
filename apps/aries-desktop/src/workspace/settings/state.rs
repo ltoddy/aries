@@ -4,7 +4,7 @@ use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::radio::{Radio, RadioGroup};
 use gpui_kit::component::scroll::ScrollableElement;
-use gpui_kit::component::searchable_list::SearchableVec;
+use gpui_kit::component::searchable_list::{SearchableListItem, SearchableVec};
 use gpui_kit::component::select::{Select, SelectEvent, SelectState};
 use gpui_kit::component::{ActiveTheme, Disableable, Selectable, Sizable, Theme, WindowExt};
 use gpui_kit::prelude::*;
@@ -39,6 +39,31 @@ impl SettingsPage {
     }
 }
 
+#[derive(Clone)]
+struct FontOption {
+    label: SharedString,
+    value: Option<String>,
+}
+
+impl FontOption {
+    fn new(value: Option<String>) -> Self {
+        let label = value.as_deref().unwrap_or("系统默认").to_owned().into();
+        Self { label, value }
+    }
+}
+
+impl SearchableListItem for FontOption {
+    type Value = Option<String>;
+
+    fn title(&self) -> SharedString {
+        self.label.clone()
+    }
+
+    fn value(&self) -> &Self::Value {
+        &self.value
+    }
+}
+
 pub struct SettingsState {
     page: SettingsPage,
     preferences_path: Option<PathBuf>,
@@ -48,7 +73,7 @@ pub struct SettingsState {
     save_task: Option<Task<()>>,
     save_revision: usize,
     _subscriptions: Vec<Subscription>,
-    font_select: Entity<SelectState<SearchableVec<String>>>,
+    font_select: Entity<SelectState<SearchableVec<FontOption>>>,
     default_font_family: SharedString,
     mono_font_ratio: f32,
     host: WeakEntity<WorkspaceView>,
@@ -90,8 +115,10 @@ impl SettingsState {
         }
         fonts.sort_unstable();
         fonts.dedup();
-        fonts.insert(0, "系统默认".into());
-        let selected = settings.font_family().unwrap_or("系统默认").to_owned();
+        let mut fonts: Vec<_> =
+            fonts.into_iter().map(|family| FontOption::new(Some(family))).collect();
+        fonts.insert(0, FontOption::new(None));
+        let selected = settings.font_family().map(str::to_owned);
         let font_select = cx.new(|cx| {
             let mut state =
                 SelectState::new(SearchableVec::new(fonts), None, window, cx).searchable(true);
@@ -100,7 +127,7 @@ impl SettingsState {
         });
         let font_subscription = cx.subscribe(&font_select, |this, _, event, cx| {
             if let SelectEvent::Confirm(Some(family)) = event {
-                this.settings.set_font_family((family != "系统默认").then(|| family.clone()));
+                this.settings.set_font_family(family.clone());
                 this.apply_typography(cx);
             }
         });

@@ -16,7 +16,7 @@ use crate::workspace::settings::{Preferences, SettingsState};
 use crate::workspace::usage::UsageView;
 use crate::workspace::{SessionRenderMode, SessionView};
 use crate::{
-    CloseTab, NewSession, NextTab, NextUserMessage, PreviousTab, PreviousUserMessage,
+    CloseTab, NewSession, NextTab, NextUserMessage, OpenSettings, PreviousTab, PreviousUserMessage,
     ToggleTerminal,
 };
 
@@ -104,6 +104,9 @@ impl Render for WorkspaceView {
         div()
             .size_full()
             .track_focus(&self.focus_handle)
+            .on_action(cx.listener(|this, _: &OpenSettings, window, cx| {
+                this.open_settings(window, cx);
+            }))
             .on_action(cx.listener(|this, _: &ToggleTerminal, window, cx| {
                 this.toggle_terminal(window, cx);
             }))

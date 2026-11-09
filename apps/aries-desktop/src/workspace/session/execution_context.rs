@@ -143,7 +143,10 @@ pub fn render_execution_context(
             row.child(TokenUsage {
                 id: ElementId::NamedChild(
                     ElementId::from(("usage", cx.entity_id())).into(),
-                    format!("usage-{:?}", owner.execution().session_id()).into(),
+                    match owner.execution().session_id() {
+                        Some(id) => format!("session:{id}").into(),
+                        None => "no-session".into(),
+                    },
                 ),
                 tokens,
             })
