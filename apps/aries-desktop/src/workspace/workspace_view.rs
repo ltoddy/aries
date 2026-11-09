@@ -6,6 +6,7 @@ use agent_client_protocol::AcpAgentConfig;
 use agent_client_protocol::v1::schema::{SessionId, SessionInfo};
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::menu::{ContextMenuExt, PopupMenu, PopupMenuItem};
 use gpui_kit::component::{ActiveTheme, Icon, Sizable, h_resizable, resizable_panel};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
@@ -26,6 +27,45 @@ struct SessionTab {
     _subscription: Subscription,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TabId {
+    Session(usize),
+    Usage,
+}
+
+#[derive(Clone)]
+struct DragTab {
+    owner: WeakEntity<WorkspaceView>,
+    id: TabId,
+    title: SharedString,
+}
+
+impl Render for DragTab {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .w(rems(11.25))
+            .h_7()
+            .px_2()
+            .flex()
+            .items_center()
+            .rounded(cx.theme().radius)
+            .border_1()
+            .border_color(cx.theme().primary)
+            .bg(cx.theme().background)
+            .text_color(cx.theme().foreground)
+            .text_xs()
+            .shadow_sm()
+            .child(div().truncate().child(self.title.clone()))
+    }
+}
+
+#[derive(Clone, Copy)]
+enum TabCommand {
+    Close(TabId),
+    CloseAll,
+    CloseOthers(TabId),
+}
+
 pub struct WorkspaceView {
     cwd: PathBuf,
     settings: Entity<SettingsState>,
@@ -42,6 +82,7 @@ pub struct WorkspaceView {
     terminal_previous_focus: Option<FocusHandle>,
     usage: Entity<UsageView>,
     usage_visible: bool,
+    usage_position: usize,
     usage_previous_focus: Option<FocusHandle>,
 }
 
@@ -86,6 +127,7 @@ impl WorkspaceView {
             terminal_previous_focus: None,
             usage,
             usage_visible: false,
+            usage_position: 0,
             usage_previous_focus: None,
         }
     }
@@ -376,6 +418,9 @@ impl WorkspaceView {
         let Some(index) = self.tabs.iter().position(|tab| tab.id == id) else {
             return;
         };
+        if self.usage_visible && index < self.usage_position {
+            self.usage_position -= 1;
+        }
         self.tabs.remove(index);
         if self.tabs.is_empty() {
             self.active = 0;
@@ -386,6 +431,74 @@ impl WorkspaceView {
         }
         self.tab_scroll.scroll_to_item(self.active);
         self.sync_sidebar_active_session(cx);
+        cx.notify();
+    }
+
+    fn tab_order(&self) -> Vec<TabId> {
+        let mut order: Vec<_> = self.tabs.iter().map(|tab| TabId::Session(tab.id)).collect();
+        if self.usage_visible {
+            order.insert(self.usage_position.min(order.len()), TabId::Usage);
+        }
+        order
+    }
+
+    fn move_tab(&mut self, drag: &DragTab, target: TabId, cx: &mut Context<Self>) {
+        if drag.owner != cx.weak_entity() || drag.id == target {
+            return;
+        }
+        let mut order = self.tab_order();
+        let Some(from) = order.iter().position(|id| *id == drag.id) else {
+            return;
+        };
+        let Some(to) = order.iter().position(|id| *id == target) else {
+            return;
+        };
+        let active = self.tabs.get(self.active).map(|tab| tab.id);
+        order.remove(from);
+        order.insert(to, drag.id);
+        self.tabs.sort_by_key(|tab| order.iter().position(|id| *id == TabId::Session(tab.id)));
+        self.active =
+            active.and_then(|id| self.tabs.iter().position(|tab| tab.id == id)).unwrap_or(0);
+        if let Some(position) = order.iter().position(|id| *id == TabId::Usage) {
+            self.usage_position = position;
+        }
+        self.tab_scroll.scroll_to_item(to);
+        cx.notify();
+    }
+
+    fn execute_tab_command(
+        &mut self,
+        command: TabCommand,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        match command {
+            TabCommand::Close(TabId::Session(id)) => self.close_tab(id, cx),
+            TabCommand::Close(TabId::Usage) => self.close_usage(window, cx),
+            TabCommand::CloseAll => {
+                self.tabs.clear();
+                self.active = 0;
+                if self.usage_visible {
+                    self.close_usage(window, cx);
+                }
+                self.sync_sidebar_active_session(cx);
+            },
+            TabCommand::CloseOthers(target) => {
+                if !self.tab_order().contains(&target) {
+                    return;
+                }
+                self.tabs.retain(|tab| target == TabId::Session(tab.id));
+                self.active = 0;
+                if target != TabId::Usage && self.usage_visible {
+                    self.close_usage(window, cx);
+                }
+                self.usage_position = 0;
+                self.sync_sidebar_active_session(cx);
+            },
+        }
+        if !self.usage_visible && !matches!(command, TabCommand::Close(TabId::Usage)) {
+            self.focus_handle.focus(window, cx);
+        }
         cx.notify();
     }
 
@@ -420,7 +533,15 @@ fn adjacent_tab(active: usize, count: usize, next: bool) -> Option<usize> {
 
 impl WorkspaceView {
     pub fn render_tab_bar(&self, p: Palette, cx: &mut Context<Self>) -> AnyElement {
-        let can_close = !self.tabs.is_empty();
+        let mut tabs: Vec<_> = self
+            .tabs
+            .iter()
+            .enumerate()
+            .map(|(index, tab)| self.render_tab(index, tab, true, p, cx))
+            .collect();
+        if self.usage_visible {
+            tabs.insert(self.usage_position.min(tabs.len()), self.render_usage_tab(cx));
+        }
         div()
             .id("tab-bar")
             .h_9()
@@ -443,38 +564,104 @@ impl WorkspaceView {
                     .gap_1()
                     .overflow_x_scroll()
                     .track_scroll(&self.tab_scroll)
-                    .children(
-                        self.tabs
-                            .iter()
-                            .enumerate()
-                            .map(|(index, tab)| self.render_tab(index, tab, can_close, p, cx)),
-                    ),
+                    .children(tabs),
             )
-            .when(self.usage_visible, |bar| {
-                bar.child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .px_2()
-                        .border_1()
-                        .border_color(cx.theme().primary)
-                        .rounded(cx.theme().radius)
-                        .text_color(cx.theme().primary)
-                        .child("用量")
-                        .child(
-                            Button::new("close-usage")
-                                .ghost()
-                                .small()
-                                .icon(Icon::new(IconName::X))
-                                .accessibility_label("关闭用量")
-                                .on_click(
-                                    cx.listener(|this, _, window, cx| this.close_usage(window, cx)),
-                                ),
-                        ),
-                )
-            })
             .into_any_element()
+    }
+
+    fn render_usage_tab(&self, cx: &mut Context<Self>) -> AnyElement {
+        let tab = div()
+            .id("usage-tab")
+            .h_7()
+            .flex_shrink_0()
+            .flex()
+            .items_center()
+            .gap_2()
+            .px_2()
+            .border_1()
+            .border_color(cx.theme().primary)
+            .rounded(cx.theme().radius)
+            .text_color(cx.theme().primary)
+            .child("统计")
+            .child(
+                Button::new("close-usage")
+                    .ghost()
+                    .small()
+                    .icon(Icon::new(IconName::X))
+                    .accessibility_label("关闭统计")
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.execute_tab_command(TabCommand::Close(TabId::Usage), window, cx);
+                    })),
+            );
+        self.with_tab_interactions(tab, TabId::Usage, "统计".into(), cx)
+    }
+
+    fn with_tab_interactions<E>(
+        &self,
+        tab: E,
+        id: TabId,
+        title: SharedString,
+        cx: &mut Context<Self>,
+    ) -> AnyElement
+    where
+        E: StatefulInteractiveElement + ParentElement + Styled + IntoElement + 'static,
+    {
+        let owner = cx.weak_entity();
+        let drag_owner = owner.clone();
+        let highlight_owner = owner.clone();
+        tab.on_drag(DragTab { owner: owner.clone(), id, title }, |drag, _, _, cx| {
+            cx.stop_propagation();
+            cx.new(|_| drag.clone())
+        })
+        .can_drop(move |value, _, _| {
+            value
+                .downcast_ref::<DragTab>()
+                .is_some_and(|drag| drag.owner == drag_owner && drag.id != id)
+        })
+        .drag_over::<DragTab>(move |style, drag, _, cx| {
+            if drag.owner == highlight_owner && drag.id != id {
+                style.border_color(cx.theme().primary).bg(cx.theme().muted)
+            } else {
+                style
+            }
+        })
+        .on_drop(cx.listener(move |this, drag: &DragTab, _, cx| this.move_tab(drag, id, cx)))
+        .context_menu(move |menu, _, cx| {
+            let Some(view) = owner.upgrade() else {
+                return menu;
+            };
+            let has_others = view.read(cx).tab_order().len() > 1;
+            Self::tab_menu(menu, id, has_others, owner.clone())
+        })
+        .into_any_element()
+    }
+
+    fn tab_menu(
+        mut menu: PopupMenu,
+        id: TabId,
+        has_others: bool,
+        owner: WeakEntity<Self>,
+    ) -> PopupMenu {
+        for (label, command, disabled) in [
+            ("关闭", TabCommand::Close(id), false),
+            ("关闭全部 Tab", TabCommand::CloseAll, false),
+            ("关闭其他 Tab", TabCommand::CloseOthers(id), !has_others),
+        ] {
+            let owner = owner.clone();
+            menu = menu.item(PopupMenuItem::new(label).disabled(disabled).on_click(
+                move |_, window, cx| {
+                    window.defer(cx, {
+                        let owner = owner.clone();
+                        move |window, cx| {
+                            let _ = owner.update(cx, |this, cx| {
+                                this.execute_tab_command(command, window, cx)
+                            });
+                        }
+                    });
+                },
+            ));
+        }
+        menu
     }
 
     pub fn render_empty_main(&self, p: Palette) -> AnyElement {
@@ -520,7 +707,8 @@ impl WorkspaceView {
         let status = state.label();
         let tab_label = format!("切换到标签 {title} · {status}");
         let details = format!("{title}\n{}\n{status}", view.directory().display());
-        div()
+        let drag_title = title.clone().into();
+        let tab = div()
             .id(("tab", id))
             .h_7()
             .flex_shrink_0()
@@ -571,12 +759,15 @@ impl WorkspaceView {
                         .accessibility_label("关闭标签")
                         .on_click(cx.listener(move |this, _, window, cx| {
                             cx.stop_propagation();
-                            this.close_tab(id, cx);
-                            this.focus_handle.focus(window, cx);
+                            this.execute_tab_command(
+                                TabCommand::Close(TabId::Session(id)),
+                                window,
+                                cx,
+                            );
                         })),
                 )
-            })
-            .into_any_element()
+            });
+        self.with_tab_interactions(tab, TabId::Session(id), drag_title, cx)
     }
 }
 
@@ -655,6 +846,7 @@ impl WorkspaceView {
     pub fn open_usage(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !self.usage_visible {
             self.usage_previous_focus = window.focused(cx);
+            self.usage_position = self.tabs.len();
         }
         self.usage_visible = true;
         self.usage.update(cx, |view, cx| view.open(window, cx));
