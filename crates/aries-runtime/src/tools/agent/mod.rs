@@ -29,7 +29,7 @@ const DESCRIPTION_TAIL: &str = include_str!("description-tail.md");
 
 pub struct AgentTool {
     gctx: GlobalContext,
-    ctx: crate::tools::ToolContext,
+    ctx: crate::tools::context::ToolContext,
     model: Model<OpenAiWire>,
     parent_dir: PathBuf,
     notifier: Notifier,
@@ -42,7 +42,7 @@ pub struct AgentTool {
 impl AgentTool {
     pub fn new(
         gctx: GlobalContext,
-        ctx: crate::tools::ToolContext,
+        ctx: crate::tools::context::ToolContext,
         model: Model<OpenAiWire>,
         parent_dir: impl AsRef<Path>,
         notifier: Notifier,

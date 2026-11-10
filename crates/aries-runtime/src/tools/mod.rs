@@ -36,49 +36,27 @@ use rig::providers::openai::wire::OpenAiWire;
 use rig::tool::ToolSet;
 use toasty::Db;
 
-use self::agent as agent_tool;
-use self::agent::AgentOutput;
-use self::bash::BashOutput;
-use self::batch::BatchOutput;
-use self::codesearch::CodeSearchOutput;
-use self::context::ToolContext;
-use self::edit::EditOutput;
-use self::enter_worktree::EnterGitWorktreeOutput;
-use self::exit_worktree::ExitGitWorktreeOutput;
-use self::glob::GlobOutput;
-use self::grep::GrepOutput;
-use self::monitor::MonitorOutput;
-use self::multiedit::MultiEditOutput;
-use self::read::ReadOutput;
-use self::skill::SkillOutput;
-use self::task_output::TaskOutputOutput;
-use self::task_stop::TaskStopOutput;
-use self::update_plan::UpdatePlanOutput;
-use self::webfetch::WebFetchOutput;
-use self::websearch::WebSearchOutput;
-use self::write::WriteOutput;
-
 pub fn format_tool_output(tool_name: &str, raw_json: serde_json::Value) -> String {
     let result = match tool_name {
-        agent::NAME => AgentOutput::render_output(raw_json),
-        bash::NAME => BashOutput::render_output(raw_json),
-        batch::NAME => BatchOutput::render_output(raw_json),
-        codesearch::NAME => CodeSearchOutput::render_output(raw_json),
-        edit::NAME => EditOutput::render_output(raw_json),
-        enter_worktree::NAME => EnterGitWorktreeOutput::render_output(raw_json),
-        exit_worktree::NAME => ExitGitWorktreeOutput::render_output(raw_json),
-        glob::NAME => GlobOutput::render_output(raw_json),
-        grep::NAME => GrepOutput::render_output(raw_json),
-        monitor::NAME => MonitorOutput::render_output(raw_json),
-        multiedit::NAME => MultiEditOutput::render_output(raw_json),
-        read::NAME => ReadOutput::render_output(raw_json),
-        skill::NAME => SkillOutput::render_output(raw_json),
-        task_output::NAME => TaskOutputOutput::render_output(raw_json),
-        task_stop::NAME => TaskStopOutput::render_output(raw_json),
-        update_plan::NAME => UpdatePlanOutput::render_output(raw_json),
-        webfetch::NAME => WebFetchOutput::render_output(raw_json),
-        websearch::NAME => WebSearchOutput::render_output(raw_json),
-        write::NAME => WriteOutput::render_output(raw_json),
+        agent::NAME => agent::AgentOutput::render_output(raw_json),
+        bash::NAME => bash::BashOutput::render_output(raw_json),
+        batch::NAME => batch::BatchOutput::render_output(raw_json),
+        codesearch::NAME => codesearch::CodeSearchOutput::render_output(raw_json),
+        edit::NAME => edit::EditOutput::render_output(raw_json),
+        enter_worktree::NAME => enter_worktree::EnterGitWorktreeOutput::render_output(raw_json),
+        exit_worktree::NAME => exit_worktree::ExitGitWorktreeOutput::render_output(raw_json),
+        glob::NAME => glob::GlobOutput::render_output(raw_json),
+        grep::NAME => grep::GrepOutput::render_output(raw_json),
+        monitor::NAME => monitor::MonitorOutput::render_output(raw_json),
+        multiedit::NAME => multiedit::MultiEditOutput::render_output(raw_json),
+        read::NAME => read::ReadOutput::render_output(raw_json),
+        skill::NAME => skill::SkillOutput::render_output(raw_json),
+        task_output::NAME => task_output::TaskOutputOutput::render_output(raw_json),
+        task_stop::NAME => task_stop::TaskStopOutput::render_output(raw_json),
+        update_plan::NAME => update_plan::UpdatePlanOutput::render_output(raw_json),
+        webfetch::NAME => webfetch::WebFetchOutput::render_output(raw_json),
+        websearch::NAME => websearch::WebSearchOutput::render_output(raw_json),
+        write::NAME => write::WriteOutput::render_output(raw_json),
         _ => return raw_json.to_string(),
     };
 
@@ -86,7 +64,7 @@ pub fn format_tool_output(tool_name: &str, raw_json: serde_json::Value) -> Strin
 }
 
 pub const ALL_TOOL_NAMES: &[&str] = &[
-    agent_tool::NAME,
+    agent::NAME,
     bash::NAME,
     batch::NAME,
     codesearch::NAME,
@@ -129,12 +107,12 @@ pub fn create_tools(
     let tool_names = tool_names.iter().unique().collect_vec();
     let mut tool_set = ToolSet::default();
 
-    let ctx = ToolContext::new(session_id, Notifier::clone(&notifier), cwd);
+    let ctx = context::ToolContext::new(session_id, Notifier::clone(&notifier), cwd);
 
     for &tool_name in tool_names {
         match tool_name {
-            agent_tool::NAME => {
-                tool_set.add_tool(agent_tool::AgentTool::new(
+            agent::NAME => {
+                tool_set.add_tool(agent::AgentTool::new(
                     gctx.clone(),
                     ctx.clone(),
                     model.clone(),

@@ -7,7 +7,7 @@ use rig::tool::Tool;
 use tempfile::TempDir;
 
 use super::*;
-use crate::tools::ToolContext;
+use crate::tools::context::ToolContext;
 
 #[tokio::test]
 async fn test_write_empty_existing_file() {

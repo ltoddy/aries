@@ -13,7 +13,7 @@ use serde_json::Value;
 pub use self::args::EnterGitWorktreeArgs;
 pub use self::error::EnterGitWorktreeError;
 pub use self::output::EnterGitWorktreeOutput;
-use crate::tools::ToolContext as AriesToolContext;
+use crate::tools::context::ToolContext as AriesToolContext;
 use crate::tools::worktree::Worktree;
 
 pub const NAME: &str = "EnterGitWorktree";

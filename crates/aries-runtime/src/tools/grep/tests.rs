@@ -6,7 +6,7 @@ use super::*;
 
 fn tool(cwd: impl AsRef<Path>) -> GrepTool {
     let (notifier, _) = aries_communicate::Notifier::channel();
-    GrepTool::new(crate::tools::ToolContext::new("test", notifier, cwd))
+    GrepTool::new(crate::tools::context::ToolContext::new("test", notifier, cwd))
 }
 
 fn grep_args(pattern: &str) -> GrepArgs {

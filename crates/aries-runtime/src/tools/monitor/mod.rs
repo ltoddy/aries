@@ -8,7 +8,7 @@ use serde_json::Value;
 pub use self::args::MonitorArgs;
 pub use self::error::MonitorError;
 pub use self::output::MonitorOutput;
-use crate::tools::ToolContext as AriesToolContext;
+use crate::tools::context::ToolContext as AriesToolContext;
 use crate::tools::task::TaskKind;
 
 pub const NAME: &str = "Monitor";

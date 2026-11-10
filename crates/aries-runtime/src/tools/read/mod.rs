@@ -24,11 +24,11 @@ const EMPTY_FILE_NOTICE: &str =
 const SEPARATOR: char = '→';
 
 pub struct ReadTool {
-    ctx: crate::tools::ToolContext,
+    ctx: crate::tools::context::ToolContext,
 }
 
 impl ReadTool {
-    pub fn new(ctx: crate::tools::ToolContext) -> Self {
+    pub fn new(ctx: crate::tools::context::ToolContext) -> Self {
         Self { ctx }
     }
 }

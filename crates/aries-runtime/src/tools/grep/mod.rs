@@ -15,11 +15,11 @@ pub use self::output::GrepOutput;
 pub const NAME: &str = "Grep";
 
 pub struct GrepTool {
-    ctx: crate::tools::ToolContext,
+    ctx: crate::tools::context::ToolContext,
 }
 
 impl GrepTool {
-    pub fn new(ctx: crate::tools::ToolContext) -> Self {
+    pub fn new(ctx: crate::tools::context::ToolContext) -> Self {
         Self { ctx }
     }
 }
