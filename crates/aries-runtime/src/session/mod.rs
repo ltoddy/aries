@@ -43,12 +43,16 @@ pub fn create_model(config: &ModelConfig) -> Model<OpenAiWire> {
     let config = match config {
         ModelConfig::Azure(c) => openai::OpenAIConfig::with_key(&openai::wire::AZURE, &c.api_key)
             .with_base_url(&c.azure_endpoint)
-            .with_api_version(&c.api_version),
+            .with_api_version(&c.api_version)
+            .with_route(openai::Route::Chat),
         ModelConfig::Deepseek(c) => {
             openai::OpenAIConfig::with_key(&openai::wire::DEEPSEEK, &c.api_key)
                 .with_base_url(&c.base_url)
+                .with_route(openai::Route::Chat)
         },
-        ModelConfig::OpenAI(c) => openai::OpenAIConfig::new(&c.api_key).with_base_url(&c.base_url),
+        ModelConfig::OpenAI(c) => openai::OpenAIConfig::new(&c.api_key)
+            .with_base_url(&c.base_url)
+            .with_route(openai::Route::Chat),
     };
     config.connect(ReqwestMiddlewareClient::from(http_client)).completion(model)
 }
