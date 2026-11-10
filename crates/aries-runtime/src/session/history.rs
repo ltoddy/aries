@@ -1,9 +1,10 @@
 use std::io;
 use std::path::Path;
 
-use aries_filesystem::jsonl::JsonlAppender;
 use rig::completion::Message;
 use tracing::error;
+
+use crate::jsonl::{self, JsonlAppender};
 
 #[derive(Debug, Clone)]
 pub struct ChatHistory {
@@ -35,6 +36,6 @@ impl ChatHistory {
     }
 
     pub async fn messages(&self) -> io::Result<Vec<Message>> {
-        aries_filesystem::jsonl::read(self.file.file_path()).await
+        jsonl::read(self.file.file_path()).await
     }
 }

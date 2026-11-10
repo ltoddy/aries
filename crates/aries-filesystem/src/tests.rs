@@ -5,7 +5,6 @@ use std::path::PathBuf;
 use serde_json::Value;
 
 use crate::document::{DocumentError, FrontmatterDocument};
-use crate::jsonl::{self, JsonlAppender};
 use crate::path_to_slug;
 use crate::walk::{walk_dir, walk_dirs};
 
@@ -24,47 +23,6 @@ async fn reads_frontmatter_document() {
 
     assert_eq!(document.frontmatter["name"], "test");
     assert_eq!(document.body, "body");
-}
-
-#[tokio::test]
-async fn writes_and_reads_jsonl_values() {
-    let dir = tempfile::tempdir().unwrap();
-    let file_path = dir.path().join("events.jsonl");
-    let values = [serde_json::json!({ "id": 1 }), serde_json::json!({ "id": 2 })];
-
-    jsonl::write(&file_path, &values).await.unwrap();
-    let result = jsonl::read::<Value>(&file_path).await.unwrap();
-
-    assert_eq!(result, values);
-}
-
-#[tokio::test]
-async fn jsonl_read_drops_invalid_trailing_line() {
-    let dir = tempfile::tempdir().unwrap();
-    let file_path = dir.path().join("events.jsonl");
-    tokio::fs::write(&file_path, "{\"id\":1}\nnot-json").await.unwrap();
-
-    let result = jsonl::read::<Value>(&file_path).await.unwrap();
-
-    assert_eq!(result, [serde_json::json!({ "id": 1 })]);
-}
-
-#[tokio::test]
-async fn jsonl_appender_appends_and_overwrites_values() {
-    let dir = tempfile::tempdir().unwrap();
-    let file_path = dir.path().join("events.jsonl");
-    let appender = JsonlAppender::open(&file_path).await.unwrap();
-
-    appender.append(&[serde_json::json!({ "id": 1 })]).await.unwrap();
-    appender.append(&[serde_json::json!({ "id": 2 })]).await.unwrap();
-    appender.flush().await.unwrap();
-    let result = jsonl::read::<Value>(&file_path).await.unwrap();
-    assert_eq!(result, [serde_json::json!({ "id": 1 }), serde_json::json!({ "id": 2 })]);
-
-    appender.overwrite(&[serde_json::json!({ "id": 3 })]).await.unwrap();
-    appender.flush().await.unwrap();
-    let result = jsonl::read::<Value>(&file_path).await.unwrap();
-    assert_eq!(result, [serde_json::json!({ "id": 3 })]);
 }
 
 #[tokio::test]

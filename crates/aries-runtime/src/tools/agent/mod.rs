@@ -21,6 +21,7 @@ pub use self::args::AgentArgs;
 pub use self::error::AgentError;
 pub use self::output::AgentOutput;
 use crate::hooks::{TokenUsageHook, ToolCallHook};
+use crate::jsonl;
 
 pub const NAME: &str = "Agent";
 pub const DEFAULT_MAX_TURNS: usize = 100;
@@ -194,7 +195,7 @@ impl Tool for AgentTool {
             _ = tokio::fs::create_dir_all(parent).await;
         }
         file_path.set_extension("jsonl");
-        let _ = aries_filesystem::jsonl::write(&file_path, messages).await;
+        let _ = jsonl::write(&file_path, messages).await;
 
         Ok(AgentOutput::new(task_id, final_res.output(), file_path))
     }

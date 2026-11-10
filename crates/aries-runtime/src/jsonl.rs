@@ -58,7 +58,7 @@ pub struct JsonlAppender {
 }
 
 impl JsonlAppender {
-    pub async fn open(file_path: impl AsRef<Path>) -> std::io::Result<Self> {
+    pub async fn open(file_path: impl AsRef<Path>) -> io::Result<Self> {
         let file_path = file_path.as_ref();
         let file = tokio::fs::OpenOptions::new()
             .create(true)
@@ -121,3 +121,6 @@ impl Debug for JsonlAppender {
         f.debug_struct("JsonlAppender").field("file_path", &self.file_path).finish()
     }
 }
+
+#[cfg(test)]
+mod tests;
