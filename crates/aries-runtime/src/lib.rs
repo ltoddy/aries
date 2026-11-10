@@ -1,5 +1,4 @@
 pub mod agent;
-pub mod chat_context;
 pub mod compact;
 pub mod hooks;
 pub mod memory;

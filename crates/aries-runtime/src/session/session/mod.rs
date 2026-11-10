@@ -36,9 +36,9 @@ pub use self::error::SessionError;
 use self::hook::SessionPromptHook;
 use self::instruction::InstructionContext;
 use crate::agent::{AgentBuilder, AriesAgent};
-use crate::chat_context::{ChatContext, ChatHistory};
 use crate::compact::ContextCompactor;
 use crate::memory::{MemoryRetriever, MemoryStore};
+use crate::session::{ChatContext, ChatHistory};
 
 pub enum PromptOutcome {
     Completed(String),
