@@ -20,13 +20,13 @@ use rig::Model;
 use rig::completion::{Message, Usage};
 use rig::providers::openai::wire::OpenAiWire;
 
-use crate::chat_context::ChatContext;
-pub use crate::compact::agent::{CompactAgent, CompactOutcome, compact_summary};
-pub use crate::compact::breaker::{AutoCompactBreaker, Decision};
-pub use crate::compact::error::CompactionError;
-pub use crate::compact::micro_compact::{KEEP_RECENT, micro_compact};
-pub use crate::compact::tokens::TokenEstimator;
-pub use crate::compact::window::ContextWindow;
+pub use self::agent::{CompactAgent, CompactOutcome, compact_summary};
+pub use self::breaker::{AutoCompactBreaker, Decision};
+pub use self::error::CompactionError;
+pub use self::micro_compact::{KEEP_RECENT, micro_compact};
+pub use self::tokens::TokenEstimator;
+pub use self::window::ContextWindow;
+use crate::session::ChatContext;
 
 #[derive(Clone)]
 pub struct ContextCompactor {

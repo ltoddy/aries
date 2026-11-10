@@ -1,4 +1,6 @@
 mod commands;
+mod context;
+mod history;
 mod registry;
 #[allow(clippy::module_inception)]
 mod session;
@@ -16,9 +18,11 @@ use rig::providers::openai::wire::OpenAiWire;
 use rig::rig_reqwest::ReqwestMiddlewareClient;
 use tokio::sync::Mutex;
 
-pub use crate::session::commands::BUILTIN_COMMANDS;
-pub use crate::session::registry::SessionRegistry;
-pub use crate::session::session::{DEFAULT_AGENT_NAME, DEFAULT_EFFORT, PromptOutcome, Session};
+pub use self::commands::BUILTIN_COMMANDS;
+pub use self::context::ChatContext;
+pub use self::history::ChatHistory;
+pub use self::registry::SessionRegistry;
+pub use self::session::{DEFAULT_AGENT_NAME, DEFAULT_EFFORT, PromptOutcome, Session};
 
 pub type SharedRegistry = Arc<Mutex<SessionRegistry>>;
 
