@@ -14,11 +14,11 @@ pub use self::output::WriteOutput;
 pub const NAME: &str = "Write";
 
 pub struct WriteTool {
-    ctx: crate::tools::ToolContext,
+    ctx: crate::tools::context::ToolContext,
 }
 
 impl WriteTool {
-    pub fn new(ctx: crate::tools::ToolContext) -> Self {
+    pub fn new(ctx: crate::tools::context::ToolContext) -> Self {
         Self { ctx }
     }
 }

@@ -14,12 +14,12 @@ pub use self::output::ExitGitWorktreeOutput;
 pub const NAME: &str = "ExitGitWorktree";
 
 pub struct ExitGitWorktreeTool {
-    ctx: crate::tools::ToolContext,
+    ctx: crate::tools::context::ToolContext,
     repository: Mutex<Repository>,
 }
 
 impl ExitGitWorktreeTool {
-    pub fn new(ctx: crate::tools::ToolContext, repository: Repository) -> Self {
+    pub fn new(ctx: crate::tools::context::ToolContext, repository: Repository) -> Self {
         Self { ctx, repository: Mutex::new(repository) }
     }
 }

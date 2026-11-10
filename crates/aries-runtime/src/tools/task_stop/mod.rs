@@ -8,7 +8,7 @@ use serde_json::Value;
 pub use self::args::TaskStopArgs;
 pub use self::error::TaskStopError;
 pub use self::output::TaskStopOutput;
-use crate::tools::ToolContext as AriesToolContext;
+use crate::tools::context::ToolContext as AriesToolContext;
 
 pub const NAME: &str = "TaskStop";
 

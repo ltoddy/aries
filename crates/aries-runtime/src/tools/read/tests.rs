@@ -7,7 +7,7 @@ use tempfile::TempDir;
 
 use super::inspector::{ContentType, MAX_SCAN_SIZE, inspect};
 use super::*;
-use crate::tools::ToolContext;
+use crate::tools::context::ToolContext;
 
 #[tokio::test]
 async fn test_read_file() {

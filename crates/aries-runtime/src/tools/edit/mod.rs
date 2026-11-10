@@ -16,11 +16,11 @@ use crate::tools::diff;
 pub const NAME: &str = "Edit";
 
 pub struct EditTool {
-    ctx: crate::tools::ToolContext,
+    ctx: crate::tools::context::ToolContext,
 }
 
 impl EditTool {
-    pub fn new(ctx: crate::tools::ToolContext) -> Self {
+    pub fn new(ctx: crate::tools::context::ToolContext) -> Self {
         Self { ctx }
     }
 }

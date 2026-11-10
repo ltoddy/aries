@@ -19,11 +19,11 @@ pub use self::output::GlobOutput;
 pub const NAME: &str = "Glob";
 
 pub struct GlobTool {
-    ctx: crate::tools::ToolContext,
+    ctx: crate::tools::context::ToolContext,
 }
 
 impl GlobTool {
-    pub fn new(ctx: crate::tools::ToolContext) -> Self {
+    pub fn new(ctx: crate::tools::context::ToolContext) -> Self {
         Self { ctx }
     }
 }

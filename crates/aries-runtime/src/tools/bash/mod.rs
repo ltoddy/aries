@@ -14,7 +14,7 @@ use tree_sitter::{Language, Node, Parser};
 pub use self::args::BashArgs;
 pub use self::error::BashError;
 pub use self::output::BashOutput;
-use crate::tools::ToolContext as AriesToolContext;
+use crate::tools::context::ToolContext as AriesToolContext;
 use crate::tools::task::TaskKind;
 
 pub const NAME: &str = "Bash";
