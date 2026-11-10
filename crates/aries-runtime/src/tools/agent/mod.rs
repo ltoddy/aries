@@ -22,9 +22,9 @@ pub use self::error::AgentError;
 pub use self::output::AgentOutput;
 use crate::hooks::{TokenUsageHook, ToolCallHook};
 use crate::jsonl;
+use crate::state::MaxTurn;
 
 pub const NAME: &str = "Agent";
-pub const DEFAULT_MAX_TURNS: usize = 100;
 
 const DESCRIPTION_HEAD: &str = include_str!("description-head.md");
 const DESCRIPTION_TAIL: &str = include_str!("description-tail.md");
@@ -161,7 +161,7 @@ impl Tool for AgentTool {
             .tool_server_handle(tool_server_handle)
             .add_hook(self.token_usage_hook.clone())
             .add_hook(self.tool_call_hook.clone())
-            .default_max_turns(DEFAULT_MAX_TURNS)
+            .default_max_turns(MaxTurn::default().as_usize())
             .build();
 
         let session_id = format!("agent-{}", nanoid::nanoid!());
