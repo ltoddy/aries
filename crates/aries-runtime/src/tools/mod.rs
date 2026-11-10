@@ -41,7 +41,7 @@ use self::agent::AgentOutput;
 use self::bash::BashOutput;
 use self::batch::BatchOutput;
 use self::codesearch::CodeSearchOutput;
-pub use self::context::ToolContext;
+use self::context::ToolContext;
 use self::edit::EditOutput;
 use self::enter_worktree::EnterGitWorktreeOutput;
 use self::exit_worktree::ExitGitWorktreeOutput;
