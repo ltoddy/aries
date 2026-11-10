@@ -14,7 +14,6 @@ pub struct AgentBuilder {
     state: State,
 
     root_dir: PathBuf,
-    cwd: PathBuf,
     gctx: GlobalContext,
 
     extensions: AgentExtensions,
@@ -25,23 +24,19 @@ pub struct AgentBuilder {
 }
 
 impl AgentBuilder {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         session_id: impl Into<String>,
         state: State,
         root_dir: impl AsRef<Path>,
-        cwd: impl AsRef<Path>,
         gctx: GlobalContext,
         notifier: Notifier,
         db: Db,
     ) -> Self {
         let root_dir = root_dir.as_ref();
-        let cwd = cwd.as_ref();
 
         Self {
             state,
             root_dir: root_dir.to_owned(),
-            cwd: cwd.to_owned(),
             gctx,
             extensions: AgentExtensions::empty(),
             db,
@@ -67,7 +62,7 @@ impl AgentBuilder {
             crate::ALL_TOOL_NAMES,
             self.state.model.clone(),
             &self.root_dir,
-            &self.cwd,
+            &self.state.cwd,
             self.extensions.clone(),
             Notifier::clone(&self.notifier),
             self.db.clone(),
@@ -75,7 +70,8 @@ impl AgentBuilder {
         tool_server_handle.add_tools(tools);
 
         let sections =
-            crate::preamble::sections(self.gctx, &self.cwd, model, &self.extensions.skills).await;
+            crate::preamble::sections(self.gctx, &self.state.cwd, model, &self.extensions.skills)
+                .await;
 
         let mut builder = rig::agent::AgentBuilder::new(self.state.model)
             .name(&self.state.agent.frontmatter.name)

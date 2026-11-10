@@ -58,7 +58,6 @@ pub struct Session {
     gctx: GlobalContext,
     setting: Setting,
     config: ModelConfig,
-    cwd: PathBuf,
     agent: AriesAgent,
 
     state: State,
@@ -182,7 +181,6 @@ impl Session {
             &self.id,
             self.state.clone(),
             &self.session_dir,
-            &self.cwd,
             self.gctx.clone(),
             Notifier::clone(&self.notifier),
             self.db.clone(),
@@ -213,7 +211,6 @@ impl Session {
             &self.id,
             self.state.clone(),
             &self.session_dir,
-            &self.cwd,
             self.gctx.clone(),
             Notifier::clone(&self.notifier),
             self.db.clone(),
@@ -366,7 +363,7 @@ impl Session {
     }
 
     pub fn current_dir(&self) -> &Path {
-        &self.cwd
+        &self.state.cwd
     }
 
     pub fn transcript_path(&self) -> &Path {
@@ -374,7 +371,7 @@ impl Session {
     }
 
     pub async fn close(&self) {
-        let input = SessionEndHookInput::new(&self.id, &self.cwd, SessionEndReason::Logout)
+        let input = SessionEndHookInput::new(&self.id, &self.state.cwd, SessionEndReason::Logout)
             .transcript_path(&self.transcript_path);
 
         self.hooks_executor.fire_session_end(input).await;
@@ -452,13 +449,12 @@ impl Session {
             .find(|agent| agent.frontmatter.name.eq_ignore_ascii_case(DEFAULT_AGENT_NAME))
             .cloned()
             .ok_or_else(|| SessionError::agent_not_found(DEFAULT_AGENT_NAME))?;
-        let state = State::new(model, agent);
+        let state = State::new(model, agent, cwd);
 
         let agent = AgentBuilder::new(
             &id,
             state.clone(),
             &session_dir,
-            cwd,
             gctx.clone(),
             Notifier::clone(&notifier),
             db.clone(),
@@ -488,7 +484,6 @@ impl Session {
             gctx,
             setting,
             config,
-            cwd: cwd.to_owned(),
             agent,
             chat_history,
             chat_context,
@@ -542,7 +537,7 @@ impl Session {
         &self,
         prompt: impl Into<String>,
     ) -> crate::agent::AriesResult<VecDeque<String>> {
-        let input = UserPromptSubmitHookInput::new(&self.id, &self.cwd, prompt)
+        let input = UserPromptSubmitHookInput::new(&self.id, &self.state.cwd, prompt)
             .transcript_path(&self.transcript_path);
         match self.hooks_executor.fire_user_prompt_submit(input).await {
             HookDecision::Terminate { reason } => {
@@ -553,8 +548,8 @@ impl Session {
     }
 
     async fn fire_stop(&self, assistant_output: impl Into<String>) {
-        let input =
-            StopHookInput::new(&self.id, &self.cwd, false).last_assistant_message(assistant_output);
+        let input = StopHookInput::new(&self.id, &self.state.cwd, false)
+            .last_assistant_message(assistant_output);
         if let HookDecision::Continue { contexts } = self.hooks_executor.fire_stop(input).await {
             self.chat_context.append(&system_reminders(contexts)).await;
         }
@@ -562,7 +557,7 @@ impl Session {
 
     async fn fire_stop_failure(&self, error: impl Into<String>) {
         let error = error.into();
-        let input = StopFailureHookInput::new(&self.id, &self.cwd, &error)
+        let input = StopFailureHookInput::new(&self.id, &self.state.cwd, &error)
             .transcript_path(&self.transcript_path)
             .error_details(&error);
 
