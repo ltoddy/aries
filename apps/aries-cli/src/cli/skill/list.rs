@@ -1,4 +1,4 @@
-use aries_extension::{SkillDefinition, SkillsLoader};
+use aries_extension::skill::{SkillDefinition, SkillsLoader};
 use aries_init::GlobalContext;
 use clap::Parser;
 use prettytable::{Cell, Row, Table, row};

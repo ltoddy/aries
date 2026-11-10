@@ -9,12 +9,15 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use aries_communicate::{AgentEvent, Notifier};
+use aries_extension::AgentExtensions;
+use aries_extension::command::SlashCommandsExecutor;
 use aries_extension::hook::input::{
     SessionEndHookInput, SessionEndReason, SessionStartHookInput, SessionStartSource,
     StopFailureHookInput, StopHookInput, UserPromptSubmitHookInput,
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
-use aries_extension::{AgentExtensions, McpDefinition, SkillExecutor, SlashCommandsExecutor, mcp};
+use aries_extension::mcp::{self, McpDefinition};
+use aries_extension::skill::SkillExecutor;
 use aries_init::{GlobalContext, ModelConfig, Setting, SettingLoader};
 use aries_persistence::SessionRepository;
 use itertools::Itertools;
@@ -345,7 +348,7 @@ impl Session {
         &self.setting
     }
 
-    pub fn agents(&self) -> &[aries_extension::AgentDefinition] {
+    pub fn agents(&self) -> &[aries_extension::agent::AgentDefinition] {
         &self.extensions.agents
     }
 

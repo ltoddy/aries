@@ -491,6 +491,7 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "tracing",
+ "url",
  "yaml_serde",
 ]
 
@@ -507,7 +508,6 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "tracing",
- "url",
  "yaml_serde",
 ]
 

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use aries_extension::McpDefinition;
+use aries_extension::mcp::McpDefinition;
 use aries_init::{GlobalContext, Setting, SettingError};
 use aries_persistence::SessionRepository;
 use toasty::Db;

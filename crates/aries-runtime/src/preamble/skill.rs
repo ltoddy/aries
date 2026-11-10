@@ -1,4 +1,4 @@
-use aries_extension::SkillDefinition;
+use aries_extension::skill::SkillDefinition;
 use itertools::Itertools;
 
 pub fn section(skills: &[SkillDefinition]) -> String {

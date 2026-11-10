@@ -2,7 +2,7 @@
 
 use std::fs;
 
-use aries_extension::{SkillDefinition, SkillFrontmatter};
+use aries_extension::skill::{Frontmatter as SkillFrontmatter, SkillDefinition};
 use rig::tool::{Tool, ToolContext};
 use tempfile::TempDir;
 

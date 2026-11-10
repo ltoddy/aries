@@ -1,32 +1,20 @@
-mod agent;
-mod command;
+pub mod agent;
+pub mod command;
 pub mod hook;
 pub mod mcp;
-mod skill;
+pub mod skill;
 mod tool;
+pub mod uri;
 
 use std::path::{Path, PathBuf};
 
-pub use self::agent::{AgentDefinition, AgentsLoader, Frontmatter as AgentFrontmatter};
-pub use self::command::{
-    CommandDefinition, CommandsLoader, Frontmatter as CommandFrontmatter, SlashCommandsExecutor,
-};
-pub use self::hook::{HookDecision, HooksDefinition, HooksExecutor, HooksLoader};
-pub use self::mcp::{
-    Http, McpConnectError, McpDefinition, McpLoadResult, McpParseError, McpServerConfig,
-    McpsLoader, Sse, Stdio, connect,
-};
-pub use self::skill::{
-    Frontmatter as SkillFrontmatter, SkillDefinition, SkillExecutor, SkillsLoader,
-};
-
 #[derive(Debug, Clone, Default)]
 pub struct AgentExtensions {
-    pub agents: Vec<AgentDefinition>,
-    pub commands: Vec<CommandDefinition>,
-    pub hooks: Vec<HooksDefinition>,
-    pub mcps: Vec<McpDefinition>,
-    pub skills: Vec<SkillDefinition>,
+    pub agents: Vec<agent::AgentDefinition>,
+    pub commands: Vec<command::CommandDefinition>,
+    pub hooks: Vec<hook::HooksDefinition>,
+    pub mcps: Vec<mcp::McpDefinition>,
+    pub skills: Vec<skill::SkillDefinition>,
 }
 
 impl AgentExtensions {
@@ -35,11 +23,11 @@ impl AgentExtensions {
         let root_dir = root_dir.as_ref();
         let home_dir = std::env::home_dir().unwrap_or_else(|| PathBuf::from("~"));
 
-        let agent_loader = AgentsLoader::new(cwd, &home_dir, root_dir);
-        let command_loader = CommandsLoader::new(cwd, &home_dir);
-        let hook_loader = HooksLoader::new(cwd, &home_dir);
-        let mcp_loader = McpsLoader::new(cwd, &home_dir);
-        let skill_loader = SkillsLoader::new(cwd, &home_dir, root_dir);
+        let agent_loader = agent::AgentsLoader::new(cwd, &home_dir, root_dir);
+        let command_loader = command::CommandsLoader::new(cwd, &home_dir);
+        let hook_loader = hook::HooksLoader::new(cwd, &home_dir);
+        let mcp_loader = mcp::McpsLoader::new(cwd, &home_dir);
+        let skill_loader = skill::SkillsLoader::new(cwd, &home_dir, root_dir);
 
         let (agents, commands, hooks, mcps, skills) = tokio::join!(
             agent_loader.load(),
@@ -90,14 +78,14 @@ impl AvailableCommand {
     }
 }
 
-impl From<&SkillDefinition> for AvailableCommand {
-    fn from(value: &SkillDefinition) -> Self {
+impl From<&skill::SkillDefinition> for AvailableCommand {
+    fn from(value: &skill::SkillDefinition) -> Self {
         AvailableCommand::new(&value.frontmatter.name, &value.frontmatter.description, None)
     }
 }
 
-impl From<&CommandDefinition> for AvailableCommand {
-    fn from(value: &CommandDefinition) -> Self {
+impl From<&command::CommandDefinition> for AvailableCommand {
+    fn from(value: &command::CommandDefinition) -> Self {
         AvailableCommand::new(
             &value.frontmatter.name,
             &value.frontmatter.description,
