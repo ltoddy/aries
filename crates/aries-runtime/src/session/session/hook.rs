@@ -405,6 +405,7 @@ impl AgentHook for SessionPromptHook {
                 OutcomeAction::proceed()
             },
             (EffectKind::ToolCall { name, args }, Err(err), Some(call_id)) => {
+                let cwd = self.cwd.display().to_string();
                 let duration_ms = self
                     .last_tool_call_at
                     .lock()
@@ -413,9 +414,7 @@ impl AgentHook for SessionPromptHook {
                     .map(|started_at| started_at.elapsed().as_millis() as u64);
 
                 let mut repo = self.tool_call_repo.clone();
-                let _ = repo
-                    .create(&self.session_id, call_id.to_string(), name, args, duration_ms, false)
-                    .await;
+                let _ = repo.create(cwd, call_id.to_string(), name, args, duration_ms, false).await;
 
                 self.fire_post_tool_use_failure(
                     name,

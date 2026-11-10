@@ -22,9 +22,16 @@ pub async fn prompt(
     cx: ConnectionTo<Client>,
     registry: SharedRegistry,
 ) -> Result<(), Error> {
-    info!("Received prompt request {req:?}");
+    info!(content_blocks = req.prompt.len(), "Received prompt request");
 
     let session_id = req.session_id.to_string();
+    let prompt = UserMessage::from(req.prompt);
+    let callback = async |event: AgentEvent| {
+        SessionUpdates::new(event).into_iter().for_each(|u| {
+            let _ = cx.send_notification(SessionNotification::new(session_id.clone(), u));
+        });
+    };
+
     let mut session = {
         let registry = registry.lock().await;
         match registry.session(&session_id) {
@@ -37,21 +44,16 @@ pub async fn prompt(
         }
     };
 
-    let callback = async |event: AgentEvent| {
-        SessionUpdates::new(event).into_iter().for_each(|u| {
-            let _ = cx.send_notification(SessionNotification::new(session_id.clone(), u));
-        });
-    };
-
-    let prompt = UserMessage::from(req.prompt);
-    let stop_reason = match session.prompt(prompt, callback).await {
+    let result = session.prompt(prompt, callback).await;
+    {
+        let mut registry = registry.lock().await;
+        registry.putback_session(session);
+    }
+    let stop_reason = match result {
         Ok(PromptOutcome::Completed(_)) => StopReason::EndTurn,
         Ok(PromptOutcome::Cancelled(_)) => StopReason::Cancelled,
         Err(err) => return responder.respond_with_internal_error(err.to_string()),
     };
-
-    let mut registry = registry.lock().await;
-    registry.putback_session(session);
 
     let _ = cx.send_notification(SessionNotification::new(
         session_id,

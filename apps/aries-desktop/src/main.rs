@@ -22,6 +22,7 @@ gpui_kit::actions!(
         PreviousUserMessage,
         NextUserMessage,
         ToggleTerminal,
+        ToggleSidebar,
     ]
 );
 
@@ -39,6 +40,7 @@ fn main() -> anyhow::Result<()> {
             KeyBinding::new("cmd-,", OpenSettings, None),
             KeyBinding::new("cmd-n", NewSession, None),
             KeyBinding::new("cmd-f", ToggleTerminal, None),
+            KeyBinding::new("cmd-b", ToggleSidebar, None),
         ]);
         cx.on_action(|_: &Quit, cx| cx.quit());
         #[cfg(target_os = "macos")]
@@ -52,6 +54,7 @@ fn main() -> anyhow::Result<()> {
         #[cfg(not(target_os = "macos"))]
         cx.bind_keys([
             KeyBinding::new("ctrl-w", CloseTab, None),
+            KeyBinding::new("ctrl-b", ToggleSidebar, None),
             KeyBinding::new("ctrl-shift-[", PreviousTab, None),
             KeyBinding::new("ctrl-shift-]", NextTab, None),
             KeyBinding::new("ctrl-alt-up", PreviousUserMessage, None),

@@ -5,8 +5,9 @@ use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::v1::ConnectionTo;
 use agent_client_protocol::v1::schema::{
     AgentCapabilities, BooleanConfigOptionCapabilities, ClientCapabilities,
-    ClientSessionCapabilities, CompactionCapabilities, Implementation, InitializeRequest,
-    NoticeCapabilities, PlanCapabilities, SessionConfigOptionsCapabilities, SubagentCapabilities,
+    ClientSessionCapabilities, CompactionCapabilities, FileSystemCapabilities, Implementation,
+    InitializeRequest, NoticeCapabilities, PlanCapabilities, SessionConfigOptionsCapabilities,
+    SubagentCapabilities,
 };
 
 use crate::acp::requests::RequestError;
@@ -19,6 +20,9 @@ pub async fn request(connection: &ConnectionTo<Agent>) -> Result<AgentCapabiliti
                 InitializeRequest::new(ProtocolVersion::V1)
                     .client_capabilities(
                         ClientCapabilities::new()
+                            .fs(FileSystemCapabilities::new()
+                                .read_text_file(true)
+                                .write_text_file(true))
                             .terminal(true)
                             .session(
                                 ClientSessionCapabilities::new()
@@ -29,8 +33,8 @@ pub async fn request(connection: &ConnectionTo<Agent>) -> Result<AgentCapabiliti
                                     .notices(NoticeCapabilities::new())
                                     .compaction(CompactionCapabilities::new()),
                             )
-                            .plan(PlanCapabilities::new())
-                            .subagents(SubagentCapabilities::new()),
+                            .subagents(SubagentCapabilities::new())
+                            .plan(PlanCapabilities::new()),
                     )
                     .client_info(Implementation::new("aries-desktop", env!("CARGO_PKG_VERSION"))),
             )

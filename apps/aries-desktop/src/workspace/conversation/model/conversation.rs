@@ -30,6 +30,35 @@ pub struct Message {
 }
 
 impl Message {
+    fn user(session_id: &SessionId, content: &[ContentBlock]) -> Self {
+        let text = content
+            .iter()
+            .filter_map(|block| match block {
+                ContentBlock::Text(text) => Some(text.text.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("");
+        let updates = content
+            .iter()
+            .cloned()
+            .map(|block| {
+                SessionNotification::new(
+                    session_id.clone(),
+                    SessionUpdate::UserMessageChunk(ContentChunk::new(block)),
+                )
+            })
+            .collect();
+        Self {
+            role: Role::User,
+            title: "你".into(),
+            text,
+            updates,
+            compaction: None,
+            tool_call: None,
+            subagent: None,
+        }
+    }
     pub fn tool_call(&self) -> Option<&ToolCallState> {
         self.tool_call.as_ref()
     }
@@ -121,24 +150,15 @@ impl Conversation {
         self.config_options = options;
     }
 
-    pub fn begin_turn(&mut self, text: &str) -> Option<String> {
-        let text = text.trim();
-        if self.busy || text.is_empty() {
-            return None;
+    pub fn begin_turn(&mut self, session_id: &SessionId, content: &[ContentBlock]) -> bool {
+        if self.busy || content.is_empty() {
+            return false;
         }
         self.end_segment();
-        self.messages.push(Message {
-            role: Role::User,
-            title: "你".into(),
-            text: text.into(),
-            updates: Vec::new(),
-            compaction: None,
-            tool_call: None,
-            subagent: None,
-        });
+        self.messages.push(Message::user(session_id, content));
         self.busy = true;
         self.error = None;
-        Some(text.into())
+        true
     }
 
     pub fn receive(&mut self, notification: SessionNotification) -> Option<usize> {

@@ -58,9 +58,15 @@ impl<'a> SessionRowView<'a> {
         let load_session = session.clone();
         let can_open_session = self.owner.tab_host().is_some() || self.owner.can_load_sessions();
         let view = cx.weak_entity();
+        let selected = current
+            && !self
+                .owner
+                .tab_host()
+                .and_then(|host| host.upgrade())
+                .is_some_and(|host| host.read(cx).is_usage_visible());
         SessionSurface::new(
             row.clone(),
-            current,
+            selected,
             p.hover(),
             div()
                 .id(SharedString::from(format!("session:{id}")))

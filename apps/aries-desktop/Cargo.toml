@@ -10,7 +10,7 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
-agent-client-protocol = { workspace = true, features = ["process"] }
+agent-client-protocol = { workspace = true, features = ["process", "unstable"] }
 alacritty_terminal = "0.26"
 anyhow = "1.0"
 async-channel = "2.5"
@@ -47,3 +47,4 @@ similar.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["rt", "macros", "time", "sync", "process", "io-util"] }
 toml.workspace = true
+url.workspace = true

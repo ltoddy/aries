@@ -1,7 +1,7 @@
 use agent_client_protocol::Error;
 use agent_client_protocol::v1::schema::{
-    LoadSessionResponse, NewSessionResponse, SessionConfigId, SessionConfigOption, SessionId,
-    SessionInfo, SessionNotification, StopReason,
+    LoadSessionResponse, NewSessionResponse, PromptCapabilities, SessionConfigId,
+    SessionConfigOption, SessionId, SessionInfo, SessionNotification, StopReason,
 };
 
 use crate::acp::{DeletionReport, Permission};
@@ -11,6 +11,7 @@ pub enum Event {
     Connected {
         list_sessions: bool,
         load_session: bool,
+        prompt_capabilities: PromptCapabilities,
     },
     Sessions(Result<Vec<SessionInfo>, Error>),
     SessionsDeleted(DeletionReport),

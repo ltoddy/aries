@@ -131,8 +131,8 @@ impl AgentConnection {
                     };
                     let _ = self.events.send(Event::SessionLoaded { session_id, result }).await;
                 },
-                Command::Prompt { session_id, text } => {
-                    if prompt::request(self, session_id, text).await? == ControlFlow::Break(()) {
+                Command::Prompt { session_id, content } => {
+                    if prompt::request(self, session_id, content).await? == ControlFlow::Break(()) {
                         break;
                     }
                 },
@@ -234,6 +234,7 @@ pub async fn connect(
             let _ = events.send(Event::Connected {
                 list_sessions: capabilities.session_capabilities.list.is_some(),
                 load_session: capabilities.load_session,
+                prompt_capabilities: capabilities.prompt_capabilities.clone(),
             }).await;
             AgentConnection { client, commands, events, cancel, capabilities }
                 .run(pending).await

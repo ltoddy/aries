@@ -1,11 +1,11 @@
 use std::collections::HashSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use agent_client_protocol::v1::schema::{SessionId, SessionInfo};
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
-use gpui_kit::component::{ActiveTheme, Disableable, Icon};
+use gpui_kit::component::{ActiveTheme, Disableable, Icon, Selectable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -23,6 +23,7 @@ pub struct Sidebar {
     anchor: ScrollAnchor,
     loading_session: Option<SessionId>,
     created_session: Option<SessionInfo>,
+    expanded_sessions: HashSet<PathBuf>,
 }
 
 impl Default for Sidebar {
@@ -42,6 +43,7 @@ impl Sidebar {
             anchor,
             loading_session: None,
             created_session: None,
+            expanded_sessions: HashSet::new(),
         }
     }
     pub fn scroll(&self) -> &ScrollHandle {
@@ -73,6 +75,14 @@ impl Sidebar {
     }
     pub fn take_created_session(&mut self) -> Option<SessionInfo> {
         self.created_session.take()
+    }
+    pub fn is_sessions_expanded(&self, cwd: &Path) -> bool {
+        self.expanded_sessions.contains(cwd)
+    }
+    pub fn toggle_sessions(&mut self, cwd: &Path) {
+        if !self.expanded_sessions.remove(cwd) {
+            self.expanded_sessions.insert(cwd.to_path_buf());
+        }
     }
     pub fn cleanup(&mut self, cx: &App) {
         self.motion.cleanup(cx.background_executor().now(), cx.reduce_motion());
@@ -143,6 +153,7 @@ impl Sidebar {
                             .size_8()
                             .tooltip("统计")
                             .accessibility_label("打开统计")
+                            .selected(usage_selected)
                             .bg(if usage_selected { cx.theme().muted } else { cx.theme().sidebar })
                             .text_color(if usage_selected {
                                 cx.theme().primary
@@ -242,6 +253,7 @@ impl Sidebar {
             .map(|session| session.cwd.clone())
             .unwrap_or_else(|| directory.to_path_buf());
         self.list.expand_project(&cwd);
+        self.expanded_sessions.insert(cwd);
         let anchor = self.anchor.clone();
         window.on_next_frame(move |window, cx| {
             anchor.scroll_to(window, cx);

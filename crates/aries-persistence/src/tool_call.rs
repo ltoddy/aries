@@ -9,7 +9,8 @@ pub struct ToolCall {
     #[auto(increment)]
     pub id: u64,
 
-    pub session_id: String,
+    #[index]
+    pub cwd: String,
     pub tool_call_id: String,
     #[index]
     pub tool_name: String,
@@ -33,7 +34,7 @@ impl ToolCallRepository {
 
     pub async fn create(
         &mut self,
-        session_id: impl IntoExpr<String>,
+        cwd: impl IntoExpr<String>,
         tool_call_id: impl IntoExpr<String>,
         tool_name: impl IntoExpr<String>,
         args: impl IntoExpr<String>,
@@ -41,7 +42,7 @@ impl ToolCallRepository {
         was_successful: impl IntoExpr<bool>,
     ) -> toasty::Result<ToolCall> {
         ToolCall::create()
-            .session_id(session_id)
+            .cwd(cwd)
             .tool_call_id(tool_call_id)
             .tool_name(tool_name)
             .args(args)

@@ -2,7 +2,7 @@ use agent_client_protocol::v1::schema::{ContentBlock, EmbeddedResourceResource};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use rig::completion::Message;
-use rig::message::{Document, DocumentMediaType, DocumentSourceKind, UserContent};
+use rig::message::{AudioMediaType, DocumentMediaType, ImageMediaType, MimeType, UserContent};
 
 #[derive(Debug, Clone)]
 pub struct UserMessage(Message);
@@ -13,10 +13,18 @@ impl From<Vec<ContentBlock>> for UserMessage {
             .into_iter()
             .filter_map(|block| match block {
                 ContentBlock::Text(t) => Some(UserContent::text(t.text)),
-                ContentBlock::Image(i) => Some(UserContent::image_base64(i.data, None, None)),
-                ContentBlock::Audio(a) => Some(UserContent::audio_base64(a.data, None)),
+                ContentBlock::Image(i) => Some(UserContent::image_base64(
+                    i.data,
+                    ImageMediaType::from_mime_type(&i.mime_type),
+                    None,
+                )),
+                ContentBlock::Audio(a) => Some(UserContent::audio_base64(
+                    a.data,
+                    AudioMediaType::from_mime_type(&a.mime_type),
+                )),
                 ContentBlock::ResourceLink(link) => {
-                    let media_type = link.mime_type.and_then(document_media_type);
+                    let media_type =
+                        link.mime_type.as_deref().and_then(DocumentMediaType::from_mime_type);
                     let content = match &link.description {
                         Some(desc) => format!("[{}]({}): {}", link.name, link.uri, desc),
                         None => format!("[{}]({})", link.name, link.uri),
@@ -27,29 +35,24 @@ impl From<Vec<ContentBlock>> for UserMessage {
                     EmbeddedResourceResource::TextResourceContents(text) => {
                         UserContent::document_text(
                             text.text,
-                            text.mime_type.and_then(document_media_type),
+                            text.mime_type.as_deref().and_then(DocumentMediaType::from_mime_type),
                         )
                     },
                     EmbeddedResourceResource::BlobResourceContents(blob) => {
-                        let media_type = blob.mime_type.and_then(document_media_type);
+                        let media_type =
+                            blob.mime_type.as_deref().and_then(DocumentMediaType::from_mime_type);
 
                         // PDF 需要保持 base64 encode之后的形式, 其他类型需要使用明文来让 AI 模型阅读
                         match media_type {
-                            Some(DocumentMediaType::PDF) => UserContent::Document(Document {
-                                data: DocumentSourceKind::Base64(blob.blob).into(),
-                                media_type,
-                                additional_params: None,
-                            }),
+                            Some(DocumentMediaType::PDF) => {
+                                UserContent::document_base64(blob.blob, media_type)
+                            },
                             _ => match STANDARD.decode(&blob.blob) {
                                 Ok(bytes) => {
                                     let text = String::from_utf8_lossy(&bytes).into_owned();
                                     UserContent::document_text(text, media_type)
                                 },
-                                Err(_) => UserContent::Document(Document {
-                                    data: DocumentSourceKind::Base64(blob.blob).into(),
-                                    media_type,
-                                    additional_params: None,
-                                }),
+                                Err(_) => UserContent::document_base64(blob.blob, media_type),
                             },
                         }
                     },
@@ -67,26 +70,4 @@ impl From<UserMessage> for Message {
     fn from(value: UserMessage) -> Self {
         value.0
     }
-}
-
-// TODO media type
-fn document_media_type(mime_type: impl Into<String>) -> Option<DocumentMediaType> {
-    let mime_type = mime_type.into();
-    let mime_type = mime_type.as_str();
-
-    let mime_type = mime_type.split(';').next().unwrap_or(mime_type).trim();
-    let media_type = match mime_type {
-        "application/pdf" => DocumentMediaType::PDF,
-        "text/plain" => DocumentMediaType::TXT,
-        "application/rtf" | "text/rtf" => DocumentMediaType::RTF,
-        "text/html" => DocumentMediaType::HTML,
-        "text/css" => DocumentMediaType::CSS,
-        "text/markdown" => DocumentMediaType::MARKDOWN,
-        "text/csv" => DocumentMediaType::CSV,
-        "application/xml" | "text/xml" => DocumentMediaType::XML,
-        "application/javascript" | "text/javascript" => DocumentMediaType::Javascript,
-        "text/x-python" | "application/x-python-code" => DocumentMediaType::Python,
-        _ => return None,
-    };
-    Some(media_type)
 }
