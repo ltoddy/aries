@@ -1,5 +1,4 @@
 pub mod document;
-pub mod jsonl;
 pub mod lock;
 #[cfg(test)]
 mod tests;

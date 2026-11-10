@@ -18,7 +18,6 @@ serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["fs", "io-util", "rt-multi-thread", "macros", "sync"] }
-tracing.workspace = true
 yaml_serde.workspace = true
 
 [dev-dependencies]

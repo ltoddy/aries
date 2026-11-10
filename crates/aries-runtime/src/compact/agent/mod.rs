@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use aries_filesystem::jsonl;
 use futures::StreamExt;
 use regex_lite::Regex;
 use rig::agent::{MultiTurnStreamItem, PromptResponse};
@@ -12,6 +11,8 @@ use rig::message::{AssistantContent, ToolResultContent, UserContent};
 use rig::providers::openai::wire::OpenAiWire;
 use rig::{Agent, Model, ProviderError};
 use tokio::pin;
+
+use crate::jsonl;
 
 const PREAMBLE: &str = include_str!("preamble.md");
 const NAME: &str = "Archivist";

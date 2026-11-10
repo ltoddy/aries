@@ -2,11 +2,11 @@ use std::io;
 use std::path::Path;
 use std::sync::Arc;
 
-use aries_filesystem::jsonl;
-use aries_filesystem::jsonl::JsonlAppender;
 use rig::completion::Message;
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tracing::error;
+
+use crate::jsonl::{self, JsonlAppender};
 
 #[derive(Debug, Clone)]
 pub struct ChatContext {
