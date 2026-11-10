@@ -96,11 +96,18 @@ async fn tool_call_repository_uses_memory_database() {
     let mut repo = ToolCallRepository::new(db);
 
     let tool_call = repo
-        .create("session-1", "tool-call-1", "Read", r#"{"file_path":"Cargo.toml"}"#, Some(10), true)
+        .create(
+            "/workspace",
+            "tool-call-1",
+            "Read",
+            r#"{"file_path":"Cargo.toml"}"#,
+            Some(10),
+            true,
+        )
         .await
         .unwrap();
 
-    assert_eq!(tool_call.session_id, "session-1");
+    assert_eq!(tool_call.cwd, "/workspace");
     assert_eq!(tool_call.tool_call_id, "tool-call-1");
     assert_eq!(tool_call.tool_name, "Read");
     assert_eq!(tool_call.duration_ms, Some(10));

@@ -2,8 +2,8 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 
 use agent_client_protocol::v1::schema::{
-    LoadSessionRequest, LoadSessionResponse, PermissionOptionId, SessionId, SessionInfo,
-    SessionNotification, SessionUpdate,
+    LoadSessionRequest, LoadSessionResponse, PermissionOptionId, PromptCapabilities, SessionId,
+    SessionInfo, SessionNotification, SessionUpdate,
 };
 use agent_client_protocol::{AcpAgentConfig, Error};
 use anyhow::Context as _;
@@ -13,6 +13,7 @@ use gpui_kit::*;
 
 use crate::acp::{Bridge, Command, DeletionReport, Event, Permission};
 use crate::workspace::conversation::Composer;
+use crate::workspace::conversation::draft::Draft;
 use crate::workspace::conversation::model::Conversation;
 use crate::workspace::conversation::timeline::Timeline;
 use crate::workspace::git::GitPanel;
@@ -38,7 +39,8 @@ pub struct Execution {
     session_id: Option<SessionId>,
     queued_session_load: Option<SessionInfo>,
     pending_updates: Vec<SessionNotification>,
-    drafts: HashMap<SessionId, String>,
+    drafts: HashMap<SessionId, Draft>,
+    prompt_capabilities: PromptCapabilities,
     loading_session: Option<SessionLoad>,
     creating_session: bool,
     load_supported: bool,
@@ -165,6 +167,7 @@ impl Execution {
             queued_session_load: None,
             pending_updates: Vec::new(),
             drafts: HashMap::new(),
+            prompt_capabilities: PromptCapabilities::new(),
             loading_session: None,
             creating_session: false,
             load_supported: false,
@@ -175,6 +178,9 @@ impl Execution {
             session_directory_selected: false,
             permissions: VecDeque::new(),
         }
+    }
+    pub fn prompt_capabilities(&self) -> &PromptCapabilities {
+        &self.prompt_capabilities
     }
     pub fn conversation(&self) -> &Conversation {
         &self.conversation
@@ -284,19 +290,19 @@ impl Execution {
         let Some(session_id) = self.session_id.clone() else {
             return;
         };
-        let Some(prompt) = self.conversation.begin_turn(&ui.composer.input().read(cx).value())
-        else {
+        let content = ui.composer.content(cx);
+        if !self.conversation.begin_turn(&session_id, &content) {
             return;
-        };
+        }
         if self.bridge.is_none() {
             self.connect(ui, window, cx);
         }
-        if self
-            .bridge
-            .as_ref()
-            .is_some_and(|bridge| bridge.send(Command::Prompt { session_id, text: prompt }).is_ok())
-        {
+        if self.bridge.as_ref().is_some_and(|bridge| {
+            bridge.send(Command::Prompt { session_id: session_id.clone(), content }).is_ok()
+        }) {
             ui.composer.input().update(cx, |input, cx| input.set_value("", window, cx));
+            ui.composer.clear_attachments();
+            self.drafts.remove(&session_id);
         } else {
             self.apply_event(
                 ui,
@@ -317,20 +323,22 @@ impl Execution {
             && !self.choosing_directory
     }
     pub fn is_session_idle(&self, ui: &SessionParts<'_>) -> bool {
-        self.is_idle(ui.deletion.is_busy() || ui.configuration.is_pending())
+        self.is_idle(
+            ui.deletion.is_busy() || ui.configuration.is_pending() || ui.composer.is_loading(),
+        )
     }
     pub fn can_send(&self, ui: &SessionParts<'_>, cx: &App) -> bool {
         self.session_id.is_some()
             && self.is_session_idle(ui)
             && !self.disconnected
-            && !ui.composer.input().read(cx).value().trim().is_empty()
+            && ui.composer.has_content(cx)
     }
     pub fn supports_load(&self) -> bool {
         self.load_supported
     }
     pub fn save_draft(&mut self, ui: &mut SessionParts<'_>, cx: &App) {
         if let Some(id) = &self.session_id {
-            let draft = ui.composer.input().read(cx).value().to_string();
+            let draft = ui.composer.draft(cx);
             if draft.is_empty() {
                 self.drafts.remove(id);
             } else {
@@ -369,6 +377,7 @@ impl Execution {
     pub fn reset_chat(&mut self, ui: &mut SessionParts<'_>) {
         self.conversation.reset();
         ui.composer.reset_menu();
+        ui.composer.clear_attachments();
         ui.timeline.reset();
         self.session_id = None;
         self.queued_session_load = None;
@@ -394,6 +403,7 @@ impl Execution {
         }
         self.disconnected = false;
         self.load_supported = false;
+        self.prompt_capabilities = PromptCapabilities::new();
         ui.sidebar.list_mut().connect();
         match Bridge::start(self.agent.clone()) {
             Ok(bridge) => {
@@ -440,9 +450,10 @@ impl Execution {
     ) {
         let mut sidebar_synced = false;
         match event {
-            Event::Connected { list_sessions, load_session } => {
+            Event::Connected { list_sessions, load_session, prompt_capabilities } => {
                 ui.sidebar.list_mut().connected(list_sessions);
                 self.load_supported = load_session;
+                self.prompt_capabilities = prompt_capabilities;
                 if let Some(session) = self.queued_session_load.take() {
                     self.load_session(ui, session, cx);
                 }
@@ -664,7 +675,7 @@ impl Execution {
                 ui.git_panel.watch_info(cx);
                 self.session_id = Some(session.session_id);
                 self.tokens = tokens;
-                ui.composer.input().update(cx, |input, cx| input.set_value(draft, window, cx));
+                ui.composer.restore_draft(draft, window, cx);
                 ui.timeline.rebuild_images();
                 ui.timeline.rebuild_tool_diffs(&self.conversation);
                 for message in self.conversation.messages() {

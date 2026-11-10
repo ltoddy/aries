@@ -5,6 +5,7 @@ pub mod hooks;
 pub mod memory;
 pub mod preamble;
 pub mod session;
+pub mod state;
 pub mod tools;
 
 pub use self::tools::{

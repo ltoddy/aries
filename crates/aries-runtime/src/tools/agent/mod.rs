@@ -19,7 +19,7 @@ use toasty::Db;
 pub use self::args::AgentArgs;
 pub use self::error::AgentError;
 pub use self::output::AgentOutput;
-use crate::hooks::TokenUsageHook;
+use crate::hooks::{TokenUsageHook, ToolCallHook};
 
 pub const NAME: &str = "Agent";
 pub const DEFAULT_MAX_TURNS: usize = 100;
@@ -34,7 +34,8 @@ pub struct AgentTool {
     parent_dir: PathBuf,
     notifier: Notifier,
     extensions: AgentExtensions,
-    hook: TokenUsageHook,
+    token_usage_hook: TokenUsageHook,
+    tool_call_hook: ToolCallHook,
     db: Db,
 }
 
@@ -49,9 +50,20 @@ impl AgentTool {
         db: Db,
     ) -> Self {
         let parent_dir = parent_dir.as_ref();
-        let hook = TokenUsageHook::new(gctx.current_dir(), db.clone());
+        let token_usage_hook = TokenUsageHook::new(gctx.current_dir(), db.clone());
+        let tool_call_hook = ToolCallHook::new(gctx.current_dir(), db.clone());
 
-        Self { gctx, ctx, model, parent_dir: parent_dir.to_owned(), notifier, extensions, hook, db }
+        Self {
+            gctx,
+            ctx,
+            model,
+            parent_dir: parent_dir.to_owned(),
+            notifier,
+            extensions,
+            token_usage_hook,
+            tool_call_hook,
+            db,
+        }
     }
 }
 
@@ -145,7 +157,8 @@ impl Tool for AgentTool {
             .preamble(&extension.body)
             .append_preamble(&crate::preamble::env::section(cwd, self.model.name()))
             .tool_server_handle(tool_server_handle)
-            .add_hook(self.hook.clone())
+            .add_hook(self.token_usage_hook.clone())
+            .add_hook(self.tool_call_hook.clone())
             .default_max_turns(DEFAULT_MAX_TURNS)
             .build();
 

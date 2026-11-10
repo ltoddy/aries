@@ -23,7 +23,7 @@ readme = "README.md"
 repository = "https://github.com/ltoddy/aries"
 
 [workspace.dependencies]
-agent-client-protocol = { version = "5.0", features = ["unstable"] }
+agent-client-protocol = "5.1"
 base64 = "0.23"
 colored = "3.1"
 futures = "0.3"
@@ -52,6 +52,7 @@ tracing = "0.1"
 tree-sitter = "0.26"
 tree-sitter-bash = "0.25"
 yaml_serde = "0.10"
+url = "2.5"
 
 [profile.dev]
 debug = 0

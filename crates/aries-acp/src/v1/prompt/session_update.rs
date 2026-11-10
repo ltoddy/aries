@@ -1,22 +1,27 @@
 use agent_client_protocol::v1::schema::{
-    CompactionStatus, CompactionUpdate, Content, ContentBlock, ContentChunk, Diff, MessageId, Plan,
-    SessionId, SessionInfoUpdate, SessionMessage, SessionMessageChunk, SessionUpdate,
-    SubagentUpdate, Terminal, TextContent, ToolCall as AcpToolCall, ToolCallContent, ToolCallId,
-    ToolCallLocation, ToolCallStatus, ToolCallUpdate, ToolCallUpdateFields, ToolKind, UsageUpdate,
+    AudioContent, BlobResourceContents, CompactionStatus, CompactionUpdate, Content, ContentBlock,
+    ContentChunk, Diff, EmbeddedResource, EmbeddedResourceResource, ImageContent, MessageId, Plan,
+    ResourceLink, SessionId, SessionInfoUpdate, SessionMessage, SessionMessageChunk, SessionUpdate,
+    SubagentUpdate, Terminal, TextContent, TextResourceContents, ToolCall as AcpToolCall,
+    ToolCallContent, ToolCallId, ToolCallLocation, ToolCallStatus, ToolCallUpdate,
+    ToolCallUpdateFields, ToolKind, UsageUpdate,
 };
 use aries_communicate::AgentEvent;
 use aries_runtime::tools::{
     agent, bash, batch, codesearch, edit, glob, grep, monitor, multiedit, read, skill, task_output,
     task_stop, update_plan, webfetch, websearch, write,
 };
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use rig::agent::{CompletionCall, MultiTurnStreamItem, PromptResponse};
 use rig::completion::Message;
 use rig::message::{
-    AssistantContent, DocumentData, ToolCall, ToolFunction, ToolName, ToolResult, UserContent,
+    AssistantContent, Audio, Document, DocumentData, DocumentSourceKind, Image, MimeType, ToolCall,
+    ToolFunction, ToolName, ToolResult, UserContent, Video,
 };
 use rig::streaming::{Item, StreamEvent};
 
-use super::plan::PlanEntry;
+use crate::v1::prompt::plan::PlanEntry;
 
 #[derive(Clone, Debug, Default)]
 pub struct SessionUpdates(Vec<SessionUpdate>);
@@ -82,32 +87,15 @@ impl SessionUpdates {
     }
 
     fn from_user_content(content: UserContent) -> Vec<SessionUpdate> {
-        match content {
-            UserContent::Text(text) => vec![SessionUpdate::UserMessageChunk(ContentChunk::new(
-                ContentBlock::from(text.text),
-            ))],
-            UserContent::ToolResult(tool_result) => Self::from_tool_result(tool_result),
-            UserContent::Image(_) => vec![SessionUpdate::UserMessageChunk(ContentChunk::new(
-                ContentBlock::from("[image]"),
-            ))],
-            UserContent::Audio(_) => vec![SessionUpdate::UserMessageChunk(ContentChunk::new(
-                ContentBlock::from("[audio]"),
-            ))],
-            UserContent::Video(_) => vec![SessionUpdate::UserMessageChunk(ContentChunk::new(
-                ContentBlock::from("[video]"),
-            ))],
-            UserContent::Document(document) => {
-                vec![SessionUpdate::UserMessageChunk(ContentChunk::new(ContentBlock::from(
-                    format!(
-                        "[document: {}]",
-                        match document.data {
-                            DocumentData::Text(s) => s,
-                            DocumentData::File(r) => r.to_string(),
-                        }
-                    ),
-                )))]
-            },
-        }
+        let block = match content {
+            UserContent::Text(text) => ContentBlock::from(text.text),
+            UserContent::ToolResult(tool_result) => return Self::from_tool_result(tool_result),
+            UserContent::Image(image) => Self::from_image(image),
+            UserContent::Audio(audio) => Self::from_audio(audio),
+            UserContent::Video(video) => Self::from_video(video),
+            UserContent::Document(document) => Self::from_document(document),
+        };
+        vec![SessionUpdate::UserMessageChunk(ContentChunk::new(block))]
     }
 
     fn from_assistant_content(content: AssistantContent) -> Vec<SessionUpdate> {
@@ -181,6 +169,104 @@ impl SessionUpdates {
             ToolCallId::new(tool_result.call.to_string()),
             fields,
         ))]
+    }
+
+    fn from_image(image: Image) -> ContentBlock {
+        let mime_type = image.media_type.as_ref().map(MimeType::to_mime_type);
+        match (image.data, mime_type) {
+            (DocumentSourceKind::Base64(data), Some(mime_type)) => {
+                ContentBlock::Image(ImageContent::new(data, mime_type))
+            },
+            (DocumentSourceKind::Raw(bytes), Some(mime_type)) => {
+                ContentBlock::Image(ImageContent::new(STANDARD.encode(bytes), mime_type))
+            },
+            (DocumentSourceKind::Url(uri), mime_type) => ContentBlock::ResourceLink(
+                ResourceLink::new("image", uri).mime_type(mime_type.map(str::to_owned)),
+            ),
+            (DocumentSourceKind::FileId(id), _) => {
+                ContentBlock::from(format!("[image: provider file ID {id}]"))
+            },
+            (DocumentSourceKind::Unknown, _) => ContentBlock::from("[image: source unavailable]"),
+            (DocumentSourceKind::Base64(data), None) => ContentBlock::Resource(
+                EmbeddedResource::new(EmbeddedResourceResource::BlobResourceContents(
+                    BlobResourceContents::new(data, "urn:aries:image"),
+                )),
+            ),
+            (DocumentSourceKind::Raw(bytes), None) => ContentBlock::Resource(
+                EmbeddedResource::new(EmbeddedResourceResource::BlobResourceContents(
+                    BlobResourceContents::new(STANDARD.encode(bytes), "urn:aries:image"),
+                )),
+            ),
+        }
+    }
+
+    fn from_audio(audio: Audio) -> ContentBlock {
+        let mime_type = audio.media_type.as_ref().map(MimeType::to_mime_type);
+        match (audio.data, mime_type) {
+            (DocumentSourceKind::Base64(data), Some(mime_type)) => {
+                ContentBlock::Audio(AudioContent::new(data, mime_type))
+            },
+            (DocumentSourceKind::Raw(bytes), Some(mime_type)) => {
+                ContentBlock::Audio(AudioContent::new(STANDARD.encode(bytes), mime_type))
+            },
+            (DocumentSourceKind::Url(uri), mime_type) => ContentBlock::ResourceLink(
+                ResourceLink::new("audio", uri).mime_type(mime_type.map(str::to_owned)),
+            ),
+            (DocumentSourceKind::FileId(id), _) => {
+                ContentBlock::from(format!("[audio: provider file ID {id}]"))
+            },
+            (DocumentSourceKind::Unknown, _) => ContentBlock::from("[audio: source unavailable]"),
+            (DocumentSourceKind::Base64(data), None) => ContentBlock::Resource(
+                EmbeddedResource::new(EmbeddedResourceResource::BlobResourceContents(
+                    BlobResourceContents::new(data, "urn:aries:audio"),
+                )),
+            ),
+            (DocumentSourceKind::Raw(bytes), None) => ContentBlock::Resource(
+                EmbeddedResource::new(EmbeddedResourceResource::BlobResourceContents(
+                    BlobResourceContents::new(STANDARD.encode(bytes), "urn:aries:audio"),
+                )),
+            ),
+        }
+    }
+
+    fn from_video(_video: Video) -> ContentBlock {
+        ContentBlock::from("[video]")
+    }
+
+    fn from_document(document: Document) -> ContentBlock {
+        let mime_type = document.media_type.as_ref().map(MimeType::to_mime_type);
+        let source = match document.data {
+            DocumentData::Text(text) => {
+                return ContentBlock::Resource(EmbeddedResource::new(
+                    EmbeddedResourceResource::TextResourceContents(
+                        TextResourceContents::new(text, "urn:aries:document")
+                            .mime_type(mime_type.map(str::to_owned)),
+                    ),
+                ));
+            },
+            DocumentData::File(source) => source,
+        };
+        let data = match source {
+            DocumentSourceKind::Base64(data) => data,
+            DocumentSourceKind::Raw(bytes) => STANDARD.encode(bytes),
+            DocumentSourceKind::Url(uri) => {
+                return ContentBlock::ResourceLink(
+                    ResourceLink::new("document", uri).mime_type(mime_type.map(str::to_owned)),
+                );
+            },
+            DocumentSourceKind::FileId(id) => {
+                return ContentBlock::from(format!("[document: provider file ID {id}]"));
+            },
+            DocumentSourceKind::Unknown => {
+                return ContentBlock::from("[document: source unavailable]");
+            },
+        };
+        ContentBlock::Resource(EmbeddedResource::new(
+            EmbeddedResourceResource::BlobResourceContents(
+                BlobResourceContents::new(data, "urn:aries:document")
+                    .mime_type(mime_type.map(str::to_owned)),
+            ),
+        ))
     }
 
     fn from_plan_entries(entries: Vec<update_plan::PlanEntry>) -> SessionUpdate {

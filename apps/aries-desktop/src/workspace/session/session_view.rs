@@ -141,6 +141,16 @@ impl SessionView {
     ) -> R {
         operation(&mut self.timeline, self.execution.conversation(), self.execution.session_id())
     }
+    pub fn with_composer<R>(&mut self, operation: impl FnOnce(&mut Composer) -> R) -> R {
+        operation(&mut self.composer)
+    }
+    pub fn attachments_available(&self) -> bool {
+        let capabilities = self.execution.prompt_capabilities();
+        self.execution.session_id().is_some()
+            && !self.execution.is_disconnected()
+            && self.is_session_idle()
+            && (capabilities.image || capabilities.audio || capabilities.embedded_context)
+    }
     pub fn input(&self) -> &Entity<gpui_kit::component::input::TextareaState> {
         self.composer.input()
     }
@@ -151,7 +161,11 @@ impl SessionView {
         self.render_mode == SessionRenderMode::Sidebar && self.tab_host.is_some()
     }
     pub fn is_session_idle(&self) -> bool {
-        self.execution.is_idle(self.deletion.is_busy() || self.configuration.is_pending())
+        self.execution.is_idle(
+            self.deletion.is_busy()
+                || self.configuration.is_pending()
+                || self.composer.is_loading(),
+        )
     }
     pub fn can_start_new_chat(&self) -> bool {
         self.is_session_idle()
@@ -160,7 +174,7 @@ impl SessionView {
         self.execution.session_id().is_some()
             && self.is_session_idle()
             && !self.execution.is_disconnected()
-            && !self.composer.input().read(cx).value().trim().is_empty()
+            && self.composer.has_content(cx)
     }
     pub fn can_load_sessions(&self) -> bool {
         self.execution.supports_load()

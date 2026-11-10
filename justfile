@@ -8,7 +8,7 @@ run:
     @cargo run
 
 build:
-    @cargo build
+    @cargo build --workspace --all-targets
 
 check:
     @cargo check --workspace --all-targets

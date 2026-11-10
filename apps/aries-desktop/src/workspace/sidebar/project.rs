@@ -3,6 +3,7 @@ use std::path::Path;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::menu::{DropdownMenu, PopupMenuItem};
+use gpui_kit::component::separator::Separator;
 use gpui_kit::component::{Disableable, Icon, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
@@ -12,6 +13,8 @@ use crate::workspace::settings::palette::Palette;
 use crate::workspace::sidebar::Sidebar;
 use crate::workspace::sidebar::motion::{SidebarRow, project_body};
 use crate::workspace::sidebar::session::SessionRowView;
+
+const SESSION_LIMIT: usize = 8;
 
 pub struct ProjectView<'a> {
     sidebar: &'a Sidebar,
@@ -34,9 +37,12 @@ impl<'a> ProjectView<'a> {
 
         let expanded = list.is_project_expanded(cwd);
         let count = sessions.len();
+        let sessions_expanded = self.sidebar.is_sessions_expanded(cwd);
+        let visible_count = if sessions_expanded { count } else { count.min(SESSION_LIMIT) };
         let directory = cwd.file_name().unwrap_or(cwd.as_os_str()).to_string_lossy();
         let path = cwd.to_path_buf();
         let delete_path = path.clone();
+        let more_path = path.clone();
         let delete_anchor = format!("project:{}", delete_path.display());
         let has_sessions = sessions.iter().any(|row| !row.is_exiting());
         let delete_enabled = self.owner.can_manage_sessions() && has_sessions;
@@ -154,10 +160,63 @@ impl<'a> ProjectView<'a> {
                         .pl_2()
                         .border_l_1()
                         .border_color(p.border())
-                        .children(sessions.iter().map(|row| {
+                        .children(sessions.iter().take(visible_count).map(|row| {
                             SessionRowView::new(self.sidebar, self.owner)
                                 .render_session_row(row, expanded, p, cx)
                         }))
+                        .when(count > SESSION_LIMIT, |body| {
+                            body.child(
+                                Button::new(SharedString::from(format!(
+                                    "more-sessions:{}",
+                                    cwd.display()
+                                )))
+                                .ghost()
+                                .small()
+                                .w_full()
+                                .text_color(p.muted())
+                                .child(
+                                    div()
+                                        .flex()
+                                        .items_center()
+                                        .gap_2()
+                                        .w_full()
+                                        .min_w_0()
+                                        .child(
+                                            Separator::horizontal_dashed()
+                                                .relative()
+                                                .flex_1()
+                                                .min_w_0()
+                                                .color(p.border()),
+                                        )
+                                        .child(div().flex_shrink_0().child(if sessions_expanded {
+                                            "收起"
+                                        } else {
+                                            "展开更多"
+                                        }))
+                                        .child(
+                                            Separator::horizontal_dashed()
+                                                .relative()
+                                                .flex_1()
+                                                .min_w_0()
+                                                .color(p.border()),
+                                        ),
+                                )
+                                .accessibility_label(format!(
+                                    "{}目录 {} 的会话",
+                                    if sessions_expanded { "收起" } else { "展开更多" },
+                                    cwd.display()
+                                ))
+                                .disabled(!expanded)
+                                .on_click(cx.listener(
+                                    move |this, _, _, cx| {
+                                        this.with_sidebar(|sidebar| {
+                                            sidebar.toggle_sessions(&more_path)
+                                        });
+                                        cx.notify();
+                                    },
+                                )),
+                            )
+                        })
                         .into_any_element()
                 },
             ))

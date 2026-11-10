@@ -1,15 +1,26 @@
-use agent_client_protocol::v1::schema::AvailableCommand;
+use std::future::Future;
+use std::path::PathBuf;
+
+use agent_client_protocol::v1::schema::{AvailableCommand, ContentBlock, PromptCapabilities};
+use anyhow::Context as _;
 use gpui_kit::assets::IconName;
 use gpui_kit::base::motion::{Presence, Transition};
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::input::{
     Enter, Escape, IndentInline, InputEvent, MoveDown, MoveUp, Textarea, TextareaState,
 };
-use gpui_kit::component::{ActiveTheme, Disableable, Icon, Sizable};
+use gpui_kit::component::notification::Notification;
+use gpui_kit::component::scroll::ScrollableElement;
+use gpui_kit::component::tooltip::Tooltip;
+use gpui_kit::component::{ActiveTheme, Disableable, Icon, Sizable, WindowExt};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
 use crate::workspace::SessionView;
+use crate::workspace::conversation::ClickHandler;
+use crate::workspace::conversation::draft::{
+    Draft, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, PromptAttachment,
+};
 use crate::workspace::conversation::slash_commands::{CommandMenu, CommandMenuAction, SlashMenu};
 use crate::workspace::settings::SendKey;
 use crate::workspace::settings::palette::Palette;
@@ -17,17 +28,179 @@ use crate::workspace::settings::palette::Palette;
 pub struct Composer {
     input: Entity<TextareaState>,
     command_menu: SlashMenu,
+    attachments: Vec<PromptAttachment>,
+    attachment_task: Option<Task<()>>,
+    attachment_revision: u64,
 }
 
 impl Composer {
     pub fn new(window: &mut Window, cx: &mut Context<SessionView>) -> Self {
         let input =
             cx.new(|cx| TextareaState::new(window, cx).placeholder("发送消息…").auto_grow(2, 6));
-        Self { input, command_menu: SlashMenu::default() }
+        Self {
+            input,
+            command_menu: SlashMenu::default(),
+            attachments: Vec::new(),
+            attachment_task: None,
+            attachment_revision: 0,
+        }
     }
     pub fn input(&self) -> &Entity<TextareaState> {
         &self.input
     }
+    pub fn is_loading(&self) -> bool {
+        self.attachment_task.is_some()
+    }
+    pub fn has_content(&self, cx: &App) -> bool {
+        self.attachment_task.is_none()
+            && (!self.input.read(cx).value().trim().is_empty() || !self.attachments.is_empty())
+    }
+
+    pub fn content(&self, cx: &App) -> Vec<ContentBlock> {
+        let text = self.input.read(cx).value();
+        let mut content = Vec::new();
+        if !text.trim().is_empty() {
+            content.push(ContentBlock::from(text.trim()));
+        }
+        content.extend(self.attachments.iter().map(|attachment| attachment.content().clone()));
+        content
+    }
+
+    pub fn draft(&self, cx: &App) -> Draft {
+        Draft::new(self.input.read(cx).value().to_string(), self.attachments.clone())
+    }
+
+    pub fn restore_draft(
+        &mut self,
+        draft: Draft,
+        window: &mut Window,
+        cx: &mut Context<SessionView>,
+    ) {
+        let (text, attachments) = draft.into_parts();
+        self.clear_attachments();
+        self.attachments = attachments;
+        self.input.update(cx, |input, cx| input.set_value(text, window, cx));
+    }
+
+    pub fn clear_attachments(&mut self) {
+        self.attachment_revision = self.attachment_revision.wrapping_add(1);
+        self.attachment_task = None;
+        self.attachments.clear();
+    }
+
+    fn render_attachments(&self, p: Palette, cx: &mut Context<SessionView>) -> AnyElement {
+        div()
+            .id("draft-attachments")
+            .max_h_24()
+            .min_h_0()
+            .overflow_y_scrollbar()
+            .flex()
+            .flex_wrap()
+            .gap_2()
+            .children(self.attachments.iter().map(|attachment| {
+                let id = attachment.id();
+                let name = attachment.name().to_owned();
+                let icon = if attachment.mime_type().starts_with("image/") {
+                    IconName::Image
+                } else if attachment.mime_type().starts_with("audio/") {
+                    IconName::FileMusic
+                } else {
+                    IconName::FileText
+                };
+                div()
+                    .id(("draft-attachment", id))
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .p_2()
+                    .w_64()
+                    .flex_shrink_0()
+                    .max_w_full()
+                    .min_w_0()
+                    .rounded(cx.theme().radius_lg)
+                    .border_1()
+                    .border_color(p.border())
+                    .bg(p.input())
+                    .child(match attachment.image() {
+                        Some(image) => Button::new(("attachment-thumbnail", id))
+                            .ghost()
+                            .size_12()
+                            .p_1()
+                            .flex_shrink_0()
+                            .accessibility_label(format!("预览图片：{}", attachment.name()))
+                            .child(
+                                img(image)
+                                    .size_10()
+                                    .rounded(cx.theme().radius)
+                                    .object_fit(ObjectFit::Contain)
+                                    .with_fallback(move || Icon::new(icon).into_any_element()),
+                            )
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                this.open_attachment_preview(id, window, cx);
+                            }))
+                            .into_any_element(),
+                        None => Icon::new(icon).size_6().into_any_element(),
+                    })
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .child(
+                                div()
+                                    .id(("attachment-name", id))
+                                    .truncate()
+                                    .text_sm()
+                                    .child(name.clone())
+                                    .tooltip(move |window, cx| {
+                                        Tooltip::new(name.clone()).build(window, cx)
+                                    }),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .items_center()
+                                    .gap_1()
+                                    .text_xs()
+                                    .text_color(p.muted())
+                                    .child(format!("{:.1} KiB", attachment.size() as f64 / 1024.))
+                                    .when(attachment.image().is_some(), |row| {
+                                        row.child(
+                                            Button::new(("preview-attachment", id))
+                                                .ghost()
+                                                .xsmall()
+                                                .label("预览…")
+                                                .on_click(cx.listener(
+                                                    move |this, _, window, cx| {
+                                                        this.open_attachment_preview(
+                                                            id, window, cx,
+                                                        );
+                                                    },
+                                                )),
+                                        )
+                                    }),
+                            ),
+                    )
+                    .child(
+                        Button::new(("remove-attachment", id))
+                            .ghost()
+                            .small()
+                            .icon(IconName::X)
+                            .accessibility_label(format!("移除附件：{}", attachment.name()))
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                this.with_composer(|composer| {
+                                    composer.attachments.retain(|attachment| attachment.id() != id)
+                                });
+                                this.input().update(cx, |input, cx| input.focus(window, cx));
+                                cx.notify();
+                            })),
+                    )
+            }))
+            .when(self.attachment_task.is_some(), |row| {
+                row.child(div().text_sm().text_color(p.muted()).child("正在添加附件…"))
+            })
+            .into_any_element()
+    }
+
     pub fn reset_menu(&mut self) {
         self.command_menu.reset();
     }
@@ -184,9 +357,9 @@ impl Composer {
                 .flex_col()
                 .gap_2()
                 .when_some(session.execution().permission(), |composer, permission| {
-                    composer.child(PermissionPrompt {
-                        id: ("permission-motion", cx.entity_id()).into(),
-                        child: div()
+                    composer.child(PermissionPrompt::new(
+                        ("permission-motion", cx.entity_id()).into(),
+                        div()
                             .p_3()
                             .rounded(cx.theme().radius_lg)
                             .border_1()
@@ -210,7 +383,7 @@ impl Composer {
                                 }),
                             ))
                             .into_any_element(),
-                    })
+                    ))
                 })
                 .child(session.render_execution_context(p, cx))
                 .child(
@@ -259,20 +432,21 @@ impl Composer {
                             p,
                             cx,
                         ))
-                        .child(ComposerInput {
-                            input: self.input.clone(),
-                            busy: session.execution().conversation().is_busy(),
-                            stopping: session.execution().is_stopping(),
-                            can_send,
-                            palette: p,
-                            on_submit: Box::new(cx.listener(|this, _, window, cx| {
+                        .child(self.render_attachments(p, cx))
+                        .child(ComposerInput::new(
+                            self,
+                            session,
+                            p,
+                            cx.weak_entity(),
+                            Box::new(cx.listener(|this, _, window, cx| {
                                 if this.execution().conversation().is_busy() {
                                     this.stop(window, cx);
                                 } else {
                                     this.send(window, cx);
                                 }
                             })),
-                        }),
+                            can_send,
+                        )),
                 )
                 .child(
                     div()
@@ -303,10 +477,343 @@ impl Composer {
     }
 }
 
+impl SessionView {
+    fn open_attachment_preview(&mut self, id: u64, window: &mut Window, cx: &mut Context<Self>) {
+        let Some((name, image)) = self.with_composer(|composer| {
+            let attachment =
+                composer.attachments.iter().find(|attachment| attachment.id() == id)?;
+            Some((attachment.name().to_owned(), attachment.image()?))
+        }) else {
+            return;
+        };
+        window.open_dialog(cx, move |dialog, _, cx| {
+            let image = image.clone();
+            dialog
+                .title(div().min_w_0().pr_6().truncate().child(name.clone()))
+                .centered()
+                .width(cx.theme().font_size * 44.)
+                .content(move |content, window, cx| {
+                    content
+                        .min_h_0()
+                        .h((window.viewport_size().height * 0.65).min(cx.theme().font_size * 32.))
+                        .child(
+                            img(image.clone())
+                                .size_full()
+                                .object_fit(ObjectFit::Contain)
+                                .with_fallback(|| {
+                                    div()
+                                        .size_full()
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .child("无法加载图片")
+                                        .into_any_element()
+                                }),
+                        )
+                })
+        });
+    }
+
+    pub fn choose_attachments(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.attachments_available() || self.composer_loading() {
+            return;
+        }
+        let selection = cx.prompt_for_paths(PathPromptOptions {
+            files: true,
+            directories: false,
+            multiple: true,
+            prompt: Some("添加图片、音频、PDF 或文本".into()),
+        });
+        self.load_attachments(
+            async move {
+                let paths = selection
+                    .await
+                    .context("等待文件选择失败")?
+                    .context("打开文件选择窗口失败")?
+                    .unwrap_or_default();
+                Ok(paths.into_iter().map(AttachmentSource::from_path).collect())
+            },
+            window,
+            cx,
+        );
+    }
+
+    pub fn attach_paths(
+        &mut self,
+        paths: Vec<PathBuf>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if paths.is_empty() {
+            return;
+        }
+        if !self.attachments_available() || self.composer_loading() {
+            window
+                .push_notification(Notification::warning("当前无法添加附件，请等待操作结束。"), cx);
+            return;
+        }
+        self.load_attachments(
+            async move { Ok(paths.into_iter().map(AttachmentSource::from_path).collect()) },
+            window,
+            cx,
+        );
+    }
+
+    pub fn paste_attachments(
+        &mut self,
+        item: &ClipboardItem,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let has_media = item.entries.iter().any(|entry| {
+            matches!(entry, ClipboardEntry::Image(_) | ClipboardEntry::ExternalPaths(_))
+        });
+        if !has_media {
+            return false;
+        }
+        if !self.attachments_available() || self.composer_loading() {
+            window
+                .push_notification(Notification::warning("当前无法添加附件，请等待操作结束。"), cx);
+            return true;
+        }
+        let paths: Vec<_> = item
+            .entries
+            .iter()
+            .filter_map(|entry| match entry {
+                ClipboardEntry::ExternalPaths(paths) => Some(paths.0.iter().cloned()),
+                _ => None,
+            })
+            .flatten()
+            .collect();
+        if !paths.is_empty() {
+            self.attach_paths(paths, window, cx);
+            return true;
+        }
+        let (count, mut bytes) = self.with_composer(|composer| {
+            (
+                composer.attachments.len(),
+                composer.attachments.iter().map(PromptAttachment::size).sum::<usize>(),
+            )
+        });
+        let mut images = Vec::new();
+        let mut image_count = 0;
+        let mut reserved_count = count;
+        let capabilities = self.execution().prompt_capabilities();
+        let mut size_exceeded = false;
+        for entry in &item.entries {
+            let ClipboardEntry::Image(image) = entry else {
+                continue;
+            };
+            image_count += 1;
+            if image_count > MAX_ATTACHMENTS || reserved_count >= MAX_ATTACHMENTS {
+                continue;
+            }
+            if !capabilities.image
+                || !matches!(
+                    image.format(),
+                    ImageFormat::Png | ImageFormat::Jpeg | ImageFormat::Webp | ImageFormat::Gif
+                )
+                || image.bytes().is_empty()
+            {
+                let message = if !capabilities.image {
+                    "当前 Agent 不支持图片附件"
+                } else if image.bytes().is_empty() {
+                    "不能添加空文件"
+                } else {
+                    "仅支持 PNG、JPEG、WebP 和 GIF 图片"
+                };
+                images.push(AttachmentSource::from_error(anyhow::anyhow!(message)));
+                continue;
+            }
+            if image.bytes().len() > MAX_ATTACHMENT_BYTES.saturating_sub(bytes) {
+                size_exceeded = true;
+                continue;
+            }
+            bytes += image.bytes().len();
+            reserved_count += 1;
+            images.push(AttachmentSource::from_image(image.clone()));
+        }
+        if image_count > MAX_ATTACHMENTS.saturating_sub(count) {
+            window.push_notification(Notification::warning(attachment_count_warning()), cx);
+        }
+        if size_exceeded {
+            window.push_notification(Notification::warning(attachment_size_warning()), cx);
+        }
+        self.load_attachments(async move { Ok(images) }, window, cx);
+        true
+    }
+
+    fn load_attachments(
+        &mut self,
+        sources: impl Future<Output = anyhow::Result<Vec<AttachmentSource>>> + 'static,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.input().update(cx, |input, cx| input.focus(window, cx));
+        let capabilities = self.execution().prompt_capabilities().clone();
+        let session_id = self.execution().session_id().cloned();
+        let (revision, count, bytes) = self.with_composer(|composer| {
+            composer.attachment_revision = composer.attachment_revision.wrapping_add(1);
+            (
+                composer.attachment_revision,
+                composer.attachments.len(),
+                composer.attachments.iter().map(PromptAttachment::size).sum(),
+            )
+        });
+        let task = cx.spawn_in(window, async move |view, cx| {
+            let result = match sources.await {
+                Ok(sources) => Ok(cx
+                    .background_executor()
+                    .spawn(
+                        async move { load_attachment_batch(sources, &capabilities, count, bytes) },
+                    )
+                    .await),
+                Err(error) => Err(error),
+            };
+            let _ = view.update_in(cx, |this, window, cx| {
+                if this.execution().session_id() == session_id.as_ref()
+                    && this.with_composer(|composer| composer.attachment_revision == revision)
+                {
+                    this.finish_attachments(result, window, cx);
+                }
+            });
+        });
+        self.with_composer(|composer| composer.attachment_task = Some(task));
+        cx.notify();
+    }
+
+    fn composer_loading(&mut self) -> bool {
+        self.with_composer(|composer| composer.is_loading())
+    }
+
+    fn finish_attachments(
+        &mut self,
+        result: anyhow::Result<AttachmentBatch>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.with_composer(|composer| {
+            composer.attachment_task = None;
+            match result {
+                Ok(batch) => {
+                    if batch.count_exceeded {
+                        window.push_notification(
+                            Notification::warning(attachment_count_warning()),
+                            cx,
+                        );
+                    }
+                    if batch.size_exceeded {
+                        window.push_notification(
+                            Notification::warning(attachment_size_warning()),
+                            cx,
+                        );
+                    }
+                    for result in batch.attachments {
+                        match result {
+                            Ok(attachment) => composer.attachments.push(attachment),
+                            Err(error) => window
+                                .push_notification(Notification::error(format!("{error:#}")), cx),
+                        }
+                    }
+                },
+                Err(error) => window
+                    .push_notification(Notification::error(format!("无法添加附件：{error:#}")), cx),
+            }
+        });
+        cx.notify();
+    }
+}
+
+enum AttachmentSource {
+    Path(PathBuf),
+    Image(Image),
+    Error(anyhow::Error),
+}
+
+impl AttachmentSource {
+    fn from_path(path: PathBuf) -> Self {
+        Self::Path(path)
+    }
+
+    fn from_image(image: Image) -> Self {
+        Self::Image(image)
+    }
+
+    fn from_error(error: anyhow::Error) -> Self {
+        Self::Error(error)
+    }
+
+    fn load(self, capabilities: &PromptCapabilities) -> anyhow::Result<PromptAttachment> {
+        match self {
+            Self::Error(error) => Err(error),
+            Self::Path(path) => PromptAttachment::from_path(&path, capabilities)
+                .with_context(|| format!("无法添加 {}", path.display())),
+            Self::Image(image) => {
+                let name = format!("粘贴图片.{}", image.format().extension());
+                PromptAttachment::from_image(name, image, None, capabilities)
+            },
+        }
+    }
+}
+
+fn attachment_count_warning() -> String {
+    format!("每条消息最多 {MAX_ATTACHMENTS} 个附件，超出部分未添加。")
+}
+
+fn attachment_size_warning() -> String {
+    format!("每条消息的附件总大小不能超过 {} MiB。", MAX_ATTACHMENT_BYTES / (1024 * 1024))
+}
+
+struct AttachmentBatch {
+    attachments: Vec<anyhow::Result<PromptAttachment>>,
+    count_exceeded: bool,
+    size_exceeded: bool,
+}
+
+impl AttachmentBatch {
+    fn new(count_exceeded: bool) -> Self {
+        Self { attachments: Vec::new(), count_exceeded, size_exceeded: false }
+    }
+}
+
+fn load_attachment_batch(
+    sources: Vec<AttachmentSource>,
+    capabilities: &PromptCapabilities,
+    mut count: usize,
+    mut bytes: usize,
+) -> AttachmentBatch {
+    let mut batch = AttachmentBatch::new(sources.len() > MAX_ATTACHMENTS.saturating_sub(count));
+    for source in sources.into_iter().take(MAX_ATTACHMENTS) {
+        if count >= MAX_ATTACHMENTS {
+            batch.count_exceeded = true;
+            break;
+        }
+        match source.load(capabilities) {
+            Ok(attachment) => {
+                if attachment.size() > MAX_ATTACHMENT_BYTES.saturating_sub(bytes) {
+                    batch.size_exceeded = true;
+                    continue;
+                }
+                count += 1;
+                bytes += attachment.size();
+                batch.attachments.push(Ok(attachment));
+            },
+            Err(error) => batch.attachments.push(Err(error)),
+        }
+    }
+    batch
+}
+
 #[derive(IntoElement)]
 struct PermissionPrompt {
     id: ElementId,
     child: AnyElement,
+}
+
+impl PermissionPrompt {
+    fn new(id: ElementId, child: AnyElement) -> Self {
+        Self { id, child }
+    }
 }
 
 impl RenderOnce for PermissionPrompt {
@@ -333,12 +840,58 @@ struct ComposerInput {
     stopping: bool,
     can_send: bool,
     palette: Palette,
-    on_submit: crate::workspace::conversation::ClickHandler,
+    attachments_available: bool,
+    view: WeakEntity<SessionView>,
+    on_submit: ClickHandler,
 }
+impl ComposerInput {
+    fn new(
+        composer: &Composer,
+        session: &SessionView,
+        palette: Palette,
+        view: WeakEntity<SessionView>,
+        on_submit: ClickHandler,
+        can_send: bool,
+    ) -> Self {
+        Self {
+            input: composer.input.clone(),
+            busy: session.execution().conversation().is_busy(),
+            stopping: session.execution().is_stopping(),
+            can_send,
+            palette,
+            attachments_available: session.attachments_available()
+                && composer.attachment_task.is_none(),
+            view,
+            on_submit,
+        }
+    }
+}
+
 impl RenderOnce for ComposerInput {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        let Self { input, busy, stopping, can_send, palette: p, on_submit } = self;
+        let Self {
+            input,
+            busy,
+            stopping,
+            can_send,
+            palette: p,
+            attachments_available,
+            view,
+            on_submit,
+        } = self;
+        let picker = view.clone();
+        let drop_view = view.clone();
         div()
+            .id("multimodal-composer")
+            .on_drop(move |paths: &ExternalPaths, window, cx| {
+                let _ = drop_view
+                    .update(cx, |this, cx| this.attach_paths(paths.0.to_vec(), window, cx));
+            })
+            .when(attachments_available, |composer| {
+                composer.drag_over::<ExternalPaths>(|style, _, _, cx| {
+                    style.border_color(cx.theme().primary)
+                })
+            })
             .flex()
             .items_end()
             .gap_2()
@@ -347,9 +900,31 @@ impl RenderOnce for ComposerInput {
             .border_1()
             .border_color(p.border())
             .bg(p.input())
-            .child(div().id("composer-input").flex_1().min_w_0().px_1().child(
-                Textarea::new(&input).appearance(false).bordered(false).aria_label("消息").w_full(),
-            ))
+            .child(
+                Button::new("add-attachments")
+                    .ghost()
+                    .icon(IconName::Paperclip)
+                    .accessibility_label("添加附件…")
+                    .tooltip("添加图片、音频、PDF 或文本…")
+                    .size_10()
+                    .disabled(!attachments_available)
+                    .on_click(move |_, window, cx| {
+                        let _ = picker.update(cx, |this, cx| this.choose_attachments(window, cx));
+                    }),
+            )
+            .child(
+                div().id("composer-input").flex_1().min_w_0().px_1().child(
+                    Textarea::new(&input)
+                        .appearance(false)
+                        .bordered(false)
+                        .aria_label("消息")
+                        .w_full()
+                        .on_paste(move |item, window, cx| {
+                            view.update(cx, |this, cx| this.paste_attachments(item, window, cx))
+                                .unwrap_or(false)
+                        }),
+                ),
+            )
             .child(
                 Button::new("send")
                     .primary()

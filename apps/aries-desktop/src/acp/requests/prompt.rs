@@ -12,15 +12,15 @@ use crate::acp::{Command, Event};
 pub async fn request(
     connection: &AgentConnection,
     session_id: SessionId,
-    text: String,
+    content: Vec<ContentBlock>,
 ) -> Result<ControlFlow<()>, RequestError> {
-    if text.trim().is_empty() {
+    if content.is_empty() {
         return Ok(ControlFlow::Continue(()));
     }
     connection.set_cancelled(false);
     let response = connection
         .client()
-        .send_request(PromptRequest::new(session_id.clone(), vec![ContentBlock::from(text)]))
+        .send_request(PromptRequest::new(session_id.clone(), content))
         .block_task();
     tokio::pin!(response);
     let deadline = tokio::time::sleep(Duration::from_secs(10));

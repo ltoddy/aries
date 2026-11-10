@@ -18,6 +18,14 @@ use jiff::{Span, Timestamp, Zoned};
 
 use crate::workspace::number;
 
+pub struct ReturnToSessions;
+
+impl ReturnToSessions {
+    fn new() -> Self {
+        Self
+    }
+}
+
 #[derive(Clone, Copy, Default)]
 struct DayUsage {
     input: u64,
@@ -117,6 +125,8 @@ pub struct UsageView {
     _subscriptions: Vec<Subscription>,
     _task: Option<Task<()>>,
 }
+
+impl EventEmitter<ReturnToSessions> for UsageView {}
 
 impl UsageView {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
@@ -568,6 +578,9 @@ impl Render for UsageView {
             .bg(cx.theme().background).text_color(cx.theme().foreground)
             .child(div().p_6().flex().flex_col().gap_6()
                 .child(div().flex().items_center().gap_3()
+                    .child(Button::new("return-to-sessions").ghost().small().label("返回会话")
+                        .icon(Icon::new(IconName::ArrowLeft))
+                        .on_click(cx.listener(|_, _, _, cx| cx.emit(ReturnToSessions::new()))))
                     .child(div().flex_1().text_lg().font_weight(FontWeight::MEDIUM).child("统计"))
                     .child(Button::new("refresh-usage").ghost().small().label(if loading { "加载中…" } else { "刷新" })
                         .icon(Icon::new(IconName::RefreshCw)).disabled(loading)

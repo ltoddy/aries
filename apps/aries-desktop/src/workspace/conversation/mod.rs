@@ -1,5 +1,6 @@
 mod attachment;
 mod composer;
+pub mod draft;
 mod media;
 pub mod model;
 mod slash_commands;

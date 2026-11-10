@@ -7,18 +7,20 @@ use agent_client_protocol::v1::schema::{SessionId, SessionInfo};
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::menu::{ContextMenuExt, PopupMenu, PopupMenuItem};
-use gpui_kit::component::{ActiveTheme, Icon, Sizable, h_resizable, resizable_panel};
+use gpui_kit::component::{
+    ActiveTheme, Icon, ResizableState, Sizable, h_resizable, resizable_panel,
+};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
 use crate::terminal::TerminalView;
 use crate::workspace::settings::palette::Palette;
 use crate::workspace::settings::{Preferences, SettingsState};
-use crate::workspace::usage::UsageView;
+use crate::workspace::usage::{ReturnToSessions, UsageView};
 use crate::workspace::{SessionRenderMode, SessionView};
 use crate::{
     CloseTab, NewSession, NextTab, NextUserMessage, OpenSettings, PreviousTab, PreviousUserMessage,
-    ToggleTerminal,
+    ToggleSidebar, ToggleTerminal,
 };
 
 struct SessionTab {
@@ -27,17 +29,23 @@ struct SessionTab {
     _subscription: Subscription,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum TabId {
-    Session(usize),
-    Usage,
+impl SessionTab {
+    fn new(id: usize, view: Entity<SessionView>, subscription: Subscription) -> Self {
+        Self { id, view, _subscription: subscription }
+    }
 }
 
 #[derive(Clone)]
 struct DragTab {
     owner: WeakEntity<WorkspaceView>,
-    id: TabId,
+    id: usize,
     title: SharedString,
+}
+
+impl DragTab {
+    fn new(owner: WeakEntity<WorkspaceView>, id: usize, title: SharedString) -> Self {
+        Self { owner, id, title }
+    }
 }
 
 impl Render for DragTab {
@@ -61,9 +69,23 @@ impl Render for DragTab {
 
 #[derive(Clone, Copy)]
 enum TabCommand {
-    Close(TabId),
+    Close(usize),
     CloseAll,
-    CloseOthers(TabId),
+    CloseOthers(usize),
+}
+
+impl TabCommand {
+    fn close(id: usize) -> Self {
+        Self::Close(id)
+    }
+
+    fn close_all() -> Self {
+        Self::CloseAll
+    }
+
+    fn close_others(id: usize) -> Self {
+        Self::CloseOthers(id)
+    }
 }
 
 pub struct WorkspaceView {
@@ -71,6 +93,10 @@ pub struct WorkspaceView {
     settings: Entity<SettingsState>,
     agent: AcpAgentConfig,
     sidebar: Entity<SessionView>,
+    sidebar_visible: bool,
+    sidebar_focus_handle: FocusHandle,
+    sidebar_toggle_focus_handle: FocusHandle,
+    layout: Entity<ResizableState>,
     _sidebar_subscription: Subscription,
     tabs: Vec<SessionTab>,
     active: usize,
@@ -82,7 +108,7 @@ pub struct WorkspaceView {
     terminal_previous_focus: Option<FocusHandle>,
     usage: Entity<UsageView>,
     usage_visible: bool,
-    usage_position: usize,
+    _usage_subscription: Subscription,
     usage_previous_focus: Option<FocusHandle>,
 }
 
@@ -109,6 +135,10 @@ impl WorkspaceView {
         let sidebar = Self::create_chat_view(&cwd, &agent, SessionRenderMode::Sidebar, window, cx);
         let sidebar_subscription = Self::observe_tab(&sidebar, window, cx);
         let usage = cx.new(|cx| UsageView::new(window, cx));
+        let usage_subscription =
+            cx.subscribe_in(&usage, window, |this, _, _: &ReturnToSessions, window, cx| {
+                this.show_sessions(window, cx);
+            });
         let focus_handle = cx.focus_handle();
         focus_handle.focus(window, cx);
         Self {
@@ -116,6 +146,10 @@ impl WorkspaceView {
             settings,
             agent,
             sidebar,
+            sidebar_visible: true,
+            sidebar_focus_handle: cx.focus_handle(),
+            sidebar_toggle_focus_handle: cx.focus_handle().tab_stop(true),
+            layout: cx.new(|_| ResizableState::default()),
             _sidebar_subscription: sidebar_subscription,
             tabs: Vec::new(),
             active: 0,
@@ -127,7 +161,7 @@ impl WorkspaceView {
             terminal_previous_focus: None,
             usage,
             usage_visible: false,
-            usage_position: 0,
+            _usage_subscription: usage_subscription,
             usage_previous_focus: None,
         }
     }
@@ -143,6 +177,31 @@ impl Render for WorkspaceView {
         } else {
             view.update(cx, |session, cx| session.git_panel().render(view, window, cx))
         };
+        let main = div()
+            .flex_1()
+            .min_w_0()
+            .h_full()
+            .flex()
+            .flex_col()
+            .child(self.render_tab_bar(p, cx))
+            .child(
+                div()
+                    .relative()
+                    .flex()
+                    .flex_col()
+                    .flex_1()
+                    .min_h_0()
+                    .child(if self.usage_visible {
+                        div().size_full().child(self.usage.clone()).into_any_element()
+                    } else {
+                        match active {
+                            Some(view) => div().size_full().child(view).into_any_element(),
+                            None => self.render_empty_main(p),
+                        }
+                    })
+                    .children(git_info)
+                    .when(self.terminal_visible, |view| view.child(self.render_terminal(cx))),
+            );
         div()
             .size_full()
             .track_focus(&self.focus_handle)
@@ -152,10 +211,13 @@ impl Render for WorkspaceView {
             .on_action(cx.listener(|this, _: &ToggleTerminal, window, cx| {
                 this.toggle_terminal(window, cx);
             }))
+            .on_action(cx.listener(|this, _: &ToggleSidebar, window, cx| {
+                this.toggle_sidebar(window, cx);
+            }))
             .on_action(cx.listener(|this, _: &CloseTab, window, cx| {
-                if this.usage_visible {
-                    this.close_usage(window, cx);
-                } else if let Some(tab) = this.tabs.get(this.active) {
+                if !this.usage_visible
+                    && let Some(tab) = this.tabs.get(this.active)
+                {
                     let id = tab.id;
                     this.close_tab(id, cx);
                     this.focus_handle.focus(window, cx);
@@ -168,12 +230,16 @@ impl Render for WorkspaceView {
                 cx.listener(|this, _: &NextTab, window, cx| this.switch_tab(true, window, cx)),
             )
             .on_action(cx.listener(|this, _: &PreviousUserMessage, _, cx| {
-                if let Some(view) = this.active_view() {
+                if !this.usage_visible
+                    && let Some(view) = this.active_view()
+                {
                     view.update(cx, |view, cx| view.jump_user_message(false, cx));
                 }
             }))
             .on_action(cx.listener(|this, _: &NextUserMessage, _, cx| {
-                if let Some(view) = this.active_view() {
+                if !this.usage_visible
+                    && let Some(view) = this.active_view()
+                {
                     view.update(cx, |view, cx| view.jump_user_message(true, cx));
                 }
             }))
@@ -185,55 +251,37 @@ impl Render for WorkspaceView {
             .text_color(p.foreground())
             .font_family(cx.theme().font_family.clone())
             .text_sm()
-            .child(
+            .child(if self.sidebar_visible {
                 h_resizable("layout")
+                    .with_state(&self.layout)
                     .child(
                         resizable_panel()
                             .size(cx.theme().font_size * 18.)
                             .size_range(cx.theme().font_size * 12.5..cx.theme().font_size * 32.5)
-                            .child(self.sidebar.clone()),
+                            .child(
+                                div()
+                                    .size_full()
+                                    .track_focus(&self.sidebar_focus_handle)
+                                    .child(self.sidebar.clone()),
+                            ),
                     )
-                    .child(
-                        resizable_panel().child(
-                            div()
-                                .flex_1()
-                                .min_w_0()
-                                .h_full()
-                                .flex()
-                                .flex_col()
-                                .child(self.render_tab_bar(p, cx))
-                                .child(
-                                    div()
-                                        .relative()
-                                        .flex()
-                                        .flex_col()
-                                        .flex_1()
-                                        .min_h_0()
-                                        .child(if self.usage_visible {
-                                            div()
-                                                .size_full()
-                                                .child(self.usage.clone())
-                                                .into_any_element()
-                                        } else {
-                                            match active {
-                                                Some(view) => {
-                                                    div().size_full().child(view).into_any_element()
-                                                },
-                                                None => self.render_empty_main(p),
-                                            }
-                                        })
-                                        .children(git_info)
-                                        .when(self.terminal_visible, |view| {
-                                            view.child(self.render_terminal(cx))
-                                        }),
-                                ),
-                        ),
-                    ),
-            )
+                    .child(resizable_panel().child(main))
+                    .into_any_element()
+            } else {
+                main.into_any_element()
+            })
     }
 }
 
 impl WorkspaceView {
+    fn toggle_sidebar(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.sidebar_visible = !self.sidebar_visible;
+        if !self.sidebar_visible && self.sidebar_focus_handle.contains_focused(window, cx) {
+            self.focus_handle.focus(window, cx);
+        }
+        cx.notify();
+    }
+
     fn toggle_terminal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.terminal_visible {
             self.terminal_visible = false;
@@ -340,14 +388,14 @@ impl WorkspaceView {
 
     fn create_tab(&mut self, directory: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
         if self.usage_visible {
-            self.close_usage(window, cx);
+            self.show_sessions(window, cx);
         }
         let id = self.next_id;
         self.next_id += 1;
         let view =
             Self::create_chat_view(&self.cwd, &self.agent, SessionRenderMode::Main, window, cx);
         let subscription = Self::observe_tab(&view, window, cx);
-        self.tabs.push(SessionTab { id, view: view.clone(), _subscription: subscription });
+        self.tabs.push(SessionTab::new(id, view.clone(), subscription));
         self.usage_visible = false;
         self.active = self.tabs.len() - 1;
         self.tab_scroll.scroll_to_item(self.active);
@@ -367,7 +415,7 @@ impl WorkspaceView {
         cx: &mut Context<Self>,
     ) {
         if self.usage_visible {
-            self.close_usage(window, cx);
+            self.show_sessions(window, cx);
         }
         let session_id = session.session_id.clone();
         if let Some(index) = self.find_session_tab(&session_id, cx) {
@@ -390,7 +438,7 @@ impl WorkspaceView {
             Self::create_chat_view(&self.cwd, &self.agent, SessionRenderMode::Main, window, cx);
         let subscription = Self::observe_tab(&view, window, cx);
         view.update(cx, |view, cx| view.queue_session_load(session, cx));
-        self.tabs.push(SessionTab { id, view, _subscription: subscription });
+        self.tabs.push(SessionTab::new(id, view, subscription));
         self.usage_visible = false;
         self.active = self.tabs.len() - 1;
         self.tab_scroll.scroll_to_item(self.active);
@@ -418,9 +466,6 @@ impl WorkspaceView {
         let Some(index) = self.tabs.iter().position(|tab| tab.id == id) else {
             return;
         };
-        if self.usage_visible && index < self.usage_position {
-            self.usage_position -= 1;
-        }
         self.tabs.remove(index);
         if self.tabs.is_empty() {
             self.active = 0;
@@ -434,15 +479,11 @@ impl WorkspaceView {
         cx.notify();
     }
 
-    fn tab_order(&self) -> Vec<TabId> {
-        let mut order: Vec<_> = self.tabs.iter().map(|tab| TabId::Session(tab.id)).collect();
-        if self.usage_visible {
-            order.insert(self.usage_position.min(order.len()), TabId::Usage);
-        }
-        order
+    fn tab_order(&self) -> Vec<usize> {
+        self.tabs.iter().map(|tab| tab.id).collect()
     }
 
-    fn move_tab(&mut self, drag: &DragTab, target: TabId, cx: &mut Context<Self>) {
+    fn move_tab(&mut self, drag: &DragTab, target: usize, cx: &mut Context<Self>) {
         if drag.owner != cx.weak_entity() || drag.id == target {
             return;
         }
@@ -456,12 +497,9 @@ impl WorkspaceView {
         let active = self.tabs.get(self.active).map(|tab| tab.id);
         order.remove(from);
         order.insert(to, drag.id);
-        self.tabs.sort_by_key(|tab| order.iter().position(|id| *id == TabId::Session(tab.id)));
+        self.tabs.sort_by_key(|tab| order.iter().position(|id| *id == tab.id));
         self.active =
             active.and_then(|id| self.tabs.iter().position(|tab| tab.id == id)).unwrap_or(0);
-        if let Some(position) = order.iter().position(|id| *id == TabId::Usage) {
-            self.usage_position = position;
-        }
         self.tab_scroll.scroll_to_item(to);
         cx.notify();
     }
@@ -473,30 +511,22 @@ impl WorkspaceView {
         cx: &mut Context<Self>,
     ) {
         match command {
-            TabCommand::Close(TabId::Session(id)) => self.close_tab(id, cx),
-            TabCommand::Close(TabId::Usage) => self.close_usage(window, cx),
+            TabCommand::Close(id) => self.close_tab(id, cx),
             TabCommand::CloseAll => {
                 self.tabs.clear();
                 self.active = 0;
-                if self.usage_visible {
-                    self.close_usage(window, cx);
-                }
                 self.sync_sidebar_active_session(cx);
             },
             TabCommand::CloseOthers(target) => {
                 if !self.tab_order().contains(&target) {
                     return;
                 }
-                self.tabs.retain(|tab| target == TabId::Session(tab.id));
+                self.tabs.retain(|tab| target == tab.id);
                 self.active = 0;
-                if target != TabId::Usage && self.usage_visible {
-                    self.close_usage(window, cx);
-                }
-                self.usage_position = 0;
                 self.sync_sidebar_active_session(cx);
             },
         }
-        if !self.usage_visible && !matches!(command, TabCommand::Close(TabId::Usage)) {
+        if !self.usage_visible {
             self.focus_handle.focus(window, cx);
         }
         cx.notify();
@@ -507,7 +537,7 @@ impl WorkspaceView {
             return;
         }
         if self.usage_visible {
-            self.close_usage(window, cx);
+            self.show_sessions(window, cx);
         }
         self.active = index;
         self.tab_scroll.scroll_to_item(index);
@@ -517,6 +547,10 @@ impl WorkspaceView {
     }
 
     pub fn switch_tab(&mut self, next: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if self.usage_visible {
+            self.show_sessions(window, cx);
+            return;
+        }
         let Some(index) = adjacent_tab(self.active, self.tabs.len(), next) else {
             return;
         };
@@ -533,15 +567,19 @@ fn adjacent_tab(active: usize, count: usize, next: bool) -> Option<usize> {
 
 impl WorkspaceView {
     pub fn render_tab_bar(&self, p: Palette, cx: &mut Context<Self>) -> AnyElement {
-        let mut tabs: Vec<_> = self
-            .tabs
-            .iter()
-            .enumerate()
-            .map(|(index, tab)| self.render_tab(index, tab, true, p, cx))
-            .collect();
-        if self.usage_visible {
-            tabs.insert(self.usage_position.min(tabs.len()), self.render_usage_tab(cx));
-        }
+        let tabs: Vec<_> = if self.usage_visible {
+            Vec::new()
+        } else {
+            self.tabs
+                .iter()
+                .enumerate()
+                .map(|(index, tab)| self.render_tab(index, tab, true, p, cx))
+                .collect()
+        };
+        let label = if self.sidebar_visible { "收起会话列表" } else { "展开会话列表" };
+        let icon =
+            if self.sidebar_visible { IconName::PanelLeftClose } else { IconName::PanelLeftOpen };
+        let shortcut = if cfg!(target_os = "macos") { "⌘B" } else { "Ctrl+B" };
         div()
             .id("tab-bar")
             .h_9()
@@ -553,6 +591,16 @@ impl WorkspaceView {
             .bg(p.input())
             .border_b_1()
             .border_color(p.border())
+            .child(
+                Button::new("toggle-sidebar")
+                    .track_focus(&self.sidebar_toggle_focus_handle)
+                    .ghost()
+                    .small()
+                    .icon(Icon::new(icon))
+                    .accessibility_label(label)
+                    .tooltip(format!("{label} {shortcut}"))
+                    .on_click(|_, window, cx| window.dispatch_action(Box::new(ToggleSidebar), cx)),
+            )
             .child(
                 div()
                     .id("tab-scroll")
@@ -569,37 +617,10 @@ impl WorkspaceView {
             .into_any_element()
     }
 
-    fn render_usage_tab(&self, cx: &mut Context<Self>) -> AnyElement {
-        let tab = div()
-            .id("usage-tab")
-            .h_7()
-            .flex_shrink_0()
-            .flex()
-            .items_center()
-            .gap_2()
-            .px_2()
-            .border_1()
-            .border_color(cx.theme().primary)
-            .rounded(cx.theme().radius)
-            .text_color(cx.theme().primary)
-            .child("统计")
-            .child(
-                Button::new("close-usage")
-                    .ghost()
-                    .small()
-                    .icon(Icon::new(IconName::X))
-                    .accessibility_label("关闭统计")
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        this.execute_tab_command(TabCommand::Close(TabId::Usage), window, cx);
-                    })),
-            );
-        self.with_tab_interactions(tab, TabId::Usage, "统计".into(), cx)
-    }
-
     fn with_tab_interactions<E>(
         &self,
         tab: E,
-        id: TabId,
+        id: usize,
         title: SharedString,
         cx: &mut Context<Self>,
     ) -> AnyElement
@@ -609,7 +630,7 @@ impl WorkspaceView {
         let owner = cx.weak_entity();
         let drag_owner = owner.clone();
         let highlight_owner = owner.clone();
-        tab.on_drag(DragTab { owner: owner.clone(), id, title }, |drag, _, _, cx| {
+        tab.on_drag(DragTab::new(owner.clone(), id, title), |drag, _, _, cx| {
             cx.stop_propagation();
             cx.new(|_| drag.clone())
         })
@@ -638,14 +659,14 @@ impl WorkspaceView {
 
     fn tab_menu(
         mut menu: PopupMenu,
-        id: TabId,
+        id: usize,
         has_others: bool,
         owner: WeakEntity<Self>,
     ) -> PopupMenu {
         for (label, command, disabled) in [
-            ("关闭", TabCommand::Close(id), false),
-            ("关闭全部 Tab", TabCommand::CloseAll, false),
-            ("关闭其他 Tab", TabCommand::CloseOthers(id), !has_others),
+            ("关闭", TabCommand::close(id), false),
+            ("关闭全部 Tab", TabCommand::close_all(), false),
+            ("关闭其他 Tab", TabCommand::close_others(id), !has_others),
         ] {
             let owner = owner.clone();
             menu = menu.item(PopupMenuItem::new(label).disabled(disabled).on_click(
@@ -759,15 +780,11 @@ impl WorkspaceView {
                         .accessibility_label("关闭标签")
                         .on_click(cx.listener(move |this, _, window, cx| {
                             cx.stop_propagation();
-                            this.execute_tab_command(
-                                TabCommand::Close(TabId::Session(id)),
-                                window,
-                                cx,
-                            );
+                            this.execute_tab_command(TabCommand::close(id), window, cx);
                         })),
                 )
             });
-        self.with_tab_interactions(tab, TabId::Session(id), drag_title, cx)
+        self.with_tab_interactions(tab, id, drag_title, cx)
     }
 }
 
@@ -846,7 +863,6 @@ impl WorkspaceView {
     pub fn open_usage(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !self.usage_visible {
             self.usage_previous_focus = window.focused(cx);
-            self.usage_position = self.tabs.len();
         }
         self.usage_visible = true;
         self.usage.update(cx, |view, cx| view.open(window, cx));
@@ -854,7 +870,10 @@ impl WorkspaceView {
         cx.notify();
     }
 
-    fn close_usage(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn show_sessions(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.usage_visible {
+            return;
+        }
         self.usage_visible = false;
         let focus = self.usage_previous_focus.take().unwrap_or_else(|| self.focus_handle.clone());
         focus.focus(window, cx);
