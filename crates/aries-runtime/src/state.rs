@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use aries_extension::agent::AgentDefinition;
 use rig::Model;
 use rig::completion::Effort;
@@ -9,11 +11,13 @@ pub struct State {
     pub effort: Effort,
     pub turns: MaxTurn,
     pub model: Model<OpenAiWire>,
+    pub cwd: PathBuf,
 }
 
 impl State {
-    pub fn new(model: Model<OpenAiWire>, agent: AgentDefinition) -> Self {
-        Self { effort: Effort::High, turns: MaxTurn::Turns400, model, agent }
+    pub fn new(model: Model<OpenAiWire>, agent: AgentDefinition, cwd: impl Into<PathBuf>) -> Self {
+        let cwd = cwd.into();
+        Self { effort: Effort::High, turns: MaxTurn::Turns400, model, agent, cwd }
     }
 }
 
@@ -52,5 +56,10 @@ impl State {
 
     pub fn model(&mut self, model: Model<OpenAiWire>) {
         self.model = model;
+    }
+
+    pub fn cwd(&mut self, cwd: impl Into<PathBuf>) {
+        let cwd = cwd.into();
+        self.cwd = cwd;
     }
 }
