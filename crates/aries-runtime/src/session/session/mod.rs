@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 use aries_communicate::{AgentEvent, Notifier};
 use aries_extension::AgentExtensions;
+use aries_extension::agent::AgentDefinition;
 use aries_extension::command::SlashCommandsExecutor;
 use aries_extension::hook::input::{
     SessionEndHookInput, SessionEndReason, SessionStartHookInput, SessionStartSource,
@@ -22,11 +23,9 @@ use aries_init::{GlobalContext, ModelConfig, Setting, SettingLoader};
 use aries_persistence::SessionRepository;
 use itertools::Itertools;
 use jiff::Zoned;
-use rig::Model;
 use rig::agent::PromptResponse;
 use rig::completion::{Effort, Message};
 use rig::message::UserContent;
-use rig::providers::openai::wire::OpenAiWire;
 use rig::tool::rmcp::McpConnection;
 use rig::tool::server::{ToolServer, ToolServerHandle};
 use toasty::Db;
@@ -42,6 +41,7 @@ use crate::agent::{AgentBuilder, AriesAgent};
 use crate::compact::ContextCompactor;
 use crate::memory::{MemoryRetriever, MemoryStore};
 use crate::session::{ChatContext, ChatHistory};
+use crate::state::State;
 
 pub enum PromptOutcome {
     Completed(String),
@@ -59,10 +59,9 @@ pub struct Session {
     setting: Setting,
     config: ModelConfig,
     cwd: PathBuf,
-    model: Model<OpenAiWire>,
     agent: AriesAgent,
-    mode: String,
-    effort: Effort,
+
+    state: State,
 
     chat_history: ChatHistory,
     chat_context: ChatContext,
@@ -150,11 +149,12 @@ impl Session {
         let config = self.setting.activate(&alias)?;
 
         let model = crate::session::create_model(&config);
-        self.agent.set_model(model.clone());
 
-        self.model = model;
+        self.state.model(model);
+        self.agent.set_model(self.state.model.clone());
+
         self.config = config.to_owned();
-        self.compactor.set_model(self.model.clone());
+        self.compactor.set_model(self.state.model.clone());
 
         let loader = SettingLoader::new(self.gctx.root_dir());
         let _ = loader.save(&self.setting).await;
@@ -164,11 +164,6 @@ impl Session {
 
     pub async fn set_mode(&mut self, mode: impl AsRef<str>) -> Result<(), SessionError> {
         let mode = mode.as_ref();
-        // 不同的模式, 注册的工具是不同的，所以先删除全部内置的，然后再重新添加
-        for tool_name in crate::ALL_TOOL_NAMES {
-            self.tool_server_handle.remove_tool(tool_name);
-        }
-
         let agent = self
             .extensions
             .agents
@@ -177,11 +172,15 @@ impl Session {
             .cloned()
             .ok_or_else(|| SessionError::agent_not_found(mode))?;
 
+        self.state.agent(agent);
+
+        // 不同的模式, 注册的工具是不同的，所以先删除全部内置的，然后再重新添加
+        for tool_name in crate::ALL_TOOL_NAMES {
+            self.tool_server_handle.remove_tool(tool_name);
+        }
         let agent = AgentBuilder::new(
             &self.id,
-            self.model.clone(),
-            agent,
-            self.effort,
+            self.state.clone(),
             &self.session_dir,
             &self.cwd,
             self.gctx.clone(),
@@ -191,9 +190,8 @@ impl Session {
         .with_extensions(self.extensions.clone())
         .build(self.tool_server_handle.clone(), self.hook.clone())
         .await;
-
         self.agent = agent;
-        self.mode = mode.to_string();
+
         Ok(())
     }
 
@@ -209,19 +207,11 @@ impl Session {
             _ => return Err(SessionError::invalid_thought_level(level)),
         };
 
-        let agent = self
-            .extensions
-            .agents
-            .iter()
-            .find(|agent| agent.frontmatter.name.eq_ignore_ascii_case(&self.mode))
-            .cloned()
-            .ok_or_else(|| SessionError::agent_not_found(&self.mode))?;
+        self.state.effort(effort);
 
         let agent = AgentBuilder::new(
             &self.id,
-            self.model.clone(),
-            agent,
-            effort,
+            self.state.clone(),
             &self.session_dir,
             &self.cwd,
             self.gctx.clone(),
@@ -231,9 +221,8 @@ impl Session {
         .with_extensions(self.extensions.clone())
         .build(self.tool_server_handle.clone(), self.hook.clone())
         .await;
-
         self.agent = agent;
-        self.effort = effort;
+
         Ok(())
     }
 
@@ -337,18 +326,18 @@ impl Session {
     }
 
     pub fn mode(&self) -> &str {
-        &self.mode
+        &self.state.agent.frontmatter.name
     }
 
     pub fn thought_level(&self) -> Effort {
-        self.effort
+        self.state.effort
     }
 
     pub fn setting(&self) -> &Setting {
         &self.setting
     }
 
-    pub fn agents(&self) -> &[aries_extension::agent::AgentDefinition] {
+    pub fn agents(&self) -> &[AgentDefinition] {
         &self.extensions.agents
     }
 
@@ -463,11 +452,11 @@ impl Session {
             .find(|agent| agent.frontmatter.name.eq_ignore_ascii_case(DEFAULT_AGENT_NAME))
             .cloned()
             .ok_or_else(|| SessionError::agent_not_found(DEFAULT_AGENT_NAME))?;
+        let state = State::new(model, agent);
+
         let agent = AgentBuilder::new(
             &id,
-            model.clone(),
-            agent,
-            DEFAULT_EFFORT,
+            state.clone(),
             &session_dir,
             cwd,
             gctx.clone(),
@@ -482,13 +471,13 @@ impl Session {
             &id,
             cwd,
             &transcript_path,
-            model.clone(),
+            state.model.clone(),
             chat_context.clone(),
             hooks_executor.clone(),
             Notifier::clone(&notifier),
         );
 
-        let input = SessionStartHookInput::new(&id, cwd, source, model.name());
+        let input = SessionStartHookInput::new(&id, cwd, source, state.model.name());
         if let HookDecision::Continue { contexts } = hooks_executor.fire_session_start(input).await
         {
             chat_context.append(&system_reminders(contexts)).await;
@@ -500,10 +489,7 @@ impl Session {
             setting,
             config,
             cwd: cwd.to_owned(),
-            model,
             agent,
-            mode: DEFAULT_AGENT_NAME.to_owned(),
-            effort: DEFAULT_EFFORT,
             chat_history,
             chat_context,
             session_repo,
@@ -521,6 +507,7 @@ impl Session {
             last_assistant_message: None,
             compactor,
             db,
+            state,
         })
     }
 
@@ -532,7 +519,7 @@ impl Session {
 
     async fn recall_context(&self, query: impl Into<String>) -> Option<String> {
         let memories = self.memory_store.scan().await;
-        let retriever = MemoryRetriever::new(self.model.clone());
+        let retriever = MemoryRetriever::new(self.state.model.clone());
         let retrieved = retriever.retrieve(query, &memories).await;
 
         let mut blocks = Vec::<String>::with_capacity(retrieved.len());

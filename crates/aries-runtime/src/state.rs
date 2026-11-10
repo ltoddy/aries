@@ -20,8 +20,8 @@ impl State {
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash)]
 pub enum MaxTurn {
     Turns100,
-    #[default]
     Turns200,
+    #[default]
     Turns400,
     Turns800,
 }

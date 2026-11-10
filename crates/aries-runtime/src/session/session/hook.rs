@@ -336,17 +336,11 @@ impl AgentHook for SessionPromptHook {
                 let tool_input: Value =
                     serde_json::from_str(args).unwrap_or_else(|_| Value::String(args.clone()));
 
+                let cwd = self.cwd.display().to_string();
                 let was_successful = result.is_success();
                 let mut repo = self.tool_call_repo.clone();
                 let _ = repo
-                    .create(
-                        &self.session_id,
-                        call_id.to_string(),
-                        name,
-                        args,
-                        duration_ms,
-                        was_successful,
-                    )
+                    .create(cwd, call_id.to_string(), name, args, duration_ms, was_successful)
                     .await;
 
                 if let Some(error) = result.error() {
