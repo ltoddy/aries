@@ -6,8 +6,8 @@ use serde_json::Value;
 
 use crate::document::{DocumentError, FrontmatterDocument};
 use crate::jsonl::{self, JsonlAppender};
+use crate::path_to_slug;
 use crate::walk::{walk_dir, walk_dirs};
-use crate::{path_to_slug, path_to_uri};
 
 async fn write_document(content: &str) -> (tempfile::TempDir, PathBuf) {
     let dir = tempfile::tempdir().unwrap();
@@ -159,18 +159,6 @@ fn walk_dirs_skips_non_directory_roots() {
     let entries = walk_dirs([&root, &non_directory], false, false).unwrap();
 
     assert_eq!(entries, [root.join("file.txt")]);
-}
-
-#[tokio::test]
-async fn path_to_uri_returns_file_uri_for_existing_path() {
-    let dir = tempfile::tempdir().unwrap();
-    let file_path = dir.path().join("file.txt");
-    tokio::fs::write(&file_path, "content").await.unwrap();
-
-    let uri = path_to_uri(&file_path).await;
-
-    assert!(uri.starts_with("file://"));
-    assert!(uri.ends_with("/file.txt"));
 }
 
 #[test]

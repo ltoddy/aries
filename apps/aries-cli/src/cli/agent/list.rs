@@ -1,4 +1,4 @@
-use aries_extension::AgentsLoader;
+use aries_extension::agent::AgentsLoader;
 use aries_init::GlobalContext;
 use clap::Parser;
 use prettytable::{Cell, Row, Table, row};

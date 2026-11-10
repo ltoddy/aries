@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use aries_extension::McpDefinition;
+use aries_extension::mcp::McpDefinition;
 use aries_init::{GlobalContext, SettingLoader};
 use aries_runtime::session::SessionRegistry;
 use colored::Colorize;

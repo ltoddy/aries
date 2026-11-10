@@ -1,7 +1,7 @@
-use aries_filesystem::path_to_uri;
 use aries_filesystem::walk::walk_dir;
 
 use crate::skill::SkillDefinition;
+use crate::uri::path_to_uri;
 
 #[derive(Debug)]
 pub struct SkillExecutor<'a> {

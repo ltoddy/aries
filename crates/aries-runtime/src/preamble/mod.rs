@@ -5,7 +5,7 @@ pub mod skill;
 
 use std::path::Path;
 
-use aries_extension::SkillDefinition;
+use aries_extension::skill::SkillDefinition;
 use aries_init::GlobalContext;
 
 pub async fn sections(

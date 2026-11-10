@@ -1,4 +1,4 @@
-use aries_extension::AgentDefinition;
+use aries_extension::agent::AgentDefinition;
 use rig::Model;
 use rig::completion::Effort;
 use rig::providers::openai::wire::OpenAiWire;

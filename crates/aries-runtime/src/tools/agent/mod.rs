@@ -5,7 +5,8 @@ mod output;
 use std::path::{Path, PathBuf};
 
 use aries_communicate::{Notifier, SubagentUpdate};
-use aries_extension::{AgentDefinition, AgentExtensions};
+use aries_extension::AgentExtensions;
+use aries_extension::agent::AgentDefinition;
 use aries_init::GlobalContext;
 use futures::StreamExt;
 use rig::Model;

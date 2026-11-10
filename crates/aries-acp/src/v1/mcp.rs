@@ -6,7 +6,7 @@ use agent_client_protocol::v1::schema::{
 };
 use agent_client_protocol::v1::{ConnectionTo, Responder};
 use agent_client_protocol::{Client, Error};
-use aries_extension::{McpDefinition, McpServerConfig};
+use aries_extension::mcp::{McpDefinition, McpServerConfig};
 use serde_json::{Map, Value};
 use tracing::info;
 

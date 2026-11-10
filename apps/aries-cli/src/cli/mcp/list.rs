@@ -1,4 +1,4 @@
-use aries_extension::{McpServerConfig, McpsLoader};
+use aries_extension::mcp::{McpServerConfig, McpsLoader};
 use aries_init::GlobalContext;
 use clap::Parser;
 use prettytable::{Cell, Row, Table, row};

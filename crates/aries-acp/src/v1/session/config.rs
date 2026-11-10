@@ -5,7 +5,7 @@ use agent_client_protocol::v1::schema::{
     SessionConfigId, SessionConfigOption, SessionConfigOptionCategory, SessionConfigSelectOption,
     SessionConfigSelectOptions, SessionMode, SessionModeId, SessionModeState,
 };
-use aries_extension::AgentDefinition;
+use aries_extension::agent::AgentDefinition;
 use aries_init::Setting;
 use rig::completion::Effort;
 

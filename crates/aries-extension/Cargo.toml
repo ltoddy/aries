@@ -26,6 +26,7 @@ shellexpand = "3.1"
 thiserror.workspace = true
 tokio = { workspace = true, features = ["fs", "process", "time", "io-util"] }
 tracing.workspace = true
+url.workspace = true
 yaml_serde.workspace = true
 
 [dev-dependencies]

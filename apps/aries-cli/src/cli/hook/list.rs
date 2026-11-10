@@ -1,4 +1,4 @@
-use aries_extension::HooksLoader;
+use aries_extension::hook::HooksLoader;
 use aries_init::GlobalContext;
 use clap::Parser;
 use itertools::Itertools;
