@@ -13,7 +13,6 @@ categories.workspace = true
 [dependencies]
 aries-filesystem = { version = "0.1.0", path = "../aries-filesystem" }
 aries-persistence = { version = "0.1.0", path = "../aries-persistence" }
-parking_lot.workspace = true
 prettytable.workspace = true
 serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true

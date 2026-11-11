@@ -13,7 +13,7 @@ pub struct ListHooksArgs {}
 pub async fn execute(_args: ListHooksArgs, gctx: GlobalContext) -> anyhow::Result<()> {
     let cwd = gctx.current_dir();
 
-    let loader = HooksLoader::new(&cwd, gctx.home_dir());
+    let loader = HooksLoader::new(cwd, gctx.home_dir());
     let mut hooks = loader.load().await;
     hooks.sort_by(|prev, next| prev.location.cmp(&next.location));
 

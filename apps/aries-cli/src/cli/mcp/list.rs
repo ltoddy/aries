@@ -10,7 +10,7 @@ pub struct ListMcpArgs {}
 pub async fn execute(_args: ListMcpArgs, gctx: GlobalContext) -> anyhow::Result<()> {
     let cwd = gctx.current_dir();
 
-    let loader = McpsLoader::new(&cwd, gctx.home_dir());
+    let loader = McpsLoader::new(cwd, gctx.home_dir());
     let definitions = loader.load().await;
 
     if definitions.is_empty() {

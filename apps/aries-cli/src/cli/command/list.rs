@@ -12,7 +12,7 @@ pub struct ListCommandArgs {}
 pub async fn execute(_args: ListCommandArgs, gctx: GlobalContext) -> anyhow::Result<()> {
     let cwd = gctx.current_dir();
 
-    let loader = CommandsLoader::new(&cwd, gctx.home_dir());
+    let loader = CommandsLoader::new(cwd, gctx.home_dir());
     let mut commands = loader.load().await;
     commands.sort_by(|prev, next| prev.frontmatter.name.cmp(&next.frontmatter.name));
 
