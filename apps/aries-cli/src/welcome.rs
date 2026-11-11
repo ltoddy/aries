@@ -7,15 +7,15 @@ use ferris_says::say;
 const TERMINAL_WIDTH: usize = 80;
 
 pub async fn welcome(
-    provider: impl Into<String>,
-    model: impl Into<String>,
-    session_id: impl Into<String>,
+    provider: impl AsRef<str>,
+    model: impl AsRef<str>,
+    session_id: impl AsRef<str>,
     context: &GlobalContext,
     cwd: impl AsRef<Path>,
 ) {
-    let provider = provider.into();
-    let model = model.into();
-    let session_id = session_id.into();
+    let provider = provider.as_ref();
+    let model = model.as_ref();
+    let session_id = session_id.as_ref();
     let cwd = cwd.as_ref();
 
     let name = env!("CARGO_BIN_NAME");

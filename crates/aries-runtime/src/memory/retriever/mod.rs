@@ -29,15 +29,15 @@ impl MemoryRetriever {
         Self { inner }
     }
 
-    pub async fn retrieve(&self, query: impl Into<String>, memories: &[Memory]) -> Vec<String> {
+    pub async fn retrieve(&self, query: impl AsRef<str>, memories: &[Memory]) -> Vec<String> {
         if memories.is_empty() {
             return vec![];
         }
 
-        let query = query.into();
+        let query = query.as_ref();
         let manifest = memories.iter().map(Memory::to_retriever_line).join("\n");
-        let prompt = ["<memories>", &manifest, "</memories>", "\n", "<query>", &query, "</query>"]
-            .join("\n");
+        let prompt =
+            ["<memories>", &manifest, "</memories>", "\n", "<query>", query, "</query>"].join("\n");
 
         let retrieved = match self.inner.extract(&prompt).await {
             Ok(res) => res.output.file_names,

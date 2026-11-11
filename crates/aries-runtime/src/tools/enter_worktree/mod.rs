@@ -2,7 +2,7 @@ mod args;
 mod error;
 mod output;
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use git2::{Repository, WorktreeAddOptions};
 use parking_lot::Mutex;
@@ -29,18 +29,13 @@ impl EnterGitWorktreeTool {
     pub fn new(
         ctx: AriesToolContext,
         repository: Repository,
-        worktree_dir: impl AsRef<Path>,
+        worktree_dir: impl Into<PathBuf>,
     ) -> Self {
-        let worktree_dir = worktree_dir.as_ref();
+        let worktree_dir = worktree_dir.into();
         let worktree_name_regex = Regex::new(r"^[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*$")
             .expect("worktree name regex should be valid");
 
-        Self {
-            ctx,
-            repository: Mutex::new(repository),
-            worktree_dir: worktree_dir.to_owned(),
-            worktree_name_regex,
-        }
+        Self { ctx, repository: Mutex::new(repository), worktree_dir, worktree_name_regex }
     }
 }
 
@@ -130,7 +125,7 @@ impl Tool for EnterGitWorktreeTool {
         }
 
         let worktree = Worktree::new(
-            &original_cwd,
+            original_cwd,
             &worktree_path,
             &worktree_name,
             &worktree_branch,

@@ -40,11 +40,11 @@ pub enum GuardWriteError {
 }
 
 impl ToolContext {
-    pub fn new(session_id: impl Into<String>, notifier: Notifier, cwd: impl AsRef<Path>) -> Self {
+    pub fn new(session_id: impl Into<String>, notifier: Notifier, cwd: impl Into<PathBuf>) -> Self {
         let session_id = session_id.into();
         let task = TaskRegistry::new(notifier);
         let read_state = SharedReadState::new();
-        let cwd = std::sync::Arc::new(parking_lot::Mutex::new(cwd.as_ref().to_owned()));
+        let cwd = std::sync::Arc::new(parking_lot::Mutex::new(cwd.into()));
         let worktree_session = std::sync::Arc::new(parking_lot::Mutex::new(None));
 
         Self { session_id, cwd, worktree: worktree_session, task, read_state }
@@ -58,8 +58,8 @@ impl ToolContext {
         self.cwd.lock().clone()
     }
 
-    pub fn set_cwd(&self, cwd: impl AsRef<Path>) {
-        *self.cwd.lock() = cwd.as_ref().to_owned();
+    pub fn set_cwd(&self, cwd: impl Into<PathBuf>) {
+        *self.cwd.lock() = cwd.into();
     }
 
     pub fn worktree(&self) -> Option<Worktree> {

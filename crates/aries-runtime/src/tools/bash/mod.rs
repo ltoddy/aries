@@ -94,7 +94,7 @@ impl Tool for BashTool {
             .map_or_else(|| self.ctx.cwd(), |worktree| worktree.path().to_owned());
 
         if args.background {
-            let task = self.ctx.task.spawn(TaskKind::Shell, &cwd, &arg, args.description).await?;
+            let task = self.ctx.task.spawn(TaskKind::Shell, cwd, arg, args.description).await?;
             return Ok(BashOutput::background(task.task_id));
         }
 

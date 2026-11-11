@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -13,13 +13,13 @@ pub struct AgentDefinition {
 
 impl AgentDefinition {
     pub fn new(
-        location: impl AsRef<Path>,
+        location: impl Into<PathBuf>,
         frontmatter: Frontmatter,
         body: impl Into<String>,
     ) -> Self {
-        let location = location.as_ref();
+        let location = location.into();
         let body = body.into();
-        Self { location: location.to_owned(), frontmatter, body }
+        Self { location, frontmatter, body }
     }
 }
 

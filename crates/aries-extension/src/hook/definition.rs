@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use regex_lite::Regex;
 use serde::{Deserialize, Serialize};
@@ -23,14 +23,18 @@ pub enum HooksFileParseError {
 }
 
 impl HooksDefinition {
-    fn new(location: impl AsRef<Path>, description: Option<String>, hooks: HooksSettings) -> Self {
-        let location = location.as_ref();
+    fn new(
+        location: impl Into<PathBuf>,
+        description: Option<String>,
+        hooks: HooksSettings,
+    ) -> Self {
+        let location = location.into();
 
-        Self { location: location.to_owned(), description, hooks }
+        Self { location, description, hooks }
     }
 
-    pub async fn parse(file_path: impl AsRef<Path>) -> Result<Self, HooksFileParseError> {
-        let file_path = file_path.as_ref();
+    pub async fn parse(file_path: impl Into<PathBuf>) -> Result<Self, HooksFileParseError> {
+        let file_path = file_path.into();
         info!("Parsing hooks file: {}", file_path.display());
 
         #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -39,7 +43,7 @@ impl HooksDefinition {
             pub hooks: HooksSettings,
         }
 
-        let content = tokio::fs::read_to_string(file_path).await?;
+        let content = tokio::fs::read_to_string(&file_path).await?;
         let definition = serde_json::from_str::<Definition>(&content)?;
 
         Ok(HooksDefinition::new(file_path, definition.description, definition.hooks))
@@ -320,8 +324,8 @@ pub enum HookMatcherError {
 }
 
 impl HookMatcher {
-    pub fn matches(&self, tool_name: impl Into<String>) -> Result<bool, HookMatcherError> {
-        let tool_name = tool_name.into();
+    pub fn matches(&self, tool_name: impl AsRef<str>) -> Result<bool, HookMatcherError> {
+        let tool_name = tool_name.as_ref();
 
         let pattern = match self.matcher.as_deref() {
             None => return Ok(true),
@@ -339,6 +343,6 @@ impl HookMatcher {
             pattern: pattern.to_string(),
             source: err,
         })?;
-        Ok(re.is_match(&tool_name))
+        Ok(re.is_match(tool_name))
     }
 }

@@ -14,14 +14,14 @@ pub struct SkillDefinition {
 
 impl SkillDefinition {
     pub fn new(
-        location: impl AsRef<Path>,
+        location: impl Into<PathBuf>,
         frontmatter: Frontmatter,
         body: impl Into<String>,
     ) -> Self {
-        let location = location.as_ref();
+        let location = location.into();
         let body = body.into();
 
-        Self { location: location.to_owned(), frontmatter, body }
+        Self { location, frontmatter, body }
     }
 }
 

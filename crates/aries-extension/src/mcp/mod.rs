@@ -41,11 +41,11 @@ pub async fn connect(
 }
 
 async fn connect_one(
-    server_name: impl Into<String>,
+    server_name: impl AsRef<str>,
     config: &McpServerConfig,
     tool_server_handle: ToolServerHandle,
 ) -> McpConnectResult<McpConnection> {
-    let server_name = server_name.into();
+    let server_name = server_name.as_ref();
     info!(server = %server_name, "Connecting to mcp server");
 
     let client_config = ClientConfig::new(ClientCapabilities::default(), Implementation::default());

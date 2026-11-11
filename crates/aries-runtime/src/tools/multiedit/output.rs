@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -18,8 +18,8 @@ pub struct MultiEditOutput {
 }
 
 impl MultiEditOutput {
-    pub fn for_create(file_path: impl AsRef<Path>, additions: usize) -> Self {
-        let file_path = file_path.as_ref().to_owned();
+    pub fn for_create(file_path: impl Into<PathBuf>, additions: usize) -> Self {
+        let file_path = file_path.into();
 
         Self {
             kind: WriteKind::Create,
@@ -32,13 +32,13 @@ impl MultiEditOutput {
     }
 
     pub fn for_update(
-        file_path: impl AsRef<Path>,
+        file_path: impl Into<PathBuf>,
         original_content: impl Into<String>,
         structured_patch: Vec<diff::Hunk>,
         additions: usize,
         deletions: usize,
     ) -> Self {
-        let file_path = file_path.as_ref().to_owned();
+        let file_path = file_path.into();
         let original_content = original_content.into();
 
         Self {

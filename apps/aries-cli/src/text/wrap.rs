@@ -1,5 +1,5 @@
-pub fn wrap(text: impl Into<String>, max_width: usize) -> String {
-    let text = text.into();
+pub fn wrap(text: impl AsRef<str>, max_width: usize) -> String {
+    let text = text.as_ref();
 
     let mut output = String::with_capacity(text.len());
     let mut line_len = 0;

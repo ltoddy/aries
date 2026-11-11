@@ -11,11 +11,11 @@ use aries_init::GlobalContext;
 pub async fn sections(
     gctx: GlobalContext,
     cwd: impl AsRef<Path>,
-    model: impl Into<String>,
+    model: impl AsRef<str>,
     skills: &[SkillDefinition],
 ) -> Vec<String> {
     let cwd = cwd.as_ref();
-    let model = model.into();
+    let model = model.as_ref();
 
     vec![
         skill::section(skills),

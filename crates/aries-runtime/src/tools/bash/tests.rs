@@ -9,7 +9,7 @@ fn bash_args(command: &str) -> BashArgs {
     BashArgs { command: command.to_owned(), description: None, background: false }
 }
 
-fn tool(cwd: impl AsRef<std::path::Path>) -> BashTool {
+fn tool(cwd: impl Into<std::path::PathBuf>) -> BashTool {
     BashTool::new(crate::tools::context::ToolContext::new(
         "test",
         {

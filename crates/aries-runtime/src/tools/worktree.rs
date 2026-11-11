@@ -11,25 +11,19 @@ pub struct Worktree {
 
 impl Worktree {
     pub fn new(
-        origin_cwd: impl AsRef<Path>,
-        path: impl AsRef<Path>,
+        origin_cwd: impl Into<PathBuf>,
+        path: impl Into<PathBuf>,
         worktree_name: impl Into<String>,
         branch: impl Into<String>,
         head_commit: impl Into<String>,
     ) -> Self {
-        let origin_cwd = origin_cwd.as_ref();
-        let path = path.as_ref();
+        let origin_cwd = origin_cwd.into();
+        let path = path.into();
         let worktree_name = worktree_name.into();
         let branch = branch.into();
         let head_commit = head_commit.into();
 
-        Self {
-            origin_cwd: origin_cwd.to_owned(),
-            path: path.to_owned(),
-            worktree_name,
-            branch,
-            head_commit,
-        }
+        Self { origin_cwd, path, worktree_name, branch, head_commit }
     }
 
     pub fn origin_cwd(&self) -> &Path {

@@ -205,21 +205,21 @@ impl TaskRegistry {
         &self,
         kind: TaskKind,
         cwd: impl AsRef<Path>,
-        command: impl AsRef<str>,
+        command: impl Into<String>,
         description: Option<String>,
     ) -> Result<TaskSnapshot, SpawnTaskError> {
         let cwd = cwd.as_ref();
-        let command = command.as_ref();
+        let command: String = command.into();
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "bash".to_owned());
         let mut child = Command::new(&shell)
             .arg("-c")
-            .arg(command)
+            .arg(&command)
             .current_dir(cwd)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true)
             .spawn()
-            .map_err(|source| SpawnTaskError::new(kind, &shell, cwd, command, source))?;
+            .map_err(|source| SpawnTaskError::new(kind, &shell, cwd, &command, source))?;
 
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
@@ -288,22 +288,22 @@ impl TaskRegistry {
             registry.lock().record_finished(task_id_for_waiter);
         });
 
-        Ok(TaskSnapshot::new(&task_id, &state.lock()))
+        Ok(TaskSnapshot::new(task_id, &state.lock()))
     }
 
-    pub fn get(&self, task_id: impl AsRef<str>) -> Option<TaskSnapshot> {
-        let task_id = task_id.as_ref();
+    pub fn get(&self, task_id: impl Into<String>) -> Option<TaskSnapshot> {
+        let task_id: String = task_id.into();
         let guard = self.inner.lock();
-        let entry = guard.tasks.get(task_id)?;
+        let entry = guard.tasks.get(&task_id)?;
         Some(TaskSnapshot::new(task_id, &entry.state.lock()))
     }
 
-    pub async fn stop(&self, task_id: impl AsRef<str>) -> Result<TaskSnapshot, StopTaskError> {
-        let task_id = task_id.as_ref();
+    pub async fn stop(&self, task_id: impl Into<String>) -> Result<TaskSnapshot, StopTaskError> {
+        let task_id: String = task_id.into();
 
         let entry = {
             let guard = self.inner.lock();
-            guard.tasks.get(task_id).cloned().ok_or(StopTaskError::NotFound)?
+            guard.tasks.get(&task_id).cloned().ok_or(StopTaskError::NotFound)?
         };
         let state = entry.state;
         let mut receiver = entry.receiver;
@@ -333,11 +333,11 @@ impl TaskRegistry {
         format!("{kind}{id:08}")
     }
 
-    pub async fn wait_until_finished(&self, task_id: impl AsRef<str>) -> Option<TaskSnapshot> {
-        let task_id = task_id.as_ref();
+    pub async fn wait_until_finished(&self, task_id: impl Into<String>) -> Option<TaskSnapshot> {
+        let task_id: String = task_id.into();
         let (state, mut receiver) = {
             let guard = self.inner.lock();
-            let entry = guard.tasks.get(task_id)?;
+            let entry = guard.tasks.get(&task_id)?;
             (entry.state.clone(), entry.receiver.clone())
         };
 
@@ -373,12 +373,12 @@ impl SpawnTaskError {
     fn new(
         kind: TaskKind,
         shell: impl Into<String>,
-        cwd: impl AsRef<Path>,
+        cwd: impl Into<PathBuf>,
         command: impl Into<String>,
         source: std::io::Error,
     ) -> Self {
-        let cwd = cwd.as_ref();
-        Self { kind, shell: shell.into(), cwd: cwd.to_owned(), command: command.into(), source }
+        let cwd: PathBuf = cwd.into();
+        Self { kind, shell: shell.into(), cwd, command: command.into(), source }
     }
 }
 
@@ -437,16 +437,15 @@ impl BoundedOutput {
         Self { max_bytes, chunks: BinaryHeap::new(), total_bytes: 0, next_seq: 0 }
     }
 
-    fn push(&mut self, chunk: impl AsRef<str>) {
-        let chunk = chunk.as_ref();
+    fn push(&mut self, chunk: impl Into<String>) {
+        let text: String = chunk.into();
 
-        if chunk.is_empty() {
+        if text.is_empty() {
             return;
         }
 
-        let text = chunk.to_owned();
         self.total_bytes += text.len();
-        self.chunks.push(OutputChunk { seq: self.next_seq, text });
+        self.chunks.push(OutputChunk::new(self.next_seq, text));
         self.next_seq += 1;
 
         while self.total_bytes > self.max_bytes {
@@ -466,6 +465,12 @@ impl BoundedOutput {
 struct OutputChunk {
     seq: u64,
     text: String,
+}
+
+impl OutputChunk {
+    fn new(seq: u64, text: String) -> Self {
+        Self { seq, text }
+    }
 }
 
 impl Ord for OutputChunk {

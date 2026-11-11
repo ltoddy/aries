@@ -10,7 +10,7 @@ use crate::preamble::agentsmd::{Agentsmd, FILENAME};
 pub struct InstructionContext(Arc<Mutex<InstructionState>>);
 
 impl InstructionContext {
-    pub fn new(root_dir: impl AsRef<Path>) -> Self {
+    pub fn new(root_dir: impl Into<PathBuf>) -> Self {
         Self(Arc::new(Mutex::new(InstructionState::new(root_dir))))
     }
 
@@ -64,11 +64,11 @@ struct InstructionState {
 }
 
 impl InstructionState {
-    pub fn new(root_dir: impl AsRef<Path>) -> Self {
-        let root_dir = root_dir.as_ref();
+    pub fn new(root_dir: impl Into<PathBuf>) -> Self {
+        let root_dir = root_dir.into();
 
         Self {
-            root_dir: root_dir.to_owned(),
+            root_dir,
             instructions: vec![],
             pending_instructions: VecDeque::new(),
             hook_contexts: VecDeque::new(),

@@ -43,8 +43,8 @@ pub struct CompactAgent {
 impl CompactAgent {
     const COMPACTION_MAX_TURNS: usize = 1; // 强制单论,避免陷入循环
 
-    pub fn new(model: Model<OpenAiWire>, transcript_path: impl AsRef<Path>) -> Self {
-        let transcript_path = transcript_path.as_ref().to_owned();
+    pub fn new(model: Model<OpenAiWire>, transcript_path: impl Into<PathBuf>) -> Self {
+        let transcript_path = transcript_path.into();
 
         let agent = rig::agent::AgentBuilder::new(model)
             .name(NAME)

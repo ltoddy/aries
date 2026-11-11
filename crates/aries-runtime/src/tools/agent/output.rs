@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -13,13 +13,13 @@ impl AgentOutput {
     pub fn new(
         task_id: impl Into<String>,
         result: impl Into<String>,
-        transcript_path: impl AsRef<Path>,
+        transcript_path: impl Into<PathBuf>,
     ) -> Self {
         let task_id = task_id.into();
         let result = result.into();
-        let transcript_path = transcript_path.as_ref();
+        let transcript_path = transcript_path.into();
 
-        Self { task_id, result, transcript_path: transcript_path.to_owned() }
+        Self { task_id, result, transcript_path }
     }
 
     pub fn render_output(raw: serde_json::Value) -> Result<String, serde_json::Error> {

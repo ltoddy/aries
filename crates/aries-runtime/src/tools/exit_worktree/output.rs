@@ -1,8 +1,8 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use super::args::ExitGitWorktreeAction;
+use crate::tools::exit_worktree::args::ExitGitWorktreeAction;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ExitGitWorktreeOutput {
@@ -15,12 +15,12 @@ pub struct ExitGitWorktreeOutput {
 
 impl ExitGitWorktreeOutput {
     pub fn keep(
-        original_cwd: impl AsRef<Path>,
-        worktree_path: impl AsRef<Path>,
+        original_cwd: impl Into<PathBuf>,
+        worktree_path: impl Into<PathBuf>,
         worktree_branch: impl Into<String>,
     ) -> Self {
-        let original_cwd = original_cwd.as_ref().to_owned();
-        let worktree_path = worktree_path.as_ref().to_owned();
+        let original_cwd: PathBuf = original_cwd.into();
+        let worktree_path: PathBuf = worktree_path.into();
         let worktree_branch = worktree_branch.into();
         let message = format!(
             "Exited worktree. Your work is preserved at {} on branch {worktree_branch}. Session is now back in {}.",
@@ -38,12 +38,12 @@ impl ExitGitWorktreeOutput {
     }
 
     pub fn remove(
-        original_cwd: impl AsRef<Path>,
-        worktree_path: impl AsRef<Path>,
+        original_cwd: impl Into<PathBuf>,
+        worktree_path: impl Into<PathBuf>,
         worktree_branch: impl Into<String>,
     ) -> Self {
-        let original_cwd = original_cwd.as_ref().to_owned();
-        let worktree_path = worktree_path.as_ref().to_owned();
+        let original_cwd: PathBuf = original_cwd.into();
+        let worktree_path: PathBuf = worktree_path.into();
         let worktree_branch = worktree_branch.into();
         let message = format!(
             "Exited and removed worktree at {}. Session is now back in {}.",

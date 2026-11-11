@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -17,17 +17,17 @@ pub struct EditOutput {
 
 impl EditOutput {
     pub fn new(
-        file_path: impl AsRef<Path>,
+        file_path: impl Into<PathBuf>,
         original_content: impl Into<String>,
         structured_patch: Vec<diff::Hunk>,
         additions: usize,
         deletions: usize,
     ) -> Self {
-        let file_path = file_path.as_ref();
+        let file_path = file_path.into();
         let original_content = original_content.into();
 
         Self {
-            file_path: file_path.to_owned(),
+            file_path,
             structured_patch,
             original_content: Some(original_content),
             additions,

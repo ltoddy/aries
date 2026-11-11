@@ -1,5 +1,5 @@
 use std::fmt::Debug;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Serialize, Serializer};
 
@@ -40,14 +40,14 @@ where
 {
     pub fn new(
         session_id: impl Into<String>,
-        cwd: impl AsRef<Path>,
+        cwd: impl Into<PathBuf>,
         tool_name: impl Into<String>,
         tool_input: ToolInput,
         tool_response: ToolResponse,
         tool_use_id: impl Into<String>,
     ) -> Self {
         let session_id = session_id.into();
-        let cwd = cwd.as_ref().to_owned();
+        let cwd = cwd.into();
         let tool_name = tool_name.into();
         let tool_use_id = tool_use_id.into();
 
@@ -62,8 +62,8 @@ where
         }
     }
 
-    pub fn transcript_path(mut self, transcript_path: impl AsRef<Path>) -> Self {
-        self.transcript_path = Some(transcript_path.as_ref().to_owned());
+    pub fn transcript_path(mut self, transcript_path: impl Into<PathBuf>) -> Self {
+        self.transcript_path = Some(transcript_path.into());
         self
     }
 

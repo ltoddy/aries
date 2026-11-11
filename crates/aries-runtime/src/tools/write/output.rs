@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -9,8 +9,8 @@ pub struct WriteOutput {
 }
 
 impl WriteOutput {
-    pub fn new(file_path: impl AsRef<Path>, additions: usize) -> Self {
-        Self { file_path: file_path.as_ref().to_owned(), additions }
+    pub fn new(file_path: impl Into<PathBuf>, additions: usize) -> Self {
+        Self { file_path: file_path.into(), additions }
     }
 
     pub fn render_output(raw: serde_json::Value) -> Result<String, serde_json::Error> {
