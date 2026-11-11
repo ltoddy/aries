@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package aries;
 
-service UsageService {
+service AriesService {
   rpc QueryTokenUsages(QueryTokenUsagesRequest) returns (QueryTokenUsagesResponse);
 }
 
@@ -12,18 +12,10 @@ message Date {
   uint32 day = 3;
 }
 
-message DateRange {
-  Date start_inclusive = 1;
-  Date end_exclusive = 2;
-}
-
-message QueryTokenUsagesRequest {
-  DateRange range = 1;
-  optional string cwd = 2;
-}
+message QueryTokenUsagesRequest {}
 
 message QueryTokenUsagesResponse {
-  repeated DailyUsage daily = 1;
+  repeated DailyUsage daily_usages = 1;
   repeated string projects = 2;
 }
 
@@ -38,5 +30,4 @@ message TokenUsage {
   uint64 total_tokens = 3;
   uint64 cached_input_tokens = 4;
   uint64 reasoning_tokens = 5;
-  uint64 record_count = 6;
 }
