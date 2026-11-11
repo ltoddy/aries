@@ -12,12 +12,31 @@ pub struct State {
     pub turns: MaxTurn,
     pub model: Model<OpenAiWire>,
     pub cwd: PathBuf,
+    pub session_dir: PathBuf,
+    pub session_id: String,
 }
 
 impl State {
-    pub fn new(model: Model<OpenAiWire>, agent: AgentDefinition, cwd: impl Into<PathBuf>) -> Self {
+    pub fn new(
+        model: Model<OpenAiWire>,
+        agent: AgentDefinition,
+        cwd: impl Into<PathBuf>,
+        session_dir: impl Into<PathBuf>,
+        session_id: impl Into<String>,
+    ) -> Self {
         let cwd = cwd.into();
-        Self { effort: Effort::High, turns: MaxTurn::Turns400, model, agent, cwd }
+        let session_dir = session_dir.into();
+        let session_id = session_id.into();
+
+        Self {
+            effort: Effort::High,
+            turns: MaxTurn::Turns400,
+            model,
+            agent,
+            cwd,
+            session_dir,
+            session_id,
+        }
     }
 }
 
