@@ -53,8 +53,6 @@ pub const DEFAULT_EFFORT: Effort = Effort::High;
 
 #[derive(Clone)]
 pub struct Session {
-    id: String,
-
     gctx: GlobalContext,
     setting: Setting,
     config: ModelConfig,
@@ -67,7 +65,6 @@ pub struct Session {
 
     session_repo: SessionRepository,
 
-    session_dir: PathBuf,
     transcript_path: PathBuf,
 
     tool_server_handle: ToolServerHandle,
@@ -178,9 +175,7 @@ impl Session {
             self.tool_server_handle.remove_tool(tool_name);
         }
         let agent = AgentBuilder::new(
-            &self.id,
             self.state.clone(),
-            &self.session_dir,
             self.gctx.clone(),
             Notifier::clone(&self.notifier),
             self.db.clone(),
@@ -208,9 +203,7 @@ impl Session {
         self.state.effort(effort);
 
         let agent = AgentBuilder::new(
-            &self.id,
             self.state.clone(),
-            &self.session_dir,
             self.gctx.clone(),
             Notifier::clone(&self.notifier),
             self.db.clone(),
@@ -223,7 +216,7 @@ impl Session {
         Ok(())
     }
 
-    #[tracing::instrument(name = "prompt", skip_all, fields(session_id = %self.id))]
+    #[tracing::instrument(name = "prompt", skip_all, fields(session_id = %self.state.session_id))]
     pub async fn prompt<F, Fut>(
         &mut self,
         prompt: impl Into<Message>,
@@ -319,7 +312,7 @@ impl Session {
     }
 
     pub fn id(&self) -> String {
-        self.id.clone()
+        self.state.session_id.clone()
     }
 
     pub fn mode(&self) -> &str {
@@ -359,7 +352,7 @@ impl Session {
     }
 
     pub fn session_dir(&self) -> &Path {
-        &self.session_dir
+        &self.state.session_dir
     }
 
     pub fn current_dir(&self) -> &Path {
@@ -371,8 +364,12 @@ impl Session {
     }
 
     pub async fn close(&self) {
-        let input = SessionEndHookInput::new(&self.id, &self.state.cwd, SessionEndReason::Logout)
-            .transcript_path(&self.transcript_path);
+        let input = SessionEndHookInput::new(
+            &self.state.session_id,
+            &self.state.cwd,
+            SessionEndReason::Logout,
+        )
+        .transcript_path(&self.transcript_path);
 
         self.hooks_executor.fire_session_end(input).await;
     }
@@ -449,19 +446,13 @@ impl Session {
             .find(|agent| agent.frontmatter.name.eq_ignore_ascii_case(DEFAULT_AGENT_NAME))
             .cloned()
             .ok_or_else(|| SessionError::agent_not_found(DEFAULT_AGENT_NAME))?;
-        let state = State::new(model, agent, cwd);
+        let state = State::new(model, agent, cwd, session_dir, &id);
 
-        let agent = AgentBuilder::new(
-            &id,
-            state.clone(),
-            &session_dir,
-            gctx.clone(),
-            Notifier::clone(&notifier),
-            db.clone(),
-        )
-        .with_extensions(extensions.clone())
-        .build(tool_server_handle.clone(), hook.clone())
-        .await;
+        let agent =
+            AgentBuilder::new(state.clone(), gctx.clone(), Notifier::clone(&notifier), db.clone())
+                .with_extensions(extensions.clone())
+                .build(tool_server_handle.clone(), hook.clone())
+                .await;
 
         let compactor = ContextCompactor::new(
             &id,
@@ -480,15 +471,14 @@ impl Session {
         }
 
         Ok(Self {
-            id,
             gctx,
             setting,
             config,
             agent,
+            state,
             chat_history,
             chat_context,
             session_repo,
-            session_dir: session_dir.to_owned(),
             transcript_path,
             tool_server_handle,
             cancel_token: Arc::new(parking_lot::Mutex::new(CancellationToken::new())),
@@ -502,13 +492,12 @@ impl Session {
             last_assistant_message: None,
             compactor,
             db,
-            state,
         })
     }
 
     async fn update_title(&mut self, prompt: &Message) -> String {
         let title = message_to_simple_text(prompt);
-        let _ = self.session_repo.update_title_by_session_id(&self.id, &title).await;
+        let _ = self.session_repo.update_title_by_session_id(&self.state.session_id, &title).await;
         title
     }
 
@@ -537,7 +526,7 @@ impl Session {
         &self,
         prompt: impl Into<String>,
     ) -> crate::agent::AriesResult<VecDeque<String>> {
-        let input = UserPromptSubmitHookInput::new(&self.id, &self.state.cwd, prompt)
+        let input = UserPromptSubmitHookInput::new(&self.state.session_id, &self.state.cwd, prompt)
             .transcript_path(&self.transcript_path);
         match self.hooks_executor.fire_user_prompt_submit(input).await {
             HookDecision::Terminate { reason } => {
@@ -548,7 +537,7 @@ impl Session {
     }
 
     async fn fire_stop(&self, assistant_output: impl Into<String>) {
-        let input = StopHookInput::new(&self.id, &self.state.cwd, false)
+        let input = StopHookInput::new(&self.state.session_id, &self.state.cwd, false)
             .last_assistant_message(assistant_output);
         if let HookDecision::Continue { contexts } = self.hooks_executor.fire_stop(input).await {
             self.chat_context.append(&system_reminders(contexts)).await;
@@ -557,7 +546,7 @@ impl Session {
 
     async fn fire_stop_failure(&self, error: impl Into<String>) {
         let error = error.into();
-        let input = StopFailureHookInput::new(&self.id, &self.state.cwd, &error)
+        let input = StopFailureHookInput::new(&self.state.session_id, &self.state.cwd, &error)
             .transcript_path(&self.transcript_path)
             .error_details(&error);
 

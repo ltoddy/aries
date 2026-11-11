@@ -1,5 +1,3 @@
-use std::path::{Path, PathBuf};
-
 use aries_communicate::Notifier;
 use aries_extension::AgentExtensions;
 use aries_init::GlobalContext;
@@ -13,36 +11,17 @@ use crate::state::State;
 pub struct AgentBuilder {
     state: State,
 
-    root_dir: PathBuf,
     gctx: GlobalContext,
 
     extensions: AgentExtensions,
     db: Db,
 
     notifier: Notifier,
-    session_id: String,
 }
 
 impl AgentBuilder {
-    pub fn new(
-        session_id: impl Into<String>,
-        state: State,
-        root_dir: impl AsRef<Path>,
-        gctx: GlobalContext,
-        notifier: Notifier,
-        db: Db,
-    ) -> Self {
-        let root_dir = root_dir.as_ref();
-
-        Self {
-            state,
-            root_dir: root_dir.to_owned(),
-            gctx,
-            extensions: AgentExtensions::empty(),
-            db,
-            notifier,
-            session_id: session_id.into(),
-        }
+    pub fn new(state: State, gctx: GlobalContext, notifier: Notifier, db: Db) -> Self {
+        Self { state, gctx, extensions: AgentExtensions::empty(), db, notifier }
     }
 
     pub fn with_extensions(mut self, extensions: AgentExtensions) -> Self {
@@ -57,11 +36,11 @@ impl AgentBuilder {
         let model = self.state.model.name();
 
         let tools = crate::create_tools(
-            &self.session_id,
+            &self.state.session_id,
             self.gctx.clone(),
             crate::ALL_TOOL_NAMES,
             self.state.model.clone(),
-            &self.root_dir,
+            &self.state.session_dir,
             &self.state.cwd,
             self.extensions.clone(),
             Notifier::clone(&self.notifier),
