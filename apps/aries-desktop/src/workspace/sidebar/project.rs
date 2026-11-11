@@ -10,11 +10,9 @@ use gpui_kit::*;
 
 use crate::workspace::SessionView;
 use crate::workspace::settings::palette::Palette;
-use crate::workspace::sidebar::Sidebar;
 use crate::workspace::sidebar::motion::{SidebarRow, project_body};
 use crate::workspace::sidebar::session::SessionRowView;
-
-const SESSION_LIMIT: usize = 8;
+use crate::workspace::sidebar::{SESSION_LIMIT, Sidebar};
 
 pub struct ProjectView<'a> {
     sidebar: &'a Sidebar,
@@ -118,11 +116,44 @@ impl<'a> ProjectView<'a> {
                                     Anchor::TopRight,
                                     {
                                         let delete_anchor = delete_anchor.clone();
-                                        move |menu, _, _| {
+                                        move |menu, _, cx| {
+                                            let mut menu = menu;
+                                            for (days, label) in [
+                                                (3, "删除超过三天的会话…"),
+                                                (7, "删除超过七天的会话…"),
+                                                (15, "删除超过十五天的会话…"),
+                                            ] {
+                                                let enabled = delete_enabled
+                                                    && view.upgrade().is_some_and(|view| {
+                                                        !view
+                                                            .read(cx)
+                                                            .old_session_ids(&delete_path, days)
+                                                            .is_empty()
+                                                    });
+                                                let view = view.clone();
+                                                let path = delete_path.clone();
+                                                menu = menu.item(
+                                                    PopupMenuItem::new(label)
+                                                        .icon(IconName::Trash)
+                                                        .disabled(!enabled)
+                                                        .on_click(move |_, window, cx| {
+                                                            let view = view.clone();
+                                                            let path = path.clone();
+                                                            window.defer(cx, move |window, cx| {
+                                                                let _ =
+                                                                    view.update(cx, |this, cx| {
+                                                                        this.delete_old_sessions(
+                                                                            &path, days, window, cx,
+                                                                        );
+                                                                    });
+                                                            });
+                                                        }),
+                                                );
+                                            }
                                             let view = view.clone();
                                             let delete_path = delete_path.clone();
                                             let delete_anchor = delete_anchor.clone();
-                                            menu.item(
+                                            menu.item(PopupMenuItem::separator()).item(
                                                 PopupMenuItem::new("删除项目会话")
                                                     .icon(IconName::Trash)
                                                     .disabled(!delete_enabled)

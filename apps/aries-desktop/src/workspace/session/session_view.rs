@@ -5,12 +5,15 @@ use agent_client_protocol::AcpAgentConfig;
 use agent_client_protocol::v1::schema::{
     PermissionOptionId, SessionId, SessionInfo, SetSessionConfigOptionRequest,
 };
-use gpui_kit::component::{ActiveTheme, h_resizable, resizable_panel};
+use gpui_kit::component::button::ButtonVariant;
+use gpui_kit::component::{ActiveTheme, WindowExt, h_resizable, resizable_panel};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
+use jiff::{SignedDuration, Timestamp};
 
 use crate::acp::Event;
 use crate::workspace::WorkspaceView;
+use crate::workspace::conversation::prompt_queue::PromptQueue;
 use crate::workspace::conversation::timeline::Timeline;
 use crate::workspace::conversation::{CommandMenuAction, Composer};
 use crate::workspace::git::GitPanel;
@@ -148,7 +151,11 @@ impl SessionView {
         let capabilities = self.execution.prompt_capabilities();
         self.execution.session_id().is_some()
             && !self.execution.is_disconnected()
-            && self.is_session_idle()
+            && self.execution.is_prompt_available(
+                self.deletion.is_busy()
+                    || self.configuration.is_pending()
+                    || self.composer.is_loading(),
+            )
             && (capabilities.image || capabilities.audio || capabilities.embedded_context)
     }
     pub fn input(&self) -> &Entity<gpui_kit::component::input::TextareaState> {
@@ -170,10 +177,13 @@ impl SessionView {
     pub fn can_start_new_chat(&self) -> bool {
         self.is_session_idle()
     }
+    pub fn is_prompt_ready(&self) -> bool {
+        self.execution
+            .is_prompt_available(self.deletion.is_busy() || self.configuration.is_pending())
+    }
     pub fn can_send(&self, cx: &App) -> bool {
-        self.execution.session_id().is_some()
-            && self.is_session_idle()
-            && !self.execution.is_disconnected()
+        self.is_prompt_ready()
+            && !self.execution.is_prompt_queue_full()
             && self.composer.has_content(cx)
     }
     pub fn can_load_sessions(&self) -> bool {
@@ -206,6 +216,15 @@ impl SessionView {
     }
     pub fn send(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.coordinate(|execution, parts| execution.send(parts, window, cx));
+    }
+    pub fn toggle_prompt_queue(&mut self, cx: &mut Context<Self>) {
+        self.execution.with_prompt_queue(PromptQueue::toggle);
+        cx.notify();
+    }
+    pub fn remove_queued_prompt(&mut self, id: u64, window: &mut Window, cx: &mut Context<Self>) {
+        self.execution.with_prompt_queue(|queue| queue.remove(id));
+        self.input().update(cx, |input, cx| input.focus(window, cx));
+        cx.notify();
     }
     pub fn stop(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.coordinate(|execution, parts| execution.stop(parts, window, cx));
@@ -392,6 +411,82 @@ impl SessionView {
         }
         ids.retain(|id| !self.sidebar.motion().is_deleted(id));
         ids
+    }
+    pub fn old_session_ids(&self, cwd: &Path, days: u16) -> Vec<SessionId> {
+        let now = Timestamp::now();
+        let age = SignedDuration::from_hours(i64::from(days) * 24);
+        self.session_ids(Some(cwd))
+            .into_iter()
+            .filter(|id| {
+                self.sidebar
+                    .list()
+                    .session(id)
+                    .and_then(|session| session.updated_at.as_deref())
+                    .and_then(|time| time.parse::<Timestamp>().ok())
+                    .is_some_and(|time| now.duration_since(time) > age)
+            })
+            .collect()
+    }
+    pub fn delete_old_sessions(
+        &mut self,
+        cwd: &Path,
+        days: u16,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.can_manage_sessions() {
+            return;
+        }
+        let ids = self.old_session_ids(cwd, days);
+        if ids.is_empty() {
+            return;
+        }
+        let count = ids.len();
+        let anchor = format!("project-prune:{}", cwd.display());
+        self.prepare_session_deletion(ids, anchor.clone(), cx);
+        let directory = cwd.file_name().unwrap_or(cwd.as_os_str()).to_string_lossy();
+        let title = format!("删除「{directory}」的旧会话？");
+        let description = format!(
+            "将删除项目 {} 中最后更新时间超过 {days} 天的 {count} 个会话，此操作无法撤销。",
+            cwd.display()
+        );
+        let view = cx.weak_entity();
+        window.open_alert_dialog(cx, move |dialog, _, _| {
+            let confirm_view = view.clone();
+            let close_view = view.clone();
+            let confirm_anchor = anchor.clone();
+            let close_anchor = anchor.clone();
+            dialog
+                .title(title.clone())
+                .description(description.clone())
+                .confirm()
+                .ok_text("删除")
+                .ok_variant(ButtonVariant::Danger)
+                .cancel_text("取消")
+                .on_ok(move |_, _, cx| {
+                    let _ = confirm_view.update(cx, |this, cx| {
+                        if this
+                            .deletion
+                            .pending_deletion()
+                            .is_some_and(|pending| pending.is_anchor(&confirm_anchor))
+                        {
+                            this.confirm_session_deletion(cx);
+                        }
+                    });
+                    true
+                })
+                .on_close(move |_, _, cx| {
+                    let _ = close_view.update(cx, |this, cx| {
+                        if this
+                            .deletion
+                            .pending_deletion()
+                            .is_some_and(|pending| pending.is_anchor(&close_anchor))
+                        {
+                            this.cancel_session_deletion(cx);
+                        }
+                    });
+                })
+        });
     }
     pub fn prepare_session_deletion(
         &mut self,

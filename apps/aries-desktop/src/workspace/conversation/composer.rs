@@ -17,7 +17,6 @@ use gpui_kit::prelude::*;
 use gpui_kit::*;
 
 use crate::workspace::SessionView;
-use crate::workspace::conversation::ClickHandler;
 use crate::workspace::conversation::draft::{
     Draft, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, PromptAttachment,
 };
@@ -80,6 +79,15 @@ impl Composer {
         self.clear_attachments();
         self.attachments = attachments;
         self.input.update(cx, |input, cx| input.set_value(text, window, cx));
+    }
+
+    pub fn clear(&mut self, window: &mut Window, cx: &mut Context<SessionView>) {
+        self.clear_attachments();
+        self.reset_menu();
+        self.input.update(cx, |input, cx| {
+            input.set_value("", window, cx);
+            input.focus(window, cx);
+        });
     }
 
     pub fn clear_attachments(&mut self) {
@@ -386,6 +394,9 @@ impl Composer {
                     ))
                 })
                 .child(session.render_execution_context(p, cx))
+                .when_some(session.execution().prompt_queue(), |composer, queue| {
+                    composer.child(queue.render(session, p, cx))
+                })
                 .child(
                     div()
                         .relative()
@@ -399,21 +410,22 @@ impl Composer {
                             this.command_menu_action(CommandMenuAction::Next, window, cx)
                         }))
                         .capture_action(cx.listener(|this, action: &Enter, window, cx| {
-                            if action.secondary
-                                || !this.input().read(cx).focus_handle(cx).is_focused(window)
+                            if !this.input().read(cx).focus_handle(cx).is_focused(window)
                                 || this.input().update(cx, |input, cx| {
                                     input.marked_text_range(window, cx).is_some()
                                 })
                             {
                                 return;
                             }
-                            if !action.shift {
+                            if !action.shift && !action.secondary {
                                 this.command_menu_action(CommandMenuAction::Complete, window, cx);
                                 if window.default_prevented() {
                                     return;
                                 }
                             }
-                            if action.shift == (this.send_key(cx) == SendKey::ShiftEnter) {
+                            if !action.shift
+                                && action.secondary == (this.send_key(cx) == SendKey::CommandEnter)
+                            {
                                 window.prevent_default();
                                 cx.stop_propagation();
                                 this.send(window, cx);
@@ -433,20 +445,7 @@ impl Composer {
                             cx,
                         ))
                         .child(self.render_attachments(p, cx))
-                        .child(ComposerInput::new(
-                            self,
-                            session,
-                            p,
-                            cx.weak_entity(),
-                            Box::new(cx.listener(|this, _, window, cx| {
-                                if this.execution().conversation().is_busy() {
-                                    this.stop(window, cx);
-                                } else {
-                                    this.send(window, cx);
-                                }
-                            })),
-                            can_send,
-                        )),
+                        .child(ComposerInput::new(self, session, p, cx.weak_entity(), can_send)),
                 )
                 .child(
                     div()
@@ -467,8 +466,15 @@ impl Composer {
                                 .text_color(p.muted())
                                 .text_right()
                                 .child(format!(
-                                    "{} 发送 · {} 换行",
+                                    "{} {} · {} 换行",
                                     send_key.send_label(),
+                                    if session.execution().conversation().is_busy() {
+                                        "加入队列"
+                                    } else if session.execution().prompt_queue().is_some() {
+                                        "合并发送"
+                                    } else {
+                                        "发送"
+                                    },
                                     send_key.newline_label(),
                                 )),
                         ),
@@ -842,7 +848,7 @@ struct ComposerInput {
     palette: Palette,
     attachments_available: bool,
     view: WeakEntity<SessionView>,
-    on_submit: ClickHandler,
+    has_queue: bool,
 }
 impl ComposerInput {
     fn new(
@@ -850,7 +856,6 @@ impl ComposerInput {
         session: &SessionView,
         palette: Palette,
         view: WeakEntity<SessionView>,
-        on_submit: ClickHandler,
         can_send: bool,
     ) -> Self {
         Self {
@@ -862,7 +867,7 @@ impl ComposerInput {
             attachments_available: session.attachments_available()
                 && composer.attachment_task.is_none(),
             view,
-            on_submit,
+            has_queue: session.execution().prompt_queue().is_some(),
         }
     }
 }
@@ -877,10 +882,12 @@ impl RenderOnce for ComposerInput {
             palette: p,
             attachments_available,
             view,
-            on_submit,
+            has_queue,
         } = self;
         let picker = view.clone();
         let drop_view = view.clone();
+        let stop_view = view.clone();
+        let send_view = view.clone();
         div()
             .id("multimodal-composer")
             .on_drop(move |paths: &ExternalPaths, window, cx| {
@@ -925,18 +932,40 @@ impl RenderOnce for ComposerInput {
                         }),
                 ),
             )
+            .when(busy, |composer| {
+                composer.child(
+                    Button::new("stop")
+                        .ghost()
+                        .icon(IconName::Square)
+                        .label(if stopping { "停止中" } else { "停止" })
+                        .accessibility_label("停止回复")
+                        .disabled(stopping)
+                        .on_click(move |_, window, cx| {
+                            let _ = stop_view.update(cx, |this, cx| this.stop(window, cx));
+                        }),
+                )
+            })
             .child(
                 Button::new("send")
                     .primary()
-                    .icon(
-                        Icon::new(if busy { IconName::Square } else { IconName::Send })
-                            .size(rems(1.0625)),
-                    )
-                    .accessibility_label(if busy { "停止回复" } else { "发送消息" })
-                    .size_10()
-                    .rounded(cx.theme().radius_lg)
-                    .disabled(if busy { stopping } else { !can_send })
-                    .on_click(on_submit),
+                    .icon(IconName::Send)
+                    .when(!busy && !has_queue, |button| {
+                        button.size_10().rounded(cx.theme().radius_lg)
+                    })
+                    .when(busy || has_queue, |button| {
+                        button.label(if busy { "加入队列" } else { "合并发送" })
+                    })
+                    .accessibility_label(if busy {
+                        "加入待发送队列"
+                    } else if has_queue {
+                        "合并队列与消息发送"
+                    } else {
+                        "发送消息"
+                    })
+                    .disabled(!can_send)
+                    .on_click(move |_, window, cx| {
+                        let _ = send_view.update(cx, |this, cx| this.send(window, cx));
+                    }),
             )
     }
 }

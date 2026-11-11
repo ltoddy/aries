@@ -62,7 +62,7 @@ impl<'a> SessionToolbar<'a> {
                             .ghost()
                             .small()
                             .on_click(cx.listener(|this, _, _, cx| {
-                                this.with_sidebar(|sidebar| sidebar.list_mut().collapse_all());
+                                this.with_sidebar(|sidebar| sidebar.collapse_all());
                                 cx.notify();
                             })),
                     )

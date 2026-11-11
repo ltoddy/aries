@@ -99,6 +99,9 @@ pub fn render_execution_context(
     if let Some(branch) = &branch {
         directory.push_str(&format!("\nGit：{branch}"));
     }
+    if let Some(id) = owner.execution().session_id() {
+        directory.push_str(&format!("\nSession ID: {id}"));
+    }
     div()
         .flex()
         .items_center()
@@ -136,6 +139,19 @@ pub fn render_execution_context(
                             "execution-branch-text",
                             format!("· {branch}"),
                         )),
+                    )
+                })
+                .when_some(owner.execution().session_id(), |row, id| {
+                    row.child(
+                        div()
+                            .min_w_0()
+                            .max_w(relative(0.5))
+                            .truncate()
+                            .font_family(cx.theme().mono_font_family.clone())
+                            .child(SelectableText::new(
+                                "execution-session-text",
+                                format!("· Session ID: {id}"),
+                            )),
                     )
                 }),
         )

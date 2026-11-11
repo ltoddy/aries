@@ -1,0 +1,22 @@
+[package]
+name = "aries-ipc"
+version = "0.1.0"
+edition = "2024"
+authors.workspace = true
+categories.workspace = true
+description.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+
+[dependencies]
+aries-persistence = { path = "../aries-persistence" }
+aries-proto = { path = "../aries-proto" }
+jiff.workspace = true
+thiserror.workspace = true
+toasty.workspace = true
+tokio = { workspace = true, features = ["net"] }
+tokio-stream = { version = "0.1", features = ["net"] }
+tonic = "0.14"
+tracing.workspace = true

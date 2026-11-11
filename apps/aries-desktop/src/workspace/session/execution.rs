@@ -2,8 +2,8 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 
 use agent_client_protocol::v1::schema::{
-    LoadSessionRequest, LoadSessionResponse, PermissionOptionId, PromptCapabilities, SessionId,
-    SessionInfo, SessionNotification, SessionUpdate,
+    ContentBlock, LoadSessionRequest, LoadSessionResponse, PermissionOptionId, PromptCapabilities,
+    SessionId, SessionInfo, SessionNotification, SessionUpdate, StopReason,
 };
 use agent_client_protocol::{AcpAgentConfig, Error};
 use anyhow::Context as _;
@@ -15,6 +15,7 @@ use crate::acp::{Bridge, Command, DeletionReport, Event, Permission};
 use crate::workspace::conversation::Composer;
 use crate::workspace::conversation::draft::Draft;
 use crate::workspace::conversation::model::Conversation;
+use crate::workspace::conversation::prompt_queue::PromptQueue;
 use crate::workspace::conversation::timeline::Timeline;
 use crate::workspace::git::GitPanel;
 use crate::workspace::session::configuration::Configuration;
@@ -40,6 +41,7 @@ pub struct Execution {
     queued_session_load: Option<SessionInfo>,
     pending_updates: Vec<SessionNotification>,
     drafts: HashMap<SessionId, Draft>,
+    prompt_queues: HashMap<SessionId, PromptQueue>,
     prompt_capabilities: PromptCapabilities,
     loading_session: Option<SessionLoad>,
     creating_session: bool,
@@ -112,6 +114,7 @@ impl Execution {
             cx,
         );
         self.drafts.retain(|id, _| !deleted.contains(id));
+        self.prompt_queues.retain(|id, _| !deleted.contains(id));
         if self.session_id.as_ref().is_some_and(|id| deleted.contains(id)) {
             self.reset_chat(ui);
             ui.composer.input().update(cx, |input, cx| input.set_value("", window, cx));
@@ -167,6 +170,7 @@ impl Execution {
             queued_session_load: None,
             pending_updates: Vec::new(),
             drafts: HashMap::new(),
+            prompt_queues: HashMap::new(),
             prompt_capabilities: PromptCapabilities::new(),
             loading_session: None,
             creating_session: false,
@@ -290,20 +294,46 @@ impl Execution {
         let Some(session_id) = self.session_id.clone() else {
             return;
         };
-        let content = ui.composer.content(cx);
+        if self.conversation.is_busy() || self.prompt_queue().is_some() {
+            if !self
+                .prompt_queues
+                .entry(session_id.clone())
+                .or_default()
+                .push(ui.composer.draft(cx))
+            {
+                return;
+            }
+            ui.composer.clear(window, cx);
+            self.drafts.remove(&session_id);
+            if !self.conversation.is_busy() {
+                self.send_prompt_queue(ui, window, cx);
+            }
+        } else if self.send_content(ui, session_id.clone(), ui.composer.content(cx), window, cx) {
+            ui.composer.clear(window, cx);
+            self.drafts.remove(&session_id);
+        }
+        cx.notify();
+    }
+
+    fn send_content(
+        &mut self,
+        ui: &mut SessionParts<'_>,
+        session_id: SessionId,
+        content: Vec<ContentBlock>,
+        window: &mut Window,
+        cx: &mut Context<SessionView>,
+    ) -> bool {
         if !self.conversation.begin_turn(&session_id, &content) {
-            return;
+            return false;
         }
         if self.bridge.is_none() {
             self.connect(ui, window, cx);
         }
-        if self.bridge.as_ref().is_some_and(|bridge| {
-            bridge.send(Command::Prompt { session_id: session_id.clone(), content }).is_ok()
-        }) {
-            ui.composer.input().update(cx, |input, cx| input.set_value("", window, cx));
-            ui.composer.clear_attachments();
-            self.drafts.remove(&session_id);
-        } else {
+        let sent = self
+            .bridge
+            .as_ref()
+            .is_some_and(|bridge| bridge.send(Command::Prompt { session_id, content }).is_ok());
+        if !sent {
             self.apply_event(
                 ui,
                 Event::Disconnected("无法发送消息，请新建对话".into()),
@@ -313,6 +343,62 @@ impl Execution {
         }
         ui.timeline.list().set_follow_mode(FollowMode::Tail);
         cx.notify();
+        sent
+    }
+
+    pub fn prompt_queue(&self) -> Option<&PromptQueue> {
+        self.session_id.as_ref().and_then(|id| self.prompt_queues.get(id))
+    }
+
+    pub fn is_prompt_queue_full(&self) -> bool {
+        self.prompt_queue().is_some_and(PromptQueue::is_full)
+    }
+
+    pub fn with_prompt_queue(&mut self, operation: impl FnOnce(&mut PromptQueue)) {
+        if let Some(id) = &self.session_id
+            && let Some(queue) = self.prompt_queues.get_mut(id)
+        {
+            operation(queue);
+            if queue.is_empty() {
+                self.prompt_queues.remove(id);
+            }
+        }
+    }
+
+    pub fn send_prompt_queue(
+        &mut self,
+        ui: &mut SessionParts<'_>,
+        window: &mut Window,
+        cx: &mut Context<SessionView>,
+    ) -> bool {
+        if self.conversation.is_busy()
+            || !self.is_prompt_available(ui.deletion.is_busy() || ui.configuration.is_pending())
+        {
+            return false;
+        }
+        let Some(id) = self.session_id.clone() else {
+            return false;
+        };
+        let Some(queue) = self.prompt_queue() else {
+            return false;
+        };
+        let content = queue.content();
+        let sent = self.send_content(ui, id.clone(), content, window, cx);
+        if sent {
+            self.prompt_queues.remove(&id);
+        }
+        cx.notify();
+        sent
+    }
+
+    pub fn is_prompt_available(&self, blocked: bool) -> bool {
+        self.session_id.is_some()
+            && !blocked
+            && !self.disconnected
+            && !self.stopping
+            && self.loading_session.is_none()
+            && !self.creating_session
+            && !self.choosing_directory
     }
 
     pub fn is_idle(&self, blocked: bool) -> bool {
@@ -328,9 +414,9 @@ impl Execution {
         )
     }
     pub fn can_send(&self, ui: &SessionParts<'_>, cx: &App) -> bool {
-        self.session_id.is_some()
-            && self.is_session_idle(ui)
-            && !self.disconnected
+        self.is_prompt_available(
+            ui.deletion.is_busy() || ui.configuration.is_pending() || ui.composer.is_loading(),
+        ) && !self.is_prompt_queue_full()
             && ui.composer.has_content(cx)
     }
     pub fn supports_load(&self) -> bool {
@@ -357,6 +443,7 @@ impl Execution {
             return;
         }
         self.dismiss_permissions();
+        self.with_prompt_queue(PromptQueue::pause);
         if self.bridge.as_ref().is_some_and(|bridge| bridge.send(Command::Cancel).is_ok()) {
             self.stopping = true;
         } else {
@@ -546,14 +633,21 @@ impl Execution {
             },
             Event::Finished(result) => {
                 self.dismiss_permissions();
+                let automatic = matches!(&result, Ok(StopReason::EndTurn)) && !self.stopping;
                 self.stopping = false;
                 self.conversation.finish(result.err().map(|error| error.to_string()));
+                if automatic && self.prompt_queue().is_some_and(PromptQueue::is_automatic) {
+                    self.send_prompt_queue(ui, window, cx);
+                } else {
+                    self.with_prompt_queue(PromptQueue::pause);
+                }
                 if ui.render_mode != crate::workspace::SessionRenderMode::Main {
                     self.refresh_sessions(ui, cx);
                 }
             },
             Event::Disconnected(error) => {
                 self.dismiss_permissions();
+                self.with_prompt_queue(PromptQueue::pause);
                 self.stopping = false;
                 self.disconnected = true;
                 self.load_supported = false;

@@ -32,7 +32,8 @@ impl SessionLoad {
         let _ = self.conversation.receive(notification);
     }
 
-    pub fn into_parts(self) -> (SessionInfo, Conversation, Option<u64>) {
+    pub fn into_parts(mut self) -> (SessionInfo, Conversation, Option<u64>) {
+        self.conversation.format_history_user_messages();
         (self.session, self.conversation, self.tokens)
     }
 }

@@ -248,7 +248,7 @@ impl SettingsState {
                     let page = this.page;
                     let appearance = this.settings.appearance();
                     let send_key = this.settings.send_key();
-                    let send_keys = [SendKey::Enter, SendKey::ShiftEnter];
+                    let send_keys = [SendKey::Enter, SendKey::CommandEnter];
                     let send_key_view = view.clone();
                     let font_size = this.settings.font_size();
                     let font_select = this.font_select.clone();
@@ -400,10 +400,14 @@ impl SettingsState {
                                             send_keys.iter().position(|key| *key == send_key),
                                         )
                                         .children([
-                                            Radio::new("send-key-enter")
-                                                .label("Enter 发送，Shift + Enter 换行"),
-                                            Radio::new("send-key-shift-enter")
-                                                .label("Shift + Enter 发送，Enter 换行"),
+                                            Radio::new("send-key-enter").label(format!(
+                                                "Enter 发送，{} 换行",
+                                                SendKey::Enter.newline_label(),
+                                            )),
+                                            Radio::new("send-key-command-enter").label(format!(
+                                                "{} 发送，Enter 换行",
+                                                SendKey::CommandEnter.send_label(),
+                                            )),
                                         ])
                                         .on_change(move |index, _, cx| {
                                             if let Some(send_key) = send_keys.get(*index) {

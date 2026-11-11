@@ -5,4 +5,4 @@ mod session;
 mod toolbar;
 mod view;
 
-pub use self::view::Sidebar;
+pub use self::view::{SESSION_LIMIT, Sidebar};

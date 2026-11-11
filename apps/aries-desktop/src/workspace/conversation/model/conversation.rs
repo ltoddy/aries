@@ -38,7 +38,7 @@ impl Message {
                 _ => None,
             })
             .collect::<Vec<_>>()
-            .join("");
+            .join("\n\n");
         let updates = content
             .iter()
             .cloned()
@@ -159,6 +159,26 @@ impl Conversation {
         self.busy = true;
         self.error = None;
         true
+    }
+
+    pub fn format_history_user_messages(&mut self) {
+        for message in &mut self.messages {
+            if message.role != Role::User {
+                continue;
+            }
+            message.text = message
+                .updates
+                .iter()
+                .filter_map(|notification| match &notification.update {
+                    SessionUpdate::UserMessageChunk(chunk) => match &chunk.content {
+                        ContentBlock::Text(text) => Some(text.text.as_str()),
+                        _ => None,
+                    },
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+                .join("\n\n");
+        }
     }
 
     pub fn receive(&mut self, notification: SessionNotification) -> Option<usize> {
