@@ -28,7 +28,7 @@ impl ChatContext {
         _ = tokio::fs::create_dir_all(root_dir).await;
 
         let history = Self::load(&file_path).await.unwrap_or_default();
-        let file = JsonlAppender::open(&file_path).await?;
+        let file = JsonlAppender::open(file_path).await?;
 
         let inner = Inner { history: RwLock::new(history), file };
         Ok(Self { inner: Arc::new(inner) })

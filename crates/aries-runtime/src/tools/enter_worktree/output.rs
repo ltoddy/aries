@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -10,15 +10,15 @@ pub struct EnterGitWorktreeOutput {
 }
 
 impl EnterGitWorktreeOutput {
-    pub fn new(worktree_path: impl AsRef<Path>, worktree_branch: impl Into<String>) -> Self {
-        let worktree_path = worktree_path.as_ref();
+    pub fn new(worktree_path: impl Into<PathBuf>, worktree_branch: impl Into<String>) -> Self {
+        let worktree_path: PathBuf = worktree_path.into();
         let worktree_branch = worktree_branch.into();
         let message = format!(
             "Created worktree at {} on branch {worktree_branch}. The session is now working in the worktree. Use ExitGitWorktree tool to leave it.",
             worktree_path.display(),
         );
 
-        Self { worktree_path: worktree_path.to_owned(), worktree_branch, message }
+        Self { worktree_path, worktree_branch, message }
     }
 
     pub fn render_output(raw: serde_json::Value) -> Result<String, serde_json::Error> {

@@ -18,15 +18,15 @@ pub struct MemoryStore {
 impl MemoryStore {
     const MANIFEST_FILENAME: &str = "MEMORY.md";
 
-    pub async fn new(dir: impl AsRef<Path>) -> Self {
-        let dir = dir.as_ref();
-        _ = tokio::fs::create_dir_all(dir).await;
+    pub async fn new(dir: impl Into<PathBuf>) -> Self {
+        let dir: PathBuf = dir.into();
+        _ = tokio::fs::create_dir_all(&dir).await;
 
-        Self { dir: dir.to_owned() }
+        Self { dir }
     }
 
-    pub async fn read_memory(&self, file_name: impl Into<String>) -> Option<String> {
-        let file_name = file_name.into();
+    pub async fn read_memory(&self, file_name: impl AsRef<str>) -> Option<String> {
+        let file_name = file_name.as_ref();
         let file_path = self.dir.join(file_name);
 
         FrontmatterDocument::<MemoryFrontmatter>::read(&file_path)
@@ -87,16 +87,16 @@ pub struct Memory {
 
 impl Memory {
     pub fn new(
-        location: impl AsRef<Path>,
+        location: impl Into<PathBuf>,
         file_name: impl Into<String>,
         frontmatter: MemoryFrontmatter,
         body: impl Into<String>,
     ) -> Self {
-        let location = location.as_ref();
+        let location = location.into();
         let file_name = file_name.into();
         let body = body.into();
 
-        Self { location: location.to_owned(), file_name, frontmatter, body }
+        Self { location, file_name, frontmatter, body }
     }
 
     pub fn to_retriever_line(&self) -> String {

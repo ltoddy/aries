@@ -20,8 +20,8 @@ pub struct AgentsmdReader {
 }
 
 impl AgentsmdReader {
-    pub fn new(root: impl AsRef<Path>) -> Self {
-        let root = root.as_ref().to_owned();
+    pub fn new(root: impl Into<PathBuf>) -> Self {
+        let root = root.into();
 
         Self { root }
     }
@@ -44,8 +44,8 @@ pub struct Agentsmd {
 }
 
 impl Agentsmd {
-    pub fn new(file_path: impl AsRef<Path>, content: impl Into<String>, is_root: bool) -> Self {
-        let file_path = file_path.as_ref().to_owned();
+    pub fn new(file_path: impl Into<PathBuf>, content: impl Into<String>, is_root: bool) -> Self {
+        let file_path = file_path.into();
         let content = content.into();
 
         Self { file_path, content, is_root }

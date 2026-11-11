@@ -91,14 +91,14 @@ impl Session {
     pub async fn new(
         id: impl Into<String>,
         gctx: GlobalContext,
-        cwd: impl AsRef<Path>,
+        cwd: impl Into<PathBuf>,
         config: ModelConfig,
         setting: Setting,
         db: Db,
         external_mcp_config: McpDefinition,
     ) -> Result<Self, SessionError> {
         let id = id.into();
-        let cwd = cwd.as_ref();
+        let cwd: PathBuf = cwd.into();
 
         Self::build(
             id,
@@ -117,14 +117,14 @@ impl Session {
     pub async fn load(
         id: impl Into<String>,
         gctx: GlobalContext,
-        cwd: impl AsRef<Path>,
+        cwd: impl Into<PathBuf>,
         config: ModelConfig,
         setting: Setting,
         db: Db,
         external_mcp_config: McpDefinition,
     ) -> Result<Self, SessionError> {
         let id = id.into();
-        let cwd = cwd.as_ref();
+        let cwd: PathBuf = cwd.into();
 
         Self::build(
             id,
@@ -142,7 +142,7 @@ impl Session {
     pub async fn set_model(&mut self, alias: impl Into<String>) -> Result<(), SessionError> {
         let alias = alias.into();
 
-        let config = self.setting.activate(&alias)?;
+        let config = self.setting.activate(alias)?;
 
         let model = crate::session::create_model(&config);
 
@@ -392,7 +392,7 @@ impl Session {
     #[allow(clippy::too_many_arguments)]
     async fn build(
         id: impl Into<String>,
-        cwd: impl AsRef<Path>,
+        cwd: impl Into<PathBuf>,
         gctx: GlobalContext,
         config: ModelConfig,
         setting: Setting,
@@ -401,7 +401,7 @@ impl Session {
         source: SessionStartSource,
     ) -> Result<Self, SessionError> {
         let id = id.into();
-        let cwd = cwd.as_ref();
+        let cwd: PathBuf = cwd.into();
         let session_dir = gctx.root_dir().join(format!("session-{id}"));
         let transcript_path = session_dir.join("transcripts");
 
@@ -412,26 +412,26 @@ impl Session {
 
         let (notifier, receiver) = Notifier::channel();
 
-        let mut extensions = AgentExtensions::new(cwd, gctx.root_dir()).await;
+        let mut extensions = AgentExtensions::new(&cwd, gctx.root_dir()).await;
         extensions.mcps.push(external_mcp_config);
         let tool_server_handle = ToolServer::new().run();
         let mcp_clients = mcp::connect(&extensions.mcps, tool_server_handle.clone()).await;
 
         let memory_store =
-            MemoryStore::new(gctx.memory_root_dir().join(aries_filesystem::path_to_slug(cwd)))
+            MemoryStore::new(gctx.memory_root_dir().join(aries_filesystem::path_to_slug(&cwd)))
                 .await;
 
         let chat_history = ChatHistory::new(&session_dir).await?;
         let chat_context = ChatContext::new(&session_dir).await?;
 
         let hooks_executor = Arc::new(HooksExecutor::new(extensions.hooks.clone()));
-        let instruction_ctx = InstructionContext::new(cwd);
+        let instruction_ctx = InstructionContext::new(&cwd);
         let session_repo = SessionRepository::new(db.clone());
 
         let hook = SessionPromptHook::new(
             hooks_executor.clone(),
             &id,
-            cwd,
+            &cwd,
             &transcript_path,
             DEFAULT_AGENT_NAME,
             db.clone(),
@@ -456,7 +456,7 @@ impl Session {
 
         let compactor = ContextCompactor::new(
             &id,
-            cwd,
+            &state.cwd,
             &transcript_path,
             state.model.clone(),
             chat_context.clone(),
@@ -464,7 +464,7 @@ impl Session {
             Notifier::clone(&notifier),
         );
 
-        let input = SessionStartHookInput::new(&id, cwd, source, state.model.name());
+        let input = SessionStartHookInput::new(&id, &state.cwd, source, state.model.name());
         if let HookDecision::Continue { contexts } = hooks_executor.fire_session_start(input).await
         {
             chat_context.append(&system_reminders(contexts)).await;
@@ -501,7 +501,8 @@ impl Session {
         title
     }
 
-    async fn recall_context(&self, query: impl Into<String>) -> Option<String> {
+    async fn recall_context(&self, query: impl AsRef<str>) -> Option<String> {
+        let query = query.as_ref();
         let memories = self.memory_store.scan().await;
         let retriever = MemoryRetriever::new(self.state.model.clone());
         let retrieved = retriever.retrieve(query, &memories).await;

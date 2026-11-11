@@ -33,8 +33,8 @@ pub async fn write<'a, S: Serialize + 'a>(
 }
 
 pub async fn read<D: DeserializeOwned>(path: impl AsRef<Path>) -> io::Result<Vec<D>> {
-    let path = path.as_ref().to_owned();
-    let content = tokio::fs::read_to_string(&path).await?;
+    let path = path.as_ref();
+    let content = tokio::fs::read_to_string(path).await?;
 
     let elements: Vec<D> = Deserializer::from_str(&content)
         .into_iter::<D>()
@@ -58,17 +58,17 @@ pub struct JsonlAppender {
 }
 
 impl JsonlAppender {
-    pub async fn open(file_path: impl AsRef<Path>) -> io::Result<Self> {
-        let file_path = file_path.as_ref();
+    pub async fn open(file_path: impl Into<PathBuf>) -> io::Result<Self> {
+        let file_path: PathBuf = file_path.into();
         let file = tokio::fs::OpenOptions::new()
             .create(true)
             .read(true)
             .write(true)
             .append(true)
-            .open(file_path)
+            .open(&file_path)
             .await?;
 
-        Ok(Self { file_path: file_path.to_owned(), file: Arc::new(Mutex::new(file)) })
+        Ok(Self { file_path, file: Arc::new(Mutex::new(file)) })
     }
 
     pub async fn append<'a, S: Serialize + 'a>(

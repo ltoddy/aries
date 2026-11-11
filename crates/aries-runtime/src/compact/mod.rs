@@ -7,7 +7,7 @@ mod tests;
 mod tokens;
 mod window;
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use aries_communicate::{CompactionStatus, Notifier};
@@ -43,29 +43,20 @@ pub struct ContextCompactor {
 impl ContextCompactor {
     pub fn new(
         id: impl Into<String>,
-        cwd: impl AsRef<Path>,
-        transcript_path: impl AsRef<Path>,
+        cwd: impl Into<PathBuf>,
+        transcript_path: impl Into<PathBuf>,
         model: Model<OpenAiWire>,
         chat_context: ChatContext,
         hooks_executor: Arc<HooksExecutor>,
         notifier: Notifier,
     ) -> Self {
         let id = id.into();
-        let cwd = cwd.as_ref();
-        let transcript_path = transcript_path.as_ref();
+        let cwd = cwd.into();
+        let transcript_path: PathBuf = transcript_path.into();
         let breaker = AutoCompactBreaker::new();
-        let agent = CompactAgent::new(model, transcript_path);
+        let agent = CompactAgent::new(model, &transcript_path);
 
-        Self {
-            agent,
-            transcript_path: transcript_path.to_owned(),
-            breaker,
-            chat_context,
-            hooks_executor,
-            id,
-            cwd: cwd.to_owned(),
-            notifier,
-        }
+        Self { agent, transcript_path, breaker, chat_context, hooks_executor, id, cwd, notifier }
     }
 
     pub fn set_model(&mut self, model: Model<OpenAiWire>) {

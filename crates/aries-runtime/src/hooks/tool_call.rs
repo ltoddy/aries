@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -20,8 +20,8 @@ pub struct ToolCallHook {
 }
 
 impl ToolCallHook {
-    pub fn new(cwd: impl AsRef<Path>, db: Db) -> Self {
-        let cwd = cwd.as_ref().to_owned();
+    pub fn new(cwd: impl Into<PathBuf>, db: Db) -> Self {
+        let cwd = cwd.into();
         let tool_call_repo = ToolCallRepository::new(db);
 
         Self { cwd, tool_call_repo, tool_call_started_at: Arc::new(Mutex::new(HashMap::new())) }

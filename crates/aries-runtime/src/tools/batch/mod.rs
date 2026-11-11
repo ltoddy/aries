@@ -2,7 +2,7 @@ mod args;
 mod error;
 mod output;
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use aries_communicate::Notifier;
 use aries_extension::AgentExtensions;
@@ -38,14 +38,14 @@ impl BatchTool {
         gctx: GlobalContext,
         ctx: ToolContext,
         model: Model<OpenAiWire>,
-        parent_dir: impl AsRef<Path>,
+        parent_dir: impl Into<PathBuf>,
         notifier: Notifier,
         extensions: AgentExtensions,
         db: Db,
     ) -> Self {
-        let parent_dir = parent_dir.as_ref();
+        let parent_dir = parent_dir.into();
 
-        Self { gctx, ctx, model, parent_dir: parent_dir.to_owned(), notifier, extensions, db }
+        Self { gctx, ctx, model, parent_dir, notifier, extensions, db }
     }
 
     async fn dispatch(

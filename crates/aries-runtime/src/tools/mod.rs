@@ -149,7 +149,7 @@ pub fn create_tools(
                     tool_set.add_tool(enter_worktree::EnterGitWorktreeTool::new(
                         ctx.clone(),
                         repository,
-                        gctx.worktree_dir(),
+                        gctx.worktree_dir().as_ref(),
                     ));
                 }
             },

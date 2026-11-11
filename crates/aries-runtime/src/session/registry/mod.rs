@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use aries_extension::mcp::McpDefinition;
 use aries_init::{GlobalContext, Setting, SettingError};
@@ -23,6 +23,12 @@ pub enum RegistryError {
 
     #[error("parent session {0} is not active")]
     SessionNotActive(String),
+}
+
+impl RegistryError {
+    pub fn session_not_active(session_id: impl Into<String>) -> Self {
+        Self::SessionNotActive(session_id.into())
+    }
 }
 
 pub struct SessionRegistry {
@@ -60,26 +66,26 @@ impl SessionRegistry {
         Ok(sessions)
     }
 
-    pub async fn close_session(&mut self, session_id: impl Into<String>) {
-        let session_id = session_id.into();
+    pub async fn close_session(&mut self, session_id: impl AsRef<str>) {
+        let session_id = session_id.as_ref();
 
-        if let Some(removed) = self.active_sessions.remove(&session_id) {
+        if let Some(removed) = self.active_sessions.remove(session_id) {
             removed.close().await;
         };
     }
 
     pub async fn delete_session(
         &mut self,
-        session_id: impl Into<String>,
+        session_id: impl AsRef<str>,
     ) -> Result<(), RegistryError> {
-        let session_id = session_id.into();
+        let session_id = session_id.as_ref();
 
-        if let Some(removed) = self.active_sessions.remove(&session_id) {
+        if let Some(removed) = self.active_sessions.remove(session_id) {
             removed.close().await;
         }
 
-        if let Ok(session) = self.session_repo.find_last_by_session_id(&session_id).await {
-            self.session_repo.delete_by_session_id(&session_id).await?;
+        if let Ok(session) = self.session_repo.find_last_by_session_id(session_id).await {
+            self.session_repo.delete_by_session_id(session_id).await?;
             let _ = tokio::fs::remove_dir_all(&session.root_dir).await;
         }
 
@@ -88,24 +94,24 @@ impl SessionRegistry {
 
     pub async fn try_session(
         &mut self,
-        cwd: impl AsRef<Path>,
-        session_id: impl Into<String>,
+        cwd: impl Into<PathBuf>,
+        session_id: impl AsRef<str>,
     ) -> Result<Session, RegistryError> {
-        let cwd = cwd.as_ref();
-        let session_id = session_id.into();
-        if let Some(session) = self.active_sessions.get(&session_id) {
+        let cwd: PathBuf = cwd.into();
+        let session_id = session_id.as_ref();
+        if let Some(session) = self.active_sessions.get(session_id) {
             return Ok(session.to_owned());
         }
 
         let mcp_config = McpDefinition::empty();
-        match self.session_repo.find_last_by_session_id(&session_id).await {
+        match self.session_repo.find_last_by_session_id(session_id).await {
             Ok(_) => self.load_session(session_id, mcp_config).await,
             Err(_) => self.new_session(cwd, mcp_config).await,
         }
     }
 
-    pub fn session(&self, session_id: impl Into<String>) -> Option<Session> {
-        let session = self.active_sessions.get(&session_id.into())?;
+    pub fn session(&self, session_id: impl AsRef<str>) -> Option<Session> {
+        let session = self.active_sessions.get(session_id.as_ref())?;
 
         Some(session.to_owned())
     }
@@ -116,10 +122,10 @@ impl SessionRegistry {
 
     pub async fn new_session(
         &mut self,
-        cwd: impl AsRef<Path>,
+        cwd: impl Into<PathBuf>,
         external_mcp_config: McpDefinition,
     ) -> Result<Session, RegistryError> {
-        let cwd = cwd.as_ref();
+        let cwd: PathBuf = cwd.into();
         let session_id = nanoid::nanoid!();
         let model_config = self.setting.active_model()?;
 
@@ -139,7 +145,7 @@ impl SessionRegistry {
         self.session_repo
             .create(
                 session.id(),
-                cwd.display().to_string(),
+                session.current_dir().display().to_string(),
                 session.session_dir().display().to_string(),
                 session.transcript_path().display().to_string(),
             )
@@ -150,12 +156,12 @@ impl SessionRegistry {
 
     pub async fn load_session(
         &mut self,
-        session_id: impl Into<String>,
+        session_id: impl AsRef<str>,
         external_mcp_config: McpDefinition,
     ) -> Result<Session, RegistryError> {
-        let session_id = session_id.into();
+        let session_id = session_id.as_ref();
 
-        let session = self.session_repo.find_last_by_session_id(&session_id).await?;
+        let session = self.session_repo.find_last_by_session_id(session_id).await?;
 
         let model_config = self.setting.active_model()?;
 
@@ -178,18 +184,18 @@ impl SessionRegistry {
 
     pub async fn fork_session(
         &mut self,
-        parent_session_id: impl Into<String>,
-        cwd: impl AsRef<Path>,
+        parent_session_id: impl AsRef<str>,
+        cwd: impl Into<PathBuf>,
         external_mcp_config: McpDefinition,
     ) -> Result<Session, RegistryError> {
-        let parent_session_id = parent_session_id.into();
-        let cwd = cwd.as_ref();
+        let parent_session_id = parent_session_id.as_ref();
+        let cwd: PathBuf = cwd.into();
         let session_id = nanoid::nanoid!();
 
         let parent_session = self
             .active_sessions
-            .get(&parent_session_id)
-            .ok_or_else(|| RegistryError::SessionNotActive(parent_session_id.clone()))?;
+            .get(parent_session_id)
+            .ok_or_else(|| RegistryError::session_not_active(parent_session_id))?;
 
         let model_config = self.setting.active_model()?;
         let session = Session::new(
@@ -211,7 +217,7 @@ impl SessionRegistry {
         self.session_repo
             .create(
                 &session.id(),
-                cwd.display().to_string(),
+                session.current_dir().display().to_string(),
                 session.session_dir().display().to_string(),
                 session.transcript_path().display().to_string(),
             )

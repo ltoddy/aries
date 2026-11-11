@@ -2,7 +2,7 @@ mod args;
 mod error;
 mod output;
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use aries_communicate::{Notifier, SubagentUpdate};
 use aries_extension::AgentExtensions;
@@ -46,12 +46,12 @@ impl AgentTool {
         gctx: GlobalContext,
         ctx: crate::tools::context::ToolContext,
         model: Model<OpenAiWire>,
-        parent_dir: impl AsRef<Path>,
+        parent_dir: impl Into<PathBuf>,
         notifier: Notifier,
         extensions: AgentExtensions,
         db: Db,
     ) -> Self {
-        let parent_dir = parent_dir.as_ref();
+        let parent_dir = parent_dir.into();
         let token_usage_hook = TokenUsageHook::new(gctx.current_dir(), db.clone());
         let tool_call_hook = ToolCallHook::new(gctx.current_dir(), db.clone());
 
@@ -59,7 +59,7 @@ impl AgentTool {
             gctx,
             ctx,
             model,
-            parent_dir: parent_dir.to_owned(),
+            parent_dir,
             notifier,
             extensions,
             token_usage_hook,
@@ -141,7 +141,7 @@ impl Tool for AgentTool {
             &tool_names,
             self.model.clone(),
             &self.parent_dir,
-            &cwd,
+            cwd,
             AgentExtensions::empty(),
             Notifier::clone(&self.notifier),
             self.db.clone(),

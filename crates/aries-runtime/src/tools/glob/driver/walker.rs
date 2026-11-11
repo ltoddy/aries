@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -8,15 +8,15 @@ use crate::glob::GlobError;
 use crate::tools::glob::driver::Collector;
 
 pub fn walk_parallel(
-    base_dir: impl AsRef<Path>,
+    base_dir: impl Into<PathBuf>,
     hidden: bool,
     respect_ignore: bool,
     set: globset::GlobSet,
     collector: Arc<Collector>,
 ) -> Result<(), GlobError> {
-    let base_dir = base_dir.as_ref();
+    let base_dir: PathBuf = base_dir.into();
 
-    let mut builder = WalkBuilder::new(base_dir);
+    let mut builder = WalkBuilder::new(&base_dir);
     builder
         .hidden(!hidden)
         .git_ignore(respect_ignore)
@@ -24,7 +24,7 @@ pub fn walk_parallel(
         .git_global(respect_ignore)
         .ignore(respect_ignore);
 
-    let base_dir = Arc::new(base_dir.to_owned());
+    let base_dir = Arc::new(base_dir);
     let set = Arc::new(set);
 
     builder.build_parallel().run(|| {

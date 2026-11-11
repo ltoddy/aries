@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -28,10 +28,10 @@ pub struct SkillMetadata {
 }
 
 impl SkillMetadata {
-    pub fn new(name: impl Into<String>, dir: impl AsRef<Path>) -> Self {
+    pub fn new(name: impl Into<String>, dir: impl Into<PathBuf>) -> Self {
         let name = name.into();
-        let dir = dir.as_ref();
+        let dir = dir.into();
 
-        Self { name, dir: dir.to_owned() }
+        Self { name, dir }
     }
 }

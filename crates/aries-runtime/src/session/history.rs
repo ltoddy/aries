@@ -22,7 +22,7 @@ impl ChatHistory {
         if let Some(parent) = file_path.parent() {
             let _ = tokio::fs::create_dir_all(parent).await;
         }
-        let file = JsonlAppender::open(&file_path).await?;
+        let file = JsonlAppender::open(file_path).await?;
 
         Ok(Self { file })
     }

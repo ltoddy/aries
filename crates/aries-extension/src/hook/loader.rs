@@ -34,7 +34,7 @@ impl HooksLoader {
         let Ok(entries) = walk_dirs(&self.roots, true, false) else { return vec![] };
 
         let file_paths = entries
-            .iter()
+            .into_iter()
             .filter(|entry| entry.is_file() && entry.file_name().eq(&Some("hooks.json".as_ref())))
             .collect::<Vec<_>>();
 

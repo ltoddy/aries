@@ -1,10 +1,10 @@
 // This file contains tests generated with AI assistance.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use super::*;
 
-fn tool(cwd: impl AsRef<Path>) -> GlobTool {
+fn tool(cwd: impl Into<PathBuf>) -> GlobTool {
     let (notifier, _) = aries_communicate::Notifier::channel();
     GlobTool::new(crate::tools::context::ToolContext::new("test", notifier, cwd))
 }

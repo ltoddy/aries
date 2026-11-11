@@ -1,10 +1,10 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use tokio::process::Command as Bash;
 
 use super::*;
 
-fn tool(cwd: impl AsRef<Path>) -> GrepTool {
+fn tool(cwd: impl Into<PathBuf>) -> GrepTool {
     let (notifier, _) = aries_communicate::Notifier::channel();
     GrepTool::new(crate::tools::context::ToolContext::new("test", notifier, cwd))
 }

@@ -64,7 +64,7 @@ impl Tool for WriteTool {
 
         match fs::metadata(&file_path).await {
             Ok(metadata) if metadata.len() > 0 => {
-                return Err(WriteError::file_not_empty(file_path.clone()));
+                return Err(WriteError::file_not_empty(file_path));
             },
             Ok(_) => {
                 self.ctx.guard_write(&file_path).await?;
@@ -81,7 +81,7 @@ impl Tool for WriteTool {
                 }
             },
             Err(err) => {
-                return Err(WriteError::io(WriteOperation::ReadMetadata, file_path.clone(), err));
+                return Err(WriteError::io(WriteOperation::ReadMetadata, file_path, err));
             },
         }
 

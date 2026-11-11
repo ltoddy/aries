@@ -1,5 +1,5 @@
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -21,17 +21,16 @@ impl<F> FrontmatterDocument<F>
 where
     F: Serialize + DeserializeOwned,
 {
-    pub fn new(location: impl AsRef<Path>, frontmatter: F, body: impl Into<String>) -> Self {
-        let location = location.as_ref().to_owned();
+    pub fn new(location: impl Into<PathBuf>, frontmatter: F, body: impl Into<String>) -> Self {
+        let location = location.into();
         let body = body.into();
 
         Self { location, frontmatter, body }
     }
 
-    pub async fn read(file_path: impl AsRef<Path>) -> Result<Self, DocumentError> {
-        let file_path = file_path.as_ref();
-        let location = file_path.to_owned();
-        let content = tokio::fs::read_to_string(file_path)
+    pub async fn read(file_path: impl Into<PathBuf>) -> Result<Self, DocumentError> {
+        let location = file_path.into();
+        let content = tokio::fs::read_to_string(&location)
             .await
             .map_err(|err| DocumentError::io(&location, err))?;
 
@@ -80,13 +79,13 @@ pub enum DocumentError {
 }
 
 impl DocumentError {
-    pub fn io(file_path: impl AsRef<Path>, err: io::Error) -> Self {
-        let file_path = file_path.as_ref().to_owned();
+    pub fn io(file_path: impl Into<PathBuf>, err: io::Error) -> Self {
+        let file_path = file_path.into();
         Self::Io { file_path, err }
     }
 
-    pub fn yaml(file_path: impl AsRef<Path>, err: yaml_serde::Error) -> Self {
-        let file_path = file_path.as_ref().to_owned();
+    pub fn yaml(file_path: impl Into<PathBuf>, err: yaml_serde::Error) -> Self {
+        let file_path = file_path.into();
         Self::Yaml { file_path, err }
     }
 
@@ -94,8 +93,8 @@ impl DocumentError {
         Self::YamlSerialize(err)
     }
 
-    pub fn wrong_format(file_path: impl AsRef<Path>) -> Self {
-        let file_path = file_path.as_ref().to_owned();
+    pub fn wrong_format(file_path: impl Into<PathBuf>) -> Self {
+        let file_path = file_path.into();
         Self::WrongFormat { file_path }
     }
 }

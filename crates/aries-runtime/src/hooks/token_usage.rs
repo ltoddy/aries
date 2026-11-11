@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use aries_persistence::TokenUsageRepository;
 use rig::agent::{AgentHook, HookContext, ModelTurnAction, ModelTurnFinished};
@@ -11,11 +11,11 @@ pub struct TokenUsageHook {
 }
 
 impl TokenUsageHook {
-    pub fn new(cwd: impl AsRef<Path>, db: Db) -> Self {
-        let cwd = cwd.as_ref();
+    pub fn new(cwd: impl Into<PathBuf>, db: Db) -> Self {
+        let cwd = cwd.into();
         let token_usage_repo = TokenUsageRepository::new(db);
 
-        Self { cwd: cwd.to_owned(), token_usage_repo }
+        Self { cwd, token_usage_repo }
     }
 }
 

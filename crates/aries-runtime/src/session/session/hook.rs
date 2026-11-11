@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time;
 
@@ -53,16 +53,16 @@ impl SessionPromptHook {
     pub fn new(
         executor: Arc<HooksExecutor>,
         session_id: impl Into<String>,
-        cwd: impl AsRef<Path>,
-        transcript_path: impl AsRef<Path>,
+        cwd: impl Into<PathBuf>,
+        transcript_path: impl Into<PathBuf>,
         agent_id: impl Into<String>,
         db: Db,
         instruction_ctx: InstructionContext,
         notifier: Notifier,
     ) -> Self {
         let session_id = session_id.into();
-        let cwd = cwd.as_ref();
-        let transcript_path = transcript_path.as_ref().to_owned();
+        let cwd = cwd.into();
+        let transcript_path = transcript_path.into();
         let agent_id = agent_id.into();
 
         let tool_call_repo = ToolCallRepository::new(db.clone());
@@ -72,7 +72,7 @@ impl SessionPromptHook {
         Self {
             executor,
             session_id,
-            cwd: cwd.to_owned(),
+            cwd,
             transcript_path,
             agent_id,
             last_tool_call_at: Default::default(),
