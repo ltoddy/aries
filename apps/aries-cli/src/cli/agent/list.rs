@@ -12,7 +12,7 @@ pub struct ListAgentArgs {}
 pub async fn execute(_args: ListAgentArgs, gctx: GlobalContext) -> anyhow::Result<()> {
     let cwd = gctx.current_dir();
 
-    let loader = AgentsLoader::new(&cwd, gctx.home_dir(), gctx.root_dir());
+    let loader = AgentsLoader::new(cwd, gctx.home_dir(), gctx.root_dir());
     let mut agents = loader.load().await;
     agents.sort_by(|prev, next| prev.frontmatter.name.cmp(&next.frontmatter.name));
 
