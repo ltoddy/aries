@@ -48,21 +48,27 @@ pub enum Appearance {
 pub enum SendKey {
     #[default]
     Enter,
-    ShiftEnter,
+    CommandEnter,
 }
 
 impl SendKey {
     pub fn send_label(self) -> &'static str {
         match self {
             Self::Enter => "Enter",
-            Self::ShiftEnter => "Shift + Enter",
+            Self::CommandEnter => {
+                if cfg!(target_os = "macos") {
+                    "Command + Enter"
+                } else {
+                    "Ctrl + Enter"
+                }
+            },
         }
     }
 
     pub fn newline_label(self) -> &'static str {
         match self {
-            Self::Enter => "Shift + Enter",
-            Self::ShiftEnter => "Enter",
+            Self::Enter => Self::CommandEnter.send_label(),
+            Self::CommandEnter => "Enter",
         }
     }
 }

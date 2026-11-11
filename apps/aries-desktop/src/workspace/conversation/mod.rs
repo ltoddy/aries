@@ -3,6 +3,7 @@ mod composer;
 pub mod draft;
 mod media;
 pub mod model;
+pub mod prompt_queue;
 mod slash_commands;
 mod subagent_message;
 mod text;

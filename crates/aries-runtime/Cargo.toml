@@ -43,8 +43,6 @@ toasty.workspace = true
 tokio = { workspace = true, features = ["fs", "process", "sync", "time", "io-util"] }
 tokio-util = "0.7"
 tracing.workspace = true
-tree-sitter.workspace = true
-tree-sitter-bash.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

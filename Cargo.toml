@@ -1,15 +1,17 @@
 [workspace]
 members = [
+    "apps/aries-cli",
+    "apps/aries-desktop",
     "crates/aries-acp",
     "crates/aries-communicate",
     "crates/aries-extension",
     "crates/aries-filesystem",
     "crates/aries-init",
+    "crates/aries-ipc",
     "crates/aries-logger",
     "crates/aries-persistence",
+    "crates/aries-proto",
     "crates/aries-runtime",
-    "apps/aries-cli",
-    "apps/aries-desktop",
 ]
 resolver = "3"
 
@@ -49,8 +51,6 @@ git2 = "0.21"
 similar = "3.2"
 toml = "1.1"
 tracing = "0.1"
-tree-sitter = "0.26"
-tree-sitter-bash = "0.25"
 yaml_serde = "0.10"
 url = "2.5"
 

@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package aries;
+
+service UsageService {
+  rpc QueryTokenUsages(QueryTokenUsagesRequest) returns (QueryTokenUsagesResponse);
+}
+
+message Date {
+  int32 year = 1;
+  uint32 month = 2;
+  uint32 day = 3;
+}
+
+message DateRange {
+  Date start_inclusive = 1;
+  Date end_exclusive = 2;
+}
+
+message QueryTokenUsagesRequest {
+  DateRange range = 1;
+  optional string cwd = 2;
+}
+
+message QueryTokenUsagesResponse {
+  repeated DailyUsage daily = 1;
+  repeated string projects = 2;
+}
+
+message DailyUsage {
+  Date date = 1;
+  TokenUsage token_usage = 2;
+}
+
+message TokenUsage {
+  uint64 input_tokens = 1;
+  uint64 output_tokens = 2;
+  uint64 total_tokens = 3;
+  uint64 cached_input_tokens = 4;
+  uint64 reasoning_tokens = 5;
+  uint64 record_count = 6;
+}

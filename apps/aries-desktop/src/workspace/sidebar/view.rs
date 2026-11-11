@@ -16,6 +16,8 @@ use crate::workspace::sidebar::list::SessionListView;
 use crate::workspace::sidebar::motion::SidebarMotion;
 use crate::workspace::{SessionView, WorkspaceView};
 
+pub const SESSION_LIMIT: usize = 8;
+
 pub struct Sidebar {
     list: SessionList,
     motion: SidebarMotion,
@@ -83,6 +85,10 @@ impl Sidebar {
         if !self.expanded_sessions.remove(cwd) {
             self.expanded_sessions.insert(cwd.to_path_buf());
         }
+    }
+    pub fn collapse_all(&mut self) {
+        self.list.collapse_all();
+        self.expanded_sessions.clear();
     }
     pub fn cleanup(&mut self, cx: &App) {
         self.motion.cleanup(cx.background_executor().now(), cx.reduce_motion());
@@ -253,7 +259,13 @@ impl Sidebar {
             .map(|session| session.cwd.clone())
             .unwrap_or_else(|| directory.to_path_buf());
         self.list.expand_project(&cwd);
-        self.expanded_sessions.insert(cwd);
+        if let Some(id) = current
+            && self.motion.projects().get(cwd.as_path()).is_some_and(|sessions| {
+                sessions.iter().skip(SESSION_LIMIT).any(|row| &row.session().session_id == id)
+            })
+        {
+            self.expanded_sessions.insert(cwd);
+        }
         let anchor = self.anchor.clone();
         window.on_next_frame(move |window, cx| {
             anchor.scroll_to(window, cx);

@@ -9,7 +9,6 @@ use std::process::Stdio;
 use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
 use tokio::process::Command;
-use tree_sitter::{Language, Node, Parser};
 
 pub use self::args::BashArgs;
 pub use self::error::BashError;
@@ -21,27 +20,11 @@ pub const NAME: &str = "Bash";
 
 pub struct BashTool {
     ctx: AriesToolContext,
-    language: Language,
 }
 
 impl BashTool {
     pub fn new(ctx: AriesToolContext) -> Self {
-        let language = tree_sitter_bash::LANGUAGE.into();
-
-        Self { ctx, language }
-    }
-
-    #[allow(dead_code)]
-    fn attempt_rewrite_last_command(&self, cmd: &str) -> Option<String> {
-        let mut parser = Parser::new();
-        parser.set_language(&self.language).ok()?;
-
-        let tree = parser.parse(cmd, None)?;
-        let last = find_last_node(tree.root_node())?;
-
-        let pos = last.start_byte();
-
-        Some(format!("{}aries exec {}", &cmd[..pos], &cmd[pos..]))
+        Self { ctx }
     }
 }
 
@@ -85,8 +68,6 @@ impl Tool for BashTool {
         _context: &mut ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
-        // attempt_rewrite_last_command 有边缘 case, 逐步修复它
-        // let arg = self.attempt_rewrite_last_command(&args.command).unwrap_or(args.command);
         let arg = args.command;
         let cwd = self
             .ctx
@@ -116,20 +97,4 @@ impl Tool for BashTool {
 
         Ok(BashOutput::new(stdout, stderr, exit_code))
     }
-}
-
-fn find_last_node(node: Node) -> Option<Node> {
-    let mut last = None::<Node>;
-
-    for child in node.children(&mut node.walk()) {
-        if child.kind() == "command" {
-            last = Some(child);
-        }
-
-        if let Some(node) = find_last_node(child) {
-            last = Some(node);
-        }
-    }
-
-    last
 }

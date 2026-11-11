@@ -24,7 +24,6 @@ pub async fn initialize(
             PromptCapabilities::new().image(true).audio(true).embedded_context(true),
         )
         .mcp_capabilities(McpCapabilities::new().http(true).sse(true))
-        .providers(ProvidersCapabilities::new())
         .session_capabilities(
             SessionCapabilities::new()
                 .list(SessionListCapabilities::new())
@@ -39,11 +38,12 @@ pub async fn initialize(
             AgentAuthCapabilities::new()
                 .status(AuthStatusCapabilities::new())
                 .logout(LogoutCapabilities::new()),
-        );
+        )
+        .providers(ProvidersCapabilities::new());
     let auth_methods = vec![AuthMethod::Terminal(
-        AuthMethodTerminal::new("aries-setup", "Set up Aries")
+        AuthMethodTerminal::new("aries", "Set up Aries")
             .description("Configure your model provider and API key in a terminal")
-            .args(vec!["--setup".into()]),
+            .args(vec!["setup".to_owned()]),
     )];
     let info = Implementation::new("Aries", "0.0.1").title("Aries Agent");
 

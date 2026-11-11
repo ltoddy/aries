@@ -1,7 +1,6 @@
 use agent_client_protocol::v1::schema::{
-    AvailableCommand, AvailableCommandInput, AvailableCommandsUpdate, ContentBlock, ContentChunk,
-    LoadSessionRequest, LoadSessionResponse, SessionNotification, SessionUpdate,
-    UnstructuredCommandInput,
+    AvailableCommand, AvailableCommandInput, AvailableCommandsUpdate, LoadSessionRequest,
+    LoadSessionResponse, SessionNotification, SessionUpdate, UnstructuredCommandInput,
 };
 use agent_client_protocol::v1::{ConnectionTo, Responder};
 use agent_client_protocol::{Client, Error};
@@ -39,18 +38,6 @@ pub async fn load_session(
             let _ = cx.send_notification(SessionNotification::new(session_id.clone(), update));
         });
     }
-
-    let setting = session.setting();
-    let greeting = if setting.nickname.is_empty() {
-        format!("Welcome back! [session id: {}]", session.id())
-    } else {
-        format!("Welcome back, {}! [session id: {}]", setting.nickname, session.id())
-    };
-
-    let _ = cx.send_notification(SessionNotification::new(
-        session_id.clone(),
-        SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::from(greeting))),
-    ));
 
     let available_commands = session
         .list_available_commands()

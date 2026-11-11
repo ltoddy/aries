@@ -1,6 +1,6 @@
 use agent_client_protocol::v1::schema::{
-    AvailableCommand, AvailableCommandInput, AvailableCommandsUpdate, ContentBlock, ContentChunk,
-    NewSessionRequest, NewSessionResponse, SessionInfoUpdate, SessionNotification, SessionUpdate,
+    AvailableCommand, AvailableCommandInput, AvailableCommandsUpdate, NewSessionRequest,
+    NewSessionResponse, SessionInfoUpdate, SessionNotification, SessionUpdate,
     UnstructuredCommandInput,
 };
 use agent_client_protocol::v1::{ConnectionTo, Responder};
@@ -29,12 +29,6 @@ pub async fn new_session(
             return responder.respond_with_internal_error(err.to_string());
         },
     };
-
-    let greeting = format!("Welcome! [session id: {}]", session.id());
-    let _ = cx.send_notification(SessionNotification::new(
-        session.id(),
-        SessionUpdate::AgentMessageChunk(ContentChunk::new(ContentBlock::from(greeting))),
-    ));
 
     let available_commands = session
         .list_available_commands()

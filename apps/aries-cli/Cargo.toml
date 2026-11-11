@@ -40,5 +40,5 @@ rustyline-derive = "0.13"
 serde_json.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "fs", "process"] }
 tracing.workspace = true
-tree-sitter.workspace = true
-tree-sitter-bash.workspace = true
+tree-sitter = "0.26"
+tree-sitter-bash = "0.25"
