@@ -24,7 +24,7 @@ pub fn init(cx: &mut App) {
 }
 
 pub use self::session::Status;
-use self::session::{Dimensions, Session};
+use self::session::{Dimensions, Session, StartError, WriteError};
 
 pub struct TerminalView {
     directory: PathBuf,
@@ -86,12 +86,12 @@ impl TerminalView {
                 entity.update(cx, |this, cx| this.key_down(&event.keystroke, cx));
             }
         });
-        let dimensions = Dimensions { columns: 80, lines: 24 };
+        let dimensions = Dimensions::new(80, 24);
         let mut view = Self {
             directory,
             focus_handle: cx.focus_handle().tab_stop(true),
             session: None,
-            status: Status::Starting,
+            status: Status::starting(),
             notifications,
             _task: task,
             _quit_subscription: quit_subscription,
@@ -107,7 +107,7 @@ impl TerminalView {
             selecting: false,
             visible: true,
         };
-        view.start();
+        let _ = view.start();
         view
     }
 
@@ -138,61 +138,75 @@ impl TerminalView {
         self.input_error = None;
         self.scroll_remainder = 0.;
         self.selecting = false;
-        self.start();
+        if let Err(error) = self.start() {
+            crate::error::report("重启 shell 失败", &error, window, cx);
+        }
         window.focus(&self.focus_handle, cx);
         window.notify_text_input_changed(&self.focus_handle);
         cx.notify();
     }
 
-    pub fn paste(&mut self, text: &str, cx: &mut Context<Self>) {
-        let bracketed = self
-            .session
-            .as_ref()
-            .is_some_and(|session| session.terminal().mode().contains(TermMode::BRACKETED_PASTE));
+    pub fn paste(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
+        if let Err(error) = self.paste_text(text, cx) {
+            crate::error::report("粘贴到终端失败", &error, window, cx);
+        }
+    }
+
+    fn paste_text(&mut self, text: &str, cx: &mut Context<Self>) -> Result<(), WriteError> {
+        let session = self.session.as_ref().ok_or_else(WriteError::not_running)?;
+        let bracketed = session.terminal()?.mode().contains(TermMode::BRACKETED_PASTE);
         let text = text.replace('\0', "");
         let bytes = if bracketed {
             format!("\x1b[200~{}\x1b[201~", text.replace('\x1b', "")).into_bytes()
         } else {
             text.replace("\r\n", "\r").replace('\n', "\r").into_bytes()
         };
-        self.send(bytes, cx);
+        self.send(bytes, cx)
     }
 
-    fn start(&mut self) {
-        self.status = Status::Starting;
+    fn start(&mut self) -> Result<(), StartError> {
+        self.status = Status::starting();
         match Session::start(&self.directory, self.dimensions, self.notifications.clone()) {
-            Ok(session) => self.session = Some(session),
-            Err(error) => self.status = Status::Failed(error.to_string()),
+            Ok(session) => {
+                self.session = Some(session);
+                Ok(())
+            },
+            Err(error) => {
+                self.status = Status::failed(&error);
+                Err(error)
+            },
         }
     }
 
-    fn send(&mut self, bytes: Vec<u8>, cx: &mut Context<Self>) {
+    fn send(&mut self, bytes: Vec<u8>, cx: &mut Context<Self>) -> Result<(), WriteError> {
         if bytes.is_empty() {
-            return;
+            return Ok(());
         }
-        if let Some(session) = &self.session {
-            match session.write(bytes) {
-                Ok(()) => {
-                    self.input_error = None;
-                    let mut terminal = session.terminal();
-                    terminal.selection = None;
-                    terminal.scroll_display(Scroll::Bottom);
-                    self.selecting = false;
-                },
-                Err(error) => self.input_error = Some(error.to_string()),
-            }
-            cx.notify();
-        }
+        let result = (|| {
+            let session = self.session.as_ref().ok_or_else(WriteError::not_running)?;
+            session.write(bytes)?;
+            let mut terminal = session.terminal()?;
+            terminal.selection = None;
+            terminal.scroll_display(Scroll::Bottom);
+            self.selecting = false;
+            Ok(())
+        })();
+        self.input_error = result.as_ref().err().map(ToString::to_string);
+        cx.notify();
+        result
     }
 
     fn key_down(&mut self, key: &Keystroke, cx: &mut Context<Self>) {
         if key.modifiers.platform || key.is_modifier_key() || !self.preedit.is_empty() {
             return;
         }
-        let mode =
-            self.session.as_ref().map_or(TermMode::empty(), |session| *session.terminal().mode());
+        let mode = self
+            .session
+            .as_ref()
+            .and_then(|session| session.terminal().ok().map(|terminal| *terminal.mode()))
+            .unwrap_or(TermMode::empty());
         if let Some(bytes) = self::input::key_bytes(key, mode) {
-            self.send(bytes, cx);
+            let _ = self.send(bytes, cx);
             cx.stop_propagation();
         }
     }
@@ -204,10 +218,10 @@ impl TerminalView {
         let cell_size = size(cell_width, font_size * 1.4);
         let metrics_changed = self.cell_size != cell_size;
         self.cell_size = cell_size;
-        let dimensions = Dimensions {
-            columns: ((bounds.size.width / cell_width).floor() as usize).clamp(2, 1000),
-            lines: ((bounds.size.height / self.cell_size.height).floor() as usize).clamp(1, 1000),
-        };
+        let dimensions = Dimensions::new(
+            ((bounds.size.width / cell_width).floor() as usize).clamp(2, 1000),
+            ((bounds.size.height / self.cell_size.height).floor() as usize).clamp(1, 1000),
+        );
         if dimensions != self.dimensions || metrics_changed {
             if let Some(session) = &self.session {
                 match session.resize(
@@ -256,12 +270,12 @@ impl Render for TerminalView {
             .flex_col()
             .overflow_hidden()
             .text_color(cx.theme().foreground)
-            .on_action(cx.listener(|this, _: &CopyTerminal, _, cx| {
-                this.copy_selection(cx);
+            .on_action(cx.listener(|this, _: &CopyTerminal, window, cx| {
+                this.copy_selection(window, cx);
             }))
-            .on_action(cx.listener(|this, _: &PasteTerminal, _, cx| {
+            .on_action(cx.listener(|this, _: &PasteTerminal, window, cx| {
                 if let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) {
-                    this.paste(&text, cx);
+                    this.paste(&text, window, cx);
                 }
             }))
             .on_mouse_down(
@@ -281,8 +295,10 @@ impl Render for TerminalView {
                 let lines = this.scroll_remainder.trunc() as i32;
                 this.scroll_remainder -= lines as f32;
                 if lines != 0 {
-                    if let Some(session) = &this.session {
-                        session.terminal().scroll_display(Scroll::Delta(lines));
+                    if let Some(session) = &this.session
+                        && let Ok(mut terminal) = session.terminal()
+                    {
+                        terminal.scroll_display(Scroll::Delta(lines));
                     }
                     cx.notify();
                 }

@@ -381,7 +381,7 @@ impl Conversation {
                     text: String::new(),
                     updates: Vec::new(),
                     compaction: None,
-                    tool_call: Some(ToolCallState::new(ToolCall::new(id, ""))),
+                    tool_call: None,
                     subagent: None,
                 });
                 self.tools.insert(key, index);
@@ -389,7 +389,8 @@ impl Conversation {
             },
         };
         let message = &mut self.messages[index];
-        let tool = message.tool_call.as_mut().expect("tool entry has state");
+        let tool =
+            message.tool_call.get_or_insert_with(|| ToolCallState::new(ToolCall::new(id, "")));
         match &notification.update {
             SessionUpdate::ToolCall(call) => tool.replace(call.clone()),
             SessionUpdate::ToolCallUpdate(update) => tool.update(update.fields.clone()),
@@ -423,17 +424,16 @@ impl Conversation {
                     title: String::new(),
                     text: String::new(),
                     updates: Vec::new(),
-                    compaction: Some(CompactionUpdate::new(
-                        id.clone(),
-                        CompactionStatus::InProgress,
-                    )),
+                    compaction: None,
                     tool_call: None,
                     subagent: None,
                 });
                 self.messages.len() - 1
             });
         let message = &mut self.messages[index];
-        let state = message.compaction.as_mut().expect("compaction entry has state");
+        let state = message
+            .compaction
+            .get_or_insert_with(|| CompactionUpdate::new(id.clone(), CompactionStatus::InProgress));
         match &notification.update {
             SessionUpdate::CompactionUpdate(patch) => {
                 state.status = patch.status.clone();

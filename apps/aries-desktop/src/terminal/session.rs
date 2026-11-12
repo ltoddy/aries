@@ -15,8 +15,6 @@ use alacritty_terminal::term::{Config, Osc52};
 #[cfg(unix)]
 use alacritty_terminal::vte::ansi::Processor;
 #[cfg(unix)]
-use anyhow::Context as _;
-#[cfg(unix)]
 use portable_pty::{CommandBuilder, PtySize, native_pty_system};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -27,10 +25,31 @@ pub enum Status {
     Failed(String),
 }
 
+impl Status {
+    pub fn starting() -> Self {
+        Self::Starting
+    }
+    pub fn running() -> Self {
+        Self::Running
+    }
+    pub fn exited(code: u32, signal: Option<String>) -> Self {
+        Self::Exited { code, signal }
+    }
+    pub fn failed(error: impl std::fmt::Display) -> Self {
+        Self::Failed(error.to_string())
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Dimensions {
     pub columns: usize,
     pub lines: usize,
+}
+
+impl Dimensions {
+    pub fn new(columns: usize, lines: usize) -> Self {
+        Self { columns, lines }
+    }
 }
 
 impl GridDimensions for Dimensions {
@@ -55,15 +74,43 @@ pub struct InvalidDimensions {
     pub dimensions: Dimensions,
 }
 
+impl InvalidDimensions {
+    pub fn new(dimensions: Dimensions) -> Self {
+        Self { dimensions }
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("terminal {resource} lock poisoned")]
+pub struct LockError {
+    resource: &'static str,
+}
+
+impl LockError {
+    pub fn new(resource: &'static str) -> Self {
+        Self { resource }
+    }
+}
+
+fn lock<'a, T>(
+    mutex: &'a Mutex<T>,
+    resource: &'static str,
+) -> Result<MutexGuard<'a, T>, LockError> {
+    mutex.lock().map_err(|_| LockError::new(resource))
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum StartError {
     #[error(transparent)]
     InvalidDimensions(#[from] InvalidDimensions),
     #[error("启动终端工作线程失败：{source}")]
-    WorkerSpawn {
-        #[source]
-        source: std::io::Error,
-    },
+    WorkerSpawn { source: std::io::Error },
+}
+
+impl StartError {
+    fn worker_spawn(source: std::io::Error) -> Self {
+        Self::WorkerSpawn { source }
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -76,6 +123,23 @@ pub enum WriteError {
     QueueFull,
     #[error("终端输入队列已关闭，请重启 shell")]
     QueueClosed,
+    #[error(transparent)]
+    Lock(#[from] LockError),
+}
+
+impl WriteError {
+    pub fn too_large(size: usize) -> Self {
+        Self::TooLarge { size }
+    }
+    pub fn not_running() -> Self {
+        Self::NotRunning
+    }
+    fn queue_full() -> Self {
+        Self::QueueFull
+    }
+    fn queue_closed() -> Self {
+        Self::QueueClosed
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -86,6 +150,15 @@ pub enum ResizeError {
     QueueFull,
     #[error("终端尺寸调整队列已关闭，请重启 shell")]
     QueueClosed,
+}
+
+impl ResizeError {
+    fn queue_full() -> Self {
+        Self::QueueFull
+    }
+    fn queue_closed() -> Self {
+        Self::QueueClosed
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -108,6 +181,134 @@ enum WorkerError {
     #[cfg(unix)]
     #[error("PTY write returned zero")]
     WriteZero,
+    #[error(transparent)]
+    Lock(#[from] LockError),
+    #[cfg(unix)]
+    #[error("terminal listener lock poisoned")]
+    ListenerLockPoisoned,
+    #[cfg(unix)]
+    #[error("resolving terminal directory {path}: {source}", path = .path.display())]
+    ResolveDirectory { path: PathBuf, source: std::io::Error },
+    #[cfg(unix)]
+    #[error("opening PTY: {source}")]
+    OpenPty { source: Box<dyn std::error::Error + Send + Sync> },
+    #[cfg(unix)]
+    #[error("cloning PTY reader: {source}")]
+    CloneReader { source: Box<dyn std::error::Error + Send + Sync> },
+    #[cfg(unix)]
+    #[error("taking PTY writer: {source}")]
+    TakeWriter { source: Box<dyn std::error::Error + Send + Sync> },
+    #[cfg(unix)]
+    #[error("setting PTY nonblocking mode: {source}")]
+    Nonblocking { source: std::io::Error },
+    #[cfg(unix)]
+    #[error("starting shell {shell} in {directory}: {source}", shell = .shell.display(), directory = .directory.display())]
+    SpawnShell {
+        shell: PathBuf,
+        directory: PathBuf,
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
+    #[cfg(unix)]
+    #[error("waiting for shell without process identifier: {source}")]
+    WaitWithoutProcessId { source: std::io::Error },
+    #[cfg(unix)]
+    #[error("resizing PTY: {source}")]
+    ResizePty { source: Box<dyn std::error::Error + Send + Sync> },
+    #[cfg(unix)]
+    #[error("writing PTY input: {source}")]
+    WriteInput { source: std::io::Error },
+    #[cfg(unix)]
+    #[error("reading PTY output: {source}")]
+    ReadOutput { source: std::io::Error },
+    #[cfg(unix)]
+    #[error("checking shell exit status: {source}")]
+    CheckExit { source: std::io::Error },
+    #[cfg(unix)]
+    #[error("waiting for shell: {source}")]
+    WaitShell { source: std::io::Error },
+}
+
+impl WorkerError {
+    #[cfg(not(unix))]
+    fn unsupported_platform() -> Self {
+        Self::UnsupportedPlatform
+    }
+    #[cfg(unix)]
+    fn missing_file_descriptor() -> Self {
+        Self::MissingFileDescriptor
+    }
+    #[cfg(unix)]
+    fn missing_process_id() -> Self {
+        Self::MissingProcessId
+    }
+    #[cfg(unix)]
+    fn response_queue_overflow() -> Self {
+        Self::ResponseQueueOverflow
+    }
+    #[cfg(unix)]
+    fn write_zero() -> Self {
+        Self::WriteZero
+    }
+    #[cfg(unix)]
+    fn listener_lock_poisoned() -> Self {
+        Self::ListenerLockPoisoned
+    }
+    #[cfg(unix)]
+    fn not_directory(path: PathBuf) -> Self {
+        Self::NotDirectory(path)
+    }
+    #[cfg(unix)]
+    fn resolve_directory(path: PathBuf, source: std::io::Error) -> Self {
+        Self::ResolveDirectory { path, source }
+    }
+    #[cfg(unix)]
+    fn open_pty(source: Box<dyn std::error::Error + Send + Sync>) -> Self {
+        Self::OpenPty { source }
+    }
+    #[cfg(unix)]
+    fn clone_reader(source: Box<dyn std::error::Error + Send + Sync>) -> Self {
+        Self::CloneReader { source }
+    }
+    #[cfg(unix)]
+    fn take_writer(source: Box<dyn std::error::Error + Send + Sync>) -> Self {
+        Self::TakeWriter { source }
+    }
+    #[cfg(unix)]
+    fn nonblocking(source: std::io::Error) -> Self {
+        Self::Nonblocking { source }
+    }
+    #[cfg(unix)]
+    fn spawn_shell(
+        shell: PathBuf,
+        directory: PathBuf,
+        source: Box<dyn std::error::Error + Send + Sync>,
+    ) -> Self {
+        Self::SpawnShell { shell, directory, source }
+    }
+    #[cfg(unix)]
+    fn wait_without_process_id(source: std::io::Error) -> Self {
+        Self::WaitWithoutProcessId { source }
+    }
+    #[cfg(unix)]
+    fn resize_pty(source: Box<dyn std::error::Error + Send + Sync>) -> Self {
+        Self::ResizePty { source }
+    }
+    #[cfg(unix)]
+    fn write_input(source: std::io::Error) -> Self {
+        Self::WriteInput { source }
+    }
+    #[cfg(unix)]
+    fn read_output(source: std::io::Error) -> Self {
+        Self::ReadOutput { source }
+    }
+    #[cfg(unix)]
+    fn check_exit(source: std::io::Error) -> Self {
+        Self::CheckExit { source }
+    }
+    #[cfg(unix)]
+    fn wait_shell(source: std::io::Error) -> Self {
+        Self::WaitShell { source }
+    }
 }
 
 #[cfg_attr(not(unix), allow(dead_code))]
@@ -116,10 +317,32 @@ enum Command {
     Resize(Dimensions, u16, u16),
 }
 
+impl Command {
+    fn write(bytes: Vec<u8>) -> Self {
+        Self::Write(bytes)
+    }
+    fn resize(dimensions: Dimensions, width: u16, height: u16) -> Self {
+        Self::Resize(dimensions, width, height)
+    }
+}
+
+#[derive(Clone)]
 pub struct Listener {
     responses: Arc<Mutex<VecDeque<Vec<u8>>>>,
     size: Arc<Mutex<WindowSize>>,
     overflow: Arc<AtomicBool>,
+    poisoned: Arc<AtomicBool>,
+}
+
+impl Listener {
+    fn new(
+        responses: Arc<Mutex<VecDeque<Vec<u8>>>>,
+        size: Arc<Mutex<WindowSize>>,
+        overflow: Arc<AtomicBool>,
+        poisoned: Arc<AtomicBool>,
+    ) -> Self {
+        Self { responses, size, overflow, poisoned }
+    }
 }
 
 impl EventListener for Listener {
@@ -129,13 +352,20 @@ impl EventListener for Listener {
             Event::ColorRequest(index, format) if index < 256 => {
                 Some(format(crate::terminal::paint::indexed_rgb(index)))
             },
-            Event::TextAreaSizeRequest(format) => {
-                Some(format(*self.size.lock().expect("terminal size lock poisoned")))
+            Event::TextAreaSizeRequest(format) => match lock(&self.size, "size") {
+                Ok(size) => Some(format(*size)),
+                Err(_) => {
+                    self.poisoned.store(true, Ordering::Release);
+                    return;
+                },
             },
             _ => None,
         };
         if let Some(response) = response {
-            let mut queue = self.responses.lock().expect("terminal response lock poisoned");
+            let Ok(mut queue) = lock(&self.responses, "response") else {
+                self.poisoned.store(true, Ordering::Release);
+                return;
+            };
             if queue.len() < 128 && response.len() <= 65536 {
                 queue.push_back(response.into_bytes());
             } else {
@@ -162,22 +392,20 @@ impl Session {
         validate_dimensions(dimensions)?;
         let responses = Arc::new(Mutex::new(VecDeque::new()));
         let overflow = Arc::new(AtomicBool::new(false));
+        let poisoned = Arc::new(AtomicBool::new(false));
         let size = Arc::new(Mutex::new(WindowSize {
             num_lines: dimensions.lines as u16,
             num_cols: dimensions.columns as u16,
             cell_width: 0,
             cell_height: 0,
         }));
+        let listener = Listener::new(responses, size, overflow, poisoned);
         let terminal = Arc::new(Mutex::new(Term::new(
             Config { scrolling_history: 10000, osc52: Osc52::Disabled, ..Config::default() },
             &dimensions,
-            Listener {
-                responses: responses.clone(),
-                size: size.clone(),
-                overflow: overflow.clone(),
-            },
+            listener.clone(),
         )));
-        let status = Arc::new(Mutex::new(Status::Starting));
+        let status = Arc::new(Mutex::new(Status::starting()));
         let cancelled = Arc::new(AtomicBool::new(false));
         let (commands, receiver) = mpsc::sync_channel(128);
         let (completed, completion) = async_channel::bounded(1);
@@ -195,25 +423,25 @@ impl Session {
                 let result = run(
                     directory,
                     dimensions,
-                    Worker {
+                    Worker::new(
                         terminal,
-                        status: status.clone(),
+                        status.clone(),
                         receiver,
                         cancelled,
-                        responses,
-                        size,
-                        overflow,
-                        notifications: notifications.clone(),
-                    },
+                        listener,
+                        notifications.clone(),
+                    ),
                 );
-                if let Err(error) = result {
-                    *status.lock().expect("terminal status lock poisoned") =
-                        Status::Failed(format!("{error:#}"));
+                if let Err(error) = result.inspect_err(|error| {
+                    crate::error::log("终端工作线程失败", error);
+                }) && let Ok(mut status) = lock(&status, "status")
+                {
+                    *status = Status::failed(error);
                 }
                 let _ = notifications.try_send(());
                 let _ = completed.try_send(());
             })
-            .map_err(|source| StartError::WorkerSpawn { source })?;
+            .map_err(StartError::worker_spawn)?;
         Ok(session)
     }
 
@@ -222,12 +450,12 @@ impl Session {
         let _ = self.completion.recv().await;
     }
 
-    pub fn terminal(&self) -> MutexGuard<'_, Term<Listener>> {
-        self.terminal.lock().expect("terminal screen lock poisoned")
+    pub fn terminal(&self) -> Result<MutexGuard<'_, Term<Listener>>, LockError> {
+        lock(&self.terminal, "screen")
     }
 
     pub fn status(&self) -> Status {
-        self.status.lock().expect("terminal status lock poisoned").clone()
+        lock(&self.status, "status").map_or_else(Status::failed, |status| status.clone())
     }
 
     pub fn write(&self, bytes: Vec<u8>) -> Result<(), WriteError> {
@@ -235,17 +463,14 @@ impl Session {
             return Ok(());
         }
         if bytes.len() > 65536 {
-            return Err(WriteError::TooLarge { size: bytes.len() });
+            return Err(WriteError::too_large(bytes.len()));
         }
-        if !matches!(
-            *self.status.lock().expect("terminal status lock poisoned"),
-            Status::Starting | Status::Running
-        ) {
-            return Err(WriteError::NotRunning);
+        if !matches!(*lock(&self.status, "status")?, Status::Starting | Status::Running) {
+            return Err(WriteError::not_running());
         }
-        self.commands.try_send(Command::Write(bytes)).map_err(|error| match error {
-            mpsc::TrySendError::Full(_) => WriteError::QueueFull,
-            mpsc::TrySendError::Disconnected(_) => WriteError::QueueClosed,
+        self.commands.try_send(Command::write(bytes)).map_err(|error| match error {
+            mpsc::TrySendError::Full(_) => WriteError::queue_full(),
+            mpsc::TrySendError::Disconnected(_) => WriteError::queue_closed(),
         })
     }
 
@@ -256,10 +481,10 @@ impl Session {
         cell_height: u16,
     ) -> Result<(), ResizeError> {
         validate_dimensions(dimensions)?;
-        self.commands.try_send(Command::Resize(dimensions, cell_width, cell_height)).map_err(
+        self.commands.try_send(Command::resize(dimensions, cell_width, cell_height)).map_err(
             |error| match error {
-                mpsc::TrySendError::Full(_) => ResizeError::QueueFull,
-                mpsc::TrySendError::Disconnected(_) => ResizeError::QueueClosed,
+                mpsc::TrySendError::Full(_) => ResizeError::queue_full(),
+                mpsc::TrySendError::Disconnected(_) => ResizeError::queue_closed(),
             },
         )
     }
@@ -273,7 +498,7 @@ impl Drop for Session {
 
 fn validate_dimensions(dimensions: Dimensions) -> Result<(), InvalidDimensions> {
     if !(2..=1000).contains(&dimensions.columns) || !(1..=1000).contains(&dimensions.lines) {
-        return Err(InvalidDimensions { dimensions });
+        return Err(InvalidDimensions::new(dimensions));
     }
     Ok(())
 }
@@ -403,29 +628,40 @@ struct Worker {
     status: Arc<Mutex<Status>>,
     receiver: mpsc::Receiver<Command>,
     cancelled: Arc<AtomicBool>,
-    responses: Arc<Mutex<VecDeque<Vec<u8>>>>,
-    size: Arc<Mutex<WindowSize>>,
-    overflow: Arc<AtomicBool>,
+    listener: Listener,
     notifications: async_channel::Sender<()>,
 }
 
+impl Worker {
+    fn new(
+        terminal: Arc<Mutex<Term<Listener>>>,
+        status: Arc<Mutex<Status>>,
+        receiver: mpsc::Receiver<Command>,
+        cancelled: Arc<AtomicBool>,
+        listener: Listener,
+        notifications: async_channel::Sender<()>,
+    ) -> Self {
+        Self { terminal, status, receiver, cancelled, listener, notifications }
+    }
+}
+
 #[cfg(not(unix))]
-fn run(_: PathBuf, _: Dimensions, _: Worker) -> anyhow::Result<()> {
-    Err(WorkerError::UnsupportedPlatform.into())
+fn run(_: PathBuf, _: Dimensions, _: Worker) -> Result<(), WorkerError> {
+    Err(WorkerError::unsupported_platform())
 }
 
 #[cfg(unix)]
-fn run(directory: PathBuf, dimensions: Dimensions, worker: Worker) -> anyhow::Result<()> {
-    let Worker { terminal, status, receiver, cancelled, responses, size, overflow, notifications } =
-        worker;
+fn run(directory: PathBuf, dimensions: Dimensions, worker: Worker) -> Result<(), WorkerError> {
+    let Worker { terminal, status, receiver, cancelled, listener, notifications } = worker;
+    let Listener { responses, size, overflow, poisoned } = listener;
     if cancelled.load(Ordering::Acquire) {
-        *status.lock().expect("terminal status lock poisoned") =
-            Status::Exited { code: 0, signal: None };
+        *lock(&status, "status")? = Status::exited(0, None);
         return Ok(());
     }
-    let directory = std::fs::canonicalize(directory).context("resolving terminal directory")?;
+    let directory = std::fs::canonicalize(&directory)
+        .map_err(|source| WorkerError::resolve_directory(directory, source))?;
     if !directory.is_dir() {
-        return Err(WorkerError::NotDirectory(directory).into());
+        return Err(WorkerError::not_directory(directory));
     }
     let pair = native_pty_system()
         .openpty(PtySize {
@@ -433,184 +669,208 @@ fn run(directory: PathBuf, dimensions: Dimensions, worker: Worker) -> anyhow::Re
             cols: dimensions.columns as u16,
             ..PtySize::default()
         })
-        .context("opening PTY")?;
-    let mut reader = pair.master.try_clone_reader().context("cloning PTY reader")?;
-    let mut writer = pair.master.take_writer().context("taking PTY writer")?;
+        .map_err(|source| WorkerError::open_pty(source.into()))?;
+    let mut reader = pair
+        .master
+        .try_clone_reader()
+        .map_err(|source| WorkerError::clone_reader(source.into()))?;
+    let mut writer =
+        pair.master.take_writer().map_err(|source| WorkerError::take_writer(source.into()))?;
     #[cfg(unix)]
     {
-        let fd = pair.master.as_raw_fd().ok_or(WorkerError::MissingFileDescriptor)?;
+        let fd = pair.master.as_raw_fd().ok_or_else(WorkerError::missing_file_descriptor)?;
         let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
         if flags < 0 || unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0 {
-            return Err(std::io::Error::last_os_error()).context("setting PTY nonblocking mode");
+            return Err(WorkerError::nonblocking(std::io::Error::last_os_error()));
         }
     }
-    let mut command = CommandBuilder::new(shell());
+    let shell = shell();
+    let mut command = CommandBuilder::new(&shell);
     command.arg("-l");
-    command.cwd(directory);
+    command.cwd(&directory);
     command.env("TERM", "xterm-256color");
     command.env("COLORTERM", "truecolor");
     if cancelled.load(Ordering::Acquire) {
-        *status.lock().expect("terminal status lock poisoned") =
-            Status::Exited { code: 0, signal: None };
+        *lock(&status, "status")? = Status::exited(0, None);
         return Ok(());
     }
-    let mut child = pair.slave.spawn_command(command).context("starting user shell")?;
+    let mut child = pair
+        .slave
+        .spawn_command(command)
+        .map_err(|source| WorkerError::spawn_shell(shell, directory, source.into()))?;
     drop(pair.slave);
     let Some(pid) = child.process_id() else {
         let _ = child.kill();
-        child.wait().context("waiting for shell without process identifier")?;
-        return Err(WorkerError::MissingProcessId.into());
+        child.wait().map_err(WorkerError::wait_without_process_id)?;
+        return Err(WorkerError::missing_process_id());
     };
-    *status.lock().expect("terminal status lock poisoned") = Status::Running;
-    let _ = notifications.try_send(());
-    let mut parser: Processor = Processor::new();
-    let mut buffer = [0u8; 16384];
-    let mut pending = VecDeque::new();
-    let mut offset = 0;
     let mut failure = None;
-    let mut exit_seen = None;
-    loop {
-        if cancelled.load(Ordering::Acquire) {
-            break;
-        }
-        if overflow.load(Ordering::Acquire) {
-            failure = Some(WorkerError::ResponseQueueOverflow.into());
-            break;
-        }
-        if pending.len() < 128 {
-            for _ in 0..(128 - pending.len()) {
-                match receiver.try_recv() {
-                    Ok(Command::Write(bytes)) => pending.push_back(bytes),
-                    Ok(Command::Resize(dimensions, width, height)) => {
-                        let result = pair
-                            .master
-                            .resize(PtySize {
-                                rows: dimensions.lines as u16,
-                                cols: dimensions.columns as u16,
-                                pixel_width: (dimensions.columns * width as usize)
-                                    .min(u16::MAX as usize)
-                                    as u16,
-                                pixel_height: (dimensions.lines * height as usize)
-                                    .min(u16::MAX as usize)
-                                    as u16,
-                            })
-                            .context("resizing PTY");
-                        if let Err(error) = result {
-                            failure = Some(error);
-                            break;
-                        }
-                        terminal.lock().expect("terminal screen lock poisoned").resize(dimensions);
-                        *size.lock().expect("terminal size lock poisoned") = WindowSize {
-                            num_lines: dimensions.lines as u16,
-                            num_cols: dimensions.columns as u16,
-                            cell_width: width,
-                            cell_height: height,
-                        };
-                        let _ = notifications.try_send(());
-                    },
-                    Err(_) => break,
+    let loop_result = (|| -> Result<(), WorkerError> {
+        *lock(&status, "status")? = Status::running();
+        let _ = notifications.try_send(());
+        let mut parser: Processor = Processor::new();
+        let mut buffer = [0u8; 16384];
+        let mut pending = VecDeque::new();
+        let mut offset = 0;
+        let mut exit_seen = None;
+        loop {
+            if cancelled.load(Ordering::Acquire) {
+                break;
+            }
+            if terminal.is_poisoned() {
+                return Err(LockError::new("screen").into());
+            }
+            if status.is_poisoned() {
+                return Err(LockError::new("status").into());
+            }
+            if poisoned.load(Ordering::Acquire) {
+                failure = Some(WorkerError::listener_lock_poisoned());
+                break;
+            }
+            if overflow.load(Ordering::Acquire) {
+                failure = Some(WorkerError::response_queue_overflow());
+                break;
+            }
+            if pending.len() < 128 {
+                for _ in 0..(128 - pending.len()) {
+                    match receiver.try_recv() {
+                        Ok(Command::Write(bytes)) => pending.push_back(bytes),
+                        Ok(Command::Resize(dimensions, width, height)) => {
+                            let result = pair
+                                .master
+                                .resize(PtySize {
+                                    rows: dimensions.lines as u16,
+                                    cols: dimensions.columns as u16,
+                                    pixel_width: (dimensions.columns * width as usize)
+                                        .min(u16::MAX as usize)
+                                        as u16,
+                                    pixel_height: (dimensions.lines * height as usize)
+                                        .min(u16::MAX as usize)
+                                        as u16,
+                                })
+                                .map_err(|source| WorkerError::resize_pty(source.into()));
+                            if let Err(error) = result {
+                                failure = Some(error);
+                                break;
+                            }
+                            lock(&terminal, "screen")?.resize(dimensions);
+                            *lock(&size, "size")? = WindowSize {
+                                num_lines: dimensions.lines as u16,
+                                num_cols: dimensions.columns as u16,
+                                cell_width: width,
+                                cell_height: height,
+                            };
+                            let _ = notifications.try_send(());
+                        },
+                        Err(_) => break,
+                    }
                 }
             }
-        }
-        if failure.is_some() {
-            break;
-        }
-        {
-            let mut queue = responses.lock().expect("terminal response lock poisoned");
-            while pending.len() < 128 {
-                let Some(bytes) = queue.pop_front() else {
+            if failure.is_some() {
+                break;
+            }
+            {
+                let mut queue = lock(&responses, "response")?;
+                while pending.len() < 128 {
+                    let Some(bytes) = queue.pop_front() else {
+                        break;
+                    };
+                    pending.push_back(bytes);
+                }
+            }
+            for _ in 0..128 {
+                let Some(bytes) = pending.front() else {
                     break;
                 };
-                pending.push_back(bytes);
+                match writer.write(&bytes[offset..]) {
+                    Ok(0) => {
+                        failure = Some(WorkerError::write_zero());
+                        break;
+                    },
+                    Ok(count) => {
+                        offset += count;
+                        if offset == bytes.len() {
+                            pending.pop_front();
+                            offset = 0;
+                        }
+                    },
+                    Err(error)
+                        if matches!(
+                            error.kind(),
+                            std::io::ErrorKind::WouldBlock | std::io::ErrorKind::Interrupted
+                        ) =>
+                    {
+                        break;
+                    },
+                    Err(error) => {
+                        failure = Some(WorkerError::write_input(error));
+                        break;
+                    },
+                }
             }
-        }
-        for _ in 0..128 {
-            let Some(bytes) = pending.front() else {
+            let mut eof = false;
+            for _ in 0..16 {
+                match reader.read(&mut buffer) {
+                    Ok(0) => {
+                        eof = true;
+                        break;
+                    },
+                    Ok(count) => {
+                        parser.advance(&mut *lock(&terminal, "screen")?, &buffer[..count]);
+                        let _ = notifications.try_send(());
+                    },
+                    Err(error)
+                        if matches!(
+                            error.kind(),
+                            std::io::ErrorKind::WouldBlock | std::io::ErrorKind::Interrupted
+                        ) =>
+                    {
+                        break;
+                    },
+                    Err(error) if error.raw_os_error() == Some(libc::EIO) => {
+                        eof = true;
+                        break;
+                    },
+                    Err(error) => {
+                        failure = Some(WorkerError::read_output(error));
+                        break;
+                    },
+                }
+            }
+            if failure.is_some() {
                 break;
-            };
-            match writer.write(&bytes[offset..]) {
-                Ok(0) => {
-                    failure = Some(WorkerError::WriteZero.into());
-                    break;
-                },
-                Ok(count) => {
-                    offset += count;
-                    if offset == bytes.len() {
-                        pending.pop_front();
-                        offset = 0;
+            }
+            if parser
+                .sync_timeout()
+                .sync_timeout()
+                .is_some_and(|deadline| Instant::now() >= deadline)
+            {
+                parser.stop_sync(&mut *lock(&terminal, "screen")?);
+                let _ = notifications.try_send(());
+            }
+            match child_exited(pid) {
+                Ok(true) => {
+                    let deadline = exit_seen
+                        .get_or_insert_with(|| Instant::now() + Duration::from_millis(100));
+                    if eof || Instant::now() >= *deadline {
+                        break;
                     }
                 },
-                Err(error)
-                    if matches!(
-                        error.kind(),
-                        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::Interrupted
-                    ) =>
-                {
-                    break;
-                },
+                Ok(false) => {},
                 Err(error) => {
-                    failure = Some(anyhow::Error::new(error).context("writing PTY input"));
+                    failure = Some(WorkerError::check_exit(error));
                     break;
                 },
             }
-        }
-        let mut eof = false;
-        for _ in 0..16 {
-            match reader.read(&mut buffer) {
-                Ok(0) => {
-                    eof = true;
-                    break;
-                },
-                Ok(count) => {
-                    parser.advance(
-                        &mut *terminal.lock().expect("terminal screen lock poisoned"),
-                        &buffer[..count],
-                    );
-                    let _ = notifications.try_send(());
-                },
-                Err(error)
-                    if matches!(
-                        error.kind(),
-                        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::Interrupted
-                    ) =>
-                {
-                    break;
-                },
-                Err(error) if error.raw_os_error() == Some(libc::EIO) => {
-                    eof = true;
-                    break;
-                },
-                Err(error) => {
-                    failure = Some(anyhow::Error::new(error).context("reading PTY output"));
-                    break;
-                },
+            if eof {
+                thread::sleep(Duration::from_millis(10));
             }
+            thread::sleep(Duration::from_millis(5));
         }
-        if failure.is_some() {
-            break;
-        }
-        if parser.sync_timeout().sync_timeout().is_some_and(|deadline| Instant::now() >= deadline) {
-            parser.stop_sync(&mut *terminal.lock().expect("terminal screen lock poisoned"));
-            let _ = notifications.try_send(());
-        }
-        match child_exited(pid) {
-            Ok(true) => {
-                let deadline =
-                    exit_seen.get_or_insert_with(|| Instant::now() + Duration::from_millis(100));
-                if eof || Instant::now() >= *deadline {
-                    break;
-                }
-            },
-            Ok(false) => {},
-            Err(error) => {
-                failure = Some(anyhow::Error::new(error).context("checking shell exit status"));
-                break;
-            },
-        }
-        if eof {
-            thread::sleep(Duration::from_millis(10));
-        }
-        thread::sleep(Duration::from_millis(5));
+        Ok(())
+    })();
+    if let Err(error) = loop_result {
+        failure = Some(error);
     }
     let deadline = Instant::now() + Duration::from_millis(50);
     let session = pid as i32;
@@ -641,11 +901,10 @@ fn run(directory: PathBuf, dimensions: Dimensions, worker: Worker) -> anyhow::Re
     drop(reader);
     drop(writer);
     drop(pair.master);
-    let exit = child.wait().context("waiting for shell")?;
+    let exit = child.wait().map_err(WorkerError::wait_shell)?;
     if let Some(error) = failure {
         return Err(error);
     }
-    *status.lock().expect("terminal status lock poisoned") =
-        Status::Exited { code: exit.exit_code(), signal: exit.signal().map(str::to_owned) };
+    *lock(&status, "status")? = Status::exited(exit.exit_code(), exit.signal().map(str::to_owned));
     Ok(())
 }

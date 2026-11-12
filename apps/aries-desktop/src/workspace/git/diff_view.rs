@@ -15,9 +15,11 @@ use gpui_kit::prelude::*;
 use gpui_kit::*;
 
 use self::tools::ToolScope;
+use crate::error::details;
 use crate::workspace::SessionView;
 use crate::workspace::git::diff_operations::DiscardBackupEntry;
 use crate::workspace::git::diff_patch::{DiffPatch, PatchScope};
+use crate::workspace::git::error::DiffLoadError;
 use crate::workspace::git::repository::{ChangeGroup, read_file_diff};
 
 mod tools;
@@ -157,7 +159,7 @@ impl GitDiffView {
         if !self.is_selected(&path, group) {
             self.target = Some(DiffTarget::new(path, group));
             self.reset(cx);
-            self.load_backups(cx);
+            self.load_backups(window, cx);
             cx.emit(DiffTargetChanged::new());
         }
         self.initialize_search(window, cx);
@@ -204,9 +206,10 @@ impl GitDiffView {
                 .background_spawn(async move {
                     let patch = read_file_diff(&directory, &target.path, target.group)?;
                     if patch == *previous_patch {
-                        return Ok::<_, anyhow::Error>(None);
+                        return Ok::<_, DiffLoadError>(None);
                     }
-                    let files = DiffFile::parse(&patch)?;
+                    let files = DiffFile::parse(&patch)
+                        .map_err(|error| DiffLoadError::display_patch(&target.path, error))?;
                     let model = if patch.is_empty() {
                         Ok(None)
                     } else {
@@ -237,7 +240,8 @@ impl GitDiffView {
                                 Err(error) => {
                                     this.model = None;
                                     this.current_hunk = None;
-                                    this.tool_error = Some(format!("部分操作不可用：{error:#}"));
+                                    this.tool_error =
+                                        Some(format!("部分操作不可用：{}", details(&error)));
                                 },
                             }
                             this.location = None;
@@ -249,7 +253,7 @@ impl GitDiffView {
                         }
                         this.error = None;
                     },
-                    Err(error) => this.error = Some(format!("{error:#}")),
+                    Err(error) => this.error = Some(details(&error)),
                 }
                 if this.pending {
                     this.refresh(cx);

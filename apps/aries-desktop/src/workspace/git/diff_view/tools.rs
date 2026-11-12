@@ -1,6 +1,13 @@
 use std::sync::Arc;
 
-use anyhow::{Context as _, Result, ensure};
+use thiserror::Error;
+
+use crate::error::{details, log, report};
+use crate::workspace::git::diff_operations::GitOperationError;
+use crate::workspace::git::diff_patch::PatchError;
+use crate::workspace::git::error::RepositoryError;
+
+type Result<T> = std::result::Result<T, ToolError>;
 use git2::Repository;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariant, ButtonVariants};
@@ -522,22 +529,27 @@ impl GitDiffView {
         }
     }
 
-    fn copy_patch(&mut self, scope: ToolScope, cx: &mut Context<Self>) {
+    fn copy_patch(&mut self, scope: ToolScope, window: &mut Window, cx: &mut Context<Self>) {
         let result = if scope == ToolScope::File {
             Ok(self.patch.as_ref().clone())
         } else {
             self.model
                 .as_ref()
                 .zip(self.scope_patch(scope))
-                .context("请先选择包含变更的行或块")
-                .and_then(|(model, scope)| model.selected_patch(&scope, PatchDirection::forward()))
+                .ok_or_else(ToolError::selection_required)
+                .and_then(|(model, scope)| {
+                    model.selected_patch(&scope, PatchDirection::forward()).map_err(ToolError::from)
+                })
         };
         match result {
             Ok(patch) => {
                 cx.write_to_clipboard(ClipboardItem::new_string(patch));
                 self.tool_error = None;
             },
-            Err(error) => self.tool_error = Some(format!("无法复制 patch：{error:#}")),
+            Err(error) => {
+                self.tool_error = Some(format!("无法复制 patch：{}", details(&error)));
+                report("无法复制 patch", &error, window, cx);
+            },
         }
         cx.notify();
     }
@@ -700,10 +712,10 @@ impl GitDiffView {
                             let snapshot = more_snapshot.clone();
                             menu =
                                 menu.item(PopupMenuItem::new(label).disabled(!enabled).on_click(
-                                    move |_, _, cx| {
+                                    move |_, window, cx| {
                                         let _ = view.update(cx, |this, cx| {
                                             if this.restore_tool_snapshot(&snapshot, cx) {
-                                                this.copy_patch(scope, cx);
+                                                this.copy_patch(scope, window, cx);
                                             }
                                         });
                                     },
@@ -857,32 +869,36 @@ impl GitDiffView {
             .into_any_element()
     }
 
-    pub fn load_backups(&mut self, cx: &mut Context<Self>) {
+    pub fn load_backups(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !self.is_open() {
             return;
         }
         let directory = self.directory.clone();
         let revision = self.revision;
-        self.backup_task = Some(cx.spawn(async move |view, cx| {
+        self.backup_task = Some(cx.spawn_in(window, async move |view, cx| {
             let result = cx
-                .background_spawn(async move {
-                    let repository = Repository::discover(&directory)?;
+                .background_executor()
+                .spawn(async move {
+                    let repository = Repository::discover(&directory).map_err(|source| {
+                        RepositoryError::git("discovering backup repository", &directory, source)
+                    })?;
                     let root = std::fs::canonicalize(
-                        repository.workdir().context("repository has no workdir")?,
-                    )?;
+                        repository.workdir().ok_or_else(GitOperationError::no_workdir)?,
+                    )
+                    .map_err(GitOperationError::resolving_repository_workdir)?;
                     let mut backups = Vec::new();
                     let mut errors = Vec::new();
                     for entry in DiscardBackup::entries()? {
                         match entry {
                             Ok(backup) if backup.root() == root => backups.push(backup),
                             Ok(_) => {},
-                            Err(error) => errors.push(format!("{error:#}")),
+                            Err(error) => errors.push(error),
                         }
                     }
-                    Ok::<_, anyhow::Error>((backups, errors))
+                    Ok::<_, GitOperationError>((backups, errors))
                 })
                 .await;
-            let _ = view.update(cx, |this, cx| {
+            let _ = view.update_in(cx, |this, window, cx| {
                 if this.revision != revision {
                     return;
                 }
@@ -890,11 +906,31 @@ impl GitDiffView {
                     Ok((backups, errors)) => {
                         this.backups = backups;
                         if !errors.is_empty() {
-                            this.tool_error =
-                                Some(format!("部分备份无法读取：{}", errors.join("；")));
+                            this.tool_error = Some(format!(
+                                "部分备份无法读取：{}",
+                                errors
+                                    .iter()
+                                    .map(|error| details(error))
+                                    .collect::<Vec<_>>()
+                                    .join("；")
+                            ));
+                            if let Some(error) = errors.first() {
+                                report(
+                                    format!("{} 条备份无法读取，请检查备份文件", errors.len()),
+                                    error,
+                                    window,
+                                    cx,
+                                );
+                            }
+                            for error in errors.iter().skip(1) {
+                                log("部分备份无法读取", error);
+                            }
                         }
                     },
-                    Err(error) => this.tool_error = Some(format!("无法加载丢弃备份：{error:#}")),
+                    Err(error) => {
+                        this.tool_error = Some(format!("无法加载丢弃备份：{}", details(&error)));
+                        report("无法加载丢弃备份", &error, window, cx);
+                    },
                 }
                 cx.notify();
             });
@@ -921,10 +957,18 @@ impl GitDiffView {
         self.editor_task = Some(cx.spawn(async move |view, cx| {
             let result = cx
                 .background_spawn(async move {
-                    let repository = Repository::discover(&directory)?;
-                    let root = repository.workdir().context("repository has no workdir")?;
+                    let repository = Repository::discover(&directory).map_err(|source| {
+                        GitOperationError::from(RepositoryError::git(
+                            "discovering editor repository",
+                            &directory,
+                            source,
+                        ))
+                    })?;
+                    let root = repository.workdir().ok_or_else(GitOperationError::no_workdir)?;
                     let path = root.join(path);
-                    ensure!(path.is_file(), "工作目录文件不存在：{}", path.display());
+                    if !path.is_file() {
+                        return Err(ToolError::file_missing(&path));
+                    }
                     let mut command = std::process::Command::new(editor);
                     if let Some(line) = line {
                         let mut location = path.into_os_string();
@@ -936,15 +980,16 @@ impl GitDiffView {
                     } else {
                         command.arg(path);
                     }
-                    let output = command
-                        .output()
-                        .with_context(|| format!("无法启动 {editor}，请安装并配置编辑器 CLI"))?;
-                    ensure!(
-                        output.status.success(),
-                        "{editor} 打开失败：{}",
-                        String::from_utf8_lossy(&output.stderr)
-                    );
-                    Ok::<_, anyhow::Error>(())
+                    let output =
+                        command.output().map_err(|source| ToolError::launch(editor, source))?;
+                    if !output.status.success() {
+                        return Err(ToolError::editor_failed(
+                            editor,
+                            output.status,
+                            String::from_utf8_lossy(&output.stderr).into_owned(),
+                        ));
+                    }
+                    Ok::<_, ToolError>(())
                 })
                 .await;
             let _ = view.update(cx, |this, cx| {
@@ -954,7 +999,7 @@ impl GitDiffView {
                 this.editor_task = None;
                 match result {
                     Ok(()) => this.tool_error = None,
-                    Err(error) => this.tool_error = Some(format!("{error:#}")),
+                    Err(error) => this.tool_error = Some(details(&error)),
                 }
                 cx.notify();
             });
@@ -964,13 +1009,13 @@ impl GitDiffView {
 }
 
 fn endpoint(side: DiffSide, line: usize) -> Result<LineEndpoint> {
-    LineEndpoint::new(
+    Ok(LineEndpoint::new(
         match side {
             DiffSide::Original => SourceSide::original(),
             DiffSide::Modified => SourceSide::modified(),
         },
-        u32::try_from(line)?,
-    )
+        u32::try_from(line).map_err(|source| ToolError::line_number(line, source))?,
+    )?)
 }
 
 fn dispatch_change(
@@ -984,4 +1029,56 @@ fn dispatch_change(
             session.with_git_panel(|panel| panel.change_diff(request, window, cx))
         });
     });
+}
+
+#[derive(Debug, Error)]
+enum ToolError {
+    #[error(transparent)]
+    Patch { source: PatchError },
+    #[error(transparent)]
+    Operation { source: GitOperationError },
+    #[error("请先选择包含变更的行或块")]
+    SelectionRequired,
+    #[error("line number {line} exceeds supported patch coordinates")]
+    LineNumber { line: usize, source: std::num::TryFromIntError },
+    #[error("工作目录文件不存在：{}", path.display())]
+    FileMissing { path: std::path::PathBuf },
+    #[error("无法启动 {editor}，请安装并配置编辑器 CLI")]
+    Launch { editor: &'static str, source: std::io::Error },
+    #[error("{editor} 打开失败 ({status})：{stderr}")]
+    EditorFailed { editor: &'static str, status: std::process::ExitStatus, stderr: String },
+}
+
+impl ToolError {
+    fn selection_required() -> Self {
+        Self::SelectionRequired
+    }
+    fn line_number(line: usize, source: std::num::TryFromIntError) -> Self {
+        Self::LineNumber { line, source }
+    }
+    fn file_missing(path: &std::path::Path) -> Self {
+        Self::FileMissing { path: path.to_owned() }
+    }
+    fn launch(editor: &'static str, source: std::io::Error) -> Self {
+        Self::Launch { editor, source }
+    }
+    fn editor_failed(
+        editor: &'static str,
+        status: std::process::ExitStatus,
+        stderr: String,
+    ) -> Self {
+        Self::EditorFailed { editor, status, stderr }
+    }
+}
+
+impl From<PatchError> for ToolError {
+    fn from(source: PatchError) -> Self {
+        Self::Patch { source }
+    }
+}
+
+impl From<GitOperationError> for ToolError {
+    fn from(source: GitOperationError) -> Self {
+        Self::Operation { source }
+    }
 }

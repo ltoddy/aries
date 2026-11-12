@@ -249,16 +249,10 @@ impl Render for WorkspaceView {
             .flex()
             .flex_col()
             .child(self.render_tab_bar(p, sidebar_available, cx))
-            .child(
-                div()
-                    .relative()
-                    .flex()
-                    .flex_col()
-                    .flex_1()
-                    .min_h_0()
-                    .child(content)
-                    .when(self.terminal_visible, |view| view.child(self.render_terminal(cx))),
-            );
+            .child(div().relative().flex().flex_col().flex_1().min_h_0().child(content).when_some(
+                self.terminal.as_ref().filter(|_| self.terminal_visible),
+                |view, terminal| view.child(self.render_terminal(terminal, cx)),
+            ));
         div()
             .size_full()
             .track_focus(&self.focus_handle)
@@ -365,8 +359,11 @@ impl WorkspaceView {
         cx.notify();
     }
 
-    fn render_terminal(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let terminal = self.terminal.as_ref().expect("visible terminal has a retained entity");
+    fn render_terminal(
+        &self,
+        terminal: &Entity<TerminalView>,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let directory = terminal.read(cx).directory().display().to_string();
         div()
             .id("floating-terminal")

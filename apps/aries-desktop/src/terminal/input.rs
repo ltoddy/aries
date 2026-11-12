@@ -146,7 +146,14 @@ impl TerminalView {
         let Some(session) = &self.session else {
             return;
         };
-        let mut terminal = session.terminal();
+        let mut terminal = match session.terminal() {
+            Ok(terminal) => terminal,
+            Err(error) => {
+                self.input_error = Some(error.to_string());
+                cx.notify();
+                return;
+            },
+        };
         let (point, side) = self.selection_point(event.position, &terminal);
         let kind = match event.click_count {
             2 => SelectionType::Semantic,
@@ -162,7 +169,14 @@ impl TerminalView {
         let Some(session) = &self.session else {
             return;
         };
-        let mut terminal = session.terminal();
+        let mut terminal = match session.terminal() {
+            Ok(terminal) => terminal,
+            Err(error) => {
+                self.input_error = Some(error.to_string());
+                cx.notify();
+                return;
+            },
+        };
         let (point, side) = self.selection_point(position, &terminal);
         if let Some(selection) = &mut terminal.selection {
             selection.update(point, side);
@@ -170,9 +184,17 @@ impl TerminalView {
         }
     }
 
-    pub fn copy_selection(&self, cx: &mut Context<Self>) {
-        let text =
-            self.session.as_ref().and_then(|session| session.terminal().selection_to_string());
+    pub fn copy_selection(&self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(session) = &self.session else {
+            return;
+        };
+        let text = match session.terminal() {
+            Ok(terminal) => terminal.selection_to_string(),
+            Err(error) => {
+                crate::error::report("复制终端文本失败", &error, window, cx);
+                return;
+            },
+        };
         if let Some(text) = text.filter(|text| !text.is_empty()) {
             cx.write_to_clipboard(ClipboardItem::new_string(text));
         }
@@ -212,7 +234,7 @@ impl EntityInputHandler for TerminalView {
     fn unmark_text(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let text = std::mem::take(&mut self.preedit);
         self.preedit_selection = 0..0;
-        self.send(text.into_bytes(), cx);
+        let _ = self.send(text.into_bytes(), cx);
         window.notify_text_input_changed(&self.focus_handle);
         cx.notify();
     }
@@ -231,7 +253,7 @@ impl EntityInputHandler for TerminalView {
             std::mem::take(&mut self.preedit)
         };
         self.preedit_selection = 0..0;
-        self.send(committed.into_bytes(), cx);
+        let _ = self.send(committed.into_bytes(), cx);
         window.notify_text_input_changed(&self.focus_handle);
         cx.notify();
     }
@@ -252,9 +274,9 @@ impl EntityInputHandler for TerminalView {
         cx.notify();
     }
 
-    fn paste(&mut self, item: ClipboardItem, _: &mut Window, cx: &mut Context<Self>) {
+    fn paste(&mut self, item: ClipboardItem, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(text) = item.text() {
-            TerminalView::paste(self, &text, cx);
+            TerminalView::paste(self, &text, window, cx);
         }
     }
 

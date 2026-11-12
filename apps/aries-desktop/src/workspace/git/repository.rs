@@ -2,12 +2,12 @@ use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::path::{Path, PathBuf};
 
-use anyhow::Context;
 use git2::{Diff, DiffFindOptions, DiffOptions, Patch, Repository, Status, StatusOptions};
 use gpui_kit::assets::IconName;
 use gpui_kit::component::ActiveTheme;
 use gpui_kit::*;
 
+use crate::workspace::git::error::RepositoryError;
 use crate::workspace::git::index::IndexAction;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -68,20 +68,26 @@ fn read_diff(repository: &Repository, group: ChangeGroup) -> Result<Diff<'_>, gi
     Ok(diff)
 }
 
-pub fn read_file_diff(cwd: &Path, path: &Path, group: ChangeGroup) -> anyhow::Result<String> {
-    let repository = Repository::discover(cwd).context("discovering Git repository")?;
-    let diff = read_diff(&repository, group).context("reading Git diff")?;
+pub fn read_file_diff(
+    cwd: &Path,
+    path: &Path,
+    group: ChangeGroup,
+) -> Result<String, RepositoryError> {
+    let repository = Repository::discover(cwd)
+        .map_err(|source| RepositoryError::git("discovering Git repository", cwd, source))?;
+    let diff = read_diff(&repository, group)
+        .map_err(|source| RepositoryError::git("reading Git diff", cwd, source))?;
     let mut output = Vec::new();
     for (ix, delta) in diff.deltas().enumerate() {
         if delta.old_file().path() != Some(path) && delta.new_file().path() != Some(path) {
             continue;
         }
         let mut patch = Patch::from_diff(&diff, ix)
-            .with_context(|| format!("reading Git patch for {}", path.display()))?
-            .with_context(|| format!("Git patch unavailable for {}", path.display()))?;
+            .map_err(|source| RepositoryError::git("reading Git patch", path, source))?
+            .ok_or_else(|| RepositoryError::patch_unavailable(path))?;
         let buffer = patch
             .to_buf()
-            .with_context(|| format!("serializing Git patch for {}", path.display()))?;
+            .map_err(|source| RepositoryError::git("serializing Git patch", path, source))?;
         output.extend_from_slice(&buffer);
     }
     Ok(String::from_utf8_lossy(&output).into_owned())
@@ -208,17 +214,29 @@ pub struct GitInfo {
 }
 
 impl GitInfo {
-    pub fn read(cwd: impl AsRef<Path>) -> anyhow::Result<Option<Self>> {
+    pub fn read(cwd: impl AsRef<Path>) -> Result<Option<Self>, RepositoryError> {
+        let cwd = cwd.as_ref();
         let repository = match Repository::discover(cwd) {
             Ok(repository) => repository,
             Err(error) if error.code() == git2::ErrorCode::NotFound => return Ok(None),
-            Err(error) => return Err(error).context("discovering Git repository"),
+            Err(error) => {
+                return Err(RepositoryError::git("discovering Git repository", cwd, error));
+            },
         };
-        let head = repository.find_reference("HEAD").context("reading HEAD reference")?;
-        let branch = match head.symbolic_target().context("reading HEAD symbolic target")? {
+        let head = repository
+            .find_reference("HEAD")
+            .map_err(|source| RepositoryError::git("reading HEAD reference", cwd, source))?;
+        let branch = match head
+            .symbolic_target()
+            .map_err(|source| RepositoryError::git("reading HEAD symbolic target", cwd, source))?
+        {
             Some(target) => target.strip_prefix("refs/heads/").unwrap_or(target).to_owned(),
             None => {
-                format!("游离 HEAD · {}", &head.target().context("HEAD 没有目标")?.to_string()[..7])
+                format!(
+                    "游离 HEAD · {}",
+                    &head.target().ok_or_else(RepositoryError::head_target_missing)?.to_string()
+                        [..7]
+                )
             },
         };
         let mut options = StatusOptions::new();
@@ -231,7 +249,9 @@ impl GitInfo {
         let staged_lines = read_line_changes(&repository, ChangeGroup::Staged).ok();
         let unstaged_lines = read_line_changes(&repository, ChangeGroup::Unstaged).ok();
         let changed_files = Some({
-            let statuses = repository.statuses(Some(&mut options)).context("reading Git status")?;
+            let statuses = repository
+                .statuses(Some(&mut options))
+                .map_err(|source| RepositoryError::git("reading Git status", cwd, source))?;
             let mut files: Vec<_> = statuses
                 .iter()
                 .map(|entry| {

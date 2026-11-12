@@ -6,10 +6,10 @@ use agent_client_protocol::v1::schema::{
     SessionId, SessionInfo, SessionNotification, SessionUpdate, StopReason,
 };
 use agent_client_protocol::{AcpAgentConfig, Error};
-use anyhow::Context as _;
 use gpui_kit::component::WindowExt;
 use gpui_kit::component::notification::Notification;
 use gpui_kit::*;
+use thiserror::Error as ThisError;
 
 use crate::acp::{Bridge, Command, DeletionReport, Event, Permission};
 use crate::workspace::conversation::Composer;
@@ -129,17 +129,17 @@ impl Execution {
                         .filter(|title| !title.trim().is_empty())
                         .map(str::to_owned)
                         .unwrap_or_else(|| id.to_string());
-                    format!("{title}：{error}")
+                    crate::error::log(&format!("无法删除会话 {title}"), error);
+                    format!("{title}：{}", crate::error::details(error))
                 })
                 .collect::<Vec<_>>()
                 .join("\n")
         });
-        let notification = if failed.is_empty() {
-            Notification::success(notice)
+        if let Some((_, error)) = failed.first() {
+            crate::error::report(notice, error, window, cx);
         } else {
-            Notification::warning(notice)
-        };
-        window.push_notification(notification.autohide(true), cx);
+            window.push_notification(Notification::success(notice).autohide(true), cx);
+        }
         ui.deletion.finish_deletion(error);
         if !deleted.is_empty()
             && let Some(host) = ui.tab_host.clone()
@@ -516,9 +516,13 @@ impl Execution {
                 self.bridge = Some(bridge);
             },
             Err(error) => {
+                crate::error::report("无法启动 Agent", &error, window, cx);
                 self.apply_event(
                     ui,
-                    Event::Disconnected(format!("无法启动 Agent：{error}")),
+                    Event::Disconnected(format!(
+                        "无法启动 Agent：{}",
+                        crate::error::details(&error)
+                    )),
                     window,
                     cx,
                 );
@@ -634,7 +638,10 @@ impl Execution {
                 self.dismiss_permissions();
                 let automatic = matches!(&result, Ok(StopReason::EndTurn)) && !self.stopping;
                 self.stopping = false;
-                self.conversation.finish(result.err().map(|error| error.to_string()));
+                self.conversation.finish(result.err().map(|error| {
+                    crate::error::log("Agent 执行失败", &error);
+                    crate::error::details(&error)
+                }));
                 if automatic && self.prompt_queue().is_some_and(PromptQueue::is_automatic) {
                     self.send_prompt_queue(ui, window, cx);
                 } else {
@@ -782,7 +789,9 @@ impl Execution {
                 ui.timeline.list().scroll_to_end();
             },
             Err(error) => {
-                self.conversation.finish(Some(format!("无法加载会话：{error}")));
+                self.conversation
+                    .finish(Some(format!("无法加载会话：{}", crate::error::details(&error))));
+                crate::error::report("无法加载会话", &error, window, cx);
             },
         }
         if ui.sidebar.list_mut().take_refresh_request() {
@@ -812,11 +821,11 @@ impl Execution {
             prompt: Some("选择新会话的项目目录".into()),
         });
         cx.spawn_in(window, async move |view, cx| {
-            let result: anyhow::Result<Option<PathBuf>> = async {
+            let result: Result<Option<PathBuf>, SelectDirectoryError> = async {
                 let Some(path) = selection
                     .await
-                    .context("等待目录选择结果失败")?
-                    .context("打开目录选择窗口失败")?
+                    .map_err(|source| SelectDirectoryError::wait(source.into()))?
+                    .map_err(|source| SelectDirectoryError::open(source.into()))?
                     .and_then(|paths| paths.into_iter().next())
                 else {
                     return Ok(None);
@@ -824,7 +833,8 @@ impl Execution {
                 let directory = cx
                     .background_executor()
                     .spawn(async move { validate_directory(&path) })
-                    .await?;
+                    .await
+                    .map_err(SelectDirectoryError::validate)?;
                 Ok(Some(directory))
             }
             .await;
@@ -842,10 +852,7 @@ impl Execution {
                     },
                     Ok(None) => {},
                     Err(error) => {
-                        window.push_notification(
-                            Notification::error(format!("无法选择项目目录：{error:#}")),
-                            cx,
-                        );
+                        crate::error::report("无法选择项目目录", &error, window, cx);
                     },
                 }
                 cx.notify();
@@ -868,10 +875,8 @@ impl Execution {
         let directory = directory.into();
         self.choosing_directory = true;
         cx.spawn_in(window, async move |view, cx| {
-            let (result, directory) = cx
-                .background_executor()
-                .spawn(async move { (validate_directory(&directory), directory) })
-                .await;
+            let result =
+                cx.background_executor().spawn(async move { validate_directory(&directory) }).await;
             let _ = view.update_in(cx, |this, window, cx| {
                 this.finish_directory_selection();
                 match result {
@@ -885,14 +890,9 @@ impl Execution {
                             this.start_new_chat(directory, window, cx);
                         }
                     },
-                    Err(error) => window.push_notification(
-                        Notification::error(format!(
-                            "无法在目录 {} 新建会话：{:#}。请检查目录是否存在且可访问。",
-                            directory.display(),
-                            error
-                        )),
-                        cx,
-                    ),
+                    Err(error) => {
+                        crate::error::report("无法在项目目录新建会话", &error, window, cx);
+                    },
                 }
                 cx.notify();
             });
@@ -966,14 +966,63 @@ impl Execution {
         cx.notify();
     }
 }
-fn validate_directory(path: impl AsRef<Path>) -> anyhow::Result<PathBuf> {
+#[derive(Debug, ThisError)]
+enum SelectDirectoryError {
+    #[error("等待目录选择结果失败")]
+    Wait { source: Box<dyn std::error::Error + Send + Sync> },
+    #[error("打开目录选择窗口失败")]
+    Open { source: Box<dyn std::error::Error + Send + Sync> },
+    #[error("所选项目目录不可用")]
+    Validate { source: ValidateDirectoryError },
+}
+
+impl SelectDirectoryError {
+    fn wait(source: Box<dyn std::error::Error + Send + Sync>) -> Self {
+        Self::Wait { source }
+    }
+
+    fn open(source: Box<dyn std::error::Error + Send + Sync>) -> Self {
+        Self::Open { source }
+    }
+
+    fn validate(source: ValidateDirectoryError) -> Self {
+        Self::Validate { source }
+    }
+}
+
+#[derive(Debug, ThisError)]
+enum ValidateDirectoryError {
+    #[error("无法解析目录 {}", path.display())]
+    Canonicalize { path: PathBuf, source: std::io::Error },
+    #[error("无法访问目录 {}", path.display())]
+    Metadata { path: PathBuf, source: std::io::Error },
+    #[error("请选择文件夹：{}", path.display())]
+    NotDirectory { path: PathBuf },
+}
+
+impl ValidateDirectoryError {
+    fn canonicalize(path: &Path, source: std::io::Error) -> Self {
+        Self::Canonicalize { path: path.to_path_buf(), source }
+    }
+
+    fn metadata(path: &Path, source: std::io::Error) -> Self {
+        Self::Metadata { path: path.to_path_buf(), source }
+    }
+
+    fn not_directory(path: PathBuf) -> Self {
+        Self::NotDirectory { path }
+    }
+}
+
+fn validate_directory(path: impl AsRef<Path>) -> Result<PathBuf, ValidateDirectoryError> {
     let path = path.as_ref();
     let directory =
-        path.canonicalize().with_context(|| format!("无法访问目录 {}", path.display()))?;
-    let metadata =
-        directory.metadata().with_context(|| format!("无法访问目录 {}", directory.display()))?;
+        path.canonicalize().map_err(|source| ValidateDirectoryError::canonicalize(path, source))?;
+    let metadata = directory
+        .metadata()
+        .map_err(|source| ValidateDirectoryError::metadata(&directory, source))?;
     if !metadata.is_dir() {
-        anyhow::bail!("请选择文件夹：{}", directory.display());
+        return Err(ValidateDirectoryError::not_directory(directory));
     }
     Ok(directory)
 }

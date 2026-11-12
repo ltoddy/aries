@@ -1,8 +1,8 @@
 mod acp;
+mod error;
 mod terminal;
 mod workspace;
 
-use anyhow::Context as _;
 use gpui_kit::assets::AllAssets;
 use gpui_kit::*;
 
@@ -26,11 +26,38 @@ gpui_kit::actions!(
     ]
 );
 
-fn main() -> anyhow::Result<()> {
-    let directory = std::env::current_dir().context("无法读取启动目录")?;
-    let cwd = directory
-        .canonicalize()
-        .with_context(|| format!("无法访问启动目录 {}", directory.display()))?;
+#[derive(Debug, thiserror::Error)]
+enum StartupError {
+    #[error("无法读取启动目录")]
+    Directory { source: std::io::Error },
+    #[error("无法访问启动目录 {}", path.display())]
+    Access { path: std::path::PathBuf, source: std::io::Error },
+}
+
+impl StartupError {
+    fn directory(source: std::io::Error) -> Self {
+        Self::Directory { source }
+    }
+
+    fn access(path: std::path::PathBuf, source: std::io::Error) -> Self {
+        Self::Access { path, source }
+    }
+}
+
+fn main() -> std::process::ExitCode {
+    error::init();
+    match run() {
+        Ok(()) => std::process::ExitCode::SUCCESS,
+        Err(error) => {
+            error::log("无法启动 Aries Desktop", &error);
+            std::process::ExitCode::FAILURE
+        },
+    }
+}
+
+fn run() -> Result<(), StartupError> {
+    let directory = std::env::current_dir().map_err(StartupError::directory)?;
+    let cwd = directory.canonicalize().map_err(|source| StartupError::access(directory, source))?;
     gpui_kit::application().with_assets(AllAssets).run(move |cx| {
         gpui_kit::init(cx);
         crate::terminal::init(cx);
@@ -98,7 +125,7 @@ fn main() -> anyhow::Result<()> {
             });
             cx.new(|cx| WorkspaceView::new(cwd, Preferences::path(), aries_config(), window, cx))
         }) {
-            eprintln!("无法创建窗口：{error:#}");
+            error::log("无法创建窗口", error.as_ref());
             cx.quit();
         }
         cx.activate(true);
