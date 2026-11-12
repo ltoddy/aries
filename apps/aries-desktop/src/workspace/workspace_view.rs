@@ -206,16 +206,22 @@ impl Render for WorkspaceView {
             Pixels::ZERO
         };
         let content_width = width - sidebar_width;
+        let panel_style = div().size_full().style().clone();
         let chat = div()
             .relative()
             .size_full()
             .min_w_0()
             .min_h_0()
             .child(if self.usage_visible {
-                div().size_full().child(self.usage.clone()).into_any_element()
+                div()
+                    .size_full()
+                    .child(self.usage.clone().cached(panel_style.clone()))
+                    .into_any_element()
             } else {
                 match active {
-                    Some(view) => div().size_full().child(view).into_any_element(),
+                    Some(view) => {
+                        div().size_full().child(view.cached(panel_style.clone())).into_any_element()
+                    },
                     None => self.render_empty_main(p),
                 }
             })
@@ -230,7 +236,7 @@ impl Render for WorkspaceView {
                     resizable_panel()
                         .size(diff_width)
                         .size_range(font_size * 16. ..Pixels::MAX)
-                        .child(diff),
+                        .child(diff.cached(panel_style.clone())),
                 )
                 .into_any_element()
         } else {
@@ -313,7 +319,7 @@ impl Render for WorkspaceView {
                                 div()
                                     .size_full()
                                     .track_focus(&self.sidebar_focus_handle)
-                                    .child(self.sidebar.clone()),
+                                    .child(self.sidebar.clone().cached(panel_style)),
                             ),
                     )
                     .child(resizable_panel().child(main))

@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
@@ -26,12 +27,20 @@ impl DiffTarget {
     }
 }
 
+pub struct DiffTargetChanged;
+
+impl DiffTargetChanged {
+    fn new() -> Self {
+        Self
+    }
+}
+
 pub struct GitDiffView {
     owner: WeakEntity<SessionView>,
     directory: PathBuf,
     target: Option<DiffTarget>,
     state: Entity<DiffState>,
-    patch: String,
+    patch: Arc<String>,
     error: Option<String>,
     loading: bool,
     pending: bool,
@@ -40,6 +49,8 @@ pub struct GitDiffView {
     previous_focus: Option<FocusHandle>,
     _subscription: Subscription,
 }
+
+impl EventEmitter<DiffTargetChanged> for GitDiffView {}
 
 impl GitDiffView {
     pub fn new(owner: WeakEntity<SessionView>, directory: PathBuf, cx: &mut Context<Self>) -> Self {
@@ -50,7 +61,7 @@ impl GitDiffView {
             directory,
             target: None,
             state,
-            patch: String::new(),
+            patch: Arc::new(String::new()),
             error: None,
             loading: false,
             pending: false,
@@ -74,9 +85,13 @@ impl GitDiffView {
             return;
         }
         self.directory = directory.to_owned();
+        let was_open = self.is_open();
         self.target = None;
         self.previous_focus = None;
         self.reset(cx);
+        if was_open {
+            cx.emit(DiffTargetChanged::new());
+        }
     }
 
     pub fn open(
@@ -92,6 +107,7 @@ impl GitDiffView {
         if !self.is_selected(&path, group) {
             self.target = Some(DiffTarget::new(path, group));
             self.reset(cx);
+            cx.emit(DiffTargetChanged::new());
         }
         self.refresh(cx);
         self.state.focus_handle(cx).focus(window, cx);
@@ -102,7 +118,7 @@ impl GitDiffView {
         self.task = None;
         self.loading = false;
         self.pending = false;
-        self.patch.clear();
+        self.patch = Arc::new(String::new());
         self.error = None;
         self.state.update(cx, |state, cx| state.set_files(Vec::new(), cx));
         cx.notify();
@@ -111,6 +127,7 @@ impl GitDiffView {
     fn close(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.target = None;
         self.reset(cx);
+        cx.emit(DiffTargetChanged::new());
         if let Some(focus) = self.previous_focus.take() {
             window.focus(&focus, cx);
         }
@@ -127,13 +144,17 @@ impl GitDiffView {
         self.loading = true;
         self.pending = false;
         let directory = self.directory.clone();
+        let previous_patch = self.patch.clone();
         let revision = self.revision;
         self.task = Some(cx.spawn(async move |view, cx| {
             let result = cx
                 .background_spawn(async move {
                     let patch = read_file_diff(&directory, &target.path, target.group)?;
+                    if patch == *previous_patch {
+                        return Ok::<_, anyhow::Error>(None);
+                    }
                     let files = DiffFile::parse(&patch)?;
-                    Ok::<_, anyhow::Error>((patch, files))
+                    Ok(Some((Arc::new(patch), files)))
                 })
                 .await;
             let _ = view.update(cx, |this, cx| {
@@ -142,8 +163,8 @@ impl GitDiffView {
                 }
                 this.loading = false;
                 match result {
-                    Ok((patch, files)) => {
-                        if this.patch != patch {
+                    Ok(result) => {
+                        if let Some((patch, files)) = result {
                             this.state.update(cx, |state, cx| state.set_files(files, cx));
                             this.patch = patch;
                         }

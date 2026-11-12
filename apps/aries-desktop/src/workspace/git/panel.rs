@@ -9,7 +9,7 @@ use gpui_kit::prelude::*;
 use gpui_kit::*;
 
 use crate::workspace::SessionView;
-use crate::workspace::git::diff_view::GitDiffView;
+use crate::workspace::git::diff_view::{DiffTargetChanged, GitDiffView};
 use crate::workspace::git::index::{IndexAction, update_index};
 use crate::workspace::git::list::GitChangeList;
 use crate::workspace::git::motion::{GitMotion, accept_result};
@@ -41,7 +41,7 @@ impl GitPanel {
         let cwd = cwd.into();
         let owner = cx.weak_entity();
         let diff = cx.new(|cx| GitDiffView::new(owner, cwd.clone(), cx));
-        let diff_subscription = cx.observe(&diff, |_, _, cx| cx.notify());
+        let diff_subscription = cx.subscribe(&diff, |_, _, _: &DiffTargetChanged, cx| cx.notify());
         Self {
             cwd,
             info: None,
