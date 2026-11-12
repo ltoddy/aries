@@ -61,13 +61,12 @@ impl Configuration {
     pub fn finish_session_config(
         &mut self,
         execution: &mut Execution,
-        session_id: SessionId,
-        config_id: SessionConfigId,
+        session_id: &SessionId,
+        config_id: &SessionConfigId,
         result: Result<Vec<SessionConfigOption>, Error>,
         cx: &mut Context<SessionView>,
     ) {
-        if execution.session_id() != Some(&session_id) || self.pending.as_ref() != Some(&config_id)
-        {
+        if execution.session_id() != Some(session_id) || self.pending.as_ref() != Some(config_id) {
             return;
         }
         self.pending = None;

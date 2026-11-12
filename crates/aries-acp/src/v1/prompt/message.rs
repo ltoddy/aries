@@ -7,8 +7,8 @@ use rig::message::{AudioMediaType, DocumentMediaType, ImageMediaType, MimeType, 
 #[derive(Debug, Clone)]
 pub struct UserMessage(Message);
 
-impl From<Vec<ContentBlock>> for UserMessage {
-    fn from(value: Vec<ContentBlock>) -> Self {
+impl UserMessage {
+    pub fn new(value: impl IntoIterator<Item = ContentBlock>) -> Self {
         let content = value
             .into_iter()
             .filter_map(|block| match block {
@@ -62,7 +62,13 @@ impl From<Vec<ContentBlock>> for UserMessage {
             })
             .collect::<Vec<UserContent>>();
 
-        UserMessage(Message::User { content })
+        Self(Message::from(content))
+    }
+}
+
+impl From<Vec<ContentBlock>> for UserMessage {
+    fn from(value: Vec<ContentBlock>) -> Self {
+        Self::new(value)
     }
 }
 

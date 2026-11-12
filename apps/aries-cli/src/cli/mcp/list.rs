@@ -28,7 +28,7 @@ pub async fn execute(_args: ListMcpArgs, gctx: GlobalContext) -> anyhow::Result<
             let (type_str, detail) = match config {
                 McpServerConfig::Stdio(stdio) => {
                     let cmd = if stdio.args.is_empty() {
-                        stdio.command.clone()
+                        stdio.command
                     } else {
                         format!("{} {}", stdio.command, stdio.args.join(" "))
                     };

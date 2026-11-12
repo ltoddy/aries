@@ -9,10 +9,10 @@ use aries_extension::skill::SkillDefinition;
 use aries_init::GlobalContext;
 
 pub async fn sections(
-    gctx: GlobalContext,
+    gctx: &GlobalContext,
     cwd: impl AsRef<Path>,
     model: impl AsRef<str>,
-    skills: &[SkillDefinition],
+    skills: impl AsRef<[SkillDefinition]>,
 ) -> Vec<String> {
     let cwd = cwd.as_ref();
     let model = model.as_ref();

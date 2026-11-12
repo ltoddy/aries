@@ -66,7 +66,11 @@ impl PromptAttachment {
         }
     }
 
-    pub fn from_path(path: &Path, capabilities: &PromptCapabilities) -> anyhow::Result<Self> {
+    pub fn from_path(
+        path: impl AsRef<Path>,
+        capabilities: &PromptCapabilities,
+    ) -> anyhow::Result<Self> {
+        let path = path.as_ref();
         let path = path.canonicalize().with_context(|| format!("无法访问 {}", path.display()))?;
         let file = File::open(&path).with_context(|| format!("无法读取 {}", path.display()))?;
         if !file.metadata()?.is_file() {

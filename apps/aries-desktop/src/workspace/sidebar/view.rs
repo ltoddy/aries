@@ -78,12 +78,13 @@ impl Sidebar {
     pub fn take_created_session(&mut self) -> Option<SessionInfo> {
         self.created_session.take()
     }
-    pub fn is_sessions_expanded(&self, cwd: &Path) -> bool {
-        self.expanded_sessions.contains(cwd)
+    pub fn is_sessions_expanded(&self, cwd: impl AsRef<Path>) -> bool {
+        self.expanded_sessions.contains(cwd.as_ref())
     }
-    pub fn toggle_sessions(&mut self, cwd: &Path) {
+    pub fn toggle_sessions(&mut self, cwd: impl AsRef<Path>) {
+        let cwd = cwd.as_ref();
         if !self.expanded_sessions.remove(cwd) {
-            self.expanded_sessions.insert(cwd.to_path_buf());
+            self.expanded_sessions.insert(cwd.to_owned());
         }
     }
     pub fn collapse_all(&mut self) {
@@ -184,7 +185,7 @@ impl Sidebar {
     pub fn sync_sidebar_rows(
         &mut self,
         current: Option<&SessionId>,
-        cwd: &Path,
+        cwd: impl AsRef<Path>,
         title: String,
         cx: &mut Context<SessionView>,
     ) {
@@ -195,7 +196,7 @@ impl Sidebar {
     pub fn receive_sidebar_rows(
         &mut self,
         current: Option<&SessionId>,
-        cwd: &Path,
+        cwd: impl AsRef<Path>,
         title: String,
         cx: &mut Context<SessionView>,
     ) {
@@ -208,7 +209,7 @@ impl Sidebar {
     fn sidebar_sessions(
         &self,
         current: Option<&SessionId>,
-        cwd: &Path,
+        cwd: impl AsRef<Path>,
         title: String,
     ) -> Vec<SessionInfo> {
         let mut sessions: Vec<_> =
@@ -216,7 +217,7 @@ impl Sidebar {
         if let Some(id) = current
             && !sessions.iter().any(|session| &session.session_id == id)
         {
-            sessions.insert(0, SessionInfo::new(id.clone(), cwd.to_path_buf()).title(title));
+            sessions.insert(0, SessionInfo::new(id.clone(), cwd.as_ref().to_owned()).title(title));
         }
         sessions
     }
@@ -225,7 +226,7 @@ impl Sidebar {
         &mut self,
         ids: &HashSet<SessionId>,
         current: Option<&SessionId>,
-        cwd: &Path,
+        cwd: impl AsRef<Path>,
         title: String,
         cx: &mut Context<SessionView>,
     ) {
@@ -250,14 +251,14 @@ impl Sidebar {
     pub fn locate_current_session(
         &mut self,
         current: Option<&SessionId>,
-        directory: &Path,
+        directory: impl AsRef<Path>,
         window: &mut Window,
         cx: &mut Context<SessionView>,
     ) {
         let cwd = current
             .and_then(|id| self.list.session(id))
             .map(|session| session.cwd.clone())
-            .unwrap_or_else(|| directory.to_path_buf());
+            .unwrap_or_else(|| directory.as_ref().to_owned());
         self.list.expand_project(&cwd);
         if let Some(id) = current
             && self.motion.projects().get(cwd.as_path()).is_some_and(|sessions| {

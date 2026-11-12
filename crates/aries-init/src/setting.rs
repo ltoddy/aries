@@ -67,8 +67,8 @@ impl SettingLoader {
         Ok(())
     }
 
-    pub fn file_path(&self) -> PathBuf {
-        self.file_path.clone()
+    pub fn file_path(&self) -> &Path {
+        &self.file_path
     }
 }
 
@@ -104,12 +104,12 @@ impl Setting {
     pub fn new(model: ModelConfig) -> Self {
         let nickname = whoami::realname().unwrap_or_default();
 
-        Self { nickname, active: model.alias(), models: vec![model] }
+        Self { nickname, active: model.alias().to_owned(), models: vec![model] }
     }
 
     pub fn add_model(&mut self, model: ModelConfig) {
         if self.models.is_empty() {
-            self.active = model.alias();
+            self.active = model.alias().to_owned();
         }
         self.models.push(model);
     }
@@ -123,23 +123,23 @@ impl Setting {
             .ok_or_else(|| SettingError::not_found(self.active.clone()))
     }
 
-    pub fn activate(&mut self, alias: impl Into<String>) -> Result<ModelConfig, SettingError> {
-        let alias = alias.into();
+    pub fn activate(&mut self, alias: impl AsRef<str>) -> Result<ModelConfig, SettingError> {
+        let alias = alias.as_ref();
 
         let activated = self
             .models
             .iter()
-            .find(|m| m.alias().eq(&alias))
+            .find(|m| m.alias() == alias)
             .cloned()
-            .ok_or(SettingError::not_found(&alias))?;
+            .ok_or_else(|| SettingError::not_found(alias))?;
 
-        self.active = alias;
+        self.active = alias.to_owned();
         Ok(activated)
     }
 
     #[inline]
     pub fn aliases(&self) -> Vec<String> {
-        self.models.iter().map(|m| m.alias()).collect::<Vec<_>>()
+        self.models.iter().map(|m| m.alias().to_owned()).collect()
     }
 
     pub fn table(&self) -> Table {
@@ -150,9 +150,9 @@ impl Setting {
             .map(|m| {
                 Row::new(vec![
                     Cell::new(if m.alias() == self.active { "default" } else { "" }),
-                    Cell::new(m.alias().as_str()),
+                    Cell::new(m.alias()),
                     Cell::new(m.provider().as_str()),
-                    Cell::new(m.model().as_str()),
+                    Cell::new(m.model()),
                 ])
             })
             .for_each(|row| {
@@ -218,39 +218,19 @@ impl ModelConfig {
         Self::OpenAI(OpenAI { alias, model, api_key, base_url })
     }
 
-    pub fn alias(&self) -> String {
+    pub fn alias(&self) -> &str {
         match self {
-            ModelConfig::Azure(Azure {
-                alias,
-                model: _,
-                api_key: _,
-                azure_endpoint: _,
-                api_version: _,
-            }) => alias.to_owned(),
-            ModelConfig::Deepseek(Deepseek { alias, model: _, api_key: _, base_url: _ }) => {
-                alias.to_owned()
-            },
-            ModelConfig::OpenAI(OpenAI { alias, model: _, api_key: _, base_url: _ }) => {
-                alias.to_owned()
-            },
+            Self::Azure(Azure { alias, .. }) => alias,
+            Self::Deepseek(Deepseek { alias, .. }) => alias,
+            Self::OpenAI(OpenAI { alias, .. }) => alias,
         }
     }
 
-    pub fn model(&self) -> String {
+    pub fn model(&self) -> &str {
         match self {
-            ModelConfig::Azure(Azure {
-                alias: _,
-                model,
-                api_key: _,
-                azure_endpoint: _,
-                api_version: _,
-            }) => model.to_owned(),
-            ModelConfig::Deepseek(Deepseek { alias: _, model, api_key: _, base_url: _ }) => {
-                model.to_owned()
-            },
-            ModelConfig::OpenAI(OpenAI { alias: _, model, api_key: _, base_url: _ }) => {
-                model.to_owned()
-            },
+            Self::Azure(Azure { model, .. }) => model,
+            Self::Deepseek(Deepseek { model, .. }) => model,
+            Self::OpenAI(OpenAI { model, .. }) => model,
         }
     }
 

@@ -1,4 +1,3 @@
-use std::fmt::Debug;
 use std::path::PathBuf;
 
 use serde::{Serialize, Serializer};
@@ -8,10 +7,7 @@ use crate::hook::input::{Effort, HookInput};
 const HOOK_EVENT_NAME: &str = "PreToolUse";
 
 #[derive(Debug, Default, Clone, Serialize)]
-pub struct PreToolUseHookInput<ToolInput>
-where
-    ToolInput: Clone + Debug + Default + Serialize,
-{
+pub struct PreToolUseHookInput<ToolInput> {
     pub session_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transcript_path: Option<PathBuf>,
@@ -29,10 +25,7 @@ where
     pub tool_use_id: String,
 }
 
-impl<ToolInput> PreToolUseHookInput<ToolInput>
-where
-    ToolInput: Clone + Debug + Default + Serialize,
-{
+impl<ToolInput> PreToolUseHookInput<ToolInput> {
     pub fn new(
         session_id: impl Into<String>,
         cwd: impl Into<PathBuf>,
@@ -45,7 +38,18 @@ where
         let tool_name = tool_name.into();
         let tool_use_id = tool_use_id.into();
 
-        Self { session_id, cwd, tool_name, tool_input, tool_use_id, ..Default::default() }
+        Self {
+            session_id,
+            transcript_path: None,
+            cwd,
+            permission_mode: None,
+            effort: None,
+            agent_id: None,
+            hook_event_name: String::new(),
+            tool_name,
+            tool_input,
+            tool_use_id,
+        }
     }
 
     pub fn transcript_path(mut self, transcript_path: impl Into<PathBuf>) -> Self {
@@ -71,7 +75,7 @@ where
 
 impl<ToolInput> HookInput for PreToolUseHookInput<ToolInput>
 where
-    ToolInput: Clone + Debug + Default + Serialize,
+    ToolInput: Serialize,
 {
     fn hook_event_name(&self) -> &'static str {
         HOOK_EVENT_NAME

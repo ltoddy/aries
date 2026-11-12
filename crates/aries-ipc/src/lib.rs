@@ -76,9 +76,10 @@ impl AriesService for AriesServiceImpl {
 
         let projects = records
             .iter()
-            .map(|r| r.cwd.clone())
+            .map(|r| r.cwd.as_str())
             .collect::<BTreeSet<_>>()
             .into_iter()
+            .map(str::to_owned)
             .collect::<Vec<_>>();
 
         let daily =

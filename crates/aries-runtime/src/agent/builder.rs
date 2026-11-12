@@ -34,23 +34,22 @@ impl AgentBuilder {
         P: AgentHook + 'static,
     {
         let model = self.state.model.name();
+        let sections =
+            crate::preamble::sections(&self.gctx, &self.state.cwd, model, &self.extensions.skills)
+                .await;
 
         let tools = crate::create_tools(
             &self.state.session_id,
-            self.gctx.clone(),
+            self.gctx,
             crate::ALL_TOOL_NAMES,
             self.state.model.clone(),
             &self.state.session_dir,
             &self.state.cwd,
-            self.extensions.clone(),
-            Notifier::clone(&self.notifier),
+            self.extensions,
+            self.notifier.clone(),
             self.db.clone(),
         );
         tool_server_handle.add_tools(tools);
-
-        let sections =
-            crate::preamble::sections(self.gctx, &self.state.cwd, model, &self.extensions.skills)
-                .await;
 
         let mut builder = rig::agent::AgentBuilder::new(self.state.model)
             .name(&self.state.agent.frontmatter.name)

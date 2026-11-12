@@ -60,7 +60,8 @@ impl CompactAgent {
         self.inner.set_model(model);
     }
 
-    pub async fn compact(&mut self, messages: &[Message]) -> CompactOutcome {
+    pub async fn compact(&self, messages: impl AsRef<[Message]>) -> CompactOutcome {
+        let messages = messages.as_ref();
         let file_path = match self.save_transcript(messages).await {
             Ok(p) => p,
             Err(e) => return CompactOutcome::Transient(format!("save transcript failed: {e}")),
@@ -108,7 +109,7 @@ impl CompactAgent {
         CompactOutcome::Success((resume_prompt(&compact_summary, &file_path), compact_summary))
     }
 
-    async fn save_transcript(&mut self, messages: &[Message]) -> io::Result<PathBuf> {
+    async fn save_transcript(&self, messages: &[Message]) -> io::Result<PathBuf> {
         #[rustfmt::skip]
         tokio::fs::create_dir_all(&self.transcript_path)
             .await?;
@@ -138,7 +139,8 @@ fn resume_prompt(formatted_summary: &str, transcript_path: impl AsRef<Path>) -> 
 }
 
 /// 从模型输出中提取 `<summary>` 块内容，格式化为 "Summary:\n..."。
-pub fn compact_summary(raw: &str) -> String {
+pub fn compact_summary(raw: impl AsRef<str>) -> String {
+    let raw = raw.as_ref();
     SUMMARY_REGEX
         .captures(raw)
         .map(|caps| format!("Summary:\n{}", caps[1].trim()))

@@ -149,7 +149,7 @@ impl Session {
         self.state.model(model);
         self.agent.set_model(self.state.model.clone());
 
-        self.config = config.to_owned();
+        self.config = config;
         self.compactor.set_model(self.state.model.clone());
 
         let loader = SettingLoader::new(self.gctx.root_dir());
@@ -220,10 +220,10 @@ impl Session {
     pub async fn prompt<F, Fut>(
         &mut self,
         prompt: impl Into<Message>,
-        callback: F,
+        mut callback: F,
     ) -> crate::agent::AriesResult<PromptOutcome>
     where
-        F: Fn(AgentEvent) -> Fut + Clone,
+        F: FnMut(AgentEvent) -> Fut,
         Fut: Future<Output = ()>,
     {
         let mut prompt: Message = prompt.into();
@@ -252,7 +252,7 @@ impl Session {
 
         let context = self.recall_context(&title).await;
         let mut history = self.chat_context.history().await.to_vec();
-        history.extend_from_slice(&system_reminders(hook_context));
+        history.extend(system_reminders(hook_context));
         if let Some(reminder) = context {
             history.push(system_reminder(reminder));
         }
@@ -339,7 +339,7 @@ impl Session {
         self.chat_history.messages().await
     }
 
-    pub async fn overwrite_context(&self, messages: Vec<Message>) {
+    pub async fn overwrite_context(&self, messages: impl IntoIterator<Item = Message>) {
         self.chat_context.overwrite(messages).await;
     }
 
@@ -378,7 +378,7 @@ impl Session {
         self.extensions.available_commands()
     }
 
-    async fn try_execute_slash_command(&mut self, input: impl AsRef<str>) -> Option<String> {
+    async fn try_execute_slash_command(&self, input: impl AsRef<str>) -> Option<String> {
         let input = input.as_ref();
         let executor = SlashCommandsExecutor::new(&self.extensions.commands);
         if let Some(command) = executor.execute(input).await {
@@ -559,7 +559,8 @@ impl Session {
         self.hooks_executor.fire_stop_failure(input).await;
     }
 
-    async fn append_messages(&mut self, messages: &[Message]) {
+    async fn append_messages(&self, messages: impl AsRef<[Message]>) {
+        let messages = messages.as_ref();
         if messages.is_empty() {
             return;
         }

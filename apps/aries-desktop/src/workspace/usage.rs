@@ -60,8 +60,8 @@ struct UsageData {
 
 impl UsageData {
     fn from_records(
-        records: Vec<TokenUsage>,
-        today_records: Vec<TokenUsage>,
+        records: impl IntoIterator<Item = TokenUsage>,
+        today_records: impl IntoIterator<Item = TokenUsage>,
         timezone: TimeZone,
     ) -> Self {
         let mut projects: BTreeMap<String, BTreeMap<Date, DayUsage>> = BTreeMap::new();
@@ -630,7 +630,7 @@ fn load_usage(year: i16) -> anyhow::Result<UsageData> {
     runtime.block_on(query_usage(&root, year))
 }
 
-async fn query_usage(root: &Path, year: i16) -> anyhow::Result<UsageData> {
+async fn query_usage(root: impl AsRef<Path>, year: i16) -> anyhow::Result<UsageData> {
     let timezone = TimeZone::system();
     let today = Timestamp::now().to_zoned(timezone.clone()).date();
     let first = Date::new(year, 1, 1)?;

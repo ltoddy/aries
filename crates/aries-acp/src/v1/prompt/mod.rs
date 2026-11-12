@@ -20,7 +20,7 @@ pub async fn prompt(
     req: PromptRequest,
     responder: Responder<PromptResponse>,
     cx: ConnectionTo<Client>,
-    registry: SharedRegistry,
+    registry: &SharedRegistry,
 ) -> Result<(), Error> {
     info!(content_blocks = req.prompt.len(), "Received prompt request");
 

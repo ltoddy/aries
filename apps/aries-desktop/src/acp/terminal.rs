@@ -191,11 +191,11 @@ impl Drop for Process {
 fn append(
     output: &watch::Sender<TerminalOutputResponse>,
     pending: &mut Vec<u8>,
-    bytes: &[u8],
+    bytes: impl AsRef<[u8]>,
     eof: bool,
     limit: usize,
 ) {
-    pending.extend_from_slice(bytes);
+    pending.extend_from_slice(bytes.as_ref());
     let mut complete = 0;
     while complete < pending.len() {
         match std::str::from_utf8(&pending[complete..]) {
@@ -286,8 +286,8 @@ async fn run(
             }
         }
     }
-    append(&output, &mut out_pending, &[], true, limit);
-    append(&output, &mut err_pending, &[], true, limit);
+    append(&output, &mut out_pending, [], true, limit);
+    append(&output, &mut err_pending, [], true, limit);
     output.send_modify(|state| state.exit_status = status);
 }
 

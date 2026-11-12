@@ -7,7 +7,7 @@ use colored::Colorize;
 use rustyline::error::ReadlineError;
 use tracing::info_span;
 
-use super::display_elapsed;
+use crate::cli::session::display_elapsed;
 use crate::display::print_agent_event;
 use crate::{commands, input, welcome};
 
@@ -16,23 +16,23 @@ pub async fn execute(gctx: GlobalContext) -> anyhow::Result<()> {
     let setting = loader.load().await?;
     let model_config = setting.active_model()?;
 
-    let mut registry = SessionRegistry::new(gctx.clone(), setting.clone()).await?;
+    let mut registry = SessionRegistry::new(gctx.clone(), setting).await?;
 
     aries_logger::init(gctx.root_dir().join("logs"));
 
     let current_dir = gctx.current_dir();
 
-    let mut session = registry.new_session(&current_dir, McpDefinition::empty()).await?;
+    let mut session = registry.new_session(current_dir, McpDefinition::empty()).await?;
     let session_id = session.id();
     let _session_span = info_span!("session", session_id = %session_id).entered();
 
     let mut reader = input::InputReader::new(gctx.root_dir())?;
     welcome::welcome(
-        model_config.provider().to_string(),
+        model_config.provider().as_str(),
         model_config.model(),
         session.id(),
-        &gctx,
-        &current_dir,
+        gctx.user(),
+        current_dir,
     )
     .await;
 
@@ -63,7 +63,7 @@ pub async fn execute(gctx: GlobalContext) -> anyhow::Result<()> {
                 display_elapsed(start);
             },
             Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
-                commands::exit::exit(&session.id())
+                commands::exit::exit(session.id())
             },
             Err(err) => eprintln!("Error: {:?}", err),
         }

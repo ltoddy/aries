@@ -56,11 +56,11 @@ impl ReadError {
         ReadError::InvalidLimit
     }
 
-    pub fn is_a_directory(path: PathBuf) -> ReadError {
-        ReadError::IsADirectory(path)
+    pub fn is_a_directory(path: impl Into<PathBuf>) -> ReadError {
+        ReadError::IsADirectory(path.into())
     }
 
-    pub fn binary_file(path: PathBuf) -> ReadError {
-        ReadError::BinaryFile(path)
+    pub fn binary_file(path: impl Into<PathBuf>) -> ReadError {
+        ReadError::BinaryFile(path.into())
     }
 }

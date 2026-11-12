@@ -36,8 +36,10 @@ use rig::providers::openai::wire::OpenAiWire;
 use rig::tool::ToolSet;
 use toasty::Db;
 
-pub fn format_tool_output(tool_name: &str, raw_json: serde_json::Value) -> String {
-    let result = match tool_name {
+use self::context::ToolContext;
+
+pub fn format_tool_output(tool_name: impl AsRef<str>, raw_json: serde_json::Value) -> String {
+    let result = match tool_name.as_ref() {
         agent::NAME => agent::AgentOutput::render_output(raw_json),
         bash::NAME => bash::BashOutput::render_output(raw_json),
         batch::NAME => batch::BatchOutput::render_output(raw_json),
@@ -85,15 +87,15 @@ pub const ALL_TOOL_NAMES: &[&str] = &[
     write::NAME,
 ];
 
-pub fn is_builtin_tool(tool_name: &str) -> bool {
-    ALL_TOOL_NAMES.contains(&tool_name)
+pub fn is_builtin_tool(tool_name: impl AsRef<str>) -> bool {
+    ALL_TOOL_NAMES.contains(&tool_name.as_ref())
 }
 
-#[allow(clippy::too_many_arguments)]
-pub fn create_tools(
+#[expect(clippy::too_many_arguments)]
+pub fn create_tools<'a>(
     session_id: impl Into<String>,
     gctx: GlobalContext,
-    tool_names: &[&str],
+    tool_names: impl AsRef<[&'a str]>,
     model: Model<OpenAiWire>,
     parent_dir: impl AsRef<Path>,
     cwd: impl AsRef<Path>,
@@ -101,23 +103,21 @@ pub fn create_tools(
     notifier: Notifier,
     db: Db,
 ) -> ToolSet {
-    let session_id = session_id.into();
     let parent_dir = parent_dir.as_ref();
     let cwd = cwd.as_ref();
-    let tool_names = tool_names.iter().unique().collect_vec();
+    let tool_names = tool_names.as_ref().iter().unique().collect_vec();
     let mut tool_set = ToolSet::default();
-
-    let ctx = context::ToolContext::new(session_id, Notifier::clone(&notifier), cwd);
+    let ctx = ToolContext::new(session_id, notifier.clone(), cwd);
 
     for &tool_name in tool_names {
         match tool_name {
             agent::NAME => {
                 tool_set.add_tool(agent::AgentTool::new(
-                    gctx.clone(),
                     ctx.clone(),
+                    gctx.clone(),
                     model.clone(),
                     parent_dir,
-                    Notifier::clone(&notifier),
+                    notifier.clone(),
                     extensions.clone(),
                     db.clone(),
                 ));
@@ -127,11 +127,11 @@ pub fn create_tools(
             },
             batch::NAME => {
                 tool_set.add_tool(batch::BatchTool::new(
-                    gctx.clone(),
                     ctx.clone(),
+                    gctx.clone(),
                     model.clone(),
                     parent_dir,
-                    Notifier::clone(&notifier),
+                    notifier.clone(),
                     extensions.clone(),
                     db.clone(),
                 ));

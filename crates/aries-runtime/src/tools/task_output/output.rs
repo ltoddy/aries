@@ -32,20 +32,21 @@ pub struct TaskOutputOutput {
 }
 
 impl TaskOutputOutput {
-    pub fn new(
-        retrieval_status: RetrievalStatus,
-        task_id: impl Into<String>,
-        task_type: TaskKind,
-        status: TaskStatus,
-        exit_code: Option<i32>,
-        output: impl Into<String>,
-        error: impl Into<String>,
-    ) -> Self {
-        let task_id = task_id.into();
-        let output = output.into();
-        let error = error.into();
-
-        Self { retrieval_status, task_id, task_type, status, exit_code, output, error }
+    pub fn new(snapshot: TaskSnapshot) -> Self {
+        let retrieval_status = if snapshot.status == TaskStatus::Running {
+            RetrievalStatus::NotReady
+        } else {
+            RetrievalStatus::Success
+        };
+        Self {
+            retrieval_status,
+            task_id: snapshot.task_id,
+            task_type: snapshot.kind,
+            status: snapshot.status,
+            exit_code: snapshot.exit_code,
+            output: snapshot.stdout,
+            error: snapshot.stderr,
+        }
     }
 
     pub fn render_output(raw: serde_json::Value) -> Result<String, serde_json::Error> {
@@ -65,20 +66,6 @@ impl TaskOutputOutput {
 
 impl From<TaskSnapshot> for TaskOutputOutput {
     fn from(snapshot: TaskSnapshot) -> Self {
-        let retrieval_status = if snapshot.status == TaskStatus::Running {
-            RetrievalStatus::NotReady
-        } else {
-            RetrievalStatus::Success
-        };
-
-        Self::new(
-            retrieval_status,
-            snapshot.task_id,
-            snapshot.kind,
-            snapshot.status,
-            snapshot.exit_code,
-            snapshot.stdout,
-            snapshot.stderr,
-        )
+        Self::new(snapshot)
     }
 }

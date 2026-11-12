@@ -8,19 +8,13 @@ use thiserror::Error;
 const DELIMITER: &str = "---";
 
 #[derive(Debug, Clone)]
-pub struct FrontmatterDocument<F>
-where
-    F: Serialize + DeserializeOwned,
-{
+pub struct FrontmatterDocument<F> {
     pub location: PathBuf,
     pub frontmatter: F,
     pub body: String,
 }
 
-impl<F> FrontmatterDocument<F>
-where
-    F: Serialize + DeserializeOwned,
-{
+impl<F> FrontmatterDocument<F> {
     pub fn new(location: impl Into<PathBuf>, frontmatter: F, body: impl Into<String>) -> Self {
         let location = location.into();
         let body = body.into();
@@ -28,7 +22,10 @@ where
         Self { location, frontmatter, body }
     }
 
-    pub async fn read(file_path: impl Into<PathBuf>) -> Result<Self, DocumentError> {
+    pub async fn read(file_path: impl Into<PathBuf>) -> Result<Self, DocumentError>
+    where
+        F: DeserializeOwned,
+    {
         let location = file_path.into();
         let content = tokio::fs::read_to_string(&location)
             .await
@@ -46,7 +43,10 @@ where
         Ok(Self::new(location, frontmatter, body))
     }
 
-    pub async fn write(&self) -> Result<(), DocumentError> {
+    pub async fn write(&self) -> Result<(), DocumentError>
+    where
+        F: Serialize,
+    {
         let frontmatter =
             yaml_serde::to_string(&self.frontmatter).map_err(DocumentError::yaml_serialize)?;
 

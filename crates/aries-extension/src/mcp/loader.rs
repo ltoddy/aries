@@ -1,7 +1,7 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
-use aries_filesystem::walk::walk_dirs;
+use aries_filesystem::walk;
 use futures::stream::{self, StreamExt};
 use itertools::Itertools;
 
@@ -32,7 +32,7 @@ impl McpsLoader {
     }
 
     pub async fn load(&self) -> Vec<McpDefinition> {
-        let Ok(entries) = walk_dirs(&self.roots, true, true) else { return vec![] };
+        let Ok(entries) = walk::walk_dirs(&self.roots, true, true) else { return vec![] };
 
         let file_paths = entries
             .into_iter()

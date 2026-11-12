@@ -18,7 +18,7 @@ pub async fn cancel_request(
 pub async fn cancel(
     args: CancelNotification,
     _: ConnectionTo<Client>,
-    registry: SharedRegistry,
+    registry: &SharedRegistry,
 ) -> Result<(), Error> {
     info!("Received cancel notification {args:?}");
 

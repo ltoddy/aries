@@ -43,7 +43,7 @@ impl Frontmatter {
                 let effective = allowed
                     .iter()
                     .filter(|tool| !disallowed.contains(tool))
-                    .cloned()
+                    .map(String::as_str)
                     .collect::<Vec<_>>();
                 if effective.is_empty() { "None".to_owned() } else { effective.join(", ") }
             },
@@ -53,12 +53,15 @@ impl Frontmatter {
         }
     }
 
-    pub fn filter_tool_names<'a>(&'a self, all_tools: &[&'a str]) -> Vec<&'a str> {
+    pub fn filter_tool_names<'a, T: AsRef<str> + ?Sized + 'a>(
+        &'a self,
+        all_tools: impl IntoIterator<Item = &'a T>,
+    ) -> Vec<&'a str> {
         let mut tools = match &self.tools {
             Some(tools) if !tools.is_empty() => {
                 HashSet::from_iter(tools.iter().map(String::as_str))
             },
-            _ => HashSet::from_iter(all_tools.iter().copied()),
+            _ => HashSet::from_iter(all_tools.into_iter().map(AsRef::as_ref)),
         };
 
         if let Some(disallowed) = &self.disallowed_tools {

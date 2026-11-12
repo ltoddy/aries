@@ -152,7 +152,7 @@ impl<'a> SessionRowView<'a> {
                                     enabled
                                         .then(|| {
                                             self.owner.render_session_delete_popup(
-                                                delete_anchor,
+                                                &delete_anchor,
                                                 p,
                                                 cx,
                                             )

@@ -154,7 +154,7 @@ impl Preferences {
         Ok(())
     }
 
-    pub fn load_or_default(path: &Path) -> (Self, Option<String>) {
+    pub fn load_or_default(path: impl AsRef<Path>) -> (Self, Option<String>) {
         match Self::load(path) {
             Ok(settings) => (settings, None),
             Err(LoadPreferencesError::Read { source, .. })

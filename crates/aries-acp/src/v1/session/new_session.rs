@@ -16,7 +16,7 @@ pub async fn new_session(
     req: NewSessionRequest,
     responder: Responder<NewSessionResponse>,
     cx: ConnectionTo<Client>,
-    registry: SharedRegistry,
+    registry: &SharedRegistry,
 ) -> Result<(), Error> {
     info!("Received new session request {req:?}");
 
@@ -55,7 +55,7 @@ pub async fn new_session(
     };
     let config_options = config_options(
         session.setting(),
-        session.mode().to_string(),
+        session.mode(),
         session.agents(),
         session.thought_level(),
     );

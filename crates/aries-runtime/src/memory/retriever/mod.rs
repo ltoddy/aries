@@ -29,7 +29,12 @@ impl MemoryRetriever {
         Self { inner }
     }
 
-    pub async fn retrieve(&self, query: impl AsRef<str>, memories: &[Memory]) -> Vec<String> {
+    pub async fn retrieve(
+        &self,
+        query: impl AsRef<str>,
+        memories: impl AsRef<[Memory]>,
+    ) -> Vec<String> {
+        let memories = memories.as_ref();
         if memories.is_empty() {
             return vec![];
         }

@@ -1,4 +1,3 @@
-use std::fmt::Debug;
 use std::path::PathBuf;
 
 use serde::{Serialize, Serializer};
@@ -8,11 +7,7 @@ use crate::hook::input::{Effort, HookInput};
 const HOOK_EVENT_NAME: &str = "PostToolUse";
 
 #[derive(Clone, Debug, Default, Serialize)]
-pub struct PostToolUseHookInput<ToolInput, ToolResponse>
-where
-    ToolInput: Clone + Debug + Default + Serialize,
-    ToolResponse: Clone + Debug + Default + Serialize,
-{
+pub struct PostToolUseHookInput<ToolInput, ToolResponse> {
     pub session_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transcript_path: Option<PathBuf>,
@@ -33,11 +28,7 @@ where
     pub duration_ms: Option<u64>,
 }
 
-impl<ToolInput, ToolResponse> PostToolUseHookInput<ToolInput, ToolResponse>
-where
-    ToolInput: Clone + Debug + Default + Serialize,
-    ToolResponse: Clone + Debug + Default + Serialize,
-{
+impl<ToolInput, ToolResponse> PostToolUseHookInput<ToolInput, ToolResponse> {
     pub fn new(
         session_id: impl Into<String>,
         cwd: impl Into<PathBuf>,
@@ -53,12 +44,17 @@ where
 
         Self {
             session_id,
+            transcript_path: None,
             cwd,
+            permission_mode: None,
+            effort: None,
+            agent_id: None,
+            hook_event_name: String::new(),
             tool_name,
             tool_input,
             tool_response,
             tool_use_id,
-            ..Default::default()
+            duration_ms: None,
         }
     }
 
@@ -90,8 +86,8 @@ where
 
 impl<ToolInput, ToolResponse> HookInput for PostToolUseHookInput<ToolInput, ToolResponse>
 where
-    ToolInput: Clone + Debug + Default + Serialize,
-    ToolResponse: Clone + Debug + Default + Serialize,
+    ToolInput: Serialize,
+    ToolResponse: Serialize,
 {
     fn hook_event_name(&self) -> &'static str {
         HOOK_EVENT_NAME

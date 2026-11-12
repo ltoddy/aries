@@ -1,7 +1,6 @@
 use std::io::{self, BufWriter};
 use std::path::Path;
 
-use aries_init::GlobalContext;
 use ferris_says::say;
 
 const TERMINAL_WIDTH: usize = 80;
@@ -10,18 +9,17 @@ pub async fn welcome(
     provider: impl AsRef<str>,
     model: impl AsRef<str>,
     session_id: impl AsRef<str>,
-    context: &GlobalContext,
+    user: impl AsRef<str>,
     cwd: impl AsRef<Path>,
 ) {
     let provider = provider.as_ref();
     let model = model.as_ref();
     let session_id = session_id.as_ref();
+    let user = user.as_ref();
     let cwd = cwd.as_ref();
-
     let name = env!("CARGO_BIN_NAME");
     let version = env!("CARGO_PKG_VERSION");
 
-    let user = context.user();
     let greeting =
         if user.is_empty() { "Welcome!".to_string() } else { format!("Welcome, {user}!") };
     let info = [

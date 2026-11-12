@@ -24,13 +24,13 @@ impl TavilyClient {
 
     pub async fn search(
         &self,
-        request: TavilySearchRequest,
+        request: &TavilySearchRequest,
     ) -> Result<TavilySearchResponse, TavilyError> {
         let response = self
             .http_client
             .post("https://api.tavily.com/search")
             .bearer_auth(&self.api_key)
-            .json(&request)
+            .json(request)
             .send()
             .await?;
 

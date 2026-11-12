@@ -14,8 +14,10 @@ impl AgentArgs {
 }
 
 impl AgentArgs {
-    pub fn render_args(raw: &str) -> Result<(String, Option<String>), serde_json::Error> {
-        let args: Self = serde_json::from_str(raw)?;
+    pub fn render_args(
+        raw: impl AsRef<str>,
+    ) -> Result<(String, Option<String>), serde_json::Error> {
+        let args: Self = serde_json::from_str(raw.as_ref())?;
 
         let mut first = args.description;
         first.push_str(&format!(", name = {}", args.name));

@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 use similar::{DiffOp, TextDiff};
 
-pub fn diff(original: &str, updated: &str) -> (Vec<Hunk>, usize, usize) {
+pub fn diff(original: impl AsRef<str>, updated: impl AsRef<str>) -> (Vec<Hunk>, usize, usize) {
+    let original = original.as_ref();
+    let updated = updated.as_ref();
     let diff = TextDiff::from_lines(original, updated);
 
     let mut additions = 0_usize;

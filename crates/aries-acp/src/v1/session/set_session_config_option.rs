@@ -6,7 +6,7 @@ use agent_client_protocol::{Client, Error};
 use aries_runtime::session::SharedRegistry;
 use tracing::{info, instrument};
 
-use super::config::{SessionConfig, config_options};
+use crate::v1::session::config::{SessionConfig, config_options};
 
 #[instrument(
     name = "acp.set_session_config_option",
@@ -17,7 +17,7 @@ pub async fn set_session_config_option(
     req: SetSessionConfigOptionRequest,
     responder: Responder<SetSessionConfigOptionResponse>,
     _: ConnectionTo<Client>,
-    registry: SharedRegistry,
+    registry: &SharedRegistry,
 ) -> Result<(), Error> {
     info!("Received set session config option request {req:?}");
 
@@ -46,7 +46,7 @@ pub async fn set_session_config_option(
                 }
                 let resp = SetSessionConfigOptionResponse::new(config_options(
                     session.setting(),
-                    session.mode().to_string(),
+                    session.mode(),
                     session.agents(),
                     session.thought_level(),
                 ));
@@ -59,7 +59,7 @@ pub async fn set_session_config_option(
                 };
                 let resp = SetSessionConfigOptionResponse::new(config_options(
                     session.setting(),
-                    session.mode().to_string(),
+                    session.mode(),
                     session.agents(),
                     session.thought_level(),
                 ));
@@ -73,7 +73,7 @@ pub async fn set_session_config_option(
 
                 let resp = SetSessionConfigOptionResponse::new(config_options(
                     session.setting(),
-                    session.mode().to_string(),
+                    session.mode(),
                     session.agents(),
                     session.thought_level(),
                 ));
@@ -84,7 +84,7 @@ pub async fn set_session_config_option(
 
     let resp = SetSessionConfigOptionResponse::new(config_options(
         session.setting(),
-        session.mode().to_string(),
+        session.mode(),
         session.agents(),
         session.thought_level(),
     ));

@@ -27,7 +27,7 @@ impl ChatHistory {
         Ok(Self { file })
     }
 
-    pub async fn append(&self, messages: impl IntoIterator<Item = &Message>) {
+    pub async fn append<'a>(&self, messages: impl IntoIterator<Item = &'a Message>) {
         if let Err(err) = self.file.append(messages).await {
             error!(path = %self.file.file_path().display(), err = %err, "failed to append chat history");
             return;

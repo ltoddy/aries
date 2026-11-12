@@ -15,11 +15,11 @@ pub struct GitWatch {
 
 impl GitWatch {
     pub fn start(
-        cwd: &Path,
+        cwd: impl AsRef<Path>,
         sender: Sender<()>,
         executor: BackgroundExecutor,
     ) -> anyhow::Result<Self> {
-        let (paths, repository_path) = watch_paths(cwd)?;
+        let (paths, repository_path) = watch_paths(cwd.as_ref())?;
         let error = Arc::new(Mutex::new(None));
         let watch_error = error.clone();
         let mut watcher =

@@ -38,9 +38,12 @@ impl SessionList {
         self.projects.keys().map(PathBuf::as_path)
     }
 
-    pub fn project_sessions(&self, cwd: &Path) -> impl ExactSizeIterator<Item = &SessionInfo> {
+    pub fn project_sessions<P: AsRef<Path>>(
+        &self,
+        cwd: P,
+    ) -> impl ExactSizeIterator<Item = &SessionInfo> + use<'_, P> {
         self.projects
-            .get(cwd)
+            .get(cwd.as_ref())
             .map(Vec::as_slice)
             .unwrap_or_default()
             .iter()
@@ -166,13 +169,14 @@ impl SessionList {
         self.rebuild_indices();
     }
 
-    pub fn is_project_expanded(&self, cwd: &Path) -> bool {
-        self.expanded_cwds.contains(cwd)
+    pub fn is_project_expanded(&self, cwd: impl AsRef<Path>) -> bool {
+        self.expanded_cwds.contains(cwd.as_ref())
     }
 
-    pub fn expand_project(&mut self, cwd: &Path) {
+    pub fn expand_project(&mut self, cwd: impl AsRef<Path>) {
+        let cwd = cwd.as_ref();
         if !self.expanded_cwds.contains(cwd) {
-            self.expanded_cwds.insert(cwd.to_path_buf());
+            self.expanded_cwds.insert(cwd.to_owned());
         }
     }
 
@@ -188,9 +192,10 @@ impl SessionList {
         self.expanded_cwds.clear();
     }
 
-    pub fn toggle_project(&mut self, cwd: &Path) {
+    pub fn toggle_project(&mut self, cwd: impl AsRef<Path>) {
+        let cwd = cwd.as_ref();
         if !self.expanded_cwds.remove(cwd) {
-            self.expanded_cwds.insert(cwd.to_path_buf());
+            self.expanded_cwds.insert(cwd.to_owned());
         }
     }
 }

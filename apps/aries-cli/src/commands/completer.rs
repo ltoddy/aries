@@ -33,7 +33,8 @@ impl Completer for CommandCompleter {
     }
 }
 
-pub fn show(prefix: &str) -> Option<String> {
+pub fn show(prefix: impl AsRef<str>) -> Option<String> {
+    let prefix = prefix.as_ref();
     let filtered = BUILTIN_COMMANDS
         .iter()
         .filter(|(cmd, _, _)| format!("/{cmd}").starts_with(prefix))

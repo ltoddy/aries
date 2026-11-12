@@ -10,7 +10,8 @@ use grep_regex::RegexMatcherBuilder;
 use self::collector::Collector;
 use crate::grep::{GrepArgs, GrepError, GrepOutput};
 
-pub fn run(cwd: &Path, args: &GrepArgs) -> Result<GrepOutput, GrepError> {
+pub fn run(cwd: impl AsRef<Path>, args: &GrepArgs) -> Result<GrepOutput, GrepError> {
+    let cwd = cwd.as_ref();
     let matcher = RegexMatcherBuilder::new()
         .case_insensitive(args.case_insensitive)
         .multi_line(true)

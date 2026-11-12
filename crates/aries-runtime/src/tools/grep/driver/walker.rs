@@ -5,16 +5,17 @@ use grep_regex::RegexMatcher;
 use ignore::{WalkBuilder, WalkState};
 use parking_lot::Mutex;
 
-use super::collector::Collector;
-use super::search::{build_searcher, search_file};
 use crate::grep::{GrepArgs, GrepError, OutputMode};
+use crate::tools::grep::driver::collector::Collector;
+use crate::tools::grep::driver::search::{build_searcher, search_file};
 
 pub fn walk_parallel(
-    cwd: &Path,
+    cwd: impl AsRef<Path>,
     args: &GrepArgs,
     matcher: &RegexMatcher,
     collector: &Collector,
 ) -> Result<(), GrepError> {
+    let cwd = cwd.as_ref();
     let mut builder = WalkBuilder::new(cwd);
     builder
         .current_dir(cwd)
@@ -39,7 +40,6 @@ pub fn walk_parallel(
     let error = Mutex::new(None);
     builder.build_parallel().run(|| {
         let mut searcher = build_searcher(args);
-        let matcher = matcher.clone();
         let error = &error;
         Box::new(move |entry| {
             if args.output_mode != OutputMode::FilesWithMatches && collector.limit.truncated() {
@@ -52,7 +52,7 @@ pub fn walk_parallel(
                 if !entry.file_type().is_some_and(|kind| kind.is_file()) {
                     return Ok(None);
                 }
-                search_file(cwd, args, &matcher, &mut searcher, entry.path(), &collector.limit)
+                search_file(cwd, args, matcher, &mut searcher, entry.path(), &collector.limit)
                     .map_err(|source| GrepError::search(entry.into_path(), source))
             });
             match result {

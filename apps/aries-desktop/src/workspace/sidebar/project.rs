@@ -25,12 +25,13 @@ impl<'a> ProjectView<'a> {
     }
     pub fn render_project(
         &self,
-        cwd: &Path,
+        cwd: impl AsRef<Path>,
         sessions: &[&SidebarRow],
         p: Palette,
         window: &mut Window,
         cx: &mut Context<SessionView>,
     ) -> AnyElement {
+        let cwd = cwd.as_ref();
         let list = &self.sidebar.list();
 
         let expanded = list.is_project_expanded(cwd);
@@ -38,7 +39,7 @@ impl<'a> ProjectView<'a> {
         let sessions_expanded = self.sidebar.is_sessions_expanded(cwd);
         let visible_count = if sessions_expanded { count } else { count.min(SESSION_LIMIT) };
         let directory = cwd.file_name().unwrap_or(cwd.as_os_str()).to_string_lossy();
-        let path = cwd.to_path_buf();
+        let path = cwd.to_owned();
         let delete_path = path.clone();
         let more_path = path.clone();
         let delete_anchor = format!("project:{}", delete_path.display());
@@ -174,7 +175,7 @@ impl<'a> ProjectView<'a> {
                                 ),
                             )
                             .when_some(
-                                self.owner.render_session_delete_popup(delete_anchor, p, cx),
+                                self.owner.render_session_delete_popup(&delete_anchor, p, cx),
                                 |button, popup| button.child(popup),
                             ),
                     ),

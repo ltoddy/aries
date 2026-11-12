@@ -29,7 +29,8 @@ impl CommandDefinition {
     }
 
     // 没有参数就传递空字符串
-    pub fn expand_arguments(&self, arguments: &str) -> String {
+    pub fn expand_arguments(&self, arguments: impl AsRef<str>) -> String {
+        let arguments = arguments.as_ref();
         let positional =
             shell_words::split(arguments).unwrap_or_else(|_| vec![arguments.to_owned()]);
 

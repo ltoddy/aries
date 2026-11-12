@@ -46,7 +46,7 @@ impl<'a> SessionToolbar<'a> {
                             .ghost()
                             .small()
                             .on_click(cx.listener(|this, _, _, cx| {
-                                let directory = this.directory().to_path_buf();
+                                let directory = this.directory().to_owned();
                                 this.with_sidebar(|sidebar| {
                                     sidebar.list_mut().expand_all();
                                     sidebar.list_mut().expand_project(&directory);

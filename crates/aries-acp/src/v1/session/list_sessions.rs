@@ -8,7 +8,7 @@ pub async fn list_session(
     req: ListSessionsRequest,
     responder: Responder<ListSessionsResponse>,
     _: ConnectionTo<Client>,
-    registry: SharedRegistry,
+    registry: &SharedRegistry,
 ) -> Result<(), Error> {
     info!("Received list sessions request {req:?}");
 

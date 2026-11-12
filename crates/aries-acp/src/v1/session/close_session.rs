@@ -9,7 +9,7 @@ pub async fn close_session(
     req: CloseSessionRequest,
     responder: Responder<CloseSessionResponse>,
     _: ConnectionTo<Client>,
-    registry: SharedRegistry,
+    registry: &SharedRegistry,
 ) -> Result<(), Error> {
     let session_id = req.session_id.to_string();
     info!("Received close session request for {session_id}");

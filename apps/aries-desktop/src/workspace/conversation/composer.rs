@@ -261,8 +261,7 @@ impl Composer {
         let Some(command) = candidates.get(self.command_menu.selected()) else {
             return false;
         };
-        let name = command.name.clone();
-        self.select_command(&name, window, cx);
+        self.select_command(&command.name, window, cx);
         true
     }
 
@@ -350,12 +349,11 @@ impl Composer {
     pub fn render(
         &self,
         session: &SessionView,
-        send_key: SendKey,
-        commands_available: bool,
         p: Palette,
         cx: &mut Context<SessionView>,
     ) -> impl IntoElement {
         let can_send = session.can_send(cx);
+        let send_key = session.send_key(cx);
         div().flex_shrink_0().pl_8().pr_4().py_2().bg(p.background()).child(
             div()
                 .w_full()
@@ -439,7 +437,7 @@ impl Composer {
                         }))
                         .children(self.render_commands(
                             session.execution().conversation().available_commands(),
-                            commands_available,
+                            session.commands_available(),
                             session.execution().session_id().is_some(),
                             p,
                             cx,
@@ -546,11 +544,12 @@ impl SessionView {
 
     pub fn attach_paths(
         &mut self,
-        paths: Vec<PathBuf>,
+        paths: impl IntoIterator<Item = PathBuf>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if paths.is_empty() {
+        let mut paths = paths.into_iter().peekable();
+        if paths.peek().is_none() {
             return;
         }
         if !self.attachments_available() || self.composer_loading() {
@@ -558,11 +557,8 @@ impl SessionView {
                 .push_notification(Notification::warning("当前无法添加附件，请等待操作结束。"), cx);
             return;
         }
-        self.load_attachments(
-            async move { Ok(paths.into_iter().map(AttachmentSource::from_path).collect()) },
-            window,
-            cx,
-        );
+        let sources = paths.map(AttachmentSource::from_path).collect();
+        self.load_attachments(async move { Ok(sources) }, window, cx);
     }
 
     pub fn paste_attachments(
@@ -737,8 +733,8 @@ enum AttachmentSource {
 }
 
 impl AttachmentSource {
-    fn from_path(path: PathBuf) -> Self {
-        Self::Path(path)
+    fn from_path(path: impl Into<PathBuf>) -> Self {
+        Self::Path(path.into())
     }
 
     fn from_image(image: Image) -> Self {
@@ -892,7 +888,7 @@ impl RenderOnce for ComposerInput {
             .id("multimodal-composer")
             .on_drop(move |paths: &ExternalPaths, window, cx| {
                 let _ = drop_view
-                    .update(cx, |this, cx| this.attach_paths(paths.0.to_vec(), window, cx));
+                    .update(cx, |this, cx| this.attach_paths(paths.0.iter().cloned(), window, cx));
             })
             .when(attachments_available, |composer| {
                 composer.drag_over::<ExternalPaths>(|style, _, _, cx| {

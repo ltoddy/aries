@@ -133,7 +133,8 @@ impl GitMotion {
         &mut self.panel
     }
 
-    pub fn reset(&mut self, cwd: &Path) -> bool {
+    pub fn reset(&mut self, cwd: impl AsRef<Path>) -> bool {
+        let cwd = cwd.as_ref();
         if self.cwd.as_deref() == Some(cwd) {
             return false;
         }
@@ -300,6 +301,11 @@ impl GitMotion {
     }
 }
 
-pub fn accept_result(cwd: &Path, revision: u64, result_cwd: &Path, result_revision: u64) -> bool {
-    cwd == result_cwd && revision == result_revision
+pub fn accept_result(
+    cwd: impl AsRef<Path>,
+    revision: u64,
+    result_cwd: impl AsRef<Path>,
+    result_revision: u64,
+) -> bool {
+    cwd.as_ref() == result_cwd.as_ref() && revision == result_revision
 }

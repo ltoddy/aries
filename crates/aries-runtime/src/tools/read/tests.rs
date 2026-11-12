@@ -169,7 +169,7 @@ async fn test_read_directory_is_rejected() {
     let result = tool
         .call(
             &mut context,
-            ReadArgs { file_path: dir.path().to_path_buf(), offset: None, limit: None },
+            ReadArgs { file_path: dir.path().to_owned(), offset: None, limit: None },
         )
         .await;
 
