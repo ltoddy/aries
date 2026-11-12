@@ -73,8 +73,8 @@ impl FromStr for SessionConfig {
 
 pub fn config_options(
     setting: &Setting,
-    current_mode: String,
-    agents: &[AgentDefinition],
+    current_mode: impl Into<String>,
+    agents: impl AsRef<[AgentDefinition]>,
     thought_level: Effort,
 ) -> Vec<SessionConfigOption> {
     vec![
@@ -84,7 +84,12 @@ pub fn config_options(
     ]
 }
 
-fn mode_option(current: String, agents: &[AgentDefinition]) -> SessionConfigOption {
+fn mode_option(
+    current: impl Into<String>,
+    agents: impl AsRef<[AgentDefinition]>,
+) -> SessionConfigOption {
+    let current = current.into();
+    let agents = agents.as_ref();
     let mut options: Vec<_> = vec![];
 
     for agent in agents {
@@ -115,7 +120,7 @@ fn model_option(setting: &Setting) -> SessionConfigOption {
         .iter()
         .map(|m| {
             let alias = m.alias();
-            SessionConfigSelectOption::new(alias.clone(), alias)
+            SessionConfigSelectOption::new(alias.to_owned(), alias)
         })
         .collect::<Vec<_>>();
 
@@ -153,9 +158,10 @@ pub struct SessionModeError(String);
 
 pub fn modes(
     current: impl AsRef<str>,
-    agents: &[AgentDefinition],
+    agents: impl AsRef<[AgentDefinition]>,
 ) -> Result<SessionModeState, SessionModeError> {
     let current = current.as_ref();
+    let agents = agents.as_ref();
     let agent = agents
         .iter()
         .find(|agent| agent.frontmatter.name == current)

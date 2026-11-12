@@ -50,8 +50,8 @@ impl Tool for TaskStopTool {
         _context: &mut ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
-        let snapshot = self.ctx.task.stop(args.task_id).await?;
+        let snapshot = self.ctx.task.stop(&args.task_id).await?;
 
-        Ok(TaskStopOutput::new(snapshot.task_id, snapshot.kind, snapshot.status, snapshot.command))
+        Ok(TaskStopOutput::new(snapshot))
     }
 }

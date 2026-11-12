@@ -18,7 +18,8 @@ impl DeletionReport {
         (self.deleted, self.failed)
     }
 
-    pub fn rejected(ids: Vec<SessionId>, message: &str) -> Self {
+    pub fn rejected(ids: impl IntoIterator<Item = SessionId>, message: impl AsRef<str>) -> Self {
+        let message = message.as_ref();
         Self {
             deleted: Vec::new(),
             failed: ids.into_iter().map(|id| (id, Error::internal_error().data(message))).collect(),
@@ -26,7 +27,10 @@ impl DeletionReport {
     }
 }
 
-pub async fn request(connection: &ConnectionTo<Agent>, ids: Vec<SessionId>) -> DeletionReport {
+pub async fn request(
+    connection: &ConnectionTo<Agent>,
+    ids: impl IntoIterator<Item = SessionId>,
+) -> DeletionReport {
     let mut result = DeletionReport::default();
     let mut seen = HashSet::new();
     for id in ids.into_iter().filter(|id| seen.insert(id.clone())) {

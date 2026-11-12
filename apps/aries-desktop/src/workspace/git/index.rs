@@ -32,7 +32,12 @@ pub enum IndexAction {
     Unstage,
 }
 
-pub fn update_index(cwd: &Path, path: &Path, action: IndexAction) -> Result<(), UpdateIndexError> {
+pub fn update_index(
+    cwd: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+    action: IndexAction,
+) -> Result<(), UpdateIndexError> {
+    let path = path.as_ref();
     if path.as_os_str().is_empty()
         || path.components().any(|component| !matches!(component, Component::Normal(_)))
         || path.as_os_str().as_encoded_bytes().ends_with(b"/")
@@ -72,7 +77,7 @@ pub fn update_index(cwd: &Path, path: &Path, action: IndexAction) -> Result<(), 
         return Err(UpdateIndexError::Conflict);
     }
 
-    let mut paths = vec![path.to_path_buf()];
+    let mut paths = vec![path.to_owned()];
     let required = match action {
         IndexAction::Stage => {
             if status.is_wt_renamed()
@@ -81,7 +86,7 @@ pub fn update_index(cwd: &Path, path: &Path, action: IndexAction) -> Result<(), 
                 paths = [delta.old_file().path(), delta.new_file().path()]
                     .into_iter()
                     .flatten()
-                    .map(Path::to_path_buf)
+                    .map(Path::to_owned)
                     .collect();
             }
             Status::WT_NEW
@@ -97,7 +102,7 @@ pub fn update_index(cwd: &Path, path: &Path, action: IndexAction) -> Result<(), 
                 paths = [delta.old_file().path(), delta.new_file().path()]
                     .into_iter()
                     .flatten()
-                    .map(Path::to_path_buf)
+                    .map(Path::to_owned)
                     .collect();
             }
             Status::INDEX_NEW

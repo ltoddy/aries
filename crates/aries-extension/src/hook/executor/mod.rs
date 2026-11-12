@@ -6,7 +6,6 @@ mod output;
 mod tests;
 
 use std::collections::{HashMap, VecDeque};
-use std::fmt::Debug;
 
 use serde::Serialize;
 use tracing::{info, warn};
@@ -29,7 +28,7 @@ pub struct HooksExecutor {
 }
 
 impl HooksExecutor {
-    pub fn new(presets: Vec<HooksDefinition>) -> Self {
+    pub fn new(presets: impl IntoIterator<Item = HooksDefinition>) -> Self {
         let mut hooks = HashMap::<HookEvent, Vec<HookMatcher>>::new();
 
         for preset in presets {
@@ -56,7 +55,7 @@ impl HooksExecutor {
 
         for matcher in matchers {
             if let HookDecision::Terminate { reason } =
-                Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await
+                Self::fire_hooks(&matcher.hooks, &input, hook_event_name).await
             {
                 warn!(event = hook_event_name, %reason, "hook exited with code 2");
             }
@@ -68,7 +67,7 @@ impl HooksExecutor {
         input: PostToolUseFailureHookInput<ToolInput>,
     ) -> HookDecision
     where
-        ToolInput: Serialize + Clone + Debug,
+        ToolInput: Serialize,
     {
         let hook_event_name = input.hook_event_name();
         let tool_name = input.tool_name.as_str();
@@ -88,16 +87,14 @@ impl HooksExecutor {
         let mut contexts = VecDeque::new();
         for matcher in matchers {
             match matcher.matches(tool_name) {
-                Ok(true) => {
-                    match Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await {
-                        HookDecision::Terminate { reason } => {
-                            warn!(event = hook_event_name, %reason, "hook exited with code 2");
-                            return HookDecision::terminate(reason);
-                        },
-                        HookDecision::Continue { contexts: next_contexts } => {
-                            contexts.extend(next_contexts)
-                        },
-                    }
+                Ok(true) => match Self::fire_hooks(&matcher.hooks, &input, hook_event_name).await {
+                    HookDecision::Terminate { reason } => {
+                        warn!(event = hook_event_name, %reason, "hook exited with code 2");
+                        return HookDecision::terminate(reason);
+                    },
+                    HookDecision::Continue { contexts: next_contexts } => {
+                        contexts.extend(next_contexts)
+                    },
                 },
                 Err(err) => warn!("invalid hook matcher, skipped: {err}"),
                 _ => {},
@@ -112,8 +109,8 @@ impl HooksExecutor {
         input: PostToolUseHookInput<ToolInput, ToolResponse>,
     ) -> HookDecision
     where
-        ToolInput: Clone + Debug + Default + Serialize,
-        ToolResponse: Clone + Debug + Default + Serialize,
+        ToolInput: Serialize,
+        ToolResponse: Serialize,
     {
         let hook_event_name = input.hook_event_name();
         let tool_name = input.tool_name.as_str();
@@ -133,16 +130,14 @@ impl HooksExecutor {
 
         for matcher in matchers {
             match matcher.matches(tool_name) {
-                Ok(true) => {
-                    match Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await {
-                        HookDecision::Terminate { reason } => {
-                            warn!(event = hook_event_name, %reason, "hook exited with code 2");
-                            return HookDecision::terminate(reason);
-                        },
-                        HookDecision::Continue { contexts: next_contexts } => {
-                            contexts.extend(next_contexts)
-                        },
-                    }
+                Ok(true) => match Self::fire_hooks(&matcher.hooks, &input, hook_event_name).await {
+                    HookDecision::Terminate { reason } => {
+                        warn!(event = hook_event_name, %reason, "hook exited with code 2");
+                        return HookDecision::terminate(reason);
+                    },
+                    HookDecision::Continue { contexts: next_contexts } => {
+                        contexts.extend(next_contexts)
+                    },
                 },
                 Err(err) => warn!("invalid hook matcher, skipped: {err}"),
                 _ => {},
@@ -169,7 +164,7 @@ impl HooksExecutor {
 
         for matcher in matchers {
             if let HookDecision::Terminate { reason } =
-                Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await
+                Self::fire_hooks(&matcher.hooks, &input, hook_event_name).await
             {
                 warn!(event = hook_event_name, %reason, "hook blocked with exit code 2");
                 return HookDecision::terminate(reason);
@@ -184,10 +179,10 @@ impl HooksExecutor {
         input: PreToolUseHookInput<ToolInput>,
     ) -> HookDecision
     where
-        ToolInput: Clone + Debug + Default + Serialize,
+        ToolInput: Serialize,
     {
         let hook_event_name = input.hook_event_name();
-        let tool_name = input.tool_name.clone();
+        let tool_name = input.tool_name.as_str();
         let input = match serde_json::to_string(&input) {
             Ok(input) => input,
             Err(err) => {
@@ -202,17 +197,15 @@ impl HooksExecutor {
 
         let mut contexts = VecDeque::new();
         for matcher in matchers {
-            match matcher.matches(&tool_name) {
-                Ok(true) => {
-                    match Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await {
-                        HookDecision::Terminate { reason } => {
-                            warn!(event = hook_event_name, %reason, "hook blocked with exit code 2");
-                            return HookDecision::terminate(reason);
-                        },
-                        HookDecision::Continue { contexts: next_contexts } => {
-                            contexts.extend(next_contexts)
-                        },
-                    }
+            match matcher.matches(tool_name) {
+                Ok(true) => match Self::fire_hooks(&matcher.hooks, &input, hook_event_name).await {
+                    HookDecision::Terminate { reason } => {
+                        warn!(event = hook_event_name, %reason, "hook blocked with exit code 2");
+                        return HookDecision::terminate(reason);
+                    },
+                    HookDecision::Continue { contexts: next_contexts } => {
+                        contexts.extend(next_contexts)
+                    },
                 },
                 Err(err) => warn!("invalid hook matcher, skipped: {err}"),
                 _ => {},
@@ -237,7 +230,7 @@ impl HooksExecutor {
 
         for matcher in matchers {
             if let HookDecision::Terminate { reason } =
-                Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await
+                Self::fire_hooks(&matcher.hooks, &input, hook_event_name).await
             {
                 warn!(event = hook_event_name, %reason, "hook exited with code 2");
             }
@@ -261,7 +254,7 @@ impl HooksExecutor {
         let mut contexts = VecDeque::new();
 
         for matcher in matchers {
-            match Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await {
+            match Self::fire_hooks(&matcher.hooks, &input, hook_event_name).await {
                 HookDecision::Terminate { reason } => {
                     warn!(event = hook_event_name, %reason, "hook exited with code 2");
                 },
@@ -289,7 +282,7 @@ impl HooksExecutor {
 
         for matcher in matchers {
             if let HookDecision::Terminate { reason } =
-                Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await
+                Self::fire_hooks(&matcher.hooks, &input, hook_event_name).await
             {
                 warn!(event = hook_event_name, %reason, "hook exited with code 2");
             }
@@ -314,7 +307,7 @@ impl HooksExecutor {
 
         let mut contexts = VecDeque::new();
         for matcher in matchers {
-            match Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await {
+            match Self::fire_hooks(&matcher.hooks, &input, hook_event_name).await {
                 HookDecision::Terminate { reason } => {
                     warn!(event = hook_event_name, %reason, "hook exited with code 2");
                     return HookDecision::terminate(reason);
@@ -345,7 +338,7 @@ impl HooksExecutor {
         let mut contexts = VecDeque::new();
 
         for matcher in matchers {
-            match Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await {
+            match Self::fire_hooks(&matcher.hooks, &input, hook_event_name).await {
                 HookDecision::Terminate { reason } => {
                     warn!(event = hook_event_name, %reason, "hook exited with code 2");
                 },
@@ -376,7 +369,7 @@ impl HooksExecutor {
 
         let mut contexts = VecDeque::new();
         for matcher in matchers {
-            match Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await {
+            match Self::fire_hooks(&matcher.hooks, &input, hook_event_name).await {
                 HookDecision::Terminate { reason } => {
                     warn!(event = hook_event_name, %reason, "hook exited with code 2");
                     return HookDecision::terminate(reason);
@@ -407,7 +400,7 @@ impl HooksExecutor {
 
         let mut contexts = VecDeque::new();
         for matcher in matchers {
-            match Self::fire_hooks(&matcher.hooks, input.clone(), hook_event_name).await {
+            match Self::fire_hooks(&matcher.hooks, &input, hook_event_name).await {
                 HookDecision::Terminate { reason } => {
                     warn!(event = hook_event_name, %reason, "hook exited with code 2");
                     return HookDecision::terminate(reason);
@@ -423,16 +416,16 @@ impl HooksExecutor {
 
     async fn fire_hooks(
         hooks: &[HookCommand],
-        input: impl Into<String>,
+        payload: impl AsRef<str>,
         hook_event_name: &str,
     ) -> HookDecision {
-        let payload = input.into();
+        let payload = payload.as_ref();
         let mut contexts = VecDeque::new();
 
         for hook in hooks {
             match hook {
                 HookCommand::Command(bash) => {
-                    match execute_bash_command_hook(bash, &payload).await {
+                    match execute_bash_command_hook(bash, payload).await {
                         Ok(outcome) => match outcome.output(hook_event_name) {
                             BashHookOutput::Terminate { reason } => {
                                 return HookDecision::terminate(reason);
@@ -451,7 +444,7 @@ impl HooksExecutor {
                 HookCommand::Prompt(_) => {
                     // TODO 未来可能会移除这个分支
                 },
-                HookCommand::Http(http) => match execute_http_hook(http, &payload).await {
+                HookCommand::Http(http) => match execute_http_hook(http, payload).await {
                     Ok(response) => match response {
                         HttpHookOutcome::Json(json) => {
                             if !json.should_continue {

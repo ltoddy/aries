@@ -12,6 +12,12 @@ enum DeletionState {
     Deleting,
 }
 
+impl DeletionState {
+    fn confirming(pending: PendingDeletion) -> Self {
+        Self::Confirming(pending)
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct SessionDeletion {
     deletion: DeletionState,
@@ -25,17 +31,21 @@ pub struct PendingDeletion {
 }
 
 impl PendingDeletion {
-    pub fn is_anchor(&self, anchor: &str) -> bool {
-        self.anchor == anchor
+    fn new(ids: Vec<SessionId>, anchor: String) -> Self {
+        Self { ids, anchor }
+    }
+
+    pub fn is_anchor(&self, anchor: impl AsRef<str>) -> bool {
+        self.anchor == anchor.as_ref()
     }
 }
 
 impl SessionDeletion {
     pub fn prepare_available(
         &mut self,
-        ids: Vec<SessionId>,
+        ids: impl IntoIterator<Item = SessionId>,
         anchor: String,
-        available: Vec<SessionId>,
+        available: impl IntoIterator<Item = SessionId>,
     ) -> bool {
         let mut available: HashSet<_> = available.into_iter().collect();
         let ids: Vec<_> = ids.into_iter().filter(|id| available.remove(id)).collect();
@@ -84,7 +94,7 @@ impl SessionDeletion {
             return;
         }
         self.error = None;
-        self.deletion = DeletionState::Confirming(PendingDeletion { ids, anchor });
+        self.deletion = DeletionState::confirming(PendingDeletion::new(ids, anchor));
     }
 
     pub fn begin_deletion(&mut self) -> Option<Vec<SessionId>> {

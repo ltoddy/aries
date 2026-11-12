@@ -99,7 +99,7 @@ impl Tool for WebSearchTool {
         let start = Instant::now();
         let response = self
             .tavily
-            .search(request)
+            .search(&request)
             .await
             .map_err(|err| WebSearchError::search_error(args.query.clone(), err))?;
         let elapsed = start.elapsed();
@@ -116,7 +116,7 @@ impl Tool for WebSearchTool {
             })
             .collect_vec();
 
-        let output = WebSearchOutput::new(args.query, results, elapsed.as_secs_f64());
+        let output = WebSearchOutput::new(args.query, results, elapsed);
         Ok(output)
     }
 }

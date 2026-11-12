@@ -3,8 +3,8 @@ use alacritty_terminal::term::color::Colors;
 use alacritty_terminal::vte::ansi::{Color, CursorShape, NamedColor, Rgb};
 use gpui_kit::component::ActiveTheme;
 use gpui_kit::{
-    App, Bounds, Context, Font, FontFeatures, Hsla, Pixels, TextAlign, TextRun, Window, fill,
-    point, px, rgb, size,
+    Bounds, Context, Font, FontFeatures, Hsla, Pixels, TextAlign, TextRun, Window, fill, point, px,
+    rgb, size,
 };
 
 use crate::terminal::TerminalView;
@@ -67,7 +67,7 @@ fn color(value: Color, colors: &Colors, foreground: Hsla, background: Hsla, bold
     }
 }
 
-pub fn cell_width(window: &Window, _cx: &App, font_size: Pixels) -> Pixels {
+pub fn cell_width(window: &Window, font_size: Pixels) -> Pixels {
     window
         .text_system()
         .shape_line(

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -17,7 +17,7 @@ pub struct MultiEditArgs {
 }
 
 impl MultiEditArgs {
-    pub fn location(&self) -> impl Into<PathBuf> {
+    pub fn location(&self) -> &Path {
         &self.file_path
     }
 
@@ -27,8 +27,10 @@ impl MultiEditArgs {
 }
 
 impl MultiEditArgs {
-    pub fn render_args(raw: &str) -> Result<(String, Option<String>), serde_json::Error> {
-        let args: Self = serde_json::from_str(raw)?;
+    pub fn render_args(
+        raw: impl AsRef<str>,
+    ) -> Result<(String, Option<String>), serde_json::Error> {
+        let args: Self = serde_json::from_str(raw.as_ref())?;
 
         let first = format!("{}", args.file_path.display());
 

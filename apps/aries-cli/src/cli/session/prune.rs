@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use anyhow::Context;
 use aries_init::GlobalContext;
 use clap::Parser;
@@ -18,7 +16,7 @@ pub struct PruneSessionsArgs {
 
 pub async fn execute(args: PruneSessionsArgs, gctx: GlobalContext) -> anyhow::Result<()> {
     let root_dir = gctx.root_dir();
-    let db = aries_persistence::connect(&root_dir)
+    let db = aries_persistence::connect(root_dir)
         .await
         .with_context(|| format!("failed to connect local storage: {}", root_dir.display()))
         .expect("Run `aries init -h` for initialization");
@@ -50,7 +48,7 @@ pub async fn execute(args: PruneSessionsArgs, gctx: GlobalContext) -> anyhow::Re
 
     stream::iter(session_dirs)
         .for_each(|dir| async move {
-            let _ = tokio::fs::remove_dir_all(PathBuf::from(&dir)).await;
+            let _ = tokio::fs::remove_dir_all(dir).await;
         })
         .await;
 

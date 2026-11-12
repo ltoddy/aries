@@ -44,17 +44,23 @@ pub enum McpServerConfig {
 impl McpServerConfig {
     pub fn stdio(
         command: impl Into<String>,
-        args: Vec<String>,
-        env: HashMap<String, String>,
+        args: impl IntoIterator<Item = String>,
+        env: impl IntoIterator<Item = (String, String)>,
     ) -> Self {
         Self::Stdio(Stdio::new(command, args, env))
     }
 
-    pub fn sse(url: impl Into<String>, headers: HashMap<String, String>) -> Self {
+    pub fn sse(
+        url: impl Into<String>,
+        headers: impl IntoIterator<Item = (String, String)>,
+    ) -> Self {
         Self::Sse(Sse::new(url, headers))
     }
 
-    pub fn http(url: impl Into<String>, headers: HashMap<String, String>) -> Self {
+    pub fn http(
+        url: impl Into<String>,
+        headers: impl IntoIterator<Item = (String, String)>,
+    ) -> Self {
         Self::Http(Http::new(url, headers))
     }
 }
@@ -71,11 +77,11 @@ pub struct Stdio {
 impl Stdio {
     pub fn new(
         command: impl Into<String>,
-        args: Vec<String>,
-        env: HashMap<String, String>,
+        args: impl IntoIterator<Item = String>,
+        env: impl IntoIterator<Item = (String, String)>,
     ) -> Self {
         let command = command.into();
-        Self { command, args, env }
+        Self { command, args: args.into_iter().collect(), env: env.into_iter().collect() }
     }
 }
 
@@ -87,9 +93,12 @@ pub struct Sse {
 }
 
 impl Sse {
-    pub fn new(url: impl Into<String>, headers: HashMap<String, String>) -> Self {
+    pub fn new(
+        url: impl Into<String>,
+        headers: impl IntoIterator<Item = (String, String)>,
+    ) -> Self {
         let url = url.into();
-        Self { url, headers }
+        Self { url, headers: headers.into_iter().collect() }
     }
 }
 
@@ -101,8 +110,11 @@ pub struct Http {
 }
 
 impl Http {
-    pub fn new(url: impl Into<String>, headers: HashMap<String, String>) -> Self {
+    pub fn new(
+        url: impl Into<String>,
+        headers: impl IntoIterator<Item = (String, String)>,
+    ) -> Self {
         let url = url.into();
-        Self { url, headers }
+        Self { url, headers: headers.into_iter().collect() }
     }
 }

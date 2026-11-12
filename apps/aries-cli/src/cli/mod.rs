@@ -12,7 +12,6 @@ pub mod skill;
 pub mod stats;
 
 use clap::{Parser, Subcommand};
-use prompt::PromptArgs;
 
 use crate::cli::acp::AcpArgs;
 use crate::cli::agent::AgentCommand;
@@ -20,6 +19,7 @@ use crate::cli::command::CommandCommand;
 use crate::cli::hook::HookCommand;
 use crate::cli::mcp::McpCommand;
 use crate::cli::model::ModelCommand;
+use crate::cli::prompt::PromptArgs;
 use crate::cli::session::SessionCommand;
 use crate::cli::skill::SkillCommand;
 use crate::cli::stats::StatsCommand;

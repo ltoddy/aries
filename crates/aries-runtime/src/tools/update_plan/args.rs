@@ -18,8 +18,10 @@ impl UpdatePlanArgs {
 }
 
 impl UpdatePlanArgs {
-    pub fn render_args(raw: &str) -> Result<(String, Option<String>), serde_json::Error> {
-        let args: Self = serde_json::from_str(raw)?;
+    pub fn render_args(
+        raw: impl AsRef<str>,
+    ) -> Result<(String, Option<String>), serde_json::Error> {
+        let args: Self = serde_json::from_str(raw.as_ref())?;
 
         let first = format!("{} plan entries", args.items.len());
         if args.items.is_empty() {

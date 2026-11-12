@@ -13,14 +13,14 @@ pub struct ToolArgs {}
 
 pub async fn execute(gctx: GlobalContext, _: ToolArgs) -> anyhow::Result<()> {
     let root_dir = gctx.root_dir();
-    let db = aries_persistence::connect(&root_dir)
+    let db = aries_persistence::connect(root_dir)
         .await
         .with_context(|| format!("connecting to database at {}", root_dir.display()))?;
 
     let now = Zoned::now();
     let thirty_days_ago = now.saturating_sub(Span::new().days(30));
 
-    let mut tool_call_repo = ToolCallRepository::new(db.clone());
+    let mut tool_call_repo = ToolCallRepository::new(db);
 
     let tool_calls = tool_call_repo
         .find_by_created_at_greater_than(Timestamp::from(&thirty_days_ago))

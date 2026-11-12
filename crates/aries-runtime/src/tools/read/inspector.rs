@@ -27,7 +27,8 @@ static BYTE_ORDER_MARKS: &[(&[u8], ContentType)] = &[
 
 static MAGIC_NUMBERS: [&[u8]; 2] = [b"%PDF", b"\x89PNG"];
 
-pub fn inspect(buffer: &[u8]) -> ContentType {
+pub fn inspect(buffer: impl AsRef<[u8]>) -> ContentType {
+    let buffer = buffer.as_ref();
     for &(mark, content_type) in BYTE_ORDER_MARKS {
         if buffer.starts_with(mark) {
             return content_type;

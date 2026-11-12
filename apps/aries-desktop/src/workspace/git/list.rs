@@ -135,8 +135,8 @@ impl<'a> GitChangeList<'a> {
                             IndexAction::Unstage => "取消暂存",
                         };
                         let view = view.clone();
-                        let target = file.path().to_path_buf();
-                        let directory = directory.clone();
+                        let target = file.path().to_owned();
+                        let directory = directory.to_owned();
                         div()
                             .id(path.clone())
                             .h_8()

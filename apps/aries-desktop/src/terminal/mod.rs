@@ -44,7 +44,8 @@ pub struct TerminalView {
 }
 
 impl TerminalView {
-    pub fn new(directory: PathBuf, _window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(directory: impl Into<PathBuf>, cx: &mut Context<Self>) -> Self {
+        let directory = directory.into();
         let (notifications, receiver) = async_channel::bounded(1);
         let task = cx.spawn(async move |this, cx| {
             while receiver.recv().await.is_ok() {
@@ -184,9 +185,9 @@ impl TerminalView {
         }
     }
 
-    fn measure(&mut self, bounds: Bounds<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
+    fn measure(&mut self, bounds: Bounds<Pixels>, window: &Window) {
         let font_size = window.rem_size() * 0.875;
-        let cell_width = self::paint::cell_width(window, cx, font_size);
+        let cell_width = self::paint::cell_width(window, font_size);
         self.bounds = bounds;
         let cell_size = size(cell_width, font_size * 1.4);
         let metrics_changed = self.cell_size != cell_size;
@@ -299,7 +300,7 @@ impl Render for TerminalView {
             .child(
                 canvas(
                     move |bounds, window, cx| {
-                        entity.update(cx, |this, cx| this.measure(bounds, window, cx));
+                        entity.update(cx, |this, _| this.measure(bounds, window));
                     },
                     move |bounds, _, window, cx| {
                         paint_entity

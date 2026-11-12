@@ -47,6 +47,31 @@ struct McpCodeRequest {
     params: McpCodeRequestParams,
 }
 
+impl McpCodeRequestArgs {
+    fn new(query: impl Into<String>, tokens_num: i32) -> Self {
+        let query = query.into();
+        Self { query, tokens_num }
+    }
+}
+
+impl McpCodeRequestParams {
+    fn new(arguments: McpCodeRequestArgs) -> Self {
+        Self { name: "get_code_context_exa".to_owned(), arguments }
+    }
+}
+
+impl McpCodeRequest {
+    fn new(query: impl Into<String>, tokens_num: i32) -> Self {
+        let arguments = McpCodeRequestArgs::new(query, tokens_num);
+        Self {
+            jsonrpc: "2.0".to_owned(),
+            id: 1,
+            method: "tools/call".to_owned(),
+            params: McpCodeRequestParams::new(arguments),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct McpCodeResponseContent {
     #[serde(rename = "type")]
@@ -97,18 +122,7 @@ impl Tool for CodeSearchTool {
         _context: &mut ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
-        let req = McpCodeRequest {
-            jsonrpc: "2.0".to_owned(),
-            id: 1,
-            method: "tools/call".to_owned(),
-            params: McpCodeRequestParams {
-                name: "get_code_context_exa".to_owned(),
-                arguments: McpCodeRequestArgs {
-                    query: args.query.clone(),
-                    tokens_num: args.tokens_num.unwrap_or(5000),
-                },
-            },
-        };
+        let req = McpCodeRequest::new(&args.query, args.tokens_num.unwrap_or(5000));
 
         let client = reqwest::Client::new();
         let response = client
@@ -118,24 +132,24 @@ impl Tool for CodeSearchTool {
             .json(&req)
             .send()
             .await
-            .map_err(|e| CodeSearchError::request(args.query.clone(), e))?;
+            .map_err(|e| CodeSearchError::request(&args.query, e))?;
 
         if !response.status().is_success() {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            return Err(CodeSearchError::status(args.query.clone(), status, text));
+            return Err(CodeSearchError::status(&args.query, status, text));
         }
 
         let response_text =
-            response.text().await.map_err(|e| CodeSearchError::read_body(args.query.clone(), e))?;
+            response.text().await.map_err(|e| CodeSearchError::read_body(&args.query, e))?;
 
         for line in response_text.lines() {
             if let Some(stripped) = line.strip_prefix("data: ")
                 && let Ok(data) = serde_json::from_str::<McpCodeResponse>(stripped)
                 && let Some(result) = data.result
-                && !result.content.is_empty()
+                && let Some(content) = result.content.into_iter().next()
             {
-                return Ok(CodeSearchOutput::new(result.content[0].text.clone()));
+                return Ok(CodeSearchOutput::new(content.text));
             }
         }
 

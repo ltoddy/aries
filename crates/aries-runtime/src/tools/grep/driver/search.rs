@@ -7,9 +7,9 @@ use grep_searcher::{
     sinks,
 };
 
-use super::collector::FileMatch;
-use super::state::ResultLimit;
 use crate::grep::{GrepArgs, OutputMode};
+use crate::tools::grep::driver::collector::FileMatch;
+use crate::tools::grep::driver::state::ResultLimit;
 
 struct ContentSink<'a> {
     path_display: String,
@@ -20,9 +20,21 @@ struct ContentSink<'a> {
     after_context_end: u64,
 }
 
-impl ContentSink<'_> {
-    fn render_line(&self, line_number: u64, bytes: &[u8], is_match: bool) -> String {
-        let text = String::from_utf8_lossy(bytes);
+impl<'a> ContentSink<'a> {
+    fn new(path_display: impl Into<String>, args: &'a GrepArgs, limit: &'a ResultLimit) -> Self {
+        let path_display = path_display.into();
+        Self {
+            path_display,
+            args,
+            limit,
+            lines: Vec::new(),
+            pending_context: Vec::new(),
+            after_context_end: 0,
+        }
+    }
+
+    fn render_line(&self, line_number: u64, bytes: impl AsRef<[u8]>, is_match: bool) -> String {
+        let text = String::from_utf8_lossy(bytes.as_ref());
         let text = text.strip_suffix('\n').unwrap_or(&text);
         let text = text.strip_suffix('\r').unwrap_or(text);
         let sep = if is_match { ':' } else { '-' };
@@ -38,7 +50,8 @@ impl Sink for ContentSink<'_> {
     type Error = io::Error;
 
     fn matched(&mut self, _searcher: &Searcher, mat: &SinkMatch<'_>) -> io::Result<bool> {
-        let line_number = mat.line_number().expect("line numbers are enabled");
+        let line_number =
+            mat.line_number().ok_or_else(|| io::Error::other("line numbers are enabled"))?;
         if !self.limit.try_acquire() {
             if line_number > self.after_context_end {
                 return Ok(false);
@@ -54,7 +67,8 @@ impl Sink for ContentSink<'_> {
     }
 
     fn context(&mut self, _searcher: &Searcher, ctx: &SinkContext<'_>) -> io::Result<bool> {
-        let line_number = ctx.line_number().expect("line numbers are enabled");
+        let line_number =
+            ctx.line_number().ok_or_else(|| io::Error::other("line numbers are enabled"))?;
         if self.limit.truncated() && line_number > self.after_context_end {
             return Ok(false);
         }
@@ -84,23 +98,18 @@ pub fn build_searcher(args: &GrepArgs) -> Searcher {
 }
 
 pub fn search_file(
-    cwd: &Path,
+    cwd: impl AsRef<Path>,
     args: &GrepArgs,
     matcher: &RegexMatcher,
     searcher: &mut Searcher,
-    path: &Path,
+    path: impl AsRef<Path>,
     limit: &ResultLimit,
 ) -> io::Result<Option<FileMatch>> {
+    let cwd = cwd.as_ref();
+    let path = path.as_ref();
     let relative_path = path.strip_prefix(cwd).unwrap_or(path);
     if args.output_mode == OutputMode::Content {
-        let mut sink = ContentSink {
-            path_display: relative_path.display().to_string(),
-            args,
-            limit,
-            lines: Vec::new(),
-            pending_context: Vec::new(),
-            after_context_end: 0,
-        };
+        let mut sink = ContentSink::new(relative_path.display().to_string(), args, limit);
         searcher.search_path(matcher, path, &mut sink)?;
         return Ok((!sink.lines.is_empty()).then_some(FileMatch::Content(sink.lines)));
     }
@@ -129,7 +138,7 @@ pub fn search_file(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::tools::grep::driver::search::*;
 
     #[test]
     fn content_is_the_union_of_context_windows_around_retained_matches() {
@@ -149,14 +158,7 @@ mod tests {
                     }))
                     .expect("valid arguments");
                     let quota = ResultLimit::new(limit);
-                    let mut sink = ContentSink {
-                        path_display: "a.rs".to_owned(),
-                        args: &args,
-                        limit: &quota,
-                        lines: Vec::new(),
-                        pending_context: Vec::new(),
-                        after_context_end: 0,
-                    };
+                    let mut sink = ContentSink::new("a.rs".to_owned(), &args, &quota);
                     build_searcher(&args)
                         .search_slice(&matcher, body.as_bytes(), &mut sink)
                         .expect("search should succeed");

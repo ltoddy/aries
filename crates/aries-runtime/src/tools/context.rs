@@ -88,7 +88,7 @@ impl ToolContext {
             return Err(GuardWriteError::NotRead);
         };
 
-        if let Some(current) = Self::modified_at(file_path).await
+        if let Some(current) = Self::modified_at(&file_path).await
             && current > record.timestamp_millis
         {
             return Err(GuardWriteError::ModifiedSinceRead);

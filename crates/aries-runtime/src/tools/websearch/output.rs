@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -30,11 +32,12 @@ pub struct WebSearchOutput {
 impl WebSearchOutput {
     pub fn new(
         query: impl Into<String>,
-        results: Vec<SearchResult>,
-        duration_seconds: f64,
+        results: impl Into<Vec<SearchResult>>,
+        duration: Duration,
     ) -> Self {
         let query = query.into();
-        Self { query, results, duration_seconds }
+        let results = results.into();
+        Self { query, results, duration_seconds: duration.as_secs_f64() }
     }
 
     pub fn render_output(raw: serde_json::Value) -> Result<String, serde_json::Error> {

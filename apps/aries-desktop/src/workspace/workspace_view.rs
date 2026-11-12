@@ -124,12 +124,13 @@ impl fmt::Debug for WorkspaceView {
 
 impl WorkspaceView {
     pub fn new(
-        cwd: PathBuf,
+        cwd: impl Into<PathBuf>,
         preferences_path: Option<PathBuf>,
         agent: AcpAgentConfig,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        let cwd = cwd.into();
         let host = cx.weak_entity();
         let settings = cx.new(|cx| SettingsState::new(preferences_path, host, window, cx));
         let sidebar = Self::create_chat_view(&cwd, &agent, SessionRenderMode::Sidebar, window, cx);
@@ -293,9 +294,9 @@ impl WorkspaceView {
             if self.terminal.is_none() {
                 let directory = self
                     .active_view()
-                    .map(|view| view.read(cx).execution().directory().to_path_buf())
+                    .map(|view| view.read(cx).execution().directory().to_owned())
                     .unwrap_or_else(|| self.cwd.clone());
-                self.terminal = Some(cx.new(|cx| TerminalView::new(directory, window, cx)));
+                self.terminal = Some(cx.new(|cx| TerminalView::new(directory, cx)));
             }
             if let Some(terminal) = &self.terminal {
                 window.focus(&terminal.read(cx).focus_handle(cx), cx);
@@ -379,11 +380,11 @@ impl WorkspaceView {
 
     pub fn new_tab_in_directory(
         &mut self,
-        directory: PathBuf,
+        directory: impl Into<PathBuf>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.create_tab(directory, window, cx);
+        self.create_tab(directory.into(), window, cx);
     }
 
     fn create_tab(&mut self, directory: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
@@ -573,7 +574,7 @@ impl WorkspaceView {
             self.tabs
                 .iter()
                 .enumerate()
-                .map(|(index, tab)| self.render_tab(index, tab, true, p, cx))
+                .map(|(index, tab)| self.render_tab(index, tab, p, cx))
                 .collect()
         };
         let label = if self.sidebar_visible { "收起会话列表" } else { "展开会话列表" };
@@ -716,7 +717,6 @@ impl WorkspaceView {
         &self,
         index: usize,
         tab: &SessionTab,
-        can_close: bool,
         p: Palette,
         cx: &mut Context<Self>,
     ) -> AnyElement {
@@ -770,20 +770,18 @@ impl WorkspaceView {
                             .child(title),
                     ),
             )
-            .when(can_close, |tab| {
-                tab.child(
-                    Button::new(("close-tab", id))
-                        .icon(Icon::new(IconName::X).size(rems(0.6875)))
-                        .ghost()
-                        .small()
-                        .tooltip_with_action("关闭标签", &CloseTab, None)
-                        .accessibility_label("关闭标签")
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            cx.stop_propagation();
-                            this.execute_tab_command(TabCommand::close(id), window, cx);
-                        })),
-                )
-            });
+            .child(
+                Button::new(("close-tab", id))
+                    .icon(Icon::new(IconName::X).size(rems(0.6875)))
+                    .ghost()
+                    .small()
+                    .tooltip_with_action("关闭标签", &CloseTab, None)
+                    .accessibility_label("关闭标签")
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        cx.stop_propagation();
+                        this.execute_tab_command(TabCommand::close(id), window, cx);
+                    })),
+            );
         self.with_tab_interactions(tab, id, drag_title, cx)
     }
 }
@@ -820,14 +818,14 @@ impl WorkspaceView {
     }
 
     pub fn create_chat_view(
-        cwd: &Path,
+        cwd: impl AsRef<Path>,
         agent: &AcpAgentConfig,
         mode: SessionRenderMode,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Entity<SessionView> {
         let host = cx.weak_entity();
-        let cwd = cwd.to_path_buf();
+        let cwd = cwd.as_ref().to_owned();
         let agent = agent.clone();
         let view = cx.new(|cx| SessionView::new(cwd, agent, window, cx));
         view.update(cx, |view, _| {

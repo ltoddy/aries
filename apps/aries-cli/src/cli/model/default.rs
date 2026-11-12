@@ -20,11 +20,10 @@ pub async fn execute(_: DefaultModelArgs, gctx: GlobalContext) -> anyhow::Result
     }
 
     let aliases = setting.aliases();
-    let items = aliases.iter().map(|a| a.as_str()).collect::<Vec<_>>();
 
     let theme = ColorfulTheme::default();
     let alias = aliases
-        [Select::with_theme(&theme).with_prompt("alias").items(items).default(0).interact()?]
+        [Select::with_theme(&theme).with_prompt("alias").items(&aliases).default(0).interact()?]
     .clone();
 
     println!("Model `{alias}` set as the default.");

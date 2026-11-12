@@ -17,14 +17,17 @@ use rig::agent::{
     RunStart, RunStartAction, StepEventKind, TextDelta, ToolCallDelta,
 };
 use rig::effect::{Answered, EffectKind};
+use serde::Deserialize;
 use serde_json::Value;
 use toasty::Db;
 use tokio::sync::Mutex;
 use tracing::warn;
 
 use crate::compact::{ContextWindow, TokenEstimator, micro_compact};
+use crate::read::ReadArgs;
 use crate::session::session::instruction::InstructionContext;
 use crate::session::session::{system_reminder, system_reminders};
+use crate::tools::agent::AgentArgs;
 
 const MICRO_COMPACT_KEEP_MESSAGES_AT_80_PERCENT: usize = 10;
 const MICRO_COMPACT_KEEP_MESSAGES_AT_75_PERCENT: usize = 15;
@@ -66,7 +69,7 @@ impl SessionPromptHook {
         let agent_id = agent_id.into();
 
         let tool_call_repo = ToolCallRepository::new(db.clone());
-        let token_usage_repo = TokenUsageRepository::new(db.clone());
+        let token_usage_repo = TokenUsageRepository::new(db);
         let window = ContextWindow::new();
 
         Self {
@@ -88,7 +91,7 @@ impl SessionPromptHook {
         &self,
         name: &str,
         args: &str,
-        call_id: String,
+        call_id: impl Into<String>,
         duration_ms: Option<u64>,
         error_message: &str,
     ) {
@@ -263,19 +266,19 @@ impl AgentHook for SessionPromptHook {
                     HookDecision::Continue { contexts } => {
                         let contexts: Vec<_> = contexts.into_iter().collect();
                         if !contexts.is_empty() {
-                            let Ok(mut args) = serde_json::from_value::<
-                                crate::tools::agent::AgentArgs,
-                            >(tool_input.clone()) else {
+                            let Ok(mut args) = AgentArgs::deserialize(&tool_input) else {
                                 warn!("failed to parse Agent args for SubagentStart context");
                                 return DispatchAction::proceed();
                             };
 
                             args.prompt.push_str("\n\n");
                             args.prompt.push_str(&render_contexts(contexts));
-                            tool_input = serde_json::to_value(args).unwrap_or_else(|err| {
-                                warn!(%err, "failed to serialize Agent args for SubagentStart context");
-                                tool_input.clone()
-                            });
+                            match serde_json::to_value(args) {
+                                Ok(patched) => tool_input = patched,
+                                Err(err) => {
+                                    warn!(%err, "failed to serialize Agent args for SubagentStart context");
+                                },
+                            }
                             patched_tool_input = true;
                         }
                     },
@@ -283,9 +286,7 @@ impl AgentHook for SessionPromptHook {
                 }
             },
             crate::read::NAME => {
-                if let Ok(args) =
-                    serde_json::from_value::<crate::read::ReadArgs>(tool_input.clone())
-                {
+                if let Ok(args) = ReadArgs::deserialize(&tool_input) {
                     let file_path = args.file_path;
                     if let Some(parent) = file_path.parent() {
                         self.instruction_ctx.visit(parent).await;
@@ -299,7 +300,7 @@ impl AgentHook for SessionPromptHook {
             &self.session_id,
             &self.cwd,
             name,
-            tool_input.clone(),
+            &tool_input,
             call_id.to_string(),
         )
         .transcript_path(&self.transcript_path)
@@ -429,10 +430,10 @@ impl AgentHook for SessionPromptHook {
     }
 }
 
-fn render_contexts(contexts: impl IntoIterator<Item = String>) -> String {
+fn render_contexts<T: AsRef<str>>(contexts: impl IntoIterator<Item = T>) -> String {
     let mut rendered = Vec::new();
     for context in contexts {
-        rendered.push(["<system-reminder>", &context, "</system-reminder>"].join("\n"));
+        rendered.push(["<system-reminder>", context.as_ref(), "</system-reminder>"].join("\n"));
     }
     rendered.join("\n\n")
 }

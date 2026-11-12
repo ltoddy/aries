@@ -30,8 +30,8 @@ pub enum TaskKind {
 impl Display for TaskKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            TaskKind::Shell => write!(f, "shell"),
-            TaskKind::Monitor => write!(f, "monitor"),
+            TaskKind::Shell => write!(f, "Shell"),
+            TaskKind::Monitor => write!(f, "Monitor"),
         }
     }
 }
@@ -84,7 +84,8 @@ impl TaskState {
         }
     }
 
-    fn notification(&self, task_id: &str) -> String {
+    fn notification(&self, task_id: impl AsRef<str>) -> String {
+        let task_id = task_id.as_ref();
         let command = self.description.as_deref().unwrap_or(&self.command);
         let summary = match (self.kind, self.status) {
             (TaskKind::Monitor, TaskStatus::Completed) => {
@@ -185,7 +186,8 @@ impl TaskRegistryInner {
         Self { tasks: HashMap::new(), finished_tasks: BoundedQueue::new(MAX_FINISHED_TASKS) }
     }
 
-    fn record_finished(&mut self, task_id: String) {
+    fn record_finished(&mut self, task_id: impl Into<String>) {
+        let task_id = task_id.into();
         if let Some(old_task_id) = self.finished_tasks.push(task_id) {
             self.tasks.remove(&old_task_id);
         }
@@ -291,19 +293,18 @@ impl TaskRegistry {
         Ok(TaskSnapshot::new(task_id, &state.lock()))
     }
 
-    pub fn get(&self, task_id: impl Into<String>) -> Option<TaskSnapshot> {
-        let task_id: String = task_id.into();
+    pub fn get(&self, task_id: impl AsRef<str>) -> Option<TaskSnapshot> {
+        let task_id = task_id.as_ref();
         let guard = self.inner.lock();
-        let entry = guard.tasks.get(&task_id)?;
+        let entry = guard.tasks.get(task_id)?;
         Some(TaskSnapshot::new(task_id, &entry.state.lock()))
     }
 
-    pub async fn stop(&self, task_id: impl Into<String>) -> Result<TaskSnapshot, StopTaskError> {
-        let task_id: String = task_id.into();
-
+    pub async fn stop(&self, task_id: impl AsRef<str>) -> Result<TaskSnapshot, StopTaskError> {
+        let task_id = task_id.as_ref();
         let entry = {
             let guard = self.inner.lock();
-            guard.tasks.get(&task_id).cloned().ok_or(StopTaskError::NotFound)?
+            guard.tasks.get(task_id).cloned().ok_or(StopTaskError::NotFound)?
         };
         let state = entry.state;
         let mut receiver = entry.receiver;
@@ -330,14 +331,14 @@ impl TaskRegistry {
 
     fn next_task_id(&self, kind: TaskKind) -> String {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed) + 1;
-        format!("{kind}{id:08}")
+        format!("{kind}: No.{id:04}")
     }
 
-    pub async fn wait_until_finished(&self, task_id: impl Into<String>) -> Option<TaskSnapshot> {
-        let task_id: String = task_id.into();
+    pub async fn wait_until_finished(&self, task_id: impl AsRef<str>) -> Option<TaskSnapshot> {
+        let task_id = task_id.as_ref();
         let (state, mut receiver) = {
             let guard = self.inner.lock();
-            let entry = guard.tasks.get(&task_id)?;
+            let entry = guard.tasks.get(task_id)?;
             (entry.state.clone(), entry.receiver.clone())
         };
 
@@ -455,9 +456,9 @@ impl BoundedOutput {
     }
 
     fn snapshot(&self) -> String {
-        let mut chunks = self.chunks.clone().into_sorted_vec();
-        chunks.reverse();
-        chunks.into_iter().map(|chunk| chunk.text).collect()
+        let mut chunks = self.chunks.iter().collect::<Vec<_>>();
+        chunks.sort_unstable_by_key(|chunk| chunk.seq);
+        chunks.into_iter().map(|chunk| chunk.text.as_str()).collect()
     }
 }
 
@@ -468,14 +469,14 @@ struct OutputChunk {
 }
 
 impl OutputChunk {
-    fn new(seq: u64, text: String) -> Self {
-        Self { seq, text }
+    fn new(seq: u64, text: impl Into<String>) -> Self {
+        Self { seq, text: text.into() }
     }
 }
 
 impl Ord for OutputChunk {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        other.seq.cmp(&self.seq)
+        other.seq.cmp(&self.seq).then_with(|| self.text.cmp(&other.text))
     }
 }
 
@@ -493,10 +494,7 @@ mod tests {
     use parking_lot::Mutex;
     use tokio::sync::{oneshot, watch};
 
-    use super::{
-        BoundedOutput, MAX_FINISHED_TASKS, TaskEntry, TaskKind, TaskRegistry, TaskRegistryInner,
-        TaskState, TaskStatus,
-    };
+    use super::*;
 
     #[test]
     fn bounded_output_drops_oldest_chunks() {
@@ -534,9 +532,9 @@ mod tests {
             TaskState::new(TaskKind::Shell, "sleep 1", Some("run background sleep".to_owned()));
         let state = TaskState { status: TaskStatus::Completed, ..state };
 
-        let notification = state.notification("shell00000001");
+        let notification = state.notification("Shell: No.0001");
 
-        assert!(notification.contains("<task-id>shell00000001</task-id>"));
+        assert!(notification.contains("<task-id>Shell: No.0001</task-id>"));
         assert!(notification.contains("<task-kind>Shell</task-kind>"));
         assert!(notification.contains("<status>Completed</status>"));
         assert!(notification.contains("Background command \"run background sleep\" completed"));
@@ -547,7 +545,7 @@ mod tests {
         let state = TaskState::new(TaskKind::Monitor, "tail -f log", None);
         let state = TaskState { status: TaskStatus::Killed, ..state };
 
-        let notification = state.notification("monitor00000001");
+        let notification = state.notification("Monitor: No.0001");
 
         assert!(notification.contains("Monitor \"tail -f log\" stopped"));
     }
@@ -556,7 +554,7 @@ mod tests {
     fn running_task_has_no_notification() {
         let state = TaskState::new(TaskKind::Shell, "sleep 1", None);
 
-        assert_eq!(state.notification("shell00000001"), "");
+        assert_eq!(state.notification("Shell: No.0001"), "");
     }
 
     #[test]
@@ -564,7 +562,7 @@ mod tests {
         let mut registry = TaskRegistryInner::new();
 
         for index in 0..(MAX_FINISHED_TASKS + 2) {
-            let task_id = format!("shell{index:08}");
+            let task_id = format!("Shell: No.{index:04}");
             let state = Arc::new(Mutex::new(TaskState::new(TaskKind::Shell, "true", None)));
             let (_sender, receiver) = watch::channel(TaskStatus::Running);
             let (stop_sender, _stop_receiver) = oneshot::channel();
@@ -573,9 +571,9 @@ mod tests {
         }
 
         assert_eq!(registry.tasks.len(), MAX_FINISHED_TASKS);
-        assert!(!registry.tasks.contains_key("shell00000000"));
-        assert!(!registry.tasks.contains_key("shell00000001"));
-        assert!(registry.tasks.contains_key("shell00000002"));
+        assert!(!registry.tasks.contains_key("Shell: No.0000"));
+        assert!(!registry.tasks.contains_key("Shell: No.0001"));
+        assert!(registry.tasks.contains_key("Shell: No.0002"));
     }
 
     #[test]
@@ -583,9 +581,9 @@ mod tests {
         let (notifier, _receiver) = Notifier::channel();
         let registry = TaskRegistry::new(notifier);
 
-        assert_eq!(registry.next_task_id(TaskKind::Shell), "shell00000001");
-        assert_eq!(registry.next_task_id(TaskKind::Monitor), "monitor00000002");
-        assert_eq!(registry.next_task_id(TaskKind::Shell), "shell00000003");
+        assert_eq!(registry.next_task_id(TaskKind::Shell), "Shell: No.0001");
+        assert_eq!(registry.next_task_id(TaskKind::Monitor), "Monitor: No.0002");
+        assert_eq!(registry.next_task_id(TaskKind::Shell), "Shell: No.0003");
     }
 
     #[tokio::test]

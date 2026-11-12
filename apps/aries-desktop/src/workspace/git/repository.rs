@@ -180,7 +180,7 @@ pub struct GitInfo {
 }
 
 impl GitInfo {
-    pub fn read(cwd: &Path) -> anyhow::Result<Option<Self>> {
+    pub fn read(cwd: impl AsRef<Path>) -> anyhow::Result<Option<Self>> {
         let repository = match Repository::discover(cwd) {
             Ok(repository) => repository,
             Err(error) if error.code() == git2::ErrorCode::NotFound => return Ok(None),

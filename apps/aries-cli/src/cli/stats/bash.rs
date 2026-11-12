@@ -15,14 +15,14 @@ pub struct BashArgs {}
 
 pub async fn execute(gctx: GlobalContext, _: BashArgs) -> anyhow::Result<()> {
     let root_dir = gctx.root_dir();
-    let db = aries_persistence::connect(&root_dir)
+    let db = aries_persistence::connect(root_dir)
         .await
         .with_context(|| format!("connecting to database at {}", root_dir.display()))?;
 
     let now = Zoned::now();
     let thirty_days_ago = now.saturating_sub(Span::new().days(30));
 
-    let mut tool_call_repo = ToolCallRepository::new(db.clone());
+    let mut tool_call_repo = ToolCallRepository::new(db);
 
     let tool_calls = tool_call_repo
         .find_by_created_at_greater_than(Timestamp::from(&thirty_days_ago))
@@ -59,10 +59,11 @@ pub async fn execute(gctx: GlobalContext, _: BashArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn walk_node(node: tree_sitter::Node, source: &str, commands: &mut Vec<String>) {
+fn walk_node(node: tree_sitter::Node, source: impl AsRef<[u8]>, commands: &mut Vec<String>) {
+    let source = source.as_ref();
     if node.kind() == "command_name" {
         if let Some(name_node) = node.child(0)
-            && let Ok(name) = name_node.utf8_text(source.as_bytes())
+            && let Ok(name) = name_node.utf8_text(source)
         {
             commands.push(name.to_string());
         }

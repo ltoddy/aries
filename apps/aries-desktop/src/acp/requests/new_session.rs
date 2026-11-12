@@ -9,8 +9,9 @@ use crate::acp::requests::RequestError;
 
 pub async fn request(
     connection: &AgentConnection,
-    cwd: PathBuf,
+    cwd: impl Into<PathBuf>,
 ) -> Result<Option<NewSessionResponse>, RequestError> {
+    let cwd = cwd.into();
     if !cwd.is_absolute() {
         return Err(RequestError::InvalidCwd);
     }

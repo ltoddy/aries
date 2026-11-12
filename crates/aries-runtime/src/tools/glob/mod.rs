@@ -6,7 +6,6 @@ mod output;
 mod tests;
 
 use std::path::Path;
-use std::sync::Arc;
 
 use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
@@ -97,11 +96,9 @@ impl Tool for GlobTool {
             .add(glob)
             .build()
             .map_err(|err| GlobError::glob_set(pattern.clone(), err))?;
-        let collector = Arc::new(Collector::new(args.limit));
+        let collector = Collector::new(args.limit);
 
-        walk_parallel(base_dir, args.hidden, args.respect_ignore, set, collector.clone())?;
-
-        let collector = Arc::into_inner(collector).ok_or(GlobError::CollectorStillShared)?;
+        walk_parallel(&base_dir, args.hidden, args.respect_ignore, &set, &collector)?;
         let (files, truncated) = collector.finish();
 
         Ok(GlobOutput::new(files, truncated))

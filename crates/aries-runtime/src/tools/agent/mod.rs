@@ -43,8 +43,8 @@ pub struct AgentTool {
 
 impl AgentTool {
     pub fn new(
-        gctx: GlobalContext,
         ctx: crate::tools::context::ToolContext,
+        gctx: GlobalContext,
         model: Model<OpenAiWire>,
         parent_dir: impl Into<PathBuf>,
         notifier: Notifier,
@@ -135,6 +135,7 @@ impl Tool for AgentTool {
 
         let tool_names = extension.frontmatter.filter_tool_names(crate::ALL_TOOL_NAMES);
         let cwd = self.ctx.cwd();
+        let extensions = AgentExtensions::empty();
         let tools = crate::create_tools(
             self.ctx.session_id(),
             self.gctx.clone(),
@@ -142,8 +143,8 @@ impl Tool for AgentTool {
             self.model.clone(),
             &self.parent_dir,
             cwd,
-            AgentExtensions::empty(),
-            Notifier::clone(&self.notifier),
+            extensions,
+            self.notifier.clone(),
             self.db.clone(),
         );
 

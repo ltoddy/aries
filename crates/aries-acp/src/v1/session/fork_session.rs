@@ -11,7 +11,7 @@ pub async fn fork_session(
     req: ForkSessionRequest,
     responder: Responder<ForkSessionResponse>,
     _: ConnectionTo<Client>,
-    registry: SharedRegistry,
+    registry: &SharedRegistry,
 ) -> Result<(), Error> {
     info!("Received fork session request {req:?}");
     let session_id = req.session_id.to_string();
@@ -27,7 +27,7 @@ pub async fn fork_session(
         .map_err(|e| Error::internal_error().data(e.to_string()))?;
     let config_options = config_options(
         session.setting(),
-        session.mode().to_string(),
+        session.mode(),
         session.agents(),
         session.thought_level(),
     );

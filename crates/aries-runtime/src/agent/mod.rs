@@ -29,7 +29,7 @@ impl AriesAgent {
 
     pub async fn prompt<I, T>(
         &self,
-        prompt: impl Into<Message> + Send,
+        prompt: impl Into<Message>,
         history: I,
     ) -> AriesResult<PromptResponse>
     where
@@ -43,11 +43,11 @@ impl AriesAgent {
         while let Some(chunk) = stream.next().await {
             match chunk {
                 Ok(item) => {
-                    self.notifier.send_stream_item(item.clone());
-
-                    if let MultiTurnStreamItem::FinalResponse(res) = item {
-                        final_res = res;
+                    if let MultiTurnStreamItem::FinalResponse(ref res) = item {
+                        final_res = res.clone();
                     }
+
+                    self.notifier.send_stream_item(item);
                 },
                 Err(err) => return Err(err.into()),
             }

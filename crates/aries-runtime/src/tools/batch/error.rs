@@ -44,7 +44,7 @@ impl BatchError {
         Self::SerializeOutput { tool, source }
     }
 
-    pub fn tool_execution(tool: impl Into<String>, source: impl ToString) -> Self {
+    pub fn tool_execution(tool: impl Into<String>, source: impl std::fmt::Display) -> Self {
         let tool = tool.into();
         let message = source.to_string();
 

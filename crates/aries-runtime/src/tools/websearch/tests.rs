@@ -1,7 +1,7 @@
 use serde_json::json;
 
-use super::tavily::TavilySearchRequest;
-use super::*;
+use crate::tools::websearch::tavily::TavilySearchRequest;
+use crate::tools::websearch::*;
 
 #[test]
 fn test_render_args_parses_query_and_domains() {
@@ -83,13 +83,9 @@ fn test_args_round_trip_with_domains() {
 
 #[test]
 fn test_tavily_request_serializes_domains() {
-    let request = TavilySearchRequest::new(
-        "rust",
-        15,
-        false,
-        Some(vec!["rust-lang.org".to_owned()]),
-        Some(vec!["reddit.com".to_owned()]),
-    );
+    let include = vec!["rust-lang.org".to_owned()];
+    let exclude = vec!["reddit.com".to_owned()];
+    let request = TavilySearchRequest::new("rust", 15, false, Some(include), Some(exclude));
 
     let json = serde_json::to_value(&request).expect("test operation should succeed");
     assert_eq!(json["query"], "rust");

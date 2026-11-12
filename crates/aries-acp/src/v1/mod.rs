@@ -50,36 +50,28 @@ pub async fn run(
         .on_receive_request(
             {
                 let register = registry.clone();
-                async move |req, responder, cx| {
-                    new_session(req, responder, cx, register.clone()).await
-                }
+                async move |req, responder, cx| new_session(req, responder, cx, &register).await
             },
             on_receive_request!(),
         )
         .on_receive_request(
             {
                 let registry = registry.clone();
-                async move |req, responder, cx| {
-                    load_session(req, responder, cx, registry.clone()).await
-                }
+                async move |req, responder, cx| load_session(req, responder, cx, &registry).await
             },
             on_receive_request!(),
         )
         .on_receive_request(
             {
                 let registry = registry.clone();
-                async move |req, responder, cx| {
-                    list_session(req, responder, cx, registry.clone()).await
-                }
+                async move |req, responder, cx| list_session(req, responder, cx, &registry).await
             },
             on_receive_request!(),
         )
         .on_receive_request(
             {
                 let registry = registry.clone();
-                async move |req, responder, cx| {
-                    fork_session(req, responder, cx, registry.clone()).await
-                }
+                async move |req, responder, cx| fork_session(req, responder, cx, &registry).await
             },
             on_receive_request!(),
         )
@@ -87,18 +79,14 @@ pub async fn run(
         .on_receive_request(
             {
                 let registry = registry.clone();
-                async move |req, responder, cx| {
-                    close_session(req, responder, cx, registry.clone()).await
-                }
+                async move |req, responder, cx| close_session(req, responder, cx, &registry).await
             },
             on_receive_request!(),
         )
         .on_receive_request(
             {
                 let registry = registry.clone();
-                async move |req, responder, cx| {
-                    delete_session(req, responder, cx, registry.clone()).await
-                }
+                async move |req, responder, cx| delete_session(req, responder, cx, &registry).await
             },
             on_receive_request!(),
         )
@@ -111,7 +99,7 @@ pub async fn run(
             {
                 let registry = registry.clone();
                 async move |req, responder, cx| {
-                    set_session_config_option(req, responder, cx, registry.clone()).await
+                    set_session_config_option(req, responder, cx, &registry).await
                 }
             },
             on_receive_request!(),
@@ -119,14 +107,14 @@ pub async fn run(
         .on_receive_request(
             {
                 let registry = registry.clone();
-                async move |req, responder, cx| prompt(req, responder, cx, registry.clone()).await
+                async move |req, responder, cx| prompt(req, responder, cx, &registry).await
             },
             on_receive_request!(),
         )
         .on_receive_request(mcp::message, on_receive_request!())
         .on_receive_notification(cancel_request, on_receive_notification!())
         .on_receive_notification(
-            async move |args, cx| cancel(args, cx, registry.clone()).await,
+            async move |args, cx| cancel(args, cx, &registry).await,
             on_receive_notification!(),
         )
         .on_receive_notification(mcp::message_notification, on_receive_notification!())

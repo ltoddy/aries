@@ -155,7 +155,7 @@ pub struct Session {
 
 impl Session {
     pub fn start(
-        directory: &Path,
+        directory: impl AsRef<Path>,
         dimensions: Dimensions,
         notifications: async_channel::Sender<()>,
     ) -> Result<Self, StartError> {
@@ -188,7 +188,7 @@ impl Session {
             cancelled: cancelled.clone(),
             completion,
         };
-        let directory = directory.to_path_buf();
+        let directory = directory.as_ref().to_owned();
         thread::Builder::new()
             .name("terminal-pty".into())
             .spawn(move || {

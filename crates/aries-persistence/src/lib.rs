@@ -55,7 +55,7 @@ pub async fn gc(db: toasty::Db) {
         }
     }
 
-    let mut tool_call_repo = ToolCallRepository::new(db.clone());
+    let mut tool_call_repo = ToolCallRepository::new(db);
     if let Ok(tool_calls) =
         tool_call_repo.find_by_created_at_less_than(Timestamp::from(&month_ago)).await
     {

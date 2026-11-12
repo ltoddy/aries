@@ -67,9 +67,9 @@ pub struct CommandMenu {
     on_select: CommandSelection,
 }
 impl CommandMenu {
-    pub fn from_commands(
+    pub fn from_commands<'a>(
         menu: &SlashMenu,
-        candidates: Vec<&AvailableCommand>,
+        candidates: impl IntoIterator<Item = &'a AvailableCommand>,
         empty: &'static str,
         p: Palette,
         on_select: impl Fn(&str, &mut Window, &mut App) + 'static,

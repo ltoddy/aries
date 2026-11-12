@@ -1,4 +1,3 @@
-use std::fmt::Debug;
 use std::path::PathBuf;
 
 use serde::{Serialize, Serializer};
@@ -9,10 +8,7 @@ use crate::hook::input::common::Effort;
 const HOOK_EVENT_NAME: &str = "PostToolUseFailure";
 
 #[derive(Debug, Default, Clone, Serialize)]
-pub struct PostToolUseFailureHookInput<ToolInput>
-where
-    ToolInput: Serialize + Clone + Debug,
-{
+pub struct PostToolUseFailureHookInput<ToolInput> {
     pub session_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transcript_path: Option<PathBuf>,
@@ -34,10 +30,7 @@ where
     pub duration_ms: Option<u64>,
 }
 
-impl<ToolInput> PostToolUseFailureHookInput<ToolInput>
-where
-    ToolInput: Serialize + Clone + Debug + Default,
-{
+impl<ToolInput> PostToolUseFailureHookInput<ToolInput> {
     pub fn new(
         session_id: impl Into<String>,
         cwd: impl Into<PathBuf>,
@@ -52,7 +45,20 @@ where
         let tool_use_id = tool_use_id.into();
         let error = error.into();
 
-        Self { session_id, cwd, tool_name, tool_input, tool_use_id, error, ..Default::default() }
+        Self {
+            session_id,
+            transcript_path: None,
+            cwd,
+            permission_mode: None,
+            effort: None,
+            hook_event_name: String::new(),
+            tool_name,
+            tool_input,
+            tool_use_id,
+            error,
+            is_interrupt: None,
+            duration_ms: None,
+        }
     }
 
     pub fn transcript_path(mut self, transcript_path: impl Into<PathBuf>) -> Self {
@@ -83,7 +89,7 @@ where
 
 impl<ToolInput> HookInput for PostToolUseFailureHookInput<ToolInput>
 where
-    ToolInput: Serialize + Clone + Debug,
+    ToolInput: Serialize,
 {
     fn hook_event_name(&self) -> &'static str {
         HOOK_EVENT_NAME

@@ -10,7 +10,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use tracing::warn;
 
-pub async fn write<'a, S: Serialize + 'a>(
+pub async fn write<'a, S: Serialize + ?Sized + 'a>(
     path: impl AsRef<Path>,
     elements: impl IntoIterator<Item = &'a S>,
 ) -> io::Result<()> {
@@ -71,7 +71,7 @@ impl JsonlAppender {
         Ok(Self { file_path, file: Arc::new(Mutex::new(file)) })
     }
 
-    pub async fn append<'a, S: Serialize + 'a>(
+    pub async fn append<'a, S: Serialize + ?Sized + 'a>(
         &self,
         elements: impl IntoIterator<Item = &'a S>,
     ) -> io::Result<()> {
@@ -88,7 +88,7 @@ impl JsonlAppender {
         Ok(())
     }
 
-    pub async fn overwrite<'a, S: Serialize + 'a>(
+    pub async fn overwrite<'a, S: Serialize + ?Sized + 'a>(
         &self,
         elements: impl IntoIterator<Item = &'a S>,
     ) -> io::Result<()> {

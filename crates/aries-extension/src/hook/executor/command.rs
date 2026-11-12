@@ -1,6 +1,6 @@
 use std::io;
 use std::process::Stdio;
-use std::time::Duration;
+use std::time::{Duration, TryFromFloatSecsError};
 
 use thiserror::Error;
 use tokio::io::AsyncWriteExt;
@@ -14,9 +14,12 @@ const DEFAULT_HOOK_TIMEOUT_SECS: f64 = 60.0;
 
 pub async fn execute_bash_command_hook(
     hook: &BashCommandHook,
-    stdin_payload: impl Into<String>,
+    stdin_payload: impl AsRef<[u8]>,
 ) -> Result<BashHookOutcome, BashHookError> {
-    let stdin_payload = stdin_payload.into();
+    let timeout = hook.timeout.unwrap_or(DEFAULT_HOOK_TIMEOUT_SECS);
+    let timeout_secs = if timeout.is_finite() { timeout.max(0.0) } else { timeout };
+    let timeout_duration = Duration::try_from_secs_f64(timeout_secs)
+        .map_err(|source| BashHookError::invalid_timeout(timeout, source))?;
     let (program, arg) = hook.shell.unwrap_or_default().invocation();
 
     let mut child = Command::new(program)
@@ -30,15 +33,13 @@ pub async fn execute_bash_command_hook(
         .map_err(BashHookError::Spawn)?;
 
     let stdin = child.stdin.take();
-    let stdin_payload = stdin_payload.into_bytes();
-    let timeout_duration =
-        Duration::from_secs_f64(hook.timeout.unwrap_or(DEFAULT_HOOK_TIMEOUT_SECS).max(0.0));
+    let stdin_payload = stdin_payload.as_ref();
 
     let output = match tokio::time::timeout(timeout_duration, async move {
         let write_stdin = async move {
             if let Some(mut stdin) = stdin {
                 if !stdin_payload.is_empty() {
-                    stdin.write_all(&stdin_payload).await.map_err(BashHookError::Stdin)?;
+                    stdin.write_all(stdin_payload).await.map_err(BashHookError::Stdin)?;
                 }
                 stdin.shutdown().await.map_err(BashHookError::Stdin)?;
             }
@@ -75,11 +76,17 @@ pub struct BashHookOutcome {
 }
 
 impl BashHookOutcome {
-    pub fn new(exit_code: Option<i32>, stdout: String, stderr: String, blocked: bool) -> Self {
-        Self { exit_code, stdout, stderr, blocked }
+    pub fn new(
+        exit_code: Option<i32>,
+        stdout: impl Into<String>,
+        stderr: impl Into<String>,
+        blocked: bool,
+    ) -> Self {
+        Self { exit_code, stdout: stdout.into(), stderr: stderr.into(), blocked }
     }
 
-    pub fn output(&self, hook_event_name: &str) -> BashHookOutput {
+    pub fn output(self, hook_event_name: impl AsRef<str>) -> BashHookOutput {
+        let hook_event_name = hook_event_name.as_ref();
         if self.blocked {
             let reason = if self.stderr.trim().is_empty() {
                 format!("{hook_event_name} hook returned exit code 2")
@@ -109,7 +116,7 @@ impl BashHookOutcome {
         }
 
         if plain_stdout_adds_context(hook_event_name) {
-            return BashHookOutput::Continue { context: Some(self.stdout.clone()) };
+            return BashHookOutput::Continue { context: Some(self.stdout) };
         }
 
         BashHookOutput::Continue { context: None }
@@ -128,6 +135,8 @@ fn plain_stdout_adds_context(hook_event_name: &str) -> bool {
 
 #[derive(Debug, Error)]
 pub enum BashHookError {
+    #[error("invalid hook timeout {timeout}: {source}")]
+    InvalidTimeout { timeout: f64, source: TryFromFloatSecsError },
     #[error("failed to spawn shell process: {0}")]
     Spawn(#[source] io::Error),
     #[error("failed to write stdin to hook process: {0}")]
@@ -140,4 +149,10 @@ pub enum BashHookError {
         #[source]
         source: Elapsed,
     },
+}
+
+impl BashHookError {
+    pub fn invalid_timeout(timeout: f64, source: TryFromFloatSecsError) -> Self {
+        Self::InvalidTimeout { timeout, source }
+    }
 }

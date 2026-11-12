@@ -17,7 +17,7 @@ use rig::agent::{CompletionCall, MultiTurnStreamItem, PromptResponse};
 use rig::completion::Message;
 use rig::message::{
     AssistantContent, Audio, Document, DocumentData, DocumentSourceKind, Image, MimeType, ToolCall,
-    ToolFunction, ToolName, ToolResult, UserContent, Video,
+    ToolFunction, ToolResult, UserContent, Video,
 };
 use rig::streaming::{Item, StreamEvent};
 
@@ -285,13 +285,13 @@ impl SessionUpdates {
     }
 
     fn from_tool_call(tool_call: ToolCall) -> SessionUpdate {
-        let (title, content) = parse_tool_call(tool_call.clone());
+        let (title, content) = parse_tool_call(&tool_call.function);
         let locations = locations(&tool_call.function);
         let ToolFunction { name, arguments, invalid_arguments: _ } = tool_call.function;
         let arguments = serde_json::Value::Object(arguments);
-        let kind = tool_kind(&name);
+        let kind = tool_kind(name.as_str());
 
-        let tc = AcpToolCall::new(ToolCallId::new(tool_call.id.to_string()), &title)
+        let tc = AcpToolCall::new(ToolCallId::new(tool_call.id.to_string()), title)
             .kind(kind)
             .status(ToolCallStatus::InProgress)
             .content(content)
@@ -358,9 +358,9 @@ impl IntoIterator for SessionUpdates {
     }
 }
 
-fn parse_tool_call(t: ToolCall) -> (String, Vec<ToolCallContent>) {
-    let ToolFunction { name, arguments, invalid_arguments: _ } = t.function;
-    let arguments = serde_json::Value::Object(arguments);
+fn parse_tool_call(function: &ToolFunction) -> (String, Vec<ToolCallContent>) {
+    let ToolFunction { name, arguments, invalid_arguments: _ } = function;
+    let arguments = serde_json::Value::Object(arguments.clone());
 
     let default_title = format!("{name}: {arguments}");
     match name.as_str() {
@@ -447,8 +447,8 @@ fn parse_tool_call(t: ToolCall) -> (String, Vec<ToolCallContent>) {
     }
 }
 
-fn tool_kind(tool_name: &ToolName) -> ToolKind {
-    match tool_name.as_str() {
+fn tool_kind(tool_name: &str) -> ToolKind {
+    match tool_name {
         glob::NAME | read::NAME | task_output::NAME => ToolKind::Read,
         edit::NAME | multiedit::NAME | write::NAME => ToolKind::Edit,
         grep::NAME | codesearch::NAME => ToolKind::Search,

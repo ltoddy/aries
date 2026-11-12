@@ -26,10 +26,10 @@ pub type McpConnectResult<T> = Result<T, McpConnectError>;
 const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
 pub async fn connect(
-    mcps: &[McpDefinition],
+    mcps: impl AsRef<[McpDefinition]>,
     tool_server_handle: ToolServerHandle,
 ) -> Vec<McpConnection> {
-    let mcp_servers = mcps.iter().flat_map(|c| &c.mcp_servers).collect::<Vec<_>>();
+    let mcp_servers = mcps.as_ref().iter().flat_map(|c| &c.mcp_servers).collect::<Vec<_>>();
 
     future::join_all(mcp_servers.into_iter().map(|(server_name, server_config)| {
         connect_one(server_name, server_config, tool_server_handle.clone())

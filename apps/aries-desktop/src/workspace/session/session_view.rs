@@ -59,11 +59,12 @@ impl fmt::Debug for SessionView {
 }
 impl SessionView {
     pub fn new(
-        cwd: PathBuf,
+        cwd: impl Into<PathBuf>,
         agent: AcpAgentConfig,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        let cwd = cwd.into();
         let composer = Composer::new(window, cx);
         let changes = cx.subscribe_in(composer.input(), window, |this, _, event, _, cx| {
             this.composer.input_event(event);
@@ -240,7 +241,7 @@ impl SessionView {
     }
     pub fn new_chat_in_directory(
         &mut self,
-        directory: PathBuf,
+        directory: impl Into<PathBuf>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -249,11 +250,11 @@ impl SessionView {
         });
     }
     pub fn new_chat_in_current_directory(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.new_chat_in_directory(self.execution.directory().to_path_buf(), window, cx);
+        self.new_chat_in_directory(self.execution.directory().to_owned(), window, cx);
     }
     pub fn start_new_chat(
         &mut self,
-        directory: PathBuf,
+        directory: impl Into<PathBuf>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -346,7 +347,7 @@ impl SessionView {
         self.execution.active_session_id()
     }
     pub fn tab_title(&self) -> String {
-        crate::workspace::conversation::single_line(&self.execution.conversation().title())
+        crate::workspace::conversation::single_line(self.execution.conversation().title())
     }
     pub fn directory(&self) -> &Path {
         self.execution.directory()
@@ -361,7 +362,7 @@ impl SessionView {
     pub fn sidebar_snapshot(&self) -> (Option<SessionId>, PathBuf, String, Option<SessionId>) {
         (
             self.active_session_id().cloned(),
-            self.directory().to_path_buf(),
+            self.directory().to_owned(),
             self.execution.conversation().title(),
             self.execution.loading_id().cloned(),
         )
@@ -398,8 +399,12 @@ impl SessionView {
         );
     }
     pub fn locate_current_session(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let cwd = self.directory().to_path_buf();
-        self.sidebar.locate_current_session(self.execution.session_id(), &cwd, window, cx);
+        self.sidebar.locate_current_session(
+            self.execution.session_id(),
+            self.execution.directory(),
+            window,
+            cx,
+        );
     }
     pub fn session_ids(&self, cwd: Option<&Path>) -> Vec<SessionId> {
         let mut ids = self.sidebar.motion().session_ids(cwd);
@@ -412,7 +417,8 @@ impl SessionView {
         ids.retain(|id| !self.sidebar.motion().is_deleted(id));
         ids
     }
-    pub fn old_session_ids(&self, cwd: &Path, days: u16) -> Vec<SessionId> {
+    pub fn old_session_ids(&self, cwd: impl AsRef<Path>, days: u16) -> Vec<SessionId> {
+        let cwd = cwd.as_ref();
         let now = Timestamp::now();
         let age = SignedDuration::from_hours(i64::from(days) * 24);
         self.session_ids(Some(cwd))
@@ -429,7 +435,7 @@ impl SessionView {
     }
     pub fn delete_old_sessions(
         &mut self,
-        cwd: &Path,
+        cwd: impl AsRef<Path>,
         days: u16,
         window: &mut Window,
         cx: &mut Context<Self>,
@@ -437,6 +443,7 @@ impl SessionView {
         if !self.can_manage_sessions() {
             return;
         }
+        let cwd = cwd.as_ref();
         let ids = self.old_session_ids(cwd, days);
         if ids.is_empty() {
             return;
@@ -490,7 +497,7 @@ impl SessionView {
     }
     pub fn prepare_session_deletion(
         &mut self,
-        ids: Vec<SessionId>,
+        ids: impl IntoIterator<Item = SessionId>,
         anchor: String,
         cx: &mut Context<Self>,
     ) {
@@ -571,8 +578,7 @@ impl SessionView {
             p,
             cx,
         );
-        let composer =
-            self.composer.render(self, self.send_key(cx), self.commands_available(), p, cx);
+        let composer = self.composer.render(self, p, cx);
         div().flex_1().min_w_0().h_full().flex().flex_col().child(timeline).child(composer)
     }
     fn render_layout(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {

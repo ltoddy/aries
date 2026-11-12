@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use gpui_kit::assets::IconName;
@@ -34,9 +34,9 @@ pub struct GitPanel {
 }
 
 impl GitPanel {
-    pub fn new(cwd: PathBuf, cx: &mut Context<SessionView>) -> Self {
+    pub fn new(cwd: impl Into<PathBuf>, cx: &mut Context<SessionView>) -> Self {
         Self {
-            cwd,
+            cwd: cwd.into(),
             info: None,
             info_task: None,
             refresh_task: None,
@@ -53,10 +53,10 @@ impl GitPanel {
             panel_focus: cx.focus_handle().tab_stop(true),
         }
     }
-    pub fn set_directory(&mut self, cwd: PathBuf) {
-        self.cwd = cwd;
+    pub fn set_directory(&mut self, cwd: impl Into<PathBuf>) {
+        self.cwd = cwd.into();
     }
-    pub fn directory(&self) -> &PathBuf {
+    pub fn directory(&self) -> &Path {
         &self.cwd
     }
     pub fn motion(&self) -> &GitMotion {
@@ -377,11 +377,12 @@ impl GitPanel {
 
     pub fn change_git_index(
         &mut self,
-        path: PathBuf,
+        path: impl Into<PathBuf>,
         action: IndexAction,
         window: &mut Window,
         cx: &mut Context<SessionView>,
     ) {
+        let path = path.into();
         let group = match action {
             IndexAction::Stage => ChangeGroup::Unstaged,
             IndexAction::Unstage => ChangeGroup::Staged,

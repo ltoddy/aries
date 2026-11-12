@@ -34,10 +34,10 @@ impl ChatContext {
         Ok(Self { inner: Arc::new(inner) })
     }
 
-    pub async fn append(&self, messages: impl IntoIterator<Item = &Message>) {
-        let messages = messages.into_iter().cloned().collect::<Vec<_>>();
+    pub async fn append<'a>(&self, messages: impl IntoIterator<Item = &'a Message>) {
+        let messages = messages.into_iter().collect::<Vec<_>>();
 
-        self.inner.history.write().await.extend(messages.clone());
+        self.inner.history.write().await.extend(messages.iter().copied().cloned());
 
         if let Err(err) = self.inner.file.append(&messages).await {
             error!(path = %self.inner.file.file_path().display(), err = %err, "failed to persist chat context");

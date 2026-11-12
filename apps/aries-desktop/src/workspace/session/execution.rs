@@ -23,14 +23,6 @@ use crate::workspace::session::model::{SessionDeletion, SessionLoad};
 use crate::workspace::sidebar::Sidebar;
 use crate::workspace::{SessionRenderMode, SessionView, WorkspaceView};
 
-#[derive(Debug, thiserror::Error)]
-enum ValidateDirectoryError {
-    #[error("无法访问目录 {}", path.display())]
-    Access { path: PathBuf, source: std::io::Error },
-    #[error("请选择文件夹：{}", .0.display())]
-    NotDirectory(PathBuf),
-}
-
 pub struct Execution {
     cwd: PathBuf,
     agent: AcpAgentConfig,
@@ -159,9 +151,9 @@ impl Execution {
         self.refresh_sessions(ui, cx);
         cx.notify();
     }
-    pub fn new(cwd: PathBuf, agent: AcpAgentConfig) -> Self {
+    pub fn new(cwd: impl Into<PathBuf>, agent: AcpAgentConfig) -> Self {
         Self {
-            cwd,
+            cwd: cwd.into(),
             agent,
             conversation: Conversation::default(),
             bridge: None,
@@ -422,7 +414,7 @@ impl Execution {
     pub fn supports_load(&self) -> bool {
         self.load_supported
     }
-    pub fn save_draft(&mut self, ui: &mut SessionParts<'_>, cx: &App) {
+    pub fn save_draft(&mut self, ui: &SessionParts<'_>, cx: &App) {
         if let Some(id) = &self.session_id {
             let draft = ui.composer.draft(cx);
             if draft.is_empty() {
@@ -566,10 +558,10 @@ impl Execution {
             },
             Event::SessionsDeleted(result) => self.finish_deletion(ui, result, window, cx),
             Event::SessionLoaded { session_id, result } => {
-                self.finish_session_load(ui, session_id, result, window, cx);
+                self.finish_session_load(ui, &session_id, result, window, cx);
             },
             Event::SessionConfigSet { session_id, config_id, result } => {
-                ui.configuration.finish_session_config(self, session_id, config_id, result, cx);
+                ui.configuration.finish_session_config(self, &session_id, &config_id, result, cx);
             },
             Event::Ready(response) => {
                 let creating_session = std::mem::take(&mut self.creating_session);
@@ -706,11 +698,11 @@ impl Execution {
         }
     }
 
-    pub fn can_load_sessions(&self, ui: &mut SessionParts<'_>) -> bool {
+    pub fn can_load_sessions(&self, ui: &SessionParts<'_>) -> bool {
         self.load_supported
             && !self.disconnected
             && self.is_session_idle(ui)
-            && !ui.sidebar.list_mut().is_loading()
+            && !ui.sidebar.list().is_loading()
     }
 
     pub fn load_session(
@@ -741,12 +733,12 @@ impl Execution {
     pub fn finish_session_load(
         &mut self,
         ui: &mut SessionParts<'_>,
-        id: SessionId,
+        id: &SessionId,
         result: Result<LoadSessionResponse, Error>,
         window: &mut Window,
         cx: &mut Context<SessionView>,
     ) {
-        if !self.loading_session.as_ref().is_some_and(|loading| loading.session_id() == &id) {
+        if !self.loading_session.as_ref().is_some_and(|loading| loading.session_id() == id) {
             return;
         }
         let Some(loading) = self.loading_session.take() else {
@@ -792,7 +784,7 @@ impl Execution {
         cx.notify();
     }
 
-    pub fn can_start_new_chat(&self, ui: &mut SessionParts<'_>) -> bool {
+    pub fn can_start_new_chat(&self, ui: &SessionParts<'_>) -> bool {
         self.is_session_idle(ui)
     }
 
@@ -859,13 +851,14 @@ impl Execution {
     pub fn new_chat_in_directory(
         &mut self,
         ui: &mut SessionParts<'_>,
-        directory: PathBuf,
+        directory: impl Into<PathBuf>,
         window: &mut Window,
         cx: &mut Context<SessionView>,
     ) {
         if !self.can_start_new_chat(ui) {
             return;
         }
+        let directory = directory.into();
         self.choosing_directory = true;
         cx.spawn_in(window, async move |view, cx| {
             let (result, directory) = cx
@@ -889,7 +882,7 @@ impl Execution {
                         Notification::error(format!(
                             "无法在目录 {} 新建会话：{:#}。请检查目录是否存在且可访问。",
                             directory.display(),
-                            anyhow::Error::from(error)
+                            error
                         )),
                         cx,
                     ),
@@ -904,7 +897,7 @@ impl Execution {
     pub fn start_new_chat(
         &mut self,
         ui: &mut SessionParts<'_>,
-        directory: PathBuf,
+        directory: impl Into<PathBuf>,
         window: &mut Window,
         cx: &mut Context<SessionView>,
     ) {
@@ -918,7 +911,7 @@ impl Execution {
             self.bridge = None;
         }
         self.reset_chat(ui);
-        self.cwd = directory;
+        self.cwd = directory.into();
         ui.git_panel.set_directory(self.cwd.clone());
         ui.git_panel.watch_info(cx);
         self.session_directory_selected = true;
@@ -966,15 +959,14 @@ impl Execution {
         cx.notify();
     }
 }
-fn validate_directory(path: &Path) -> Result<PathBuf, ValidateDirectoryError> {
-    let directory = path
-        .canonicalize()
-        .map_err(|source| ValidateDirectoryError::Access { path: path.to_owned(), source })?;
-    let metadata = directory
-        .metadata()
-        .map_err(|source| ValidateDirectoryError::Access { path: directory.to_owned(), source })?;
+fn validate_directory(path: impl AsRef<Path>) -> anyhow::Result<PathBuf> {
+    let path = path.as_ref();
+    let directory =
+        path.canonicalize().with_context(|| format!("无法访问目录 {}", path.display()))?;
+    let metadata =
+        directory.metadata().with_context(|| format!("无法访问目录 {}", directory.display()))?;
     if !metadata.is_dir() {
-        return Err(ValidateDirectoryError::NotDirectory(directory));
+        anyhow::bail!("请选择文件夹：{}", directory.display());
     }
     Ok(directory)
 }

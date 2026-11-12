@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::tools::task::{TaskKind, TaskStatus};
+use crate::tools::task::{TaskKind, TaskSnapshot, TaskStatus};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TaskStopOutput {
@@ -11,16 +11,13 @@ pub struct TaskStopOutput {
 }
 
 impl TaskStopOutput {
-    pub fn new(
-        task_id: impl Into<String>,
-        task_type: TaskKind,
-        status: TaskStatus,
-        command: impl Into<String>,
-    ) -> Self {
-        let task_id = task_id.into();
-        let command = command.into();
-
-        Self { task_id, task_type, status, command }
+    pub fn new(snapshot: TaskSnapshot) -> Self {
+        Self {
+            task_id: snapshot.task_id,
+            task_type: snapshot.kind,
+            status: snapshot.status,
+            command: snapshot.command,
+        }
     }
 
     pub fn render_output(raw: serde_json::Value) -> Result<String, serde_json::Error> {

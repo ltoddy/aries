@@ -1,11 +1,11 @@
 use std::str::FromStr;
-use std::time::Duration;
+use std::time::{Duration, TryFromFloatSecsError};
 
 use http::{HeaderName, HeaderValue, StatusCode};
 use thiserror::Error;
 
-use super::output::HookOutput;
 use crate::hook::definition::HttpHook;
+use crate::hook::executor::output::HookOutput;
 
 const DEFAULT_HOOK_TIMEOUT_SECS: f64 = 60.0;
 
@@ -13,7 +13,7 @@ pub async fn execute_http_hook(
     hook: &HttpHook,
     payload: impl Into<String>,
 ) -> Result<HttpHookOutcome, HttpHookError> {
-    let default_headers = hook.headers.clone().map_or_else(Default::default, |headers| {
+    let default_headers = hook.headers.as_ref().map_or_else(Default::default, |headers| {
         headers
             .iter()
             .filter_map(|(key, value)| {
@@ -25,10 +25,9 @@ pub async fn execute_http_hook(
             .collect()
     });
 
-    let timeout = hook.timeout.map_or_else(
-        || Duration::from_secs_f64(DEFAULT_HOOK_TIMEOUT_SECS),
-        Duration::from_secs_f64,
-    );
+    let timeout_secs = hook.timeout.unwrap_or(DEFAULT_HOOK_TIMEOUT_SECS);
+    let timeout = Duration::try_from_secs_f64(timeout_secs)
+        .map_err(|source| HttpHookError::invalid_timeout(timeout_secs, source))?;
 
     let http_client = reqwest::Client::builder()
         .default_headers(default_headers)
@@ -73,8 +72,8 @@ impl HttpHookOutcome {
         HttpHookOutcome::Empty
     }
 
-    pub fn text(text: String) -> HttpHookOutcome {
-        HttpHookOutcome::Text(text)
+    pub fn text(text: impl Into<String>) -> HttpHookOutcome {
+        HttpHookOutcome::Text(text.into())
     }
 
     pub fn json(body: HookOutput) -> HttpHookOutcome {
@@ -84,6 +83,8 @@ impl HttpHookOutcome {
 
 #[derive(Debug, Error)]
 pub enum HttpHookError {
+    #[error("invalid hook timeout {timeout}: {source}")]
+    InvalidTimeout { timeout: f64, source: TryFromFloatSecsError },
     #[error("failed to create http client: {0}")]
     BuildClient(#[source] reqwest::Error),
     #[error("failed to send request: {0}")]
@@ -95,6 +96,10 @@ pub enum HttpHookError {
 }
 
 impl HttpHookError {
+    pub fn invalid_timeout(timeout: f64, source: TryFromFloatSecsError) -> Self {
+        Self::InvalidTimeout { timeout, source }
+    }
+
     pub fn build_client(err: reqwest::Error) -> Self {
         Self::BuildClient(err)
     }
@@ -107,7 +112,7 @@ impl HttpHookError {
         Self::ReadBody(err)
     }
 
-    pub fn non_success_status(status_code: StatusCode, body: String) -> Self {
-        Self::NonSuccessStatus { status_code, body }
+    pub fn non_success_status(status_code: StatusCode, body: impl Into<String>) -> Self {
+        Self::NonSuccessStatus { status_code, body: body.into() }
     }
 }

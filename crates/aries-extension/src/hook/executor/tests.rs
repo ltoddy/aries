@@ -34,7 +34,7 @@ async fn bash_hook_timeout_covers_stdin_write() {
 
     let result = tokio::time::timeout(
         std::time::Duration::from_millis(100),
-        execute_bash_command_hook(&hook, input),
+        execute_bash_command_hook(&hook, &input),
     )
     .await;
 

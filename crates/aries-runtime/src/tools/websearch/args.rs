@@ -15,8 +15,10 @@ impl WebSearchArgs {
 }
 
 impl WebSearchArgs {
-    pub fn render_args(raw: &str) -> Result<(String, Option<String>), serde_json::Error> {
-        let args: Self = serde_json::from_str(raw)?;
+    pub fn render_args(
+        raw: impl AsRef<str>,
+    ) -> Result<(String, Option<String>), serde_json::Error> {
+        let args: Self = serde_json::from_str(raw.as_ref())?;
         let first = args.query;
         Ok((first, None))
     }

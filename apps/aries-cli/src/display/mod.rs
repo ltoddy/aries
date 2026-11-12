@@ -80,7 +80,12 @@ pub fn print_agent_event(event: AgentEvent) {
     }
 }
 
-pub fn format_tool_call_args(tool_name: &str, args: &str) -> (String, Option<String>) {
+pub fn format_tool_call_args(
+    tool_name: impl AsRef<str>,
+    args: impl AsRef<str>,
+) -> (String, Option<String>) {
+    let tool_name = tool_name.as_ref();
+    let args = args.as_ref();
     if !aries_runtime::is_builtin_tool(tool_name) {
         return format_unknown_call(tool_name, args);
     }
@@ -127,7 +132,12 @@ pub fn display_token_usage(usage: &rig::completion::Usage) {
     );
 }
 
-pub fn format_unknown_call(tool_name: &str, args: &str) -> (String, Option<String>) {
+pub fn format_unknown_call(
+    tool_name: impl AsRef<str>,
+    args: impl AsRef<str>,
+) -> (String, Option<String>) {
+    let tool_name = tool_name.as_ref();
+    let args = args.as_ref();
     let args_str = serde_json::from_str::<serde_json::Value>(args)
         .and_then(|value| serde_json::to_string_pretty(&value))
         .unwrap_or_else(|_| args.to_string());

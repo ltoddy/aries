@@ -1,5 +1,4 @@
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use ignore::{DirEntry, WalkBuilder, WalkState};
@@ -8,15 +7,14 @@ use crate::glob::GlobError;
 use crate::tools::glob::driver::Collector;
 
 pub fn walk_parallel(
-    base_dir: impl Into<PathBuf>,
+    base_dir: impl AsRef<Path>,
     hidden: bool,
     respect_ignore: bool,
-    set: globset::GlobSet,
-    collector: Arc<Collector>,
+    set: &globset::GlobSet,
+    collector: &Collector,
 ) -> Result<(), GlobError> {
-    let base_dir: PathBuf = base_dir.into();
-
-    let mut builder = WalkBuilder::new(&base_dir);
+    let base_dir = base_dir.as_ref();
+    let mut builder = WalkBuilder::new(base_dir);
     builder
         .hidden(!hidden)
         .git_ignore(respect_ignore)
@@ -24,26 +22,23 @@ pub fn walk_parallel(
         .git_global(respect_ignore)
         .ignore(respect_ignore);
 
-    let base_dir = Arc::new(base_dir);
-    let set = Arc::new(set);
-
     builder.build_parallel().run(|| {
-        let mut worker = GlobWorker::new(base_dir.clone(), set.clone(), collector.clone());
+        let mut worker = GlobWorker::new(base_dir, set, collector);
         Box::new(move |entry| worker.visit(entry))
     });
 
     Ok(())
 }
 
-struct GlobWorker {
-    base_dir: Arc<PathBuf>,
-    set: Arc<globset::GlobSet>,
-    collector: Arc<Collector>,
+struct GlobWorker<'a> {
+    base_dir: &'a Path,
+    set: &'a globset::GlobSet,
+    collector: &'a Collector,
     batch: Vec<(PathBuf, SystemTime)>,
 }
 
-impl GlobWorker {
-    fn new(base_dir: Arc<PathBuf>, set: Arc<globset::GlobSet>, collector: Arc<Collector>) -> Self {
+impl<'a> GlobWorker<'a> {
+    fn new(base_dir: &'a Path, set: &'a globset::GlobSet, collector: &'a Collector) -> Self {
         Self { base_dir, set, collector, batch: Vec::new() }
     }
 
@@ -55,7 +50,7 @@ impl GlobWorker {
             return WalkState::Continue;
         }
 
-        let Ok(relative) = entry.path().strip_prefix(self.base_dir.as_path()) else {
+        let Ok(relative) = entry.path().strip_prefix(self.base_dir) else {
             return WalkState::Continue;
         };
         if !self.set.is_match(relative) {
@@ -80,7 +75,7 @@ impl GlobWorker {
     }
 }
 
-impl Drop for GlobWorker {
+impl Drop for GlobWorker<'_> {
     fn drop(&mut self) {
         self.flush_batch();
     }

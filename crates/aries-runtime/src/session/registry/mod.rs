@@ -43,7 +43,7 @@ pub struct SessionRegistry {
 impl SessionRegistry {
     pub async fn new(gctx: GlobalContext, setting: Setting) -> Result<Self, RegistryError> {
         let root_dir = gctx.root_dir();
-        let db = aries_persistence::connect(&root_dir).await?;
+        let db = aries_persistence::connect(root_dir).await?;
         let session_repo = SessionRepository::new(db.clone());
 
         Ok(Self { gctx, setting, db, active_sessions: Default::default(), session_repo })

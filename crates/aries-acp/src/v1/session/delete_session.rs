@@ -9,7 +9,7 @@ pub async fn delete_session(
     req: DeleteSessionRequest,
     responder: Responder<DeleteSessionResponse>,
     _: ConnectionTo<Client>,
-    registry: SharedRegistry,
+    registry: &SharedRegistry,
 ) -> Result<(), Error> {
     let session_id = req.session_id.to_string();
     info!("Received delete session request for {session_id}");

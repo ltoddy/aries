@@ -42,7 +42,7 @@ pub fn create_model(config: &ModelConfig) -> Model<OpenAiWire> {
     );
     let http_client = reqwest_middleware::ClientBuilder::new(http_client).with(retry).build();
 
-    let model = config.model();
+    let model = config.model().to_owned();
 
     let config = match config {
         ModelConfig::Azure(c) => openai::OpenAIConfig::with_key(&openai::wire::AZURE, &c.api_key)
