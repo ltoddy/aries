@@ -584,7 +584,7 @@ impl SessionView {
             cx,
         );
         let composer = self.composer.render(self, p, cx);
-        div().flex_1().min_w_0().h_full().flex().flex_col().child(timeline).child(composer)
+        div().flex_1().min_w_0().size_full().flex().flex_col().child(timeline).child(composer)
     }
     fn render_layout(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let p = Palette::new(cx.theme().mode);
