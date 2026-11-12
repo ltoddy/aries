@@ -9,6 +9,9 @@ use gpui_kit::prelude::*;
 use gpui_kit::*;
 
 use crate::workspace::SessionView;
+use crate::workspace::git::diff_operations::{
+    DiffRequest, DiscardBackup, DiscardBackupEntry, with_git_write,
+};
 use crate::workspace::git::diff_view::{DiffTargetChanged, GitDiffView};
 use crate::workspace::git::index::{IndexAction, update_index};
 use crate::workspace::git::list::GitChangeList;
@@ -247,6 +250,25 @@ impl GitPanel {
                                         }),
                                 )
                             })
+                            .when(expanded, |actions| {
+                                let view = view.clone();
+                                actions.child(
+                                    Button::new("recover-git-discard")
+                                        .ghost()
+                                        .small()
+                                        .icon(IconName::Undo)
+                                        .disabled(conversation.index_busy)
+                                        .accessibility_label("恢复丢弃的变更")
+                                        .tooltip("恢复丢弃的变更…")
+                                        .on_click(move |_, window, cx| {
+                                            view.update(cx, |this, cx| {
+                                                this.with_git_panel(|panel| {
+                                                    panel.open_discard_backups(window, cx)
+                                                });
+                                            });
+                                        }),
+                                )
+                            })
                             .child(if !expanded {
                                 div()
                                     .size_6()
@@ -437,7 +459,9 @@ impl GitPanel {
             let result = cx
                 .background_executor()
                 .spawn(async move {
-                    let result = update_index(&directory, &path, action);
+                    let result = with_git_write(|| {
+                        update_index(&directory, &path, action).map_err(anyhow::Error::from)
+                    });
                     let info = GitInfo::read(&directory);
                     (result, info, path, directory)
                 })
@@ -473,10 +497,216 @@ impl GitPanel {
                             Notification::error(format!(
                                 "{label} {}：{:#}",
                                 result.2.display(),
-                                anyhow::Error::from(error)
+                                error
                             )),
                             cx,
                         );
+                    }
+                    cx.notify();
+                });
+            });
+        })
+        .detach();
+        cx.notify();
+    }
+
+    fn open_discard_backups(&self, window: &mut Window, cx: &mut Context<SessionView>) {
+        let directory = self.cwd.clone();
+        cx.spawn_in(window, async move |view, cx| {
+            let result = cx
+                .background_executor()
+                .spawn(async move {
+                    let repository = git2::Repository::discover(&directory)?;
+                    let root = std::fs::canonicalize(
+                        repository
+                            .workdir()
+                            .ok_or_else(|| anyhow::anyhow!("repository has no workdir"))?,
+                    )?;
+                    let backups = DiscardBackup::entries()?
+                        .into_iter()
+                        .filter_map(|entry| match entry {
+                            Ok(entry) if entry.root() == root => Some(Ok(entry)),
+                            Ok(_) => None,
+                            Err(error) => Some(Err(error)),
+                        })
+                        .collect::<anyhow::Result<Vec<_>>>()?;
+                    Ok::<_, anyhow::Error>((backups, directory))
+                })
+                .await;
+            let _ = view.update_in(cx, |session, window, cx| {
+                let (backups, directory) = match result {
+                    Ok(result) => result,
+                    Err(error) => {
+                        window.push_notification(
+                            Notification::error(format!("无法读取备份：{error:#}")),
+                            cx,
+                        );
+                        return;
+                    },
+                };
+                if session.git_panel().directory() != directory {
+                    return;
+                }
+                let owner = cx.weak_entity();
+                window.open_dialog(cx, move |dialog, _, _| {
+                    let backups = backups.clone();
+                    let owner = owner.clone();
+                    let directory = directory.clone();
+                    dialog.title("恢复丢弃").content(move |content, _, cx| {
+                        let mut list = div()
+                            .id("discard-backup-list")
+                            .flex()
+                            .flex_col()
+                            .gap_2()
+                            .max_h(rems(24.))
+                            .overflow_y_scroll();
+                        if backups.is_empty() {
+                            list = list.child("没有可恢复的丢弃记录");
+                        }
+                        for backup in backups.iter().rev() {
+                            let backup = backup.clone();
+                            let owner = owner.clone();
+                            let directory = directory.clone();
+                            let label = format!(
+                                "{} · {}",
+                                backup.path().display(),
+                                backup
+                                    .directory()
+                                    .file_name()
+                                    .unwrap_or_default()
+                                    .to_string_lossy()
+                            );
+                            list = list.child(
+                                Button::new(SharedString::from(label.clone()))
+                                    .label(label)
+                                    .on_click(move |_, window, cx| {
+                                        let backup = backup.clone();
+                                        let owner = owner.clone();
+                                        let directory = directory.clone();
+                                        window.close_dialog(cx);
+                                        window.defer(cx, move |window, cx| {
+                                            let _ = owner.update(cx, |session, cx| {
+                                                session.with_git_panel(|panel| {
+                                                    if panel.directory() == directory {
+                                                        panel.restore_diff(backup, window, cx);
+                                                    }
+                                                });
+                                            });
+                                        });
+                                    }),
+                            );
+                        }
+                        content.child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_3()
+                            .child(div().text_sm().text_color(cx.theme().muted_foreground).child(
+                                "选择要恢复的记录。文件已变化时会拒绝覆盖；操作期间请暂停编辑。",
+                            ))
+                            .child(list),
+                    )
+                    })
+                });
+            });
+        })
+        .detach();
+    }
+
+    pub fn change_diff(
+        &mut self,
+        request: DiffRequest,
+        window: &mut Window,
+        cx: &mut Context<SessionView>,
+    ) {
+        if request.directory() != self.cwd {
+            return;
+        }
+        let path = request.path().to_owned();
+        self.run_diff_operation(path, move || request.execute(), window, cx);
+    }
+
+    pub fn restore_diff(
+        &mut self,
+        backup: DiscardBackupEntry,
+        window: &mut Window,
+        cx: &mut Context<SessionView>,
+    ) {
+        let directory = self.cwd.clone();
+        let path = backup.path().to_owned();
+        self.run_diff_operation(
+            path,
+            move || {
+                with_git_write(|| {
+                    let repository = git2::Repository::discover(&directory)?;
+                    let root = std::fs::canonicalize(
+                        repository
+                            .workdir()
+                            .ok_or_else(|| anyhow::anyhow!("repository has no workdir"))?,
+                    )?;
+                    anyhow::ensure!(root == backup.root(), "backup belongs to another repository");
+                    backup.load()?.restore()?;
+                    Ok(None)
+                })
+            },
+            window,
+            cx,
+        );
+    }
+
+    fn run_diff_operation(
+        &mut self,
+        path: PathBuf,
+        operation: impl FnOnce() -> anyhow::Result<Option<DiscardBackup>> + Send + 'static,
+        window: &mut Window,
+        cx: &mut Context<SessionView>,
+    ) {
+        if self.index_busy {
+            return;
+        }
+        self.index_busy = true;
+        self.revision += 1;
+        let revision = self.revision;
+        let directory = self.cwd.clone();
+        self.diff.update(cx, |_, cx| cx.notify());
+        cx.spawn_in(window, async move |view, cx| {
+            let (result, info, directory) = cx
+                .background_executor()
+                .spawn(async move {
+                    let result = operation();
+                    let info = GitInfo::read(&directory);
+                    (result, info, directory)
+                })
+                .await;
+            let _ = view.update_in(cx, |session, window, cx| {
+                session.with_git_panel(|panel| {
+                    panel.index_busy = false;
+                    let current = accept_result(&panel.cwd, panel.revision, &directory, revision);
+                    if current {
+                        panel.sync_info(info, result.is_ok(), cx);
+                    }
+                    panel.diff.update(cx, |diff, cx| {
+                        diff.load_backups(cx);
+                        diff.refresh(cx);
+                        cx.notify();
+                    });
+                    panel.revision += 1;
+                    if panel.refresh_pending || !current {
+                        panel.refresh_info(cx);
+                    }
+                    match result {
+                        Ok(Some(_)) => window.push_notification(
+                            Notification::success(format!(
+                                "已丢弃 {} 的所选变更，可从「恢复丢弃」恢复",
+                                path.display()
+                            )),
+                            cx,
+                        ),
+                        Ok(None) => {},
+                        Err(error) => window.push_notification(
+                            Notification::error(format!("无法处理 {}：{error:#}", path.display())),
+                            cx,
+                        ),
                     }
                     cx.notify();
                 });
