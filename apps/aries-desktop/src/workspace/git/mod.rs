@@ -1,3 +1,5 @@
+mod diff_operations;
+mod diff_patch;
 mod diff_view;
 pub mod index;
 mod list;

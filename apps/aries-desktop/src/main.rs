@@ -34,6 +34,14 @@ fn main() -> anyhow::Result<()> {
     gpui_kit::application().with_assets(AllAssets).run(move |cx| {
         gpui_kit::init(cx);
         crate::terminal::init(cx);
+        cx.bind_keys([
+            KeyBinding::new(
+                if cfg!(target_os = "macos") { "cmd-f" } else { "ctrl-f" },
+                gpui_kit::component::input::Search,
+                Some("GitDiff"),
+            ),
+            KeyBinding::new("escape", gpui_kit::component::input::Escape, Some("GitDiff")),
+        ]);
         cx.bind_keys([KeyBinding::new("cmd-q", Quit, None), KeyBinding::new("ctrl-q", Quit, None)]);
         #[cfg(target_os = "macos")]
         cx.bind_keys([
