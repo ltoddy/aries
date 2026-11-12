@@ -184,6 +184,13 @@ impl Execution {
     pub fn directory(&self) -> &Path {
         &self.cwd
     }
+    pub fn tab_directory(&self) -> &Path {
+        self.loading_session
+            .as_ref()
+            .map(|session| session.directory())
+            .or_else(|| self.queued_session_load.as_ref().map(|session| session.cwd.as_path()))
+            .unwrap_or(&self.cwd)
+    }
     pub fn session_id(&self) -> Option<&SessionId> {
         self.session_id.as_ref()
     }

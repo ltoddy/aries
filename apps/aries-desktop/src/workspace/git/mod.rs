@@ -1,3 +1,4 @@
+mod diff_view;
 pub mod index;
 mod list;
 pub mod motion;

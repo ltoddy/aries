@@ -347,7 +347,12 @@ impl SessionView {
         self.execution.active_session_id()
     }
     pub fn tab_title(&self) -> String {
-        crate::workspace::conversation::single_line(self.execution.conversation().title())
+        let directory = self.execution.tab_directory();
+        let project = directory.file_name().unwrap_or(directory.as_os_str()).to_string_lossy();
+        crate::workspace::conversation::single_line(format!(
+            "{project} · {}",
+            self.execution.conversation().title()
+        ))
     }
     pub fn directory(&self) -> &Path {
         self.execution.directory()

@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use agent_client_protocol::v1::schema::{
     SessionId, SessionInfo, SessionNotification, SessionUpdate,
 };
@@ -20,6 +22,10 @@ impl SessionLoad {
 
     pub fn session_id(&self) -> &SessionId {
         &self.session.session_id
+    }
+
+    pub fn directory(&self) -> &Path {
+        &self.session.cwd
     }
 
     pub fn receive(&mut self, notification: SessionNotification) {
