@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use agent_client_protocol::Error;
@@ -10,19 +10,60 @@ use agent_client_protocol::v1::schema::{
     CreateTerminalRequest, SessionId, TerminalExitStatus, TerminalId, TerminalOutputResponse,
 };
 use tokio::io::AsyncReadExt;
-use tokio::process::{Child, Command};
+use tokio::process::{Child, ChildStderr, ChildStdout, Command};
 use tokio::sync::{mpsc, watch};
 
 #[derive(Debug, thiserror::Error)]
 pub enum TerminalError {
     #[error("终端工作目录必须为绝对路径")]
     InvalidCwd,
-    #[error("{0}")]
-    Spawn(#[source] io::Error),
+    #[error("{source}")]
+    Spawn { source: io::Error },
     #[error("终端不存在或已释放")]
     NotFound,
     #[error("终端连接已关闭")]
-    Closed(#[from] watch::error::RecvError),
+    Closed {
+        #[from]
+        source: watch::error::RecvError,
+    },
+    #[error("终端状态锁已损坏")]
+    Poisoned { source: PoisonError<()> },
+    #[error("终端标准输出管道不可用")]
+    MissingStdout,
+    #[error("终端标准错误管道不可用")]
+    MissingStderr,
+    #[error("{source}")]
+    Wait { source: io::Error },
+}
+
+impl TerminalError {
+    fn invalid_cwd() -> Self {
+        Self::InvalidCwd
+    }
+
+    fn spawn(source: io::Error) -> Self {
+        Self::Spawn { source }
+    }
+
+    fn not_found() -> Self {
+        Self::NotFound
+    }
+
+    fn poisoned<T>(_: PoisonError<T>) -> Self {
+        Self::Poisoned { source: PoisonError::new(()) }
+    }
+
+    fn missing_stdout() -> Self {
+        Self::MissingStdout
+    }
+
+    fn missing_stderr() -> Self {
+        Self::MissingStderr
+    }
+
+    fn wait(source: io::Error) -> Self {
+        Self::Wait { source }
+    }
 }
 
 impl From<TerminalError> for Error {
@@ -31,9 +72,12 @@ impl From<TerminalError> for Error {
             TerminalError::InvalidCwd | TerminalError::NotFound => {
                 Self::invalid_params().data(error.to_string())
             },
-            TerminalError::Spawn(_) | TerminalError::Closed(_) => {
-                Self::internal_error().data(error.to_string())
-            },
+            TerminalError::Spawn { .. }
+            | TerminalError::Closed { .. }
+            | TerminalError::Poisoned { .. }
+            | TerminalError::MissingStdout
+            | TerminalError::MissingStderr
+            | TerminalError::Wait { .. } => Self::internal_error().data(error.to_string()),
         }
     }
 }
@@ -42,6 +86,15 @@ impl From<TerminalError> for Error {
 struct Terminal {
     output: watch::Receiver<TerminalOutputResponse>,
     kill: mpsc::UnboundedSender<()>,
+}
+
+impl Terminal {
+    fn new(
+        output: watch::Receiver<TerminalOutputResponse>,
+        kill: mpsc::UnboundedSender<()>,
+    ) -> Self {
+        Self { output, kill }
+    }
 }
 
 #[derive(Debug)]
@@ -62,7 +115,7 @@ impl Terminals {
 
     pub fn create(&self, request: CreateTerminalRequest) -> Result<TerminalId, TerminalError> {
         if request.cwd.as_ref().is_some_and(|path| !path.is_absolute()) {
-            return Err(TerminalError::InvalidCwd);
+            return Err(TerminalError::invalid_cwd());
         }
         let mut command = Command::new(&request.command);
         command
@@ -77,8 +130,10 @@ impl Terminals {
         }
         #[cfg(unix)]
         command.process_group(0);
-        let child = command.spawn().map_err(TerminalError::Spawn)?;
-        let process = Process { group: child.id(), child };
+        let child = command.spawn().map_err(TerminalError::spawn)?;
+        let mut process = Process::new(child);
+        let stdout = process.child.stdout.take().ok_or_else(TerminalError::missing_stdout)?;
+        let stderr = process.child.stderr.take().ok_or_else(TerminalError::missing_stderr)?;
         let id = TerminalId::new(format!(
             "orbit-terminal-{}-{}",
             self.prefix,
@@ -88,13 +143,13 @@ impl Terminals {
         let (kill, kills) = mpsc::unbounded_channel();
         self.entries
             .lock()
-            .expect("terminal entries lock poisoned")
+            .map_err(TerminalError::poisoned)?
             .entry(request.session_id)
             .or_default()
-            .insert(id.clone(), Terminal { output: receiver, kill });
+            .insert(id.clone(), Terminal::new(receiver, kill));
         let limit =
             usize::try_from(request.output_byte_limit.unwrap_or(1024 * 1024)).unwrap_or(usize::MAX);
-        tokio::spawn(run(process, output, kills, limit));
+        tokio::spawn(run(process, stdout, stderr, output, kills, limit));
         Ok(id)
     }
 
@@ -103,12 +158,12 @@ impl Terminals {
         session: &SessionId,
         id: &TerminalId,
     ) -> Result<TerminalOutputResponse, TerminalError> {
-        let entries = self.entries.lock().expect("terminal entries lock poisoned");
+        let entries = self.entries.lock().map_err(TerminalError::poisoned)?;
         entries
             .get(session)
             .and_then(|terminals| terminals.get(id))
             .map(|terminal| terminal.output.borrow().clone())
-            .ok_or(TerminalError::NotFound)
+            .ok_or_else(TerminalError::not_found)
     }
 
     fn receiver(
@@ -118,11 +173,11 @@ impl Terminals {
     ) -> Result<watch::Receiver<TerminalOutputResponse>, TerminalError> {
         self.entries
             .lock()
-            .expect("terminal entries lock poisoned")
+            .map_err(TerminalError::poisoned)?
             .get(session)
             .and_then(|terminals| terminals.get(id))
             .map(|terminal| terminal.output.clone())
-            .ok_or(TerminalError::NotFound)
+            .ok_or_else(TerminalError::not_found)
     }
 
     pub async fn wait(
@@ -141,11 +196,11 @@ impl Terminals {
 
     pub async fn kill(&self, session: &SessionId, id: &TerminalId) -> Result<(), TerminalError> {
         {
-            let entries = self.entries.lock().expect("terminal entries lock poisoned");
+            let entries = self.entries.lock().map_err(TerminalError::poisoned)?;
             let terminal = entries
                 .get(session)
                 .and_then(|terminals| terminals.get(id))
-                .ok_or(TerminalError::NotFound)?;
+                .ok_or_else(TerminalError::not_found)?;
             let _ = terminal.kill.send(());
         }
         self.wait(session, id).await?;
@@ -154,7 +209,7 @@ impl Terminals {
 
     pub async fn release(&self, session: &SessionId, id: &TerminalId) -> Result<(), TerminalError> {
         self.kill(session, id).await?;
-        let mut entries = self.entries.lock().expect("terminal entries lock poisoned");
+        let mut entries = self.entries.lock().map_err(TerminalError::poisoned)?;
         if let Some(terminals) = entries.get_mut(session) {
             terminals.remove(id);
             if terminals.is_empty() {
@@ -171,6 +226,10 @@ struct Process {
 }
 
 impl Process {
+    fn new(child: Child) -> Self {
+        Self { group: child.id(), child }
+    }
+
     fn kill(&mut self) {
         #[cfg(unix)]
         if let Some(group) = self.group {
@@ -237,12 +296,12 @@ fn append(
 
 async fn run(
     mut process: Process,
+    mut stdout: ChildStdout,
+    mut stderr: ChildStderr,
     output: watch::Sender<TerminalOutputResponse>,
     mut kills: mpsc::UnboundedReceiver<()>,
     limit: usize,
 ) {
-    let mut stdout = process.child.stdout.take().expect("stdout is piped");
-    let mut stderr = process.child.stderr.take().expect("stderr is piped");
     let (mut out_bytes, mut err_bytes) = ([0; 4096], [0; 4096]);
     let (mut out_pending, mut err_pending) = (Vec::new(), Vec::new());
     let (mut out_open, mut err_open, mut killed) = (true, true, false);
@@ -268,6 +327,7 @@ async fn run(
                         status
                     }
                     Err(error) => {
+                        let error = TerminalError::wait(error);
                         append(&output, &mut out_pending, error.to_string().as_bytes(), true, limit);
                         TerminalExitStatus::new().signal("wait_failed")
                     }

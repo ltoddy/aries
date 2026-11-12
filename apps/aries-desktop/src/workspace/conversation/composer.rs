@@ -2,7 +2,6 @@ use std::future::Future;
 use std::path::PathBuf;
 
 use agent_client_protocol::v1::schema::{AvailableCommand, ContentBlock, PromptCapabilities};
-use anyhow::Context as _;
 use gpui_kit::assets::IconName;
 use gpui_kit::base::motion::{Presence, Transition};
 use gpui_kit::component::button::{Button, ButtonVariants};
@@ -15,10 +14,12 @@ use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme, Disableable, Icon, Sizable, WindowExt};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
+use thiserror::Error;
 
+use crate::error::report;
 use crate::workspace::SessionView;
 use crate::workspace::conversation::draft::{
-    Draft, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, PromptAttachment,
+    AttachmentError, Draft, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, PromptAttachment,
 };
 use crate::workspace::conversation::slash_commands::{CommandMenu, CommandMenuAction, SlashMenu};
 use crate::workspace::settings::SendKey;
@@ -532,8 +533,8 @@ impl SessionView {
             async move {
                 let paths = selection
                     .await
-                    .context("等待文件选择失败")?
-                    .context("打开文件选择窗口失败")?
+                    .map_err(|source| LoadAttachmentsError::selection_wait(source.into()))?
+                    .map_err(|source| LoadAttachmentsError::selection_open(source.into()))?
                     .unwrap_or_default();
                 Ok(paths.into_iter().map(AttachmentSource::from_path).collect())
             },
@@ -617,14 +618,18 @@ impl SessionView {
                 )
                 || image.bytes().is_empty()
             {
-                let message = if !capabilities.image {
-                    "当前 Agent 不支持图片附件"
+                let name = format!("粘贴图片.{}", image.format().extension());
+                let error = if !capabilities.image {
+                    AttachmentError::image_unsupported(name)
                 } else if image.bytes().is_empty() {
-                    "不能添加空文件"
+                    AttachmentError::empty(name)
                 } else {
-                    "仅支持 PNG、JPEG、WebP 和 GIF 图片"
+                    AttachmentError::image_format_unsupported(
+                        name,
+                        image.format().mime_type().to_owned(),
+                    )
                 };
-                images.push(AttachmentSource::from_error(anyhow::anyhow!(message)));
+                images.push(AttachmentSource::from_error(LoadAttachmentError::image(error)));
                 continue;
             }
             if image.bytes().len() > MAX_ATTACHMENT_BYTES.saturating_sub(bytes) {
@@ -647,7 +652,7 @@ impl SessionView {
 
     fn load_attachments(
         &mut self,
-        sources: impl Future<Output = anyhow::Result<Vec<AttachmentSource>>> + 'static,
+        sources: impl Future<Output = Result<Vec<AttachmentSource>, LoadAttachmentsError>> + 'static,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -690,7 +695,7 @@ impl SessionView {
 
     fn finish_attachments(
         &mut self,
-        result: anyhow::Result<AttachmentBatch>,
+        result: Result<AttachmentBatch, LoadAttachmentsError>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -713,23 +718,57 @@ impl SessionView {
                     for result in batch.attachments {
                         match result {
                             Ok(attachment) => composer.attachments.push(attachment),
-                            Err(error) => window
-                                .push_notification(Notification::error(format!("{error:#}")), cx),
+                            Err(error) => report("无法添加附件", &error, window, cx),
                         }
                     }
                 },
-                Err(error) => window
-                    .push_notification(Notification::error(format!("无法添加附件：{error:#}")), cx),
+                Err(error) => report("无法添加附件", &error, window, cx),
             }
         });
         cx.notify();
     }
 }
 
+#[derive(Debug, Error)]
+enum LoadAttachmentsError {
+    #[error("等待文件选择失败")]
+    SelectionWait { source: Box<dyn std::error::Error + Send + Sync> },
+    #[error("打开文件选择窗口失败")]
+    SelectionOpen { source: Box<dyn std::error::Error + Send + Sync> },
+}
+
+impl LoadAttachmentsError {
+    fn selection_wait(source: Box<dyn std::error::Error + Send + Sync>) -> Self {
+        Self::SelectionWait { source }
+    }
+
+    fn selection_open(source: Box<dyn std::error::Error + Send + Sync>) -> Self {
+        Self::SelectionOpen { source }
+    }
+}
+
+#[derive(Debug, Error)]
+enum LoadAttachmentError {
+    #[error("无法添加 {}", path.display())]
+    Path { path: PathBuf, source: AttachmentError },
+    #[error("无法添加粘贴图片")]
+    Image { source: AttachmentError },
+}
+
+impl LoadAttachmentError {
+    fn path(path: PathBuf, source: AttachmentError) -> Self {
+        Self::Path { path, source }
+    }
+
+    fn image(source: AttachmentError) -> Self {
+        Self::Image { source }
+    }
+}
+
 enum AttachmentSource {
     Path(PathBuf),
     Image(Image),
-    Error(anyhow::Error),
+    Error(LoadAttachmentError),
 }
 
 impl AttachmentSource {
@@ -741,18 +780,22 @@ impl AttachmentSource {
         Self::Image(image)
     }
 
-    fn from_error(error: anyhow::Error) -> Self {
+    fn from_error(error: LoadAttachmentError) -> Self {
         Self::Error(error)
     }
 
-    fn load(self, capabilities: &PromptCapabilities) -> anyhow::Result<PromptAttachment> {
+    fn load(
+        self,
+        capabilities: &PromptCapabilities,
+    ) -> Result<PromptAttachment, LoadAttachmentError> {
         match self {
             Self::Error(error) => Err(error),
             Self::Path(path) => PromptAttachment::from_path(&path, capabilities)
-                .with_context(|| format!("无法添加 {}", path.display())),
+                .map_err(|source| LoadAttachmentError::path(path, source)),
             Self::Image(image) => {
                 let name = format!("粘贴图片.{}", image.format().extension());
                 PromptAttachment::from_image(name, image, None, capabilities)
+                    .map_err(LoadAttachmentError::image)
             },
         }
     }
@@ -767,7 +810,7 @@ fn attachment_size_warning() -> String {
 }
 
 struct AttachmentBatch {
-    attachments: Vec<anyhow::Result<PromptAttachment>>,
+    attachments: Vec<Result<PromptAttachment, LoadAttachmentError>>,
     count_exceeded: bool,
     size_exceeded: bool,
 }

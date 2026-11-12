@@ -8,11 +8,13 @@ use gpui_kit::component::{ActiveTheme, Disableable, Icon, Sizable, WindowExt};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
+use crate::error::{details, log, report};
 use crate::workspace::SessionView;
 use crate::workspace::git::diff_operations::{
-    DiffRequest, DiscardBackup, DiscardBackupEntry, with_git_write,
+    DiffRequest, DiscardBackup, DiscardBackupEntry, GitOperationError, with_git_write,
 };
 use crate::workspace::git::diff_view::{DiffTargetChanged, GitDiffView};
+use crate::workspace::git::error::RepositoryError;
 use crate::workspace::git::index::{IndexAction, update_index};
 use crate::workspace::git::list::GitChangeList;
 use crate::workspace::git::motion::{GitMotion, accept_result};
@@ -376,7 +378,7 @@ impl GitPanel {
 
     pub fn sync_info(
         &mut self,
-        result: anyhow::Result<Option<GitInfo>>,
+        result: Result<Option<GitInfo>, RepositoryError>,
         animate: bool,
         cx: &mut Context<SessionView>,
     ) {
@@ -390,7 +392,7 @@ impl GitPanel {
                 (None, Some("项目不再是可读取的 Git 仓库".into()))
             },
             Ok(info) => (info, None),
-            Err(error) => (None, Some(format!("{error:#}"))),
+            Err(error) => (None, Some(details(&error))),
         };
         let changed = self.info != info || self.read_error != error;
         let tokens = cx.theme().motion_tokens();
@@ -456,55 +458,63 @@ impl GitPanel {
         let directory = self.cwd.clone();
         let action_focus = window.focused(cx);
         cx.spawn_in(window, async move |view, cx| {
-            let result = cx
+            let (result, info, path, directory) = cx
                 .background_executor()
                 .spawn(async move {
                     let result = with_git_write(|| {
-                        update_index(&directory, &path, action).map_err(anyhow::Error::from)
+                        update_index(&directory, &path, action)
+                            .map_err(GitOperationError::updating_git_index)
                     });
                     let info = GitInfo::read(&directory);
                     (result, info, path, directory)
                 })
                 .await;
-            let _ = view.update_in(cx, |this, window, cx| {
-                this.with_git_panel(|panel| {
-                    panel.index_busy = false;
-                    panel.pending_index = None;
-                    panel.diff.update(cx, |_, cx| cx.notify());
-                    let current = accept_result(&panel.cwd, panel.revision, &result.3, revision);
-                    if current {
-                        panel.sync_info(result.1, result.0.is_ok(), cx);
-                        if !panel.info_collapsed
-                            && window.focused(cx) == action_focus
+            let focus_panel = view
+                .update(cx, |this, cx| {
+                    this.with_git_panel(|panel| {
+                        panel.index_busy = false;
+                        panel.pending_index = None;
+                        panel.diff.update(cx, |_, cx| cx.notify());
+                        let current =
+                            accept_result(&panel.cwd, panel.revision, &directory, revision);
+                        if current {
+                            panel.sync_info(info, result.is_ok(), cx);
+                        }
+                        let focus_panel = current
+                            && !panel.info_collapsed
                             && !panel
                                 .motion
                                 .rows(group)
-                                .any(|row| row.file().path() == result.2 && !row.is_exiting())
-                        {
-                            panel.panel_focus.focus(window, cx);
+                                .any(|row| row.file().path() == path && !row.is_exiting());
+                        panel.revision += 1;
+                        if panel.refresh_pending || !current {
+                            panel.refresh_info(cx);
                         }
+                        cx.notify();
+                        focus_panel
+                    })
+                })
+                .unwrap_or(false);
+            let label = match action {
+                IndexAction::Stage => "无法暂存",
+                IndexAction::Unstage => "无法取消暂存",
+            };
+            let title = format!("{label} {}", path.display());
+            let delivered = view.update_in(cx, |this, window, cx| {
+                this.with_git_panel(|panel| {
+                    if focus_panel && window.focused(cx) == action_focus {
+                        panel.panel_focus.focus(window, cx);
                     }
-                    panel.revision += 1;
-                    if panel.refresh_pending || !current {
-                        panel.refresh_info(cx);
-                    }
-                    if let Err(error) = result.0 {
-                        let label = match action {
-                            IndexAction::Stage => "无法暂存",
-                            IndexAction::Unstage => "无法取消暂存",
-                        };
-                        window.push_notification(
-                            Notification::error(format!(
-                                "{label} {}：{:#}",
-                                result.2.display(),
-                                error
-                            )),
-                            cx,
-                        );
-                    }
-                    cx.notify();
                 });
+                if let Err(error) = &result {
+                    report(title.clone(), error, window, cx);
+                }
             });
+            if delivered.is_err()
+                && let Err(error) = &result
+            {
+                log(&title, error);
+            }
         })
         .detach();
         cx.notify();
@@ -516,40 +526,54 @@ impl GitPanel {
             let result = cx
                 .background_executor()
                 .spawn(async move {
-                    let repository = git2::Repository::discover(&directory)?;
+                    let repository = git2::Repository::discover(&directory).map_err(|source| {
+                        RepositoryError::git("discovering backup repository", &directory, source)
+                    })?;
                     let root = std::fs::canonicalize(
-                        repository
-                            .workdir()
-                            .ok_or_else(|| anyhow::anyhow!("repository has no workdir"))?,
-                    )?;
-                    let backups = DiscardBackup::entries()?
-                        .into_iter()
-                        .filter_map(|entry| match entry {
-                            Ok(entry) if entry.root() == root => Some(Ok(entry)),
-                            Ok(_) => None,
-                            Err(error) => Some(Err(error)),
-                        })
-                        .collect::<anyhow::Result<Vec<_>>>()?;
-                    Ok::<_, anyhow::Error>((backups, directory))
+                        repository.workdir().ok_or_else(GitOperationError::no_workdir)?,
+                    )
+                    .map_err(GitOperationError::resolving_repository_workdir)?;
+                    let mut backups = Vec::new();
+                    let mut errors = Vec::new();
+                    for entry in DiscardBackup::entries()? {
+                        match entry {
+                            Ok(entry) if entry.root() == root => backups.push(entry),
+                            Ok(_) => {},
+                            Err(error) => {
+                                log("无法读取备份记录", &error);
+                                errors.push(details(&error));
+                            },
+                        }
+                    }
+                    let error = (!errors.is_empty())
+                        .then(|| GitOperationError::backup_entries(errors.len(), errors.join("\n")));
+                    Ok::<_, GitOperationError>((backups, error, directory))
                 })
                 .await;
+            let (backups, error, directory) = match result {
+                Ok(result) => result,
+                Err(error) => {
+                    if view
+                        .update_in(cx, |_, window, cx| report("无法读取备份", &error, window, cx))
+                        .is_err()
+                    {
+                        log("无法读取备份", &error);
+                    }
+                    return;
+                },
+            };
             let _ = view.update_in(cx, |session, window, cx| {
-                let (backups, directory) = match result {
-                    Ok(result) => result,
-                    Err(error) => {
-                        window.push_notification(
-                            Notification::error(format!("无法读取备份：{error:#}")),
-                            cx,
-                        );
-                        return;
-                    },
-                };
                 if session.git_panel().directory() != directory {
                     return;
                 }
+                if let Some(error) = &error {
+                    report("部分备份无法读取", error, window, cx);
+                }
+                let error = error.as_ref().map(|error| details(error));
                 let owner = cx.weak_entity();
                 window.open_dialog(cx, move |dialog, _, _| {
                     let backups = backups.clone();
+                    let error = error.clone();
                     let owner = owner.clone();
                     let directory = directory.clone();
                     dialog.title("恢复丢弃").content(move |content, _, cx| {
@@ -560,8 +584,21 @@ impl GitPanel {
                             .gap_2()
                             .max_h(rems(24.))
                             .overflow_y_scroll();
+                        if let Some(error) = &error {
+                            list = list.child(
+                                div()
+                                    .text_sm()
+                                    .text_color(cx.theme().warning)
+                                    .whitespace_normal()
+                                    .child(error.clone()),
+                            );
+                        }
                         if backups.is_empty() {
-                            list = list.child("没有可恢复的丢弃记录");
+                            list = list.child(if error.is_some() {
+                                "当前仓库没有可读取的恢复记录；部分备份无法读取，不能确认没有丢弃记录。"
+                            } else {
+                                "没有可恢复的丢弃记录"
+                            });
                         }
                         for backup in backups.iter().rev() {
                             let backup = backup.clone();
@@ -638,13 +675,16 @@ impl GitPanel {
             path,
             move || {
                 with_git_write(|| {
-                    let repository = git2::Repository::discover(&directory)?;
+                    let repository = git2::Repository::discover(&directory).map_err(|source| {
+                        RepositoryError::git("discovering backup repository", &directory, source)
+                    })?;
                     let root = std::fs::canonicalize(
-                        repository
-                            .workdir()
-                            .ok_or_else(|| anyhow::anyhow!("repository has no workdir"))?,
-                    )?;
-                    anyhow::ensure!(root == backup.root(), "backup belongs to another repository");
+                        repository.workdir().ok_or_else(GitOperationError::no_workdir)?,
+                    )
+                    .map_err(GitOperationError::resolving_repository_workdir)?;
+                    if root != backup.root() {
+                        return Err(GitOperationError::backup_repository_mismatch());
+                    }
                     backup.load()?.restore()?;
                     Ok(None)
                 })
@@ -657,7 +697,7 @@ impl GitPanel {
     fn run_diff_operation(
         &mut self,
         path: PathBuf,
-        operation: impl FnOnce() -> anyhow::Result<Option<DiscardBackup>> + Send + 'static,
+        operation: impl FnOnce() -> Result<Option<DiscardBackup>, GitOperationError> + Send + 'static,
         window: &mut Window,
         cx: &mut Context<SessionView>,
     ) {
@@ -678,7 +718,7 @@ impl GitPanel {
                     (result, info, directory)
                 })
                 .await;
-            let _ = view.update_in(cx, |session, window, cx| {
+            let _ = view.update(cx, |session, cx| {
                 session.with_git_panel(|panel| {
                     panel.index_busy = false;
                     let current = accept_result(&panel.cwd, panel.revision, &directory, revision);
@@ -686,7 +726,6 @@ impl GitPanel {
                         panel.sync_info(info, result.is_ok(), cx);
                     }
                     panel.diff.update(cx, |diff, cx| {
-                        diff.load_backups(cx);
                         diff.refresh(cx);
                         cx.notify();
                     });
@@ -694,23 +733,29 @@ impl GitPanel {
                     if panel.refresh_pending || !current {
                         panel.refresh_info(cx);
                     }
-                    match result {
-                        Ok(Some(_)) => window.push_notification(
-                            Notification::success(format!(
-                                "已丢弃 {} 的所选变更，可从「恢复丢弃」恢复",
-                                path.display()
-                            )),
-                            cx,
-                        ),
-                        Ok(None) => {},
-                        Err(error) => window.push_notification(
-                            Notification::error(format!("无法处理 {}：{error:#}", path.display())),
-                            cx,
-                        ),
-                    }
                     cx.notify();
                 });
             });
+            let title = format!("无法处理 {}", path.display());
+            let delivered = view.update_in(cx, |session, window, cx| {
+                session.git_panel().diff.update(cx, |diff, cx| diff.load_backups(window, cx));
+                match &result {
+                    Ok(Some(_)) => window.push_notification(
+                        Notification::success(format!(
+                            "已丢弃 {} 的所选变更，可从「恢复丢弃」恢复",
+                            path.display()
+                        )),
+                        cx,
+                    ),
+                    Ok(None) => {},
+                    Err(error) => report(title.clone(), error, window, cx),
+                }
+            });
+            if delivered.is_err()
+                && let Err(error) = &result
+            {
+                log(&title, error);
+            }
         })
         .detach();
         cx.notify();
@@ -740,7 +785,8 @@ impl GitPanel {
                 Err(error) => {
                     let _ = view.update(cx, |this, cx| {
                         this.with_git_panel(|panel| {
-                            panel.watch_error = Some(format!("{error:#}"));
+                            log("Git 自动刷新不可用", &error);
+                            panel.watch_error = Some(details(&error));
                             panel.refresh_info(cx);
                         });
                     });
@@ -756,13 +802,19 @@ impl GitPanel {
             while receiver.recv().await.is_ok() {
                 cx.background_executor().timer(Duration::from_millis(300)).await;
                 while receiver.try_recv().is_ok() {}
-                let error = watcher.take_error();
+                let (error, poisoned) = match watcher.take_error() {
+                    Ok(error) => (error, false),
+                    Err(error) => (Some(error), true),
+                };
                 if view
                     .update(cx, |this, cx| {
                         this.with_git_panel(|panel| {
                             if let Some(error) = error {
-                                panel.watch_error =
-                                    Some(format!("{:#}", anyhow::Error::from(error)));
+                                let message = details(&error);
+                                if panel.watch_error.as_ref() != Some(&message) {
+                                    log("Git 自动刷新不可用", &error);
+                                    panel.watch_error = Some(message);
+                                }
                             }
                             panel.refresh_info(cx);
                         });
@@ -770,6 +822,9 @@ impl GitPanel {
                     .is_err()
                 {
                     return;
+                }
+                if poisoned {
+                    break;
                 }
             }
             drop(watcher);

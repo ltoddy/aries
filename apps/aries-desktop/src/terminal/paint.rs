@@ -81,25 +81,47 @@ pub fn cell_width(window: &Window, font_size: Pixels) -> Pixels {
         .max(px(1.))
 }
 
+#[derive(PartialEq)]
+struct RunStyle {
+    font: Font,
+    foreground: Hsla,
+    background: Hsla,
+    flags: Flags,
+}
+
+impl RunStyle {
+    fn new(font: Font, foreground: Hsla, background: Hsla, flags: Flags) -> Self {
+        Self { font, foreground, background, flags }
+    }
+}
+
 struct Run {
     row: i32,
     end_column: usize,
     bounds: Bounds<Pixels>,
     text: String,
-    font: Font,
-    foreground: Hsla,
-    background: Hsla,
-    flags: Flags,
+    style: RunStyle,
     force_width: Option<Pixels>,
 }
 
 impl Run {
+    fn new(
+        row: i32,
+        end_column: usize,
+        bounds: Bounds<Pixels>,
+        text: String,
+        style: RunStyle,
+        force_width: Option<Pixels>,
+    ) -> Self {
+        Self { row, end_column, bounds, text, style, force_width }
+    }
+
     fn paint(self, font_size: Pixels, window: &mut Window, cx: &mut Context<TerminalView>) {
         if !self.text.is_empty() {
             let run = TextRun {
                 len: self.text.len(),
-                font: self.font,
-                color: self.foreground,
+                font: self.style.font,
+                color: self.style.foreground,
                 ..TextRun::default()
             };
             let line = window.text_system().shape_line(
@@ -117,22 +139,22 @@ impl Run {
                 cx,
             );
         }
-        if self.flags.intersects(Flags::ALL_UNDERLINES) {
+        if self.style.flags.intersects(Flags::ALL_UNDERLINES) {
             window.paint_quad(fill(
                 Bounds::new(
                     self.bounds.origin + point(px(0.), self.bounds.size.height - px(2.)),
                     size(self.bounds.size.width, px(1.)),
                 ),
-                self.foreground,
+                self.style.foreground,
             ));
         }
-        if self.flags.contains(Flags::STRIKEOUT) {
+        if self.style.flags.contains(Flags::STRIKEOUT) {
             window.paint_quad(fill(
                 Bounds::new(
                     self.bounds.origin + point(px(0.), self.bounds.size.height * 0.55),
                     size(self.bounds.size.width, px(1.)),
                 ),
-                self.foreground,
+                self.style.foreground,
             ));
         }
     }
@@ -148,7 +170,9 @@ pub fn paint(
         return;
     };
     let (cells, cursor, display_offset, colors, selection) = {
-        let terminal = session.terminal();
+        let Ok(terminal) = session.terminal() else {
+            return;
+        };
         let content = terminal.renderable_content();
         let cells: Vec<_> =
             content.display_iter.map(|cell| (cell.point, cell.cell.clone())).collect();
@@ -303,16 +327,14 @@ pub fn paint(
             if cell.flags.contains(Flags::ITALIC) {
                 font = font.italic();
             }
+            let style = RunStyle::new(font, fg, bg, cell.flags);
             let merge = !cursor_here
                 && !cell.flags.contains(Flags::HIDDEN)
                 && ascii
                 && pending.as_ref().is_some_and(|run| {
                     run.row == row
                         && run.end_column == position.column.0
-                        && run.font == font
-                        && run.foreground == fg
-                        && run.background == bg
-                        && run.flags == cell.flags
+                        && run.style == style
                         && run.force_width.is_some()
                 });
             if merge {
@@ -333,17 +355,14 @@ pub fn paint(
                             text.extend(extra);
                         }
                     }
-                    let run = Run {
+                    let run = Run::new(
                         row,
-                        end_column: position.column.0 + 1,
-                        bounds: cell_bounds,
+                        position.column.0 + 1,
+                        cell_bounds,
                         text,
-                        font,
-                        foreground: fg,
-                        background: bg,
-                        flags: cell.flags,
-                        force_width: ascii.then_some(cell_size.width),
-                    };
+                        style,
+                        ascii.then_some(cell_size.width),
+                    );
                     if ascii && !cursor_here {
                         pending = Some(run);
                     } else {

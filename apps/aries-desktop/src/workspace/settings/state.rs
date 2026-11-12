@@ -10,7 +10,9 @@ use gpui_kit::component::{ActiveTheme, Disableable, Selectable, Sizable, Theme, 
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
+use crate::error::{details, log, report};
 use crate::workspace::WorkspaceView;
+use crate::workspace::settings::preferences::SavePreferencesError;
 use crate::workspace::settings::ui::render_shortcuts;
 use crate::workspace::settings::{Appearance, Preferences, SendKey, palette};
 
@@ -67,6 +69,7 @@ impl SearchableListItem for FontOption {
 pub struct SettingsState {
     page: SettingsPage,
     preferences_path: Option<PathBuf>,
+    window: AnyWindowHandle,
     settings: Preferences,
     settings_error: Option<String>,
     settings_saving: bool,
@@ -94,9 +97,9 @@ impl SettingsState {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let (settings, settings_error) = match preferences_path.as_deref() {
+        let (settings, load_error) = match preferences_path.as_deref() {
             Some(path) => Preferences::load_or_default(path),
-            None => (Preferences::default(), Some("未找到用户主目录，设置无法保存".into())),
+            None => (Preferences::default(), None),
         };
         let default_font_family = cx.theme().font_family.clone();
         let mono_font_ratio = cx.theme().mono_font_size / cx.theme().font_size;
@@ -146,11 +149,12 @@ impl SettingsState {
                 }
             }
         });
-        Self {
+        let mut state = Self {
             page: SettingsPage::Appearance,
             preferences_path,
+            window: window.window_handle(),
             settings,
-            settings_error,
+            settings_error: None,
             settings_saving: false,
             save_task: None,
             save_revision: 0,
@@ -159,7 +163,13 @@ impl SettingsState {
             default_font_family,
             mono_font_ratio,
             host,
+        };
+        if let Some(error) = load_error {
+            state.report_error("无法读取设置，已使用默认值；原文件未修改", error, cx);
+        } else if state.preferences_path.is_none() {
+            state.report_error("设置无法保存", SavePreferencesError::missing_home(), cx);
         }
+        state
     }
 }
 
@@ -197,9 +207,27 @@ impl SettingsState {
         self.save_settings(cx);
     }
 
+    fn report_error(
+        &mut self,
+        title: &'static str,
+        error: impl std::error::Error + 'static,
+        cx: &mut Context<Self>,
+    ) {
+        self.settings_error = Some(format!("{title}：{}", details(&error)));
+        let window = self.window;
+        cx.defer(move |cx| {
+            if cx.update_window(window, |_, window, cx| report(title, &error, window, cx)).is_err()
+            {
+                log(title, &error);
+            }
+        });
+    }
+
     pub fn save_settings(&mut self, cx: &mut Context<Self>) {
         let Some(path) = self.preferences_path.clone() else {
-            self.settings_error = Some("设置已生效，但未找到用户主目录，无法保存".into());
+            self.report_error("设置已生效，但未保存", SavePreferencesError::missing_home(), cx);
+            let _ = self.host.update(cx, |host, cx| host.notify_settings_sidebar(cx));
+            cx.refresh_windows();
             let _ = self.host.update(cx, |_, cx| cx.notify());
             cx.notify();
             return;
@@ -208,7 +236,6 @@ impl SettingsState {
         self.save_revision += 1;
         let revision = self.save_revision;
         let previous = self.save_task.take();
-        self.settings_error = None;
         self.settings_saving = true;
         self.save_task = Some(cx.spawn(async move |view, cx| {
             if let Some(previous) = previous {
@@ -218,8 +245,10 @@ impl SettingsState {
             let _ = view.update(cx, |this, cx| {
                 if this.save_revision == revision {
                     this.settings_saving = false;
-                    this.settings_error =
-                        result.err().map(|error| format!("设置已生效，但未保存：{error}"));
+                    match result {
+                        Ok(()) => this.settings_error = None,
+                        Err(error) => this.report_error("设置已生效，但未保存", error, cx),
+                    }
                     let _ = this.host.update(cx, |host, cx| host.notify_settings_sidebar(cx));
                     cx.refresh_windows();
                     let _ = this.host.update(cx, |_, cx| cx.notify());
@@ -477,6 +506,7 @@ impl SettingsState {
                                         Button::new("settings-retry")
                                             .label("重试保存")
                                             .small()
+                                            .disabled(saving)
                                             .on_click(move |_, _, cx| {
                                                 let _ = retry
                                                     .update(cx, |this, cx| this.save_settings(cx));

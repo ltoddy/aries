@@ -12,26 +12,74 @@ pub enum ValidatePreferencesError {
     FontFamily,
 }
 
+impl ValidatePreferencesError {
+    pub fn font_size(size: f32) -> Self {
+        Self::FontSize { size }
+    }
+
+    pub fn font_family() -> Self {
+        Self::FontFamily
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum LoadPreferencesError {
-    #[error("无法读取设置文件 {}：{source}", path.display())]
+    #[error("无法读取设置文件 {}", path.display())]
     Read { path: PathBuf, source: io::Error },
-    #[error("无法解析设置文件 {}：{source}", path.display())]
+    #[error("无法解析设置文件 {}", path.display())]
     Toml { path: PathBuf, source: toml::de::Error },
-    #[error("设置文件 {} 无效：{source}", path.display())]
+    #[error("设置文件 {} 无效", path.display())]
     Validation { path: PathBuf, source: ValidatePreferencesError },
+}
+
+impl LoadPreferencesError {
+    pub fn read(path: &Path, source: io::Error) -> Self {
+        Self::Read { path: path.to_owned(), source }
+    }
+
+    pub fn toml(path: &Path, source: toml::de::Error) -> Self {
+        Self::Toml { path: path.to_owned(), source }
+    }
+
+    pub fn validation(path: &Path, source: ValidatePreferencesError) -> Self {
+        Self::Validation { path: path.to_owned(), source }
+    }
 }
 
 #[derive(Debug, Error)]
 pub enum SavePreferencesError {
-    #[error("无法序列化设置到 {}：{source}", path.display())]
+    #[error("未找到用户主目录，设置无法保存")]
+    MissingHome,
+    #[error("无法序列化设置到 {}", path.display())]
     Serialize { path: PathBuf, source: toml::ser::Error },
-    #[error("无法创建设置目录 {}：{source}", path.display())]
+    #[error("无法创建设置目录 {}", path.display())]
     CreateDirectory { path: PathBuf, source: io::Error },
-    #[error("无法写入临时设置文件 {}：{source}", path.display())]
+    #[error("无法写入临时设置文件 {}", path.display())]
     Write { path: PathBuf, source: io::Error },
-    #[error("无法将临时设置文件 {} 替换到 {}：{source}", temporary.display(), path.display())]
+    #[error("无法将临时设置文件 {} 替换到 {}", temporary.display(), path.display())]
     Rename { temporary: PathBuf, path: PathBuf, source: io::Error },
+}
+
+impl SavePreferencesError {
+    pub fn missing_home() -> Self {
+        Self::MissingHome
+    }
+
+    pub fn serialize(path: &Path, source: toml::ser::Error) -> Self {
+        Self::Serialize { path: path.to_owned(), source }
+    }
+
+    pub fn create_directory(path: &Path, source: io::Error) -> Self {
+        Self::CreateDirectory { path: path.to_owned(), source }
+    }
+
+    pub fn write(path: &Path, source: io::Error) -> Self {
+        Self::Write { path: path.to_owned(), source }
+    }
+
+    pub fn rename(temporary: &Path, path: &Path, source: io::Error) -> Self {
+        Self::Rename { temporary: temporary.to_owned(), path: path.to_owned(), source }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -133,28 +181,26 @@ impl Preferences {
 
     pub fn load(path: impl AsRef<Path>) -> Result<Self, LoadPreferencesError> {
         let path = path.as_ref();
-        let text = fs::read_to_string(path)
-            .map_err(|source| LoadPreferencesError::Read { path: path.to_owned(), source })?;
-        let settings: Self = toml::from_str(&text)
-            .map_err(|source| LoadPreferencesError::Toml { path: path.to_owned(), source })?;
-        settings
-            .validate()
-            .map_err(|source| LoadPreferencesError::Validation { path: path.to_owned(), source })?;
+        let text =
+            fs::read_to_string(path).map_err(|source| LoadPreferencesError::read(path, source))?;
+        let settings: Self =
+            toml::from_str(&text).map_err(|source| LoadPreferencesError::toml(path, source))?;
+        settings.validate().map_err(|source| LoadPreferencesError::validation(path, source))?;
         Ok(settings)
     }
 
     fn validate(&self) -> Result<(), ValidatePreferencesError> {
         let size = self.font_size();
         if !size.is_finite() || !(12.0..=24.0).contains(&size) {
-            return Err(ValidatePreferencesError::FontSize { size });
+            return Err(ValidatePreferencesError::font_size(size));
         }
         if self.font_family().is_some_and(|family| family.trim().is_empty()) {
-            return Err(ValidatePreferencesError::FontFamily);
+            return Err(ValidatePreferencesError::font_family());
         }
         Ok(())
     }
 
-    pub fn load_or_default(path: impl AsRef<Path>) -> (Self, Option<String>) {
+    pub fn load_or_default(path: impl AsRef<Path>) -> (Self, Option<LoadPreferencesError>) {
         match Self::load(path) {
             Ok(settings) => (settings, None),
             Err(LoadPreferencesError::Read { source, .. })
@@ -162,32 +208,24 @@ impl Preferences {
             {
                 (Self::default(), None)
             },
-            Err(error) => (
-                Self::default(),
-                Some(format!("无法读取设置，已使用默认值；原文件未修改：{error}")),
-            ),
+            Err(error) => (Self::default(), Some(error)),
         }
     }
 
     pub fn save(&self, path: impl AsRef<Path>) -> Result<(), SavePreferencesError> {
         let path = path.as_ref();
         let text = toml::to_string_pretty(self)
-            .map_err(|source| SavePreferencesError::Serialize { path: path.to_owned(), source })?;
+            .map_err(|source| SavePreferencesError::serialize(path, source))?;
         if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
-            fs::create_dir_all(parent).map_err(|source| SavePreferencesError::CreateDirectory {
-                path: parent.to_owned(),
-                source,
-            })?;
+            fs::create_dir_all(parent)
+                .map_err(|source| SavePreferencesError::create_directory(parent, source))?;
         }
         let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
         let result = fs::write(&temporary, text)
-            .map_err(|source| SavePreferencesError::Write { path: temporary.to_owned(), source })
+            .map_err(|source| SavePreferencesError::write(&temporary, source))
             .and_then(|_| {
-                fs::rename(&temporary, path).map_err(|source| SavePreferencesError::Rename {
-                    temporary: temporary.to_owned(),
-                    path: path.to_owned(),
-                    source,
-                })
+                fs::rename(&temporary, path)
+                    .map_err(|source| SavePreferencesError::rename(&temporary, path, source))
             });
         if result.is_err() {
             let _ = fs::remove_file(&temporary);

@@ -8,11 +8,7 @@ pub enum RequestError {
     #[error("会话工作目录必须是绝对路径")]
     InvalidCwd,
     #[error("{message}")]
-    Timeout {
-        message: &'static str,
-        #[source]
-        source: Elapsed,
-    },
+    Timeout { message: &'static str, source: Elapsed },
     #[error("已停止创建会话")]
     CreationCancelled,
     #[error("Agent 未协商 ACP v1")]

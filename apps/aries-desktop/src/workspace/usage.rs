@@ -1,8 +1,7 @@
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use anyhow::Context as _;
 use aries_persistence::{TokenUsage, TokenUsageRepository};
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
@@ -15,6 +14,7 @@ use gpui_kit::*;
 use jiff::civil::Date;
 use jiff::tz::TimeZone;
 use jiff::{Span, Timestamp, Zoned};
+use thiserror::Error;
 
 use crate::workspace::number;
 
@@ -201,7 +201,10 @@ impl UsageView {
                         this.data = Some(data);
                         this.state = LoadState::Ready;
                     },
-                    Err(error) => this.state = LoadState::Failed(format!("{error:#}")),
+                    Err(error) => {
+                        crate::error::log("无法读取用量", &error);
+                        this.state = LoadState::Failed(crate::error::details(&error));
+                    },
                 }
                 cx.notify();
             });
@@ -612,37 +615,116 @@ impl Render for UsageView {
     }
 }
 
-fn load_usage(year: i16) -> anyhow::Result<UsageData> {
-    let home = std::env::home_dir().context("无法确定 Aries 数据目录")?;
+#[derive(Debug, Error)]
+enum LoadUsageError {
+    #[error("无法确定 Aries 数据目录")]
+    HomeUnavailable,
+    #[error("Aries 数据库路径不是文件：{}", path.display())]
+    NotFile { path: PathBuf },
+    #[error("无法访问 Aries 数据库 {}", path.display())]
+    Metadata { path: PathBuf, source: std::io::Error },
+    #[error("无法启动用量查询运行时")]
+    Runtime { source: std::io::Error },
+    #[error("无法确定 {year} 年的用量日期范围")]
+    YearRange { year: i16, source: jiff::Error },
+    #[error("无法确定 {date} 的次日日期")]
+    NextDay { date: Date, source: jiff::Error },
+    #[error("无法确定 {first} 至 {next} 的用量时间范围")]
+    TimestampRange { first: Date, next: Date, source: jiff::Error },
+    #[error("无法连接本地 Aries 数据库 {}", path.display())]
+    Connect { path: PathBuf, source: toasty::Error },
+    #[error("无法查询 {year} 年的年度用量")]
+    AnnualQuery { year: i16, source: toasty::Error },
+    #[error("无法查询 {date} 的今日用量")]
+    TodayQuery { date: Date, source: toasty::Error },
+}
+
+impl LoadUsageError {
+    fn home_unavailable() -> Self {
+        Self::HomeUnavailable
+    }
+
+    fn not_file(path: PathBuf) -> Self {
+        Self::NotFile { path }
+    }
+
+    fn metadata(path: PathBuf, source: std::io::Error) -> Self {
+        Self::Metadata { path, source }
+    }
+
+    fn runtime(source: std::io::Error) -> Self {
+        Self::Runtime { source }
+    }
+
+    fn year_range(year: i16, source: jiff::Error) -> Self {
+        Self::YearRange { year, source }
+    }
+
+    fn next_day(date: Date, source: jiff::Error) -> Self {
+        Self::NextDay { date, source }
+    }
+
+    fn timestamp_range(first: Date, next: Date, source: jiff::Error) -> Self {
+        Self::TimestampRange { first, next, source }
+    }
+
+    fn connect(path: PathBuf, source: toasty::Error) -> Self {
+        Self::Connect { path, source }
+    }
+
+    fn annual_query(year: i16, source: toasty::Error) -> Self {
+        Self::AnnualQuery { year, source }
+    }
+
+    fn today_query(date: Date, source: toasty::Error) -> Self {
+        Self::TodayQuery { date, source }
+    }
+}
+
+fn load_usage(year: i16) -> Result<UsageData, LoadUsageError> {
+    let home = std::env::home_dir().ok_or_else(LoadUsageError::home_unavailable)?;
     let root = home.join(".local/share/aries");
-    match fs::metadata(root.join("aries.db")) {
+    let path = root.join("aries.db");
+    match fs::metadata(&path) {
         Ok(metadata) if metadata.is_file() => {},
-        Ok(_) => anyhow::bail!("Aries 数据库路径不是文件"),
+        Ok(_) => return Err(LoadUsageError::not_file(path)),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
             return Ok(UsageData::from_records(Vec::new(), Vec::new(), TimeZone::system()));
         },
-        Err(error) => return Err(error).context("无法访问 Aries 数据库"),
+        Err(source) => return Err(LoadUsageError::metadata(path, source)),
     }
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
-        .context("无法启动用量查询运行时")?;
+        .map_err(LoadUsageError::runtime)?;
     runtime.block_on(query_usage(&root, year))
 }
 
-async fn query_usage(root: impl AsRef<Path>, year: i16) -> anyhow::Result<UsageData> {
+async fn query_usage(root: impl AsRef<Path>, year: i16) -> Result<UsageData, LoadUsageError> {
+    let root = root.as_ref();
     let timezone = TimeZone::system();
     let today = Timestamp::now().to_zoned(timezone.clone()).date();
-    let first = Date::new(year, 1, 1)?;
-    let next = first.checked_add(Span::new().years(1))?;
+    let first = Date::new(year, 1, 1).map_err(|source| LoadUsageError::year_range(year, source))?;
+    let next = first
+        .checked_add(Span::new().years(1))
+        .map_err(|source| LoadUsageError::year_range(year, source))?;
     let (low, high) = timestamp_range(first, next, &timezone)?;
-    let db = aries_persistence::connect(root).await.context("无法连接本地 Aries 数据库")?;
+    let db = aries_persistence::connect(root)
+        .await
+        .map_err(|source| LoadUsageError::connect(root.join("aries.db"), source))?;
     let mut repository = TokenUsageRepository::new(db);
-    let records =
-        repository.find_by_created_at_between(low, high).await.context("无法查询年度用量")?;
-    let (low, high) = timestamp_range(today, today.checked_add(Span::new().days(1))?, &timezone)?;
-    let today_records =
-        repository.find_by_created_at_between(low, high).await.context("无法查询今日用量")?;
+    let records = repository
+        .find_by_created_at_between(low, high)
+        .await
+        .map_err(|source| LoadUsageError::annual_query(year, source))?;
+    let tomorrow = today
+        .checked_add(Span::new().days(1))
+        .map_err(|source| LoadUsageError::next_day(today, source))?;
+    let (low, high) = timestamp_range(today, tomorrow, &timezone)?;
+    let today_records = repository
+        .find_by_created_at_between(low, high)
+        .await
+        .map_err(|source| LoadUsageError::today_query(today, source))?;
     Ok(UsageData::from_records(records, today_records, timezone))
 }
 
@@ -650,9 +732,12 @@ fn timestamp_range(
     first: Date,
     next: Date,
     timezone: &TimeZone,
-) -> anyhow::Result<(Timestamp, Timestamp)> {
-    let low = first.to_zoned(timezone.clone())?.timestamp();
-    let high =
-        next.to_zoned(timezone.clone())?.timestamp().checked_sub(Span::new().nanoseconds(1))?;
-    Ok((low, high))
+) -> Result<(Timestamp, Timestamp), LoadUsageError> {
+    let range = || -> Result<(Timestamp, Timestamp), jiff::Error> {
+        let low = first.to_zoned(timezone.clone())?.timestamp();
+        let high =
+            next.to_zoned(timezone.clone())?.timestamp().checked_sub(Span::new().nanoseconds(1))?;
+        Ok((low, high))
+    };
+    range().map_err(|source| LoadUsageError::timestamp_range(first, next, source))
 }

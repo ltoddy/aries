@@ -451,7 +451,6 @@ version = "0.1.0"
 dependencies = [
  "agent-client-protocol",
  "alacritty_terminal",
- "anyhow",
  "aries-persistence",
  "async-channel",
  "base64 0.23.1",
@@ -466,8 +465,11 @@ dependencies = [
  "serde_json",
  "similar 3.2.1",
  "thiserror 2.0.21",
+ "toasty",
  "tokio",
  "toml 1.2.1+spec-1.1.0",
+ "tracing",
+ "tracing-subscriber",
  "url",
 ]
 
