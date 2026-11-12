@@ -300,6 +300,7 @@ impl Render for GitDiffView {
                 .flex()
                 .items_center()
                 .justify_center()
+                .text_sm()
                 .text_color(cx.theme().muted_foreground)
                 .child(if self.loading {
                     "正在读取 diff"
@@ -365,9 +366,9 @@ impl Render for GitDiffView {
                     .gap_2()
                     .flex_shrink_0()
                     .px_3()
-                    .py_2()
+                    .py_1()
                     .border_b_1()
-                    .border_color(cx.theme().border)
+                    .border_color(cx.theme().border.opacity(0.5))
                     .child(
                         div()
                             .flex_1()
@@ -415,6 +416,7 @@ impl Render for GitDiffView {
                         Button::new("refresh-diff")
                             .small()
                             .ghost()
+                            .compact()
                             .icon(IconName::RefreshCw)
                             .disabled(self.controls_busy(cx))
                             .accessibility_label("刷新 diff")
@@ -424,6 +426,7 @@ impl Render for GitDiffView {
                         Button::new("close-diff")
                             .small()
                             .ghost()
+                            .compact()
                             .icon(IconName::X)
                             .accessibility_label("收起 diff")
                             .tooltip("收起 diff · Esc")
@@ -438,6 +441,8 @@ impl Render for GitDiffView {
                     .flex_shrink_0()
                     .px_3()
                     .py_1()
+                    .border_b_1()
+                    .border_color(cx.theme().border.opacity(0.5))
                     .capture_any_mouse_down(cx.listener(
                         move |this, event: &MouseDownEvent, _, cx| {
                             if event.button == MouseButton::Left {
@@ -449,10 +454,16 @@ impl Render for GitDiffView {
                         Button::new("unified-diff")
                             .small()
                             .ghost()
+                            .compact()
                             .icon(IconName::Square)
                             .accessibility_label("单栏")
                             .tooltip("单栏")
                             .selected(mode == DiffMode::Unified)
+                            .when(mode == DiffMode::Unified, |button| {
+                                button
+                                    .bg(cx.theme().foreground.opacity(0.08))
+                                    .text_color(cx.theme().foreground)
+                            })
                             .on_click(
                                 cx.listener(|this, _, _, cx| this.set_mode(DiffMode::Unified, cx)),
                             ),
@@ -461,10 +472,16 @@ impl Render for GitDiffView {
                         Button::new("split-diff")
                             .small()
                             .ghost()
+                            .compact()
                             .icon(IconName::Columns2)
                             .accessibility_label("左右对照")
                             .tooltip("左右对照")
                             .selected(mode == DiffMode::Split)
+                            .when(mode == DiffMode::Split, |button| {
+                                button
+                                    .bg(cx.theme().foreground.opacity(0.08))
+                                    .text_color(cx.theme().foreground)
+                            })
                             .on_click(
                                 cx.listener(|this, _, _, cx| this.set_mode(DiffMode::Split, cx)),
                             ),

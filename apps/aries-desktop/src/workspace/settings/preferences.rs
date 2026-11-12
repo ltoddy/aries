@@ -4,6 +4,8 @@ use std::{fs, io};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::workspace::settings::typography::BASE_FONT_SIZE;
+
 #[derive(Debug, Error)]
 pub enum ValidatePreferencesError {
     #[error("字号必须在 12–24 之间，当前值为 {size}")]
@@ -138,7 +140,7 @@ struct AppearanceSettings {
 
 impl Default for AppearanceSettings {
     fn default() -> Self {
-        Self { theme: Appearance::System, font_family: None, font_size: 16.0 }
+        Self { theme: Appearance::System, font_family: None, font_size: BASE_FONT_SIZE }
     }
 }
 

@@ -11,8 +11,8 @@ use gpui_kit::*;
 
 use crate::workspace::conversation::model::Conversation;
 use crate::workspace::conversation::model::tool_call::ToolCallState;
-use crate::workspace::conversation::timeline::markdown_style;
 use crate::workspace::settings::palette::Palette;
+use crate::workspace::settings::typography;
 
 #[derive(IntoElement)]
 struct ToolContent {
@@ -38,7 +38,7 @@ impl RenderOnce for ToolContent {
             .flex_col()
             .items_start()
             .gap_1()
-            .text_xs()
+            .text_sm()
             .text_color(p.muted())
             .children(entries)
     }
@@ -68,7 +68,7 @@ impl RenderOnce for ToolDiff {
             DiffContent::Markdown(markdown) => TextView::markdown(id, markdown)
                 .w_full()
                 .min_w_0()
-                .style(markdown_style())
+                .map(typography::style_markdown)
                 .selectable(true)
                 .scrollable(false)
                 .code_block_actions(|code_block, _window, cx| {
@@ -81,7 +81,7 @@ impl RenderOnce for ToolDiff {
                             el.child(
                                 div()
                                     .text_xs()
-                                    .text_color(cx.theme().muted)
+                                    .text_color(cx.theme().muted_foreground)
                                     .child(lang.to_string()),
                             )
                         })
@@ -93,12 +93,13 @@ impl RenderOnce for ToolDiff {
                                     cx.write_to_clipboard(ClipboardItem::new_string(code.clone()));
                                 })
                                 .child(
-                                    Icon::new(IconName::Copy).xsmall().text_color(cx.theme().muted),
+                                    Icon::new(IconName::Copy)
+                                        .xsmall()
+                                        .text_color(cx.theme().muted_foreground),
                                 )
                         })
                         .into_any_element()
                 })
-                .text_sm()
                 .into_any_element(),
             DiffContent::Path(path) => {
                 div().w_full().child(SelectableText::new(id, path)).into_any_element()

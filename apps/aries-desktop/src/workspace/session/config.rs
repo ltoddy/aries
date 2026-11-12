@@ -24,7 +24,7 @@ pub fn render_session_config(
         .flex()
         .flex_col()
         .gap_1()
-        .child(div().flex().min_w_0().items_center().gap_1().when_some(
+        .child(div().flex().flex_wrap().min_w_0().items_center().gap_2().when_some(
             owner.execution().session_id().as_ref(),
             |row, session_id| {
                 row.children(
@@ -86,6 +86,8 @@ fn render_config_option(
         .small()
         .max_w(rems(16.25))
         .min_w_0()
+        .rounded(cx.theme().radius_full())
+        .bg(p.bubble())
         .text_color(p.muted())
         .disabled(!supported || !owner.is_session_idle() || owner.execution().is_disconnected())
         .tooltip(tooltip)

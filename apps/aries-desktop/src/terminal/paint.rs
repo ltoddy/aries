@@ -9,6 +9,7 @@ use gpui_kit::{
 };
 
 use crate::terminal::TerminalView;
+use crate::workspace::settings::typography;
 
 const ANSI: [u32; 16] = [
     0x000000, 0xcd0000, 0x00cd00, 0xcdcd00, 0x0000ee, 0xcd00cd, 0x00cdcd, 0xe5e5e5, 0x7f7f7f,
@@ -192,7 +193,7 @@ pub fn paint(
         cx.theme().background,
         false,
     );
-    let font_size = window.rem_size() * 0.875;
+    let font_size = typography::code_size_in_window(window);
     let cell_size = view.cell_size;
     let focused = view.focus_handle.is_focused(window);
     let cursor_row = cursor.point.line.0 + display_offset as i32;

@@ -56,14 +56,12 @@ impl Palette {
     pub fn new(mode: ThemeMode) -> Self {
         let colors = match mode {
             ThemeMode::Dark => [
-                0x191a1c, 0x191a1c, 0x27282b, 0x393b40, 0xbcbec4, 0x868a91, 0x2b2d30, 0x2b2d30,
-                0xf75464, 0x548af7, 0x4a7ce6, 0x2b2d30, 0x373b39, 0x43454a, 0x6aab73, 0xf2c55c,
-                0x56a8f5, 0x548af7,
+                0x303033, 0x252528, 0x3a3a3e, 0x3b3b3f, 0xf0f0f2, 0xb3b3ba, 0x525257, 0xf06c66,
+                0x5e9bea, 0x74a9ef, 0x5b5b63, 0x63c27a, 0xeac04a, 0x5aa5f5, 0x78b4f5,
             ],
             ThemeMode::Light => [
-                0xffffff, 0xf7f8fa, 0xffffff, 0xebecf0, 0x080808, 0x6c707e, 0xe4e6eb, 0xf5f8fe,
-                0xf50000, 0x0033b3, 0x002d9e, 0xe7effd, 0xa6d2ff, 0xdfe1e5, 0x067d17, 0x9e880d,
-                0x0066cc, 0x006dcc,
+                0xfafafa, 0xededf0, 0xf1f1f3, 0xececef, 0x27272a, 0x62626b, 0xd5d5da, 0xcc3d3d,
+                0x2f74c0, 0x2866ac, 0xc4c4cc, 0x3a9150, 0x9a7400, 0x2f74c0, 0x246aaa,
             ],
         };
         let [
@@ -74,12 +72,9 @@ impl Palette {
             foreground,
             muted,
             border,
-            hover,
             danger,
             primary,
             primary_hover,
-            selection,
-            text_selection,
             input_border,
             success,
             warning,
@@ -94,12 +89,12 @@ impl Palette {
             foreground,
             muted,
             border,
-            hover,
+            hover: foreground.opacity(0.07),
             danger,
             primary,
             primary_hover,
-            selection,
-            text_selection,
+            selection: foreground.opacity(0.115),
+            text_selection: primary.opacity(0.25),
             input_border,
             success,
             warning,
@@ -163,7 +158,7 @@ pub fn sync(mode: ThemeMode, cx: &mut App) {
         theme.colors.selection = p.text_selection;
         theme.colors.popover = p.input();
         theme.colors.popover_foreground = p.foreground();
-        theme.colors.group_box = p.bubble();
+        theme.colors.group_box = p.foreground().opacity(0.045);
         theme.colors.group_box_foreground = p.foreground();
         theme.colors.sidebar = p.sidebar();
         theme.colors.sidebar_foreground = p.foreground();
@@ -177,7 +172,9 @@ pub fn sync(mode: ThemeMode, cx: &mut App) {
         theme.colors.list_even = p.bubble();
         theme.colors.list_hover = p.hover();
         theme.colors.list_active = p.selection;
-        theme.colors.list_active_border = p.primary;
+        theme.colors.list_active_border = p.selection;
+        theme.colors.title_bar = p.sidebar();
+        theme.colors.title_bar_border = p.border().opacity(0.5);
         theme.colors.danger = p.danger();
         theme.colors.success = p.success;
         theme.colors.warning = p.warning;

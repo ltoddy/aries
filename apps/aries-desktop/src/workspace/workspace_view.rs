@@ -8,7 +8,7 @@ use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants};
 use gpui_kit::component::menu::{ContextMenuExt, PopupMenu, PopupMenuItem};
 use gpui_kit::component::{
-    ActiveTheme, Disableable, Icon, ResizableState, Sizable, h_resizable, resizable_panel,
+    ActiveTheme, Disableable, Icon, ResizableState, Sizable, TitleBar, h_resizable, resizable_panel,
 };
 use gpui_kit::prelude::*;
 use gpui_kit::*;
@@ -61,7 +61,7 @@ impl Render for DragTab {
             .border_color(cx.theme().primary)
             .bg(cx.theme().background)
             .text_color(cx.theme().foreground)
-            .text_xs()
+            .text_sm()
             .shadow_sm()
             .child(div().truncate().child(self.title.clone()))
     }
@@ -184,28 +184,30 @@ impl Render for WorkspaceView {
         let diff_open = !self.usage_visible && diff.read(cx).is_open();
         let font_size = cx.theme().font_size;
         let width = window.viewport_size().width;
-        let diff_minimum = font_size * 28.;
-        let sidebar_minimum = font_size * 12.5;
-        let sidebar_maximum = if diff_open {
-            (width - diff_minimum - font_size).min(font_size * 32.5)
-        } else {
-            font_size * 32.5
-        };
-        let sidebar_available =
-            (!diff_open || sidebar_maximum >= sidebar_minimum).then_some(sidebar_maximum);
+        let content_minimum = font_size * if diff_open { 28. } else { 26. };
+        let sidebar_minimum = font_size * 13.75;
+        let sidebar_maximum = (width - content_minimum - font_size).min(font_size * 30.);
+        let sidebar_available = (sidebar_maximum >= sidebar_minimum).then_some(sidebar_maximum);
         let sidebar_visible = self.sidebar_visible && sidebar_available.is_some();
+        if !sidebar_visible && self.sidebar_focus_handle.contains_focused(window, cx) {
+            cx.defer_in(window, |this, window, cx| {
+                if this.sidebar_focus_handle.contains_focused(window, cx) {
+                    this.sidebar_toggle_focus_handle.focus(window, cx);
+                }
+            });
+        }
         let sidebar_width = if sidebar_visible {
             self.layout
                 .read(cx)
                 .sizes()
                 .first()
                 .copied()
-                .unwrap_or(font_size * 18.)
+                .unwrap_or(font_size * 16.25)
                 .clamp(sidebar_minimum, sidebar_maximum)
         } else {
             Pixels::ZERO
         };
-        let content_width = width - sidebar_width;
+        let content_width = width - sidebar_width - font_size;
         let panel_style = div().size_full().style().clone();
         let chat = div()
             .relative()
@@ -222,7 +224,7 @@ impl Render for WorkspaceView {
                     Some(view) => {
                         div().size_full().child(view.cached(panel_style.clone())).into_any_element()
                     },
-                    None => self.render_empty_main(p),
+                    None => self.render_empty_main(p, cx),
                 }
             })
             .children(git_info);
@@ -248,11 +250,25 @@ impl Render for WorkspaceView {
             .h_full()
             .flex()
             .flex_col()
-            .child(self.render_tab_bar(p, sidebar_available, cx))
-            .child(div().relative().flex().flex_col().flex_1().min_h_0().child(content).when_some(
-                self.terminal.as_ref().filter(|_| self.terminal_visible),
-                |view, terminal| view.child(self.render_terminal(terminal, cx)),
-            ));
+            .pr_1p5()
+            .pb_1p5()
+            .when(!sidebar_visible, |main| main.pl_1p5())
+            .child(
+                div()
+                    .relative()
+                    .flex()
+                    .flex_col()
+                    .flex_1()
+                    .min_h_0()
+                    .rounded(cx.theme().radius_tokens().lg)
+                    .bg(p.background())
+                    .overflow_hidden()
+                    .child(content)
+                    .when_some(
+                        self.terminal.as_ref().filter(|_| self.terminal_visible),
+                        |view, terminal| view.child(self.render_terminal(terminal, cx)),
+                    ),
+            );
         div()
             .size_full()
             .track_focus(&self.focus_handle)
@@ -298,16 +314,41 @@ impl Render for WorkspaceView {
                 this.new_session(window, cx);
             }))
             .flex()
-            .bg(p.background())
+            .flex_col()
+            .bg(p.sidebar().opacity(if cfg!(target_os = "macos") { 0.82 } else { 1. }))
             .text_color(p.foreground())
             .font_family(cx.theme().font_family.clone())
             .text_sm()
-            .child(if sidebar_visible {
+            .child(
+                TitleBar::new().h_9().bg(p.sidebar().opacity(0.)).border_b_0().child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .h_full()
+                        .flex_1()
+                        .min_w_0()
+                        .when(sidebar_visible, |bar| {
+                            let inset = if cfg!(target_os = "macos") { px(80.) } else { px(12.) };
+                            bar.child(
+                                div()
+                                    .w(sidebar_width - inset)
+                                    .flex_shrink_0()
+                                    .px_2()
+                                    .text_sm()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .child("Aries"),
+                            )
+                        })
+                        .child(self.render_tab_bar(p, sidebar_available, cx))
+                        .child(div().w_3().h_full().flex_shrink_0()),
+                ),
+            )
+            .child(div().flex().items_stretch().flex_1().min_h_0().child(if sidebar_visible {
                 h_resizable("layout")
                     .with_state(&self.layout)
                     .child(
                         resizable_panel()
-                            .size(cx.theme().font_size * 18.)
+                            .size(cx.theme().font_size * 16.25)
                             .size_range(sidebar_minimum..sidebar_maximum)
                             .child(
                                 div()
@@ -320,7 +361,7 @@ impl Render for WorkspaceView {
                     .into_any_element()
             } else {
                 main.into_any_element()
-            })
+            }))
     }
 }
 
@@ -382,11 +423,11 @@ impl WorkspaceView {
                     .min_h_0()
                     .flex()
                     .flex_col()
-                    .bg(cx.theme().background.opacity(0.9))
+                    .bg(cx.theme().popover)
                     .text_color(cx.theme().foreground)
                     .border_1()
                     .border_color(cx.theme().border)
-                    .rounded(cx.theme().radius)
+                    .rounded(cx.theme().radius_tokens().xl)
                     .shadow_lg()
                     .overflow_hidden()
                     .child(
@@ -647,9 +688,8 @@ impl WorkspaceView {
             .gap_1()
             .flex()
             .items_center()
-            .bg(p.input())
-            .border_b_1()
-            .border_color(p.border())
+            .flex_1()
+            .min_w_0()
             .child(
                 Button::new("toggle-sidebar")
                     .track_focus(&self.sidebar_toggle_focus_handle)
@@ -657,13 +697,17 @@ impl WorkspaceView {
                     .small()
                     .icon(Icon::new(icon))
                     .accessibility_label(label)
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .disabled(sidebar_available.is_none())
                     .tooltip(if sidebar_available.is_some() {
                         format!("{label} {shortcut}")
                     } else {
-                        "窗口较窄，收起 diff 或加宽窗口后可展开会话列表".into()
+                        "窗口较窄，加宽窗口或收起 Diff 后可展开会话列表".into()
                     })
-                    .on_click(|_, window, cx| window.dispatch_action(Box::new(ToggleSidebar), cx)),
+                    .on_click(|_, window, cx| {
+                        cx.stop_propagation();
+                        window.dispatch_action(Box::new(ToggleSidebar), cx);
+                    }),
             )
             .child(
                 div()
@@ -673,7 +717,7 @@ impl WorkspaceView {
                     .h_full()
                     .flex()
                     .items_center()
-                    .gap_1()
+                    .gap_1p5()
                     .overflow_x_scroll()
                     .track_scroll(&self.tab_scroll)
                     .children(tabs),
@@ -698,6 +742,8 @@ impl WorkspaceView {
             cx.stop_propagation();
             cx.new(|_| drag.clone())
         })
+        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+        .on_click(|_, _, cx| cx.stop_propagation())
         .can_drop(move |value, _, _| {
             value
                 .downcast_ref::<DragTab>()
@@ -749,10 +795,12 @@ impl WorkspaceView {
         menu
     }
 
-    pub fn render_empty_main(&self, p: Palette) -> AnyElement {
+    fn render_empty_main(&self, p: Palette, cx: &mut Context<Self>) -> AnyElement {
+        let project = self.cwd.file_name().unwrap_or(self.cwd.as_os_str()).to_string_lossy();
         div()
-            .flex_1()
+            .size_full()
             .min_h_0()
+            .p_8()
             .flex()
             .items_center()
             .justify_center()
@@ -764,14 +812,42 @@ impl WorkspaceView {
                     .items_center()
                     .gap_2()
                     .text_center()
-                    .child(div().text_sm().text_color(p.foreground()).child("没有打开的会话"))
+                    .child(Icon::new(IconName::MessageCircle).size_12().text_color(p.muted()))
+                    .child(
+                        div()
+                            .mt_2()
+                            .text_lg()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(p.foreground())
+                            .child(project.into_owned()),
+                    )
                     .child(
                         div()
                             .text_xs()
                             .line_height(rems(1.25))
                             .text_color(p.muted())
-                            .child("从左侧选择一个会话，点击“新建会话…”选择项目目录，或按 ⌘N 使用当前目录直接新建会话。"),
-                    ),
+                            .child("从侧栏选择会话，或在当前项目开始新的会话。"),
+                    )
+                    .child(
+                        Button::new("empty-new-session")
+                            .small()
+                            .mt_4()
+                            .icon(IconName::Plus)
+                            .label("新建会话")
+                            .disabled(!self.sidebar.read(cx).can_start_new_chat())
+                            .on_click(|_, window, cx| {
+                                window.dispatch_action(Box::new(NewSession), cx)
+                            }),
+                    )
+                    .when(cfg!(target_os = "macos"), |empty| {
+                        empty.child(
+                            div()
+                                .mt_2()
+                                .text_xs()
+                                .text_color(p.muted())
+                                .child("⌘N 新建会话 · ⌘B 切换侧栏"),
+                        )
+                    }),
             )
             .into_any_element()
     }
@@ -799,20 +875,19 @@ impl WorkspaceView {
             .flex_shrink_0()
             .w(rems(11.25))
             .min_w(rems(11.25))
-            .rounded(rems(0.5))
-            .border_1()
-            .border_color(if active { p.foreground() } else { p.border() })
+            .rounded(cx.theme().radius_tokens().md)
             .flex()
             .items_center()
-            .bg(if active { p.background() } else { p.input() })
+            .bg(if active { p.background() } else { p.background().opacity(0.) })
+            .when(!active, |tab| tab.hover(|style| style.bg(p.hover())))
             .child(
                 Button::new(("tab-button", id))
                     .custom(ButtonCustomVariant::new(cx).active(cx.theme().button_active))
                     .small()
                     .h_full()
-                    .px_1()
+                    .px_2()
                     .pr_8()
-                    .rounded(cx.theme().font_size * 0.5)
+                    .rounded(cx.theme().radius_tokens().md)
                     .flex_1()
                     .min_w_0()
                     .accessibility_label(tab_label)
@@ -828,7 +903,7 @@ impl WorkspaceView {
                             .truncate()
                             .line_clamp(1)
                             .text_left()
-                            .text_xs()
+                            .text_sm()
                             .text_color(if active { p.foreground() } else { p.muted() })
                             .child(title),
                     ),
@@ -838,9 +913,11 @@ impl WorkspaceView {
                     Button::new(("close-tab", id))
                         .icon(Icon::new(IconName::X).size(rems(0.6875)))
                         .ghost()
-                        .small()
+                        .xsmall()
+                        .text_color(p.muted())
                         .tooltip_with_action("关闭标签", &CloseTab, None)
                         .accessibility_label("关闭标签")
+                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                         .on_click(cx.listener(move |this, _, window, cx| {
                             cx.stop_propagation();
                             this.execute_tab_command(TabCommand::close(id), window, cx);

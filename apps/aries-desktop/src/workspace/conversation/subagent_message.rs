@@ -6,8 +6,8 @@ use gpui_kit::*;
 
 use crate::workspace::conversation::ClickHandler;
 use crate::workspace::conversation::model::subagent::SubagentState;
-use crate::workspace::conversation::timeline::markdown_style;
 use crate::workspace::settings::palette::Palette;
+use crate::workspace::settings::typography;
 
 #[derive(IntoElement)]
 pub struct SubagentMessage {
@@ -79,20 +79,20 @@ impl SubagentSummary {
 }
 
 impl RenderOnce for SubagentMessage {
-    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let Self { toggle_id, collapsed, summary, entries, palette: p, on_toggle } = self;
         let SubagentSummary { title, description, state } = summary;
         let toggle_label = if collapsed { "展开子 Agent" } else { "折叠子 Agent" };
         div()
             .w_full()
-            .rounded(px(10.))
-            .border_1()
-            .border_color(p.border())
-            .bg(p.input())
-            .p_2()
+            .min_w_0()
+            .rounded(cx.theme().radius_lg)
+            .bg(p.bubble())
+            .px_2()
+            .py_1()
             .flex()
             .flex_col()
-            .gap_2()
+            .gap_1()
             .child(
                 Button::new(toggle_id)
                     .ghost()
@@ -114,10 +114,10 @@ impl RenderOnce for SubagentMessage {
                                 } else {
                                     IconName::ChevronDown
                                 })
-                                .size(px(14.))
+                                .size(rems(0.875))
                                 .text_color(p.muted()),
                             )
-                            .child(Icon::new(IconName::Bot).size(px(14.)).text_color(p.muted()))
+                            .child(Icon::new(IconName::Bot).size(rems(0.875)).text_color(p.muted()))
                             .child(
                                 div()
                                     .min_w_0()
@@ -146,12 +146,11 @@ impl RenderOnce for SubagentMessage {
                                 this.child(
                                     div()
                                         .flex_shrink_0()
-                                        .rounded_full()
-                                        .border_1()
-                                        .border_color(p.border())
+                                        .rounded(cx.theme().radius_full())
+                                        .bg(p.input())
                                         .px_2()
                                         .py_1()
-                                        .text_size(rems(0.6875))
+                                        .text_xs()
                                         .text_color(p.muted())
                                         .child(state),
                                 )
@@ -183,17 +182,17 @@ impl RenderOnce for SubagentEntry {
     fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
         let Self { id, text, palette: p } = self;
         div()
-            .rounded(px(8.))
-            .bg(p.background())
+            .min_w_0()
+            .w_full()
             .px_2()
             .py_1()
             .child(
                 TextView::markdown(id, text)
-                    .style(markdown_style())
+                    .map(typography::style_markdown)
                     .selectable(true)
                     .scrollable(false)
                     .w_full()
-                    .code_block_actions(|code_block, _window, cx| {
+                    .code_block_actions(move |code_block, _window, _cx| {
                         let code = code_block.code().to_string();
                         div()
                             .flex()
@@ -201,10 +200,7 @@ impl RenderOnce for SubagentEntry {
                             .gap_1()
                             .when_some(code_block.lang(), |el, lang| {
                                 el.child(
-                                    div()
-                                        .text_xs()
-                                        .text_color(cx.theme().muted)
-                                        .child(lang.to_string()),
+                                    div().text_xs().text_color(p.muted()).child(lang.to_string()),
                                 )
                             })
                             .child({
@@ -216,16 +212,10 @@ impl RenderOnce for SubagentEntry {
                                             code.clone(),
                                         ));
                                     })
-                                    .child(
-                                        Icon::new(IconName::Copy)
-                                            .xsmall()
-                                            .text_color(cx.theme().muted),
-                                    )
+                                    .child(Icon::new(IconName::Copy).xsmall().text_color(p.muted()))
                             })
                             .into_any_element()
                     })
-                    .text_sm()
-                    .line_height(rems(1.375))
                     .into_any_element(),
             )
             .into_any_element()

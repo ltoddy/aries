@@ -1,6 +1,6 @@
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
-use gpui_kit::component::{ActiveTheme, Disableable, Icon};
+use gpui_kit::component::{ActiveTheme, Disableable, Icon, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -31,8 +31,9 @@ impl RenderOnce for SettingsButton {
             .and_then(|host| host.read(cx).settings_state().read(cx).error().map(str::to_owned));
         Button::new("settings")
             .ghost()
-            .icon(Icon::new(IconName::Settings).size(rems(1.125)))
-            .size_8()
+            .small()
+            .icon(Icon::new(IconName::Settings).small())
+            .size_7()
             .disabled(host.is_none())
             .text_color(if error.is_some() { p.danger() } else { p.muted() })
             .tooltip_with_action(
@@ -82,26 +83,42 @@ pub fn render_shortcuts(send_key: SendKey, cx: &App) -> impl IntoElement {
             ],
         ),
     ];
-    div().flex().flex_col().gap_4().children(groups.into_iter().map(|(title, rows)| {
-        div()
-            .flex()
-            .flex_col()
-            .gap_2()
-            .child(div().font_weight(FontWeight::MEDIUM).child(title))
-            .children(rows.into_iter().map(|(label, keys)| {
-                div()
-                    .flex()
-                    .items_center()
-                    .justify_between()
-                    .gap_4()
-                    .text_sm()
-                    .child(div().flex_1().min_w_0().child(label))
-                    .child(
-                        div()
-                            .flex_shrink_0()
-                            .font_family(cx.theme().mono_font_family.clone())
-                            .child(keys),
-                    )
-            }))
-    }))
+    div().flex().flex_col().gap_6().text_color(cx.theme().foreground).children(
+        groups.into_iter().map(|(title, rows)| {
+            div()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).child(title))
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .rounded(cx.theme().radius_tokens().lg)
+                        .bg(cx.theme().group_box)
+                        .children(rows.into_iter().enumerate().map(|(index, (label, keys))| {
+                            div()
+                                .mx_2p5()
+                                .py_2()
+                                .min_h(rems(2.375))
+                                .flex()
+                                .items_center()
+                                .justify_between()
+                                .gap_4()
+                                .text_sm()
+                                .when(index > 0, |row| {
+                                    row.border_t_1().border_color(cx.theme().border.opacity(0.5))
+                                })
+                                .child(div().flex_1().min_w_0().child(label))
+                                .child(
+                                    div()
+                                        .flex_shrink_0()
+                                        .text_color(cx.theme().muted_foreground)
+                                        .font_family(cx.theme().mono_font_family.clone())
+                                        .child(keys),
+                                )
+                        })),
+                )
+        }),
+    )
 }
