@@ -135,7 +135,6 @@ impl GitDiffView {
         self.decorations.clear();
         self.backups.clear();
         self.backup_task = None;
-        self.editor_task = None;
     }
 
     pub fn initialize_search(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -738,39 +737,7 @@ impl GitDiffView {
                                     },
                                 ));
                         }
-                        let exact = this
-                            .target
-                            .as_ref()
-                            .is_some_and(|target| target.group == ChangeGroup::Unstaged)
-                            && this
-                                .location
-                                .as_ref()
-                                .is_some_and(|position| position.side() == DiffSide::Modified);
                         menu = menu.item(PopupMenuItem::separator());
-                        for (editor, label) in
-                            [("code", "VS Code"), ("cursor", "Cursor"), ("zed", "Zed")]
-                        {
-                            let view = more_view.clone();
-                            let snapshot = more_snapshot.clone();
-                            menu = menu.item(
-                                PopupMenuItem::new(format!(
-                                    "在 {label} 打开{}…",
-                                    if exact {
-                                        "定位行"
-                                    } else {
-                                        "工作目录文件（不定位）"
-                                    }
-                                ))
-                                .disabled(!restored || this.editor_task.is_some())
-                                .on_click(move |_, _, cx| {
-                                    let _ = view.update(cx, |this, cx| {
-                                        if this.restore_tool_snapshot(&snapshot, cx) {
-                                            this.open_editor(editor, cx);
-                                        }
-                                    });
-                                }),
-                            );
-                        }
                         let view = more_view.clone();
                         let location_snapshot = more_snapshot.clone();
                         menu = menu.item(
@@ -954,76 +921,6 @@ impl GitDiffView {
             });
         }));
     }
-
-    fn open_editor(&mut self, editor: &'static str, cx: &mut Context<Self>) {
-        if self.editor_task.is_some() {
-            return;
-        }
-        let Some(target) = &self.target else {
-            return;
-        };
-        let path = target.path.clone();
-        let directory = self.directory.clone();
-        let line = self
-            .location
-            .as_ref()
-            .filter(|position| {
-                target.group == ChangeGroup::Unstaged && position.side() == DiffSide::Modified
-            })
-            .map(DiffLinePosition::line);
-        let revision = self.revision;
-        self.editor_task = Some(cx.spawn(async move |view, cx| {
-            let result = cx
-                .background_spawn(async move {
-                    let repository = Repository::discover(&directory).map_err(|source| {
-                        GitOperationError::from(RepositoryError::git(
-                            "discovering editor repository",
-                            &directory,
-                            source,
-                        ))
-                    })?;
-                    let root = repository.workdir().ok_or_else(GitOperationError::no_workdir)?;
-                    let path = root.join(path);
-                    if !path.is_file() {
-                        return Err(ToolError::file_missing(&path));
-                    }
-                    let mut command = std::process::Command::new(editor);
-                    if let Some(line) = line {
-                        let mut location = path.into_os_string();
-                        location.push(format!(":{line}:1"));
-                        if editor != "zed" {
-                            command.arg("--goto");
-                        }
-                        command.arg(location);
-                    } else {
-                        command.arg(path);
-                    }
-                    let output =
-                        command.output().map_err(|source| ToolError::launch(editor, source))?;
-                    if !output.status.success() {
-                        return Err(ToolError::editor_failed(
-                            editor,
-                            output.status,
-                            String::from_utf8_lossy(&output.stderr).into_owned(),
-                        ));
-                    }
-                    Ok::<_, ToolError>(())
-                })
-                .await;
-            let _ = view.update(cx, |this, cx| {
-                if this.revision != revision {
-                    return;
-                }
-                this.editor_task = None;
-                match result {
-                    Ok(()) => this.tool_error = None,
-                    Err(error) => this.tool_error = Some(details(&error)),
-                }
-                cx.notify();
-            });
-        }));
-        cx.notify();
-    }
 }
 
 fn endpoint(side: DiffSide, line: usize) -> Result<LineEndpoint> {
@@ -1053,18 +950,10 @@ fn dispatch_change(
 enum ToolError {
     #[error(transparent)]
     Patch { source: PatchError },
-    #[error(transparent)]
-    Operation { source: GitOperationError },
     #[error("请先选择包含变更的行或块")]
     SelectionRequired,
     #[error("line number {line} exceeds supported patch coordinates")]
     LineNumber { line: usize, source: std::num::TryFromIntError },
-    #[error("工作目录文件不存在：{}", path.display())]
-    FileMissing { path: std::path::PathBuf },
-    #[error("无法启动 {editor}，请安装并配置编辑器 CLI")]
-    Launch { editor: &'static str, source: std::io::Error },
-    #[error("{editor} 打开失败 ({status})：{stderr}")]
-    EditorFailed { editor: &'static str, status: std::process::ExitStatus, stderr: String },
 }
 
 impl ToolError {
@@ -1074,29 +963,10 @@ impl ToolError {
     fn line_number(line: usize, source: std::num::TryFromIntError) -> Self {
         Self::LineNumber { line, source }
     }
-    fn file_missing(path: &std::path::Path) -> Self {
-        Self::FileMissing { path: path.to_owned() }
-    }
-    fn launch(editor: &'static str, source: std::io::Error) -> Self {
-        Self::Launch { editor, source }
-    }
-    fn editor_failed(
-        editor: &'static str,
-        status: std::process::ExitStatus,
-        stderr: String,
-    ) -> Self {
-        Self::EditorFailed { editor, status, stderr }
-    }
 }
 
 impl From<PatchError> for ToolError {
     fn from(source: PatchError) -> Self {
         Self::Patch { source }
-    }
-}
-
-impl From<GitOperationError> for ToolError {
-    fn from(source: GitOperationError) -> Self {
-        Self::Operation { source }
     }
 }
