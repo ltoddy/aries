@@ -904,18 +904,6 @@ impl RenderOnce for ComposerInput {
             .border_color(p.border())
             .bg(p.input())
             .child(
-                Button::new("add-attachments")
-                    .ghost()
-                    .icon(IconName::Paperclip)
-                    .accessibility_label("添加附件…")
-                    .tooltip("添加图片、音频、PDF 或文本…")
-                    .size_10()
-                    .disabled(!attachments_available)
-                    .on_click(move |_, window, cx| {
-                        let _ = picker.update(cx, |this, cx| this.choose_attachments(window, cx));
-                    }),
-            )
-            .child(
                 div().id("composer-input").flex_1().min_w_0().px_1().child(
                     Textarea::new(&input)
                         .appearance(false)
@@ -941,6 +929,18 @@ impl RenderOnce for ComposerInput {
                         }),
                 )
             })
+            .child(
+                Button::new("add-attachments")
+                    .ghost()
+                    .icon(IconName::Paperclip)
+                    .accessibility_label("添加附件…")
+                    .tooltip("添加图片、音频、PDF 或文本…")
+                    .size_10()
+                    .disabled(!attachments_available)
+                    .on_click(move |_, window, cx| {
+                        let _ = picker.update(cx, |this, cx| this.choose_attachments(window, cx));
+                    }),
+            )
             .child(
                 Button::new("send")
                     .primary()

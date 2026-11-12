@@ -5,10 +5,10 @@ use std::path::{Path, PathBuf};
 use agent_client_protocol::AcpAgentConfig;
 use agent_client_protocol::v1::schema::{SessionId, SessionInfo};
 use gpui_kit::assets::IconName;
-use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants};
 use gpui_kit::component::menu::{ContextMenuExt, PopupMenu, PopupMenuItem};
 use gpui_kit::component::{
-    ActiveTheme, Icon, ResizableState, Sizable, h_resizable, resizable_panel,
+    ActiveTheme, Disableable, Icon, ResizableState, Sizable, h_resizable, resizable_panel,
 };
 use gpui_kit::prelude::*;
 use gpui_kit::*;
@@ -97,6 +97,7 @@ pub struct WorkspaceView {
     sidebar_focus_handle: FocusHandle,
     sidebar_toggle_focus_handle: FocusHandle,
     layout: Entity<ResizableState>,
+    diff_layout: Entity<ResizableState>,
     _sidebar_subscription: Subscription,
     tabs: Vec<SessionTab>,
     active: usize,
@@ -151,6 +152,7 @@ impl WorkspaceView {
             sidebar_focus_handle: cx.focus_handle(),
             sidebar_toggle_focus_handle: cx.focus_handle().tab_stop(true),
             layout: cx.new(|_| ResizableState::default()),
+            diff_layout: cx.new(|_| ResizableState::default()),
             _sidebar_subscription: sidebar_subscription,
             tabs: Vec::new(),
             active: 0,
@@ -178,13 +180,69 @@ impl Render for WorkspaceView {
         } else {
             view.update(cx, |session, cx| session.git_panel().render(view, window, cx))
         };
+        let diff = view.read(cx).git_panel().diff().clone();
+        let diff_open = !self.usage_visible && diff.read(cx).is_open();
+        let font_size = cx.theme().font_size;
+        let width = window.viewport_size().width;
+        let diff_minimum = font_size * 28.;
+        let sidebar_minimum = font_size * 12.5;
+        let sidebar_maximum = if diff_open {
+            (width - diff_minimum - font_size).min(font_size * 32.5)
+        } else {
+            font_size * 32.5
+        };
+        let sidebar_available =
+            (!diff_open || sidebar_maximum >= sidebar_minimum).then_some(sidebar_maximum);
+        let sidebar_visible = self.sidebar_visible && sidebar_available.is_some();
+        let sidebar_width = if sidebar_visible {
+            self.layout
+                .read(cx)
+                .sizes()
+                .first()
+                .copied()
+                .unwrap_or(font_size * 18.)
+                .clamp(sidebar_minimum, sidebar_maximum)
+        } else {
+            Pixels::ZERO
+        };
+        let content_width = width - sidebar_width;
+        let chat = div()
+            .relative()
+            .size_full()
+            .min_w_0()
+            .min_h_0()
+            .child(if self.usage_visible {
+                div().size_full().child(self.usage.clone()).into_any_element()
+            } else {
+                match active {
+                    Some(view) => div().size_full().child(view).into_any_element(),
+                    None => self.render_empty_main(p),
+                }
+            })
+            .children(git_info);
+        let content = if diff_open {
+            let diff_width =
+                (content_width * 0.6).clamp(font_size * 16., content_width - font_size * 12.);
+            h_resizable("chat-diff-layout")
+                .with_state(&self.diff_layout)
+                .child(resizable_panel().size_range(font_size * 12. ..Pixels::MAX).child(chat))
+                .child(
+                    resizable_panel()
+                        .size(diff_width)
+                        .size_range(font_size * 16. ..Pixels::MAX)
+                        .child(diff),
+                )
+                .into_any_element()
+        } else {
+            chat.into_any_element()
+        };
         let main = div()
             .flex_1()
             .min_w_0()
             .h_full()
             .flex()
             .flex_col()
-            .child(self.render_tab_bar(p, cx))
+            .child(self.render_tab_bar(p, sidebar_available, cx))
             .child(
                 div()
                     .relative()
@@ -192,15 +250,7 @@ impl Render for WorkspaceView {
                     .flex_col()
                     .flex_1()
                     .min_h_0()
-                    .child(if self.usage_visible {
-                        div().size_full().child(self.usage.clone()).into_any_element()
-                    } else {
-                        match active {
-                            Some(view) => div().size_full().child(view).into_any_element(),
-                            None => self.render_empty_main(p),
-                        }
-                    })
-                    .children(git_info)
+                    .child(content)
                     .when(self.terminal_visible, |view| view.child(self.render_terminal(cx))),
             );
         div()
@@ -252,13 +302,13 @@ impl Render for WorkspaceView {
             .text_color(p.foreground())
             .font_family(cx.theme().font_family.clone())
             .text_sm()
-            .child(if self.sidebar_visible {
+            .child(if sidebar_visible {
                 h_resizable("layout")
                     .with_state(&self.layout)
                     .child(
                         resizable_panel()
                             .size(cx.theme().font_size * 18.)
-                            .size_range(cx.theme().font_size * 12.5..cx.theme().font_size * 32.5)
+                            .size_range(sidebar_minimum..sidebar_maximum)
                             .child(
                                 div()
                                     .size_full()
@@ -394,7 +444,7 @@ impl WorkspaceView {
         let id = self.next_id;
         self.next_id += 1;
         let view =
-            Self::create_chat_view(&self.cwd, &self.agent, SessionRenderMode::Main, window, cx);
+            Self::create_chat_view(&directory, &self.agent, SessionRenderMode::Main, window, cx);
         let subscription = Self::observe_tab(&view, window, cx);
         self.tabs.push(SessionTab::new(id, view.clone(), subscription));
         self.usage_visible = false;
@@ -436,7 +486,7 @@ impl WorkspaceView {
         let id = self.next_id;
         self.next_id += 1;
         let view =
-            Self::create_chat_view(&self.cwd, &self.agent, SessionRenderMode::Main, window, cx);
+            Self::create_chat_view(&session.cwd, &self.agent, SessionRenderMode::Main, window, cx);
         let subscription = Self::observe_tab(&view, window, cx);
         view.update(cx, |view, cx| view.queue_session_load(session, cx));
         self.tabs.push(SessionTab::new(id, view, subscription));
@@ -567,7 +617,12 @@ fn adjacent_tab(active: usize, count: usize, next: bool) -> Option<usize> {
 }
 
 impl WorkspaceView {
-    pub fn render_tab_bar(&self, p: Palette, cx: &mut Context<Self>) -> AnyElement {
+    fn render_tab_bar(
+        &self,
+        p: Palette,
+        sidebar_available: Option<Pixels>,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let tabs: Vec<_> = if self.usage_visible {
             Vec::new()
         } else {
@@ -577,9 +632,9 @@ impl WorkspaceView {
                 .map(|(index, tab)| self.render_tab(index, tab, p, cx))
                 .collect()
         };
-        let label = if self.sidebar_visible { "收起会话列表" } else { "展开会话列表" };
-        let icon =
-            if self.sidebar_visible { IconName::PanelLeftClose } else { IconName::PanelLeftOpen };
+        let sidebar_visible = self.sidebar_visible && sidebar_available.is_some();
+        let label = if sidebar_visible { "收起会话列表" } else { "展开会话列表" };
+        let icon = if sidebar_visible { IconName::PanelLeftClose } else { IconName::PanelLeftOpen };
         let shortcut = if cfg!(target_os = "macos") { "⌘B" } else { "Ctrl+B" };
         div()
             .id("tab-bar")
@@ -599,7 +654,12 @@ impl WorkspaceView {
                     .small()
                     .icon(Icon::new(icon))
                     .accessibility_label(label)
-                    .tooltip(format!("{label} {shortcut}"))
+                    .disabled(sidebar_available.is_none())
+                    .tooltip(if sidebar_available.is_some() {
+                        format!("{label} {shortcut}")
+                    } else {
+                        "窗口较窄，收起 diff 或加宽窗口后可展开会话列表".into()
+                    })
                     .on_click(|_, window, cx| window.dispatch_action(Box::new(ToggleSidebar), cx)),
             )
             .child(
@@ -727,29 +787,29 @@ impl WorkspaceView {
         let state = view.execution_state();
         let status = state.label();
         let tab_label = format!("切换到标签 {title} · {status}");
-        let details = format!("{title}\n{}\n{status}", view.directory().display());
+        let details = format!("{title}\n{}\n{status}", view.execution().tab_directory().display());
         let drag_title = title.clone().into();
         let tab = div()
             .id(("tab", id))
+            .relative()
             .h_7()
             .flex_shrink_0()
             .w(rems(11.25))
             .min_w(rems(11.25))
-            .px_1()
             .rounded(rems(0.5))
             .border_1()
             .border_color(if active { p.foreground() } else { p.border() })
             .flex()
             .items_center()
-            .gap_1()
             .bg(if active { p.background() } else { p.input() })
-            .hover(move |style| style.bg(if active { p.background() } else { p.muted() }))
             .child(
                 Button::new(("tab-button", id))
-                    .ghost()
+                    .custom(ButtonCustomVariant::new(cx).active(cx.theme().button_active))
                     .small()
                     .h_full()
-                    .px_0()
+                    .px_1()
+                    .pr_8()
+                    .rounded(cx.theme().font_size * 0.5)
                     .flex_1()
                     .min_w_0()
                     .accessibility_label(tab_label)
@@ -771,16 +831,18 @@ impl WorkspaceView {
                     ),
             )
             .child(
-                Button::new(("close-tab", id))
-                    .icon(Icon::new(IconName::X).size(rems(0.6875)))
-                    .ghost()
-                    .small()
-                    .tooltip_with_action("关闭标签", &CloseTab, None)
-                    .accessibility_label("关闭标签")
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        cx.stop_propagation();
-                        this.execute_tab_command(TabCommand::close(id), window, cx);
-                    })),
+                div().absolute().right_1().top_0().bottom_0().flex().items_center().child(
+                    Button::new(("close-tab", id))
+                        .icon(Icon::new(IconName::X).size(rems(0.6875)))
+                        .ghost()
+                        .small()
+                        .tooltip_with_action("关闭标签", &CloseTab, None)
+                        .accessibility_label("关闭标签")
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            cx.stop_propagation();
+                            this.execute_tab_command(TabCommand::close(id), window, cx);
+                        })),
+                ),
             );
         self.with_tab_interactions(tab, id, drag_title, cx)
     }

@@ -1,7 +1,7 @@
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{ActiveTheme, Disableable, Icon, Sizable};
+use gpui_kit::component::{ActiveTheme, Disableable, Icon, Selectable, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -137,6 +137,10 @@ impl<'a> GitChangeList<'a> {
                         let view = view.clone();
                         let target = file.path().to_owned();
                         let directory = directory.to_owned();
+                        let diff_view = view.clone();
+                        let diff_target = target.clone();
+                        let diff_directory = directory.clone();
+                        let selected = conversation.diff().read(cx).is_selected(file.path(), group);
                         div()
                             .id(path.clone())
                             .h_8()
@@ -202,15 +206,35 @@ impl<'a> GitChangeList<'a> {
                                     }),
                             )
                             .child(
-                                div()
-                                    .id("file-path")
+                                Button::new("file-path")
+                                    .ghost()
+                                    .small()
                                     .flex_1()
                                     .min_w_0()
-                                    .truncate()
-                                    .text_sm()
-                                    .child(path.clone())
-                                    .tooltip(move |window, cx| {
-                                        Tooltip::new(path.clone()).build(window, cx)
+                                    .px_0()
+                                    .selected(selected)
+                                    .disabled(row.is_exiting())
+                                    .accessibility_label(format!(
+                                        "查看 diff：{path} · {}",
+                                        group.title()
+                                    ))
+                                    .tooltip(path.clone())
+                                    .child(
+                                        div().w_full().truncate().text_left().child(path.clone()),
+                                    )
+                                    .on_click(move |_, window, cx| {
+                                        diff_view.update(cx, |this, cx| {
+                                            if this.directory() == diff_directory {
+                                                this.with_git_panel(|panel| {
+                                                    panel.open_diff(
+                                                        diff_target.clone(),
+                                                        group,
+                                                        window,
+                                                        cx,
+                                                    );
+                                                });
+                                            }
+                                        });
                                     }),
                             )
                             .child(

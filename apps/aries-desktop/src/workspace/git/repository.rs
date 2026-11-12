@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::path::{Path, PathBuf};
 
 use anyhow::Context;
-use git2::{DiffFindOptions, DiffOptions, Patch, Repository, Status, StatusOptions};
+use git2::{Diff, DiffFindOptions, DiffOptions, Patch, Repository, Status, StatusOptions};
 use gpui_kit::assets::IconName;
 use gpui_kit::component::ActiveTheme;
 use gpui_kit::*;
@@ -44,12 +44,13 @@ pub enum LineChanges {
     Unavailable,
 }
 
-fn read_line_changes(
-    repository: &Repository,
-    group: ChangeGroup,
-) -> Result<BTreeMap<PathBuf, LineChanges>, git2::Error> {
+fn read_diff(repository: &Repository, group: ChangeGroup) -> Result<Diff<'_>, git2::Error> {
     let mut options = DiffOptions::new();
-    options.include_untracked(true).recurse_untracked_dirs(true).show_untracked_content(true);
+    options
+        .update_index(false)
+        .include_untracked(true)
+        .recurse_untracked_dirs(true)
+        .show_untracked_content(true);
     let mut diff = match group {
         ChangeGroup::Staged => {
             let tree = match repository.head() {
@@ -64,6 +65,33 @@ fn read_line_changes(
     let mut find = DiffFindOptions::new();
     find.renames(true).for_untracked(true);
     diff.find_similar(Some(&mut find))?;
+    Ok(diff)
+}
+
+pub fn read_file_diff(cwd: &Path, path: &Path, group: ChangeGroup) -> anyhow::Result<String> {
+    let repository = Repository::discover(cwd).context("discovering Git repository")?;
+    let diff = read_diff(&repository, group).context("reading Git diff")?;
+    let mut output = Vec::new();
+    for (ix, delta) in diff.deltas().enumerate() {
+        if delta.old_file().path() != Some(path) && delta.new_file().path() != Some(path) {
+            continue;
+        }
+        let mut patch = Patch::from_diff(&diff, ix)
+            .with_context(|| format!("reading Git patch for {}", path.display()))?
+            .with_context(|| format!("Git patch unavailable for {}", path.display()))?;
+        let buffer = patch
+            .to_buf()
+            .with_context(|| format!("serializing Git patch for {}", path.display()))?;
+        output.extend_from_slice(&buffer);
+    }
+    Ok(String::from_utf8_lossy(&output).into_owned())
+}
+
+fn read_line_changes(
+    repository: &Repository,
+    group: ChangeGroup,
+) -> Result<BTreeMap<PathBuf, LineChanges>, git2::Error> {
+    let diff = read_diff(repository, group)?;
     let mut changes = BTreeMap::new();
     for ix in 0..diff.deltas().len() {
         let lines = match Patch::from_diff(&diff, ix) {

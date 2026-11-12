@@ -1,9 +1,13 @@
 use std::ops::Range;
 
+use alacritty_terminal::Term;
+use alacritty_terminal::grid::Dimensions as _;
+use alacritty_terminal::index::{Column, Line, Point as GridPoint, Side};
+use alacritty_terminal::selection::{Selection, SelectionType};
 use alacritty_terminal::term::TermMode;
 use gpui_kit::{
-    Bounds, ClipboardItem, Context, EntityInputHandler, Keystroke, Pixels, Point, UTF16Selection,
-    Window,
+    Bounds, ClipboardItem, Context, EntityInputHandler, Keystroke, MouseDownEvent, Pixels, Point,
+    UTF16Selection, Window, px,
 };
 
 use crate::terminal::TerminalView;
@@ -113,6 +117,66 @@ fn replace_preedit(text: &mut String, range: Option<Range<usize>>, replacement: 
     let start = byte_offset(text, range.start);
     let end = byte_offset(text, range.end.max(range.start));
     text.replace_range(start..end, replacement);
+}
+
+impl TerminalView {
+    fn selection_point<T>(&self, position: Point<Pixels>, terminal: &Term<T>) -> (GridPoint, Side) {
+        let offset = position - self.bounds.origin;
+        let column = (offset.x / self.cell_size.width).max(0.);
+        let row = (offset.y / self.cell_size.height).floor() as i32;
+        let row = row.clamp(0, terminal.screen_lines() as i32 - 1);
+        let point = GridPoint::new(
+            Line(row - terminal.grid().display_offset() as i32),
+            Column((column.floor() as usize).min(terminal.columns() - 1)),
+        );
+        let side = if offset.x < px(0.) {
+            Side::Left
+        } else if column >= terminal.columns() as f32 || column.fract() >= 0.5 {
+            Side::Right
+        } else {
+            Side::Left
+        };
+        (point, side)
+    }
+
+    pub fn start_selection(&mut self, event: &MouseDownEvent, cx: &mut Context<Self>) {
+        if !self.bounds.contains(&event.position) {
+            return;
+        }
+        let Some(session) = &self.session else {
+            return;
+        };
+        let mut terminal = session.terminal();
+        let (point, side) = self.selection_point(event.position, &terminal);
+        let kind = match event.click_count {
+            2 => SelectionType::Semantic,
+            3.. => SelectionType::Lines,
+            _ => SelectionType::Simple,
+        };
+        terminal.selection = Some(Selection::new(kind, point, side));
+        self.selecting = true;
+        cx.notify();
+    }
+
+    pub fn update_selection(&mut self, position: Point<Pixels>, cx: &mut Context<Self>) {
+        let Some(session) = &self.session else {
+            return;
+        };
+        let mut terminal = session.terminal();
+        let (point, side) = self.selection_point(position, &terminal);
+        if let Some(selection) = &mut terminal.selection {
+            selection.update(point, side);
+            cx.notify();
+        }
+    }
+
+    pub fn copy_selection(&self, cx: &mut Context<Self>) {
+        let text =
+            self.session.as_ref().and_then(|session| session.terminal().selection_to_string());
+        if let Some(text) = text.filter(|text| !text.is_empty()) {
+            cx.write_to_clipboard(ClipboardItem::new_string(text));
+        }
+    }
 }
 
 impl EntityInputHandler for TerminalView {

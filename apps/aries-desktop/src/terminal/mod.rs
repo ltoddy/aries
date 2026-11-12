@@ -10,14 +10,17 @@ use gpui_kit::component::ActiveTheme;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    App, Bounds, Context, FocusHandle, Focusable, Keystroke, Pixels, Subscription, Task, Window,
-    canvas, div, px, size,
+    App, Bounds, Context, FocusHandle, Focusable, Keystroke, MouseButton, MouseDownEvent,
+    MouseMoveEvent, MouseUpEvent, Pixels, Subscription, Task, Window, canvas, div, px, size,
 };
 
-gpui_kit::actions!(terminal, [PasteTerminal]);
+gpui_kit::actions!(terminal, [CopyTerminal, PasteTerminal]);
 
 pub fn init(cx: &mut App) {
-    cx.bind_keys([gpui_kit::KeyBinding::new("cmd-v", PasteTerminal, Some("Terminal"))]);
+    cx.bind_keys([
+        gpui_kit::KeyBinding::new("cmd-c", CopyTerminal, Some("Terminal")),
+        gpui_kit::KeyBinding::new("cmd-v", PasteTerminal, Some("Terminal")),
+    ]);
 }
 
 pub use self::session::Status;
@@ -40,6 +43,7 @@ pub struct TerminalView {
     preedit_selection: std::ops::Range<usize>,
     input_error: Option<String>,
     scroll_remainder: f32,
+    selecting: bool,
     visible: bool,
 }
 
@@ -100,6 +104,7 @@ impl TerminalView {
             preedit_selection: 0..0,
             input_error: None,
             scroll_remainder: 0.,
+            selecting: false,
             visible: true,
         };
         view.start();
@@ -113,6 +118,9 @@ impl TerminalView {
     pub fn set_visible(&mut self, visible: bool, cx: &mut Context<Self>) {
         if self.visible != visible {
             self.visible = visible;
+            if !visible {
+                self.selecting = false;
+            }
             if visible {
                 cx.notify();
             }
@@ -129,6 +137,7 @@ impl TerminalView {
         self.preedit_selection = 0..0;
         self.input_error = None;
         self.scroll_remainder = 0.;
+        self.selecting = false;
         self.start();
         window.focus(&self.focus_handle, cx);
         window.notify_text_input_changed(&self.focus_handle);
@@ -165,7 +174,10 @@ impl TerminalView {
             match session.write(bytes) {
                 Ok(()) => {
                     self.input_error = None;
-                    session.terminal().scroll_display(Scroll::Bottom);
+                    let mut terminal = session.terminal();
+                    terminal.selection = None;
+                    terminal.scroll_display(Scroll::Bottom);
+                    self.selecting = false;
                 },
                 Err(error) => self.input_error = Some(error.to_string()),
             }
@@ -244,15 +256,19 @@ impl Render for TerminalView {
             .flex_col()
             .overflow_hidden()
             .text_color(cx.theme().foreground)
+            .on_action(cx.listener(|this, _: &CopyTerminal, _, cx| {
+                this.copy_selection(cx);
+            }))
             .on_action(cx.listener(|this, _: &PasteTerminal, _, cx| {
                 if let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) {
                     this.paste(&text, cx);
                 }
             }))
             .on_mouse_down(
-                gpui_kit::MouseButton::Left,
-                cx.listener(|this, _, window, cx| {
+                MouseButton::Left,
+                cx.listener(|this, event: &MouseDownEvent, window, cx| {
                     window.focus(&this.focus_handle, cx);
+                    this.start_selection(event, cx);
                 }),
             )
             .on_scroll(cx.listener(|this, event: &gpui_kit::ScrollEvent, _, cx| {
@@ -306,6 +322,33 @@ impl Render for TerminalView {
                         paint_entity
                             .update(cx, |this, cx| self::paint::paint(this, bounds, window, cx));
                         let handle = paint_entity.read(cx).focus_handle.clone();
+                        let mouse_entity = paint_entity.clone();
+                        window.on_mouse_event(move |event: &MouseMoveEvent, phase, _, cx| {
+                            if phase.bubble() {
+                                mouse_entity.update(cx, |this, cx| {
+                                    if this.selecting {
+                                        if event.dragging() {
+                                            this.update_selection(event.position, cx);
+                                            cx.stop_propagation();
+                                        } else {
+                                            this.selecting = false;
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                        let mouse_entity = paint_entity.clone();
+                        window.on_mouse_event(move |event: &MouseUpEvent, phase, _, cx| {
+                            if phase.bubble() && event.button == MouseButton::Left {
+                                mouse_entity.update(cx, |this, cx| {
+                                    if this.selecting {
+                                        this.update_selection(event.position, cx);
+                                        this.selecting = false;
+                                        cx.stop_propagation();
+                                    }
+                                });
+                            }
+                        });
                         window.handle_input(
                             &handle,
                             gpui_kit::ElementInputHandler::new(bounds, paint_entity),

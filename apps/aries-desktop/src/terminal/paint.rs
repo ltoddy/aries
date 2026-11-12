@@ -1,3 +1,4 @@
+use alacritty_terminal::index::Point as GridPoint;
 use alacritty_terminal::term::cell::Flags;
 use alacritty_terminal::term::color::Colors;
 use alacritty_terminal::vte::ansi::{Color, CursorShape, NamedColor, Rgb};
@@ -146,12 +147,12 @@ pub fn paint(
     let Some(session) = &view.session else {
         return;
     };
-    let (cells, cursor, display_offset, colors) = {
+    let (cells, cursor, display_offset, colors, selection) = {
         let terminal = session.terminal();
         let content = terminal.renderable_content();
         let cells: Vec<_> =
             content.display_iter.map(|cell| (cell.point, cell.cell.clone())).collect();
-        (cells, content.cursor, content.display_offset, *content.colors)
+        (cells, content.cursor, content.display_offset, *content.colors, content.selection)
     };
     let foreground = color(
         Color::Named(NamedColor::Foreground),
@@ -281,6 +282,15 @@ pub fn paint(
             }
             if cell.flags.contains(Flags::DIM) {
                 fg.a *= 0.65;
+            }
+            if selection.is_some_and(|selection| {
+                selection.contains(position)
+                    || (cell.flags.contains(Flags::WIDE_CHAR)
+                        && selection.contains(GridPoint::new(position.line, position.column + 1)))
+            }) {
+                fg = cx.theme().primary_foreground;
+                bg = cx.theme().primary;
+                window.paint_quad(fill(cell_bounds, bg));
             }
             let extra = cell.zerowidth().filter(|extra| !extra.is_empty());
             let ascii = cell.c.is_ascii_graphic()

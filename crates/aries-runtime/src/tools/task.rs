@@ -101,15 +101,7 @@ impl TaskState {
             (_, TaskStatus::Running) => return String::new(),
         };
 
-        [
-            "<task-notification>".to_owned(),
-            format!("<task-id>{task_id}</task-id>"),
-            format!("<task-kind>{:?}</task-kind>", self.kind),
-            format!("<status>{:?}</status>", self.status),
-            format!("<summary>{summary}</summary>"),
-            "</task-notification>".to_owned(),
-        ]
-        .join("\n")
+        format!("\n\n{task_id} ({} · {})\n\n{summary}\n\n", self.kind, self.status)
     }
 }
 
@@ -534,10 +526,10 @@ mod tests {
 
         let notification = state.notification("Shell: No.0001");
 
-        assert!(notification.contains("<task-id>Shell: No.0001</task-id>"));
-        assert!(notification.contains("<task-kind>Shell</task-kind>"));
-        assert!(notification.contains("<status>Completed</status>"));
-        assert!(notification.contains("Background command \"run background sleep\" completed"));
+        assert_eq!(
+            notification,
+            "\n\nShell: No.0001 (Shell · completed)\n\nBackground command \"run background sleep\" completed\n\n"
+        );
     }
 
     #[test]

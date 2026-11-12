@@ -9,6 +9,7 @@ use gpui_kit::prelude::*;
 use gpui_kit::*;
 
 use crate::workspace::SessionView;
+use crate::workspace::git::diff_view::GitDiffView;
 use crate::workspace::git::index::{IndexAction, update_index};
 use crate::workspace::git::list::GitChangeList;
 use crate::workspace::git::motion::{GitMotion, accept_result};
@@ -31,12 +32,18 @@ pub struct GitPanel {
     read_error: Option<String>,
     trigger_focus: FocusHandle,
     panel_focus: FocusHandle,
+    diff: Entity<GitDiffView>,
+    _diff_subscription: Subscription,
 }
 
 impl GitPanel {
     pub fn new(cwd: impl Into<PathBuf>, cx: &mut Context<SessionView>) -> Self {
+        let cwd = cwd.into();
+        let owner = cx.weak_entity();
+        let diff = cx.new(|cx| GitDiffView::new(owner, cwd.clone(), cx));
+        let diff_subscription = cx.observe(&diff, |_, _, cx| cx.notify());
         Self {
-            cwd: cwd.into(),
+            cwd,
             info: None,
             info_task: None,
             refresh_task: None,
@@ -51,10 +58,25 @@ impl GitPanel {
             read_error: None,
             trigger_focus: cx.focus_handle().tab_stop(true),
             panel_focus: cx.focus_handle().tab_stop(true),
+            diff,
+            _diff_subscription: diff_subscription,
         }
     }
     pub fn set_directory(&mut self, cwd: impl Into<PathBuf>) {
         self.cwd = cwd.into();
+    }
+    pub fn diff(&self) -> &Entity<GitDiffView> {
+        &self.diff
+    }
+    pub fn open_diff(
+        &mut self,
+        path: PathBuf,
+        group: ChangeGroup,
+        window: &mut Window,
+        cx: &mut Context<SessionView>,
+    ) {
+        self.set_collapsed(true, window, cx);
+        self.diff.update(cx, |diff, cx| diff.open(path, group, window, cx));
     }
     pub fn directory(&self) -> &Path {
         &self.cwd
@@ -360,6 +382,7 @@ impl GitPanel {
         );
         self.info = info;
         self.read_error = error;
+        self.diff.update(cx, |diff, cx| diff.refresh(cx));
         if changed {
             if !duration.is_zero() {
                 cx.spawn(async move |view, cx| {
@@ -375,6 +398,19 @@ impl GitPanel {
         }
     }
 
+    pub fn is_index_action_available(&self, path: &Path, action: IndexAction) -> bool {
+        let group = match action {
+            IndexAction::Stage => ChangeGroup::Unstaged,
+            IndexAction::Unstage => ChangeGroup::Staged,
+        };
+        !self.index_busy
+            && self.motion.rows(group).any(|row| {
+                row.file().path() == path
+                    && !row.is_exiting()
+                    && !row.file().status().is_conflicted()
+            })
+    }
+
     pub fn change_git_index(
         &mut self,
         path: impl Into<PathBuf>,
@@ -387,18 +423,12 @@ impl GitPanel {
             IndexAction::Stage => ChangeGroup::Unstaged,
             IndexAction::Unstage => ChangeGroup::Staged,
         };
-        if self.index_busy
-            || self.info_collapsed
-            || !self.motion.rows(group).any(|row| {
-                row.file().path() == path
-                    && !row.is_exiting()
-                    && !row.file().status().is_conflicted()
-            })
-        {
+        if !self.is_index_action_available(&path, action) {
             return;
         }
         self.index_busy = true;
         self.pending_index = Some((path.clone(), action));
+        self.diff.update(cx, |_, cx| cx.notify());
         self.revision += 1;
         let revision = self.revision;
         let directory = self.cwd.clone();
@@ -416,6 +446,7 @@ impl GitPanel {
                 this.with_git_panel(|panel| {
                     panel.index_busy = false;
                     panel.pending_index = None;
+                    panel.diff.update(cx, |_, cx| cx.notify());
                     let current = accept_result(&panel.cwd, panel.revision, &result.3, revision);
                     if current {
                         panel.sync_info(result.1, result.0.is_ok(), cx);
@@ -456,6 +487,7 @@ impl GitPanel {
     }
 
     pub fn watch_info(&mut self, cx: &mut Context<SessionView>) {
+        self.diff.update(cx, |diff, cx| diff.set_directory(&self.cwd, cx));
         if self.motion.reset(&self.cwd) {
             self.info = None;
             self.read_error = None;
