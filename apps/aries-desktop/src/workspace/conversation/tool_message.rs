@@ -148,7 +148,7 @@ impl RenderOnce for ToolMessage {
                     .tooltip(move |window, cx| {
                         let details = details.clone();
                         Tooltip::element(move |_, _| {
-                            div().max_w(px(480.)).whitespace_normal().child(details.clone())
+                            div().max_w(rems(30.)).whitespace_normal().child(details.clone())
                         })
                         .build(window, cx)
                     })
@@ -173,7 +173,7 @@ impl RenderOnce for ToolMessage {
                                     .child(status_icon)
                                     .when(show_status, |status_row| status_row.child(status)),
                             )
-                            .child(Icon::new(icon).size(px(14.)).flex_shrink_0())
+                            .child(Icon::new(icon).size(rems(0.875)).flex_shrink_0())
                             .child(
                                 div().flex_1().min_w_0().child(
                                     div()

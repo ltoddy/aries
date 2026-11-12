@@ -1,5 +1,5 @@
 use gpui_kit::base::SelectableText;
-use gpui_kit::component::{Icon, IconName, Sizable};
+use gpui_kit::component::{ActiveTheme, Icon, IconName, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -8,6 +8,7 @@ use crate::workspace::conversation::attachment::Attachment;
 use crate::workspace::conversation::media::MessageImages;
 use crate::workspace::conversation::model::Message;
 use crate::workspace::settings::palette::Palette;
+use crate::workspace::settings::typography;
 
 #[derive(IntoElement)]
 pub struct UserMessage {
@@ -63,7 +64,7 @@ impl UserMessage {
 }
 
 impl RenderOnce for UserMessage {
-    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let Self { index, text, attachments, palette: p, on_copy } = self;
         div()
             .id(("message", index))
@@ -95,19 +96,20 @@ impl RenderOnce for UserMessage {
             .child(
                 div()
                     .min_w_0()
-                    .max_w(relative(0.72))
-                    .px_2()
+                    .max_w(relative(0.8))
+                    .px_3()
                     .py_1()
-                    .rounded(rems(1.))
+                    .rounded(cx.theme().radius_lg)
                     .bg(p.bubble())
                     .flex()
                     .flex_col()
-                    .gap_2()
+                    .gap_1()
                     .children(attachments)
                     .when(!text.is_empty(), |bubble| {
                         bubble.child(
                             div()
                                 .whitespace_normal()
+                                .text_size(typography::body_size())
                                 .line_height(rems(1.5))
                                 .child(SelectableText::new(("user-message-text", index), text)),
                         )

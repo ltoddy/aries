@@ -6,7 +6,7 @@ use agent_client_protocol::v1::schema::{CompactionStatus, SessionId};
 use gpui_kit::assets::IconName;
 use gpui_kit::base::SelectableText;
 use gpui_kit::component::button::{Button, ButtonVariants};
-use gpui_kit::component::text::{TextView, TextViewState, TextViewStyle};
+use gpui_kit::component::text::{TextView, TextViewState};
 use gpui_kit::component::{ActiveTheme, Disableable, Icon, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
@@ -22,6 +22,7 @@ use crate::workspace::conversation::tool_content::ToolDiffs;
 use crate::workspace::conversation::tool_message::{MessageStatusIcon, ToolMessage};
 use crate::workspace::conversation::user_message::UserMessage;
 use crate::workspace::settings::palette::Palette;
+use crate::workspace::settings::typography;
 use crate::{NextUserMessage, PreviousUserMessage};
 
 fn user_message_target(
@@ -35,10 +36,6 @@ fn user_message_target(
     } else {
         anchors.into_iter().rev().find(|index| *index < current || (*index == current && inside))
     }
-}
-
-pub fn markdown_style() -> TextViewStyle {
-    TextViewStyle { paragraph_gap: rems(0.35), ..Default::default() }
 }
 
 pub struct Timeline {
@@ -165,8 +162,8 @@ impl Timeline {
             .flex_1()
             .min_h_0()
             .pl_8()
-            .pr_4()
-            .py_2()
+            .pr_3()
+            .py_1()
             .relative()
             .child(
                 div().w_full().h_full().child(
@@ -176,12 +173,12 @@ impl Timeline {
                                 let gap = match conversation.messages().get(index).map(|m| m.role())
                                 {
                                     Some(Role::User) => rems(0.75),
-                                    _ => rems(0.25),
+                                    _ => rems(0.375),
                                 };
                                 div()
                                     .w_full()
                                     .pb(gap)
-                                    .child(div().max_w(rems(72.)).mx_auto().child(
+                                    .child(div().max_w(rems(60.)).mx_auto().child(
                                         if index < messages {
                                             timeline.timeline_item(
                                                 index,
@@ -193,10 +190,9 @@ impl Timeline {
                                         } else {
                                             div()
                                                 .id("chat-error")
-                                                .rounded(rems(0.75))
-                                                .p_2()
-                                                .border_1()
-                                                .border_color(p.border())
+                                                .rounded(cx.theme().radius_lg)
+                                                .p_3()
+                                                .bg(p.bubble())
                                                 .text_color(p.danger())
                                                 .child(SelectableText::new(
                                                     "chat-error-text",
@@ -223,12 +219,12 @@ impl Timeline {
                 el.child(
                     div().absolute().bottom_4().left_0().right_0().flex().justify_center().child(
                         Button::new("scroll-to-bottom")
+                            .ghost()
                             .icon(IconName::ArrowDown)
-                            .size(rems(2.5))
-                            .rounded_full()
-                            .bg(p.bubble())
-                            .opacity(0.7)
-                            .shadow_md()
+                            .size_8()
+                            .rounded(cx.theme().radius_full())
+                            .bg(p.input())
+                            .text_color(p.muted())
                             .accessibility_label("回到最新消息并恢复自动跟随")
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.with_timeline(|timeline, _, _| {
@@ -262,7 +258,7 @@ impl Timeline {
                     .gap_1()
                     .child(
                         Button::new("scroll-to-top")
-                            .outline()
+                            .ghost()
                             .small()
                             .bg(p.input())
                             .icon(IconName::ArrowUpToLine)
@@ -277,7 +273,7 @@ impl Timeline {
                     )
                     .child(
                         Button::new("previous-user-message")
-                            .outline()
+                            .ghost()
                             .small()
                             .bg(p.input())
                             .icon(IconName::ArrowUp)
@@ -290,7 +286,7 @@ impl Timeline {
                     )
                     .child(
                         Button::new("next-user-message")
-                            .outline()
+                            .ghost()
                             .small()
                             .bg(p.input())
                             .icon(IconName::ArrowDown)
@@ -494,14 +490,7 @@ impl Timeline {
             .flex()
             .flex_col()
             .gap_1()
-            .when(card, |body| {
-                body.px_2()
-                    .py_1()
-                    .rounded(rems(0.625))
-                    .bg(p.input())
-                    .border_1()
-                    .border_color(p.border())
-            })
+            .when(card, |body| body.px_2().py_1().rounded(cx.theme().radius).bg(p.bubble()))
             .when(card || !message.title().is_empty(), |body| {
                 body.child(
                     div()
@@ -571,11 +560,11 @@ impl Timeline {
                         .is_some_and(|state| matches!(&state.error, MaybeUndefined::Value(_))))
                 .then(|| {
                     TextView::new(&markdown)
-                        .style(markdown_style())
+                        .map(typography::style_markdown)
                         .selectable(true)
                         .scrollable(false)
                         .w_full()
-                        .code_block_actions(|code_block, _window, cx| {
+                        .code_block_actions(move |code_block, _window, _cx| {
                             let code = code_block.code().to_string();
                             div()
                                 .flex()
@@ -585,7 +574,7 @@ impl Timeline {
                                     el.child(
                                         div()
                                             .text_xs()
-                                            .text_color(cx.theme().muted)
+                                            .text_color(p.muted())
                                             .child(lang.to_string()),
                                     )
                                 })
@@ -601,13 +590,11 @@ impl Timeline {
                                         .child(
                                             Icon::new(IconName::Copy)
                                                 .xsmall()
-                                                .text_color(cx.theme().muted),
+                                                .text_color(p.muted()),
                                         )
                                 })
                                 .into_any_element()
                         })
-                        .text_sm()
-                        .line_height(rems(1.5))
                         .into_any_element()
                 }),
             )
@@ -641,7 +628,7 @@ struct EmptyTimeline {
     palette: Palette,
 }
 impl RenderOnce for EmptyTimeline {
-    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let p = self.palette;
         div().flex_1().min_h_0().px_6().flex().items_center().justify_center().child(
             div()
@@ -654,10 +641,8 @@ impl RenderOnce for EmptyTimeline {
                 .child(
                     div()
                         .size(rems(3.5))
-                        .rounded(rems(1.))
-                        .border_1()
-                        .border_color(p.border())
-                        .bg(p.input())
+                        .rounded(cx.theme().radius_lg)
+                        .bg(p.bubble())
                         .flex()
                         .items_center()
                         .justify_center()
@@ -666,7 +651,7 @@ impl RenderOnce for EmptyTimeline {
                 .child(
                     div()
                         .mt_1()
-                        .text_size(rems(1.375))
+                        .text_lg()
                         .font_weight(FontWeight::SEMIBOLD)
                         .child("开始与 Aries 对话"),
                 )

@@ -11,7 +11,7 @@ use gpui_kit::component::input::{
 use gpui_kit::component::notification::Notification;
 use gpui_kit::component::scroll::ScrollableElement;
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{ActiveTheme, Disableable, Icon, Sizable, WindowExt};
+use gpui_kit::component::{ActiveTheme, Disableable, Icon, Sizable, Size, WindowExt};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 use thiserror::Error;
@@ -22,8 +22,8 @@ use crate::workspace::conversation::draft::{
     AttachmentError, Draft, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, PromptAttachment,
 };
 use crate::workspace::conversation::slash_commands::{CommandMenu, CommandMenuAction, SlashMenu};
-use crate::workspace::settings::SendKey;
 use crate::workspace::settings::palette::Palette;
+use crate::workspace::settings::{SendKey, typography};
 
 pub struct Composer {
     input: Entity<TextareaState>,
@@ -100,9 +100,6 @@ impl Composer {
     fn render_attachments(&self, p: Palette, cx: &mut Context<SessionView>) -> AnyElement {
         div()
             .id("draft-attachments")
-            .max_h_24()
-            .min_h_0()
-            .overflow_y_scrollbar()
             .flex()
             .flex_wrap()
             .gap_2()
@@ -126,10 +123,8 @@ impl Composer {
                     .flex_shrink_0()
                     .max_w_full()
                     .min_w_0()
-                    .rounded(cx.theme().radius_lg)
-                    .border_1()
-                    .border_color(p.border())
-                    .bg(p.input())
+                    .rounded(cx.theme().radius)
+                    .bg(p.bubble())
                     .child(match attachment.image() {
                         Some(image) => Button::new(("attachment-thumbnail", id))
                             .ghost()
@@ -351,54 +346,75 @@ impl Composer {
         &self,
         session: &SessionView,
         p: Palette,
+        window: &mut Window,
         cx: &mut Context<SessionView>,
     ) -> impl IntoElement {
+        let rem = window.rem_size();
+        let input_height =
+            rem * (6. * 1.25 + 1. + 0.25 + 2. * 1.5 + 0.5) + Size::Medium.input_py() * 2. + px(2.);
+        let remaining_height =
+            (window.viewport_size().height - rem * (2.25 + 0.375 + 1.25 + 1.) - input_height)
+                .max(Pixels::ZERO);
+        let footer_height = (rem * 3.).min(remaining_height * 0.4);
+        let auxiliary_height = remaining_height - footer_height;
         let can_send = session.can_send(cx);
         let send_key = session.send_key(cx);
-        div().flex_shrink_0().pl_8().pr_4().py_2().bg(p.background()).child(
+        div().flex_shrink_0().min_w_0().pl_8().pr_3().pt_1().pb_2().child(
             div()
                 .w_full()
-                .max_w(rems(72.))
+                .max_w(rems(60.))
                 .mx_auto()
                 .flex()
                 .flex_col()
-                .gap_2()
-                .when_some(session.execution().permission(), |composer, permission| {
-                    composer.child(PermissionPrompt::new(
-                        ("permission-motion", cx.entity_id()).into(),
-                        div()
-                            .p_3()
-                            .rounded(cx.theme().radius_lg)
-                            .border_1()
-                            .border_color(p.border())
-                            .bg(p.input())
-                            .child(
+                .gap_1()
+                .child(
+                    div()
+                        .id("composer-auxiliary")
+                        .min_h_0()
+                        .max_h(auxiliary_height)
+                        .overflow_y_scrollbar()
+                        .flex()
+                        .flex_col()
+                        .gap_2()
+                        .when_some(session.execution().permission(), |composer, permission| {
+                            composer.child(PermissionPrompt::new(
+                                ("permission-motion", cx.entity_id()).into(),
                                 div()
-                                    .mb_2()
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .child(permission.title().to_owned()),
-                            )
-                            .child(div().flex().flex_wrap().gap_2().children(
-                                permission.options().iter().enumerate().map(|(index, option)| {
-                                    let id = option.option_id.clone();
-                                    Button::new(("permission", index))
-                                        .label(option.name.clone())
-                                        .small()
-                                        .on_click(cx.listener(move |this, _, _, cx| {
-                                            this.choose_permission(id.clone(), cx)
-                                        }))
-                                }),
+                                    .p_3()
+                                    .rounded(cx.theme().radius_lg)
+                                    .bg(p.bubble())
+                                    .child(
+                                        div()
+                                            .mb_2()
+                                            .font_weight(FontWeight::MEDIUM)
+                                            .child(permission.title().to_owned()),
+                                    )
+                                    .child(div().flex().flex_wrap().gap_2().children(
+                                        permission.options().iter().enumerate().map(
+                                            |(index, option)| {
+                                                let id = option.option_id.clone();
+                                                Button::new(("permission", index))
+                                                    .label(option.name.clone())
+                                                    .small()
+                                                    .on_click(cx.listener(move |this, _, _, cx| {
+                                                        this.choose_permission(id.clone(), cx)
+                                                    }))
+                                            },
+                                        ),
+                                    ))
+                                    .into_any_element(),
                             ))
-                            .into_any_element(),
-                    ))
-                })
-                .child(session.render_execution_context(p, cx))
-                .when_some(session.execution().prompt_queue(), |composer, queue| {
-                    composer.child(queue.render(session, p, cx))
-                })
+                        })
+                        .child(session.render_execution_context(p, cx))
+                        .when_some(session.execution().prompt_queue(), |composer, queue| {
+                            composer.child(queue.render(session, p, cx))
+                        })
+                        .child(self.render_attachments(p, cx)),
+                )
                 .child(
                     div()
                         .relative()
+                        .flex_shrink_0()
                         .flex()
                         .flex_col()
                         .gap_1()
@@ -443,16 +459,19 @@ impl Composer {
                             p,
                             cx,
                         ))
-                        .child(self.render_attachments(p, cx))
                         .child(ComposerInput::new(self, session, p, cx.weak_entity(), can_send)),
                 )
                 .child(
                     div()
+                        .id("composer-footer")
+                        .min_h_0()
+                        .max_h(footer_height)
+                        .overflow_y_scrollbar()
                         .flex()
                         .items_center()
-                        .justify_between()
+                        .flex_wrap()
                         .gap_2()
-                        .min_h_6()
+                        .min_w_0()
                         .child(div().flex_1().min_w_0().when(
                             !session.execution().conversation().config_options().is_empty()
                                 || session.configuration().error().is_some(),
@@ -460,9 +479,11 @@ impl Composer {
                         ))
                         .child(
                             div()
-                                .flex_shrink_0()
+                                .min_w_0()
+                                .ml_auto()
                                 .text_xs()
                                 .text_color(p.muted())
+                                .whitespace_normal()
                                 .text_right()
                                 .child(format!(
                                     "{} {} · {} 换行",
@@ -912,7 +933,7 @@ impl ComposerInput {
 }
 
 impl RenderOnce for ComposerInput {
-    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let Self {
             input,
             busy,
@@ -923,6 +944,7 @@ impl RenderOnce for ComposerInput {
             view,
             has_queue,
         } = self;
+        let input_focused = input.read(cx).focus_handle(cx).is_focused(window);
         let picker = view.clone();
         let drop_view = view.clone();
         let stop_view = view.clone();
@@ -939,19 +961,22 @@ impl RenderOnce for ComposerInput {
                 })
             })
             .flex()
-            .items_end()
-            .gap_2()
-            .p_1()
-            .rounded(rems(0.875))
+            .flex_col()
+            .gap_1()
+            .p_2()
+            .rounded(cx.theme().radius_2xl())
             .border_1()
             .border_color(p.border())
+            .when(input_focused, |surface| surface.border_color(cx.theme().ring))
             .bg(p.input())
             .child(
-                div().id("composer-input").flex_1().min_w_0().px_1().child(
+                div().id("composer-input").w_full().min_w_0().child(
                     Textarea::new(&input)
                         .appearance(false)
                         .bordered(false)
                         .aria_label("消息")
+                        .rounded(cx.theme().radius)
+                        .text_size(typography::body_size())
                         .w_full()
                         .on_paste(move |item, window, cx| {
                             view.update(cx, |this, cx| this.paste_attachments(item, window, cx))
@@ -959,52 +984,67 @@ impl RenderOnce for ComposerInput {
                         }),
                 ),
             )
-            .when(busy, |composer| {
-                composer.child(
-                    Button::new("stop")
-                        .ghost()
-                        .icon(IconName::Square)
-                        .label(if stopping { "停止中" } else { "停止" })
-                        .accessibility_label("停止回复")
-                        .disabled(stopping)
-                        .on_click(move |_, window, cx| {
-                            let _ = stop_view.update(cx, |this, cx| this.stop(window, cx));
-                        }),
-                )
-            })
             .child(
-                Button::new("add-attachments")
-                    .ghost()
-                    .icon(IconName::Paperclip)
-                    .accessibility_label("添加附件…")
-                    .tooltip("添加图片、音频、PDF 或文本…")
-                    .size_10()
-                    .disabled(!attachments_available)
-                    .on_click(move |_, window, cx| {
-                        let _ = picker.update(cx, |this, cx| this.choose_attachments(window, cx));
-                    }),
-            )
-            .child(
-                Button::new("send")
-                    .primary()
-                    .icon(IconName::Send)
-                    .when(!busy && !has_queue, |button| {
-                        button.size_10().rounded(cx.theme().radius_lg)
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .justify_end()
+                    .gap_2()
+                    .min_w_0()
+                    .when(busy, |composer| {
+                        composer.child(
+                            Button::new("stop")
+                                .ghost()
+                                .small()
+                                .rounded(cx.theme().radius)
+                                .text_color(p.muted())
+                                .icon(IconName::Square)
+                                .label(if stopping { "停止中" } else { "停止" })
+                                .accessibility_label("停止回复")
+                                .disabled(stopping)
+                                .on_click(move |_, window, cx| {
+                                    let _ = stop_view.update(cx, |this, cx| this.stop(window, cx));
+                                }),
+                        )
                     })
-                    .when(busy || has_queue, |button| {
-                        button.label(if busy { "加入队列" } else { "合并发送" })
-                    })
-                    .accessibility_label(if busy {
-                        "加入待发送队列"
-                    } else if has_queue {
-                        "合并队列与消息发送"
-                    } else {
-                        "发送消息"
-                    })
-                    .disabled(!can_send)
-                    .on_click(move |_, window, cx| {
-                        let _ = send_view.update(cx, |this, cx| this.send(window, cx));
-                    }),
+                    .child(
+                        Button::new("add-attachments")
+                            .ghost()
+                            .icon(IconName::Paperclip)
+                            .accessibility_label("添加附件…")
+                            .tooltip("添加图片、音频、PDF 或文本…")
+                            .small()
+                            .rounded(cx.theme().radius)
+                            .text_color(p.muted())
+                            .disabled(!attachments_available)
+                            .on_click(move |_, window, cx| {
+                                let _ = picker
+                                    .update(cx, |this, cx| this.choose_attachments(window, cx));
+                            }),
+                    )
+                    .child(
+                        Button::new("send")
+                            .primary()
+                            .small()
+                            .rounded(cx.theme().radius)
+                            .icon(IconName::Send)
+                            .when(!busy && !has_queue, |button| button.size_8())
+                            .when(busy || has_queue, |button| {
+                                button.label(if busy { "加入队列" } else { "合并发送" })
+                            })
+                            .accessibility_label(if busy {
+                                "加入待发送队列"
+                            } else if has_queue {
+                                "合并队列与消息发送"
+                            } else {
+                                "发送消息"
+                            })
+                            .disabled(!can_send)
+                            .on_click(move |_, window, cx| {
+                                let _ = send_view.update(cx, |this, cx| this.send(window, cx));
+                            }),
+                    ),
             )
     }
 }

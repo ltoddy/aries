@@ -513,7 +513,10 @@ impl UsageView {
             .border_color(cx.theme().border)
             .pt_4()
             .child(
-                div().font_weight(FontWeight::MEDIUM).child(format!("{} · 日明细", self.selected)),
+                div()
+                    .text_sm()
+                    .font_weight(FontWeight::MEDIUM)
+                    .child(format!("{} · 日明细", self.selected)),
             )
             .child(match usage {
                 Some(usage) => div()

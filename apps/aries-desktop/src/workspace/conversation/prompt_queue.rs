@@ -102,14 +102,13 @@ impl PromptQueue {
             .flex()
             .flex_col()
             .rounded(cx.theme().radius_lg)
-            .border_1()
-            .border_color(p.border())
-            .bg(p.input())
+            .bg(p.bubble())
             .text_color(p.foreground())
             .child(
                 div()
                     .flex()
                     .items_center()
+                    .flex_wrap()
                     .gap_2()
                     .px_2()
                     .py_1()
@@ -119,13 +118,17 @@ impl PromptQueue {
                         ),
                     )
                     .child(
-                        div().flex_1().min_w_0().truncate().text_xs().text_color(p.muted()).child(
-                            if automatic {
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .whitespace_normal()
+                            .text_xs()
+                            .text_color(p.muted())
+                            .child(if automatic {
                                 "本次回复正常结束后，将按顺序合并发送。"
                             } else {
                                 "队列已保留，当前不会自动发送。"
-                            },
-                        ),
+                            }),
                     )
                     .child(
                         Button::new(("toggle-prompt-queue", self.id))

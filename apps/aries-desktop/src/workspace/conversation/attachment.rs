@@ -3,8 +3,8 @@ use std::sync::Arc;
 use agent_client_protocol::v1::schema::{ContentBlock, EmbeddedResourceResource};
 use gpui_kit::assets::IconName;
 use gpui_kit::base::SelectableText;
-use gpui_kit::component::Icon;
 use gpui_kit::component::tooltip::Tooltip;
+use gpui_kit::component::{ActiveTheme, Icon};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -165,37 +165,35 @@ impl AttachmentText {
 }
 
 impl RenderOnce for Attachment {
-    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let Self { id, text, icon, image, palette: p } = self;
         let AttachmentText { label, name, subtitle, details } = text;
         let preview = match image {
             Some(image) => img(image)
                 .size_10()
-                .rounded(px(6.))
+                .rounded(cx.theme().radius)
                 .object_fit(ObjectFit::Contain)
-                .with_fallback(move || Icon::new(icon).size(px(24.)).into_any_element())
+                .with_fallback(move || Icon::new(icon).size_6().into_any_element())
                 .into_any_element(),
-            None => Icon::new(icon).size(px(24.)).into_any_element(),
+            None => Icon::new(icon).size_6().into_any_element(),
         };
         div()
             .id(id)
             .aria_label(label)
-            .w(px(240.))
+            .w(rems(15.))
             .max_w_full()
             .min_w_0()
             .px_2()
             .py_1()
-            .rounded(px(8.))
-            .border_1()
-            .border_color(p.border())
-            .bg(p.input())
+            .rounded(cx.theme().radius)
+            .bg(p.bubble())
             .flex()
             .items_center()
             .gap_2()
             .tooltip(move |window, cx| {
                 let details = details.clone();
                 Tooltip::element(move |_, _| {
-                    div().max_w(px(480.)).whitespace_normal().child(details.clone())
+                    div().max_w(rems(30.)).whitespace_normal().child(details.clone())
                 })
                 .build(window, cx)
             })
@@ -216,6 +214,7 @@ impl RenderOnce for Attachment {
                     .child(
                         div()
                             .truncate()
+                            .text_sm()
                             .font_weight(FontWeight::MEDIUM)
                             .child(SelectableText::new("attachment-name", name)),
                     )

@@ -288,24 +288,30 @@ impl GitDiffView {
             .items_center()
             .gap_2()
             .px_3()
-            .py_1()
+            .py_2()
             .flex_shrink_0()
             .child(div().flex_1().min_w_0().child(Input::new(input).small()))
-            .child(div().text_sm().text_color(cx.theme().muted_foreground).child(
-                if self.search_loading {
-                    "正在搜索".to_owned()
-                } else {
-                    format!(
-                        "{} / {}",
-                        self.match_index.map_or(0, |index| index + 1),
-                        self.matches.len()
-                    )
-                },
-            ))
+            .child(
+                div()
+                    .flex_shrink_0()
+                    .text_xs()
+                    .font_family(cx.theme().mono_font_family.clone())
+                    .text_color(cx.theme().muted_foreground)
+                    .child(if self.search_loading {
+                        "正在搜索".to_owned()
+                    } else {
+                        format!(
+                            "{} / {}",
+                            self.match_index.map_or(0, |index| index + 1),
+                            self.matches.len()
+                        )
+                    }),
+            )
             .child(
                 Button::new("previous-diff-match")
                     .small()
                     .ghost()
+                    .compact()
                     .icon(IconName::ChevronUp)
                     .accessibility_label("上一个匹配")
                     .disabled(self.matches.is_empty())
@@ -315,6 +321,7 @@ impl GitDiffView {
                 Button::new("next-diff-match")
                     .small()
                     .ghost()
+                    .compact()
                     .icon(IconName::ChevronDown)
                     .accessibility_label("下一个匹配")
                     .disabled(self.matches.is_empty())
@@ -324,6 +331,7 @@ impl GitDiffView {
                 Button::new("close-diff-search")
                     .small()
                     .ghost()
+                    .compact()
                     .icon(IconName::X)
                     .accessibility_label("关闭搜索")
                     .on_click(cx.listener(|this, _, window, cx| this.close_search(window, cx))),
@@ -432,6 +440,7 @@ impl GitDiffView {
                 Button::new("diff-operation-scope")
                     .small()
                     .ghost()
+                    .compact()
                     .label(selected.label())
                     .icon(IconName::ChevronDown)
                     .tooltip("选中行需点击行号，Shift 扩展；仅操作真正变更的行")
@@ -464,6 +473,8 @@ impl GitDiffView {
             .child(
                 Button::new("diff-index-operation")
                     .small()
+                    .compact()
+                    .secondary()
                     .label(label)
                     .disabled(self.writes_busy(cx) || !self.scope_available(self.scope))
                     .on_click(cx.listener(move |this, _, window, cx| {
@@ -611,6 +622,7 @@ impl GitDiffView {
                 Button::new("previous-diff-change")
                     .small()
                     .ghost()
+                    .compact()
                     .icon(IconName::ChevronUp)
                     .accessibility_label("上一个变更")
                     .disabled(count == 0)
@@ -621,6 +633,7 @@ impl GitDiffView {
                 Button::new("next-diff-change")
                     .small()
                     .ghost()
+                    .compact()
                     .icon(IconName::ChevronDown)
                     .accessibility_label("下一个变更")
                     .disabled(count == 0)
@@ -631,6 +644,8 @@ impl GitDiffView {
                 Button::new("diff-hunk-selector")
                     .small()
                     .ghost()
+                    .compact()
+                    .font_family(cx.theme().mono_font_family.clone())
                     .label(format!("块 {} / {count}", current.map_or(0, |index| index + 1)))
                     .icon(IconName::ChevronDown)
                     .disabled(count == 0)
@@ -675,6 +690,7 @@ impl GitDiffView {
                 Button::new("search-diff")
                     .small()
                     .ghost()
+                    .compact()
                     .icon(IconName::Search)
                     .accessibility_label("搜索 diff")
                     .tooltip("搜索 diff · Cmd/Ctrl+F")
@@ -684,6 +700,7 @@ impl GitDiffView {
                 Button::new("diff-more-tools")
                     .small()
                     .ghost()
+                    .compact()
                     .label("更多")
                     .icon(IconName::ChevronDown)
                     .dropdown_menu(move |menu, _, cx| {
@@ -801,6 +818,7 @@ impl GitDiffView {
                 Button::new("restore-discarded-diff")
                     .small()
                     .ghost()
+                    .compact()
                     .label("恢复丢弃")
                     .icon(IconName::ChevronDown)
                     .disabled(self.backups.is_empty() || self.controls_busy(cx))

@@ -1,4 +1,5 @@
 use agent_client_protocol::v1::schema::{AvailableCommand, AvailableCommandInput};
+use gpui_kit::component::ActiveTheme;
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::prelude::*;
 use gpui_kit::*;
@@ -85,7 +86,7 @@ impl CommandMenu {
     }
 }
 impl RenderOnce for CommandMenu {
-    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let Self { candidates, selected, scroll, empty, palette: p, on_select } = self;
         let on_select = std::rc::Rc::new(on_select);
         div()
@@ -95,7 +96,7 @@ impl RenderOnce for CommandMenu {
             .left_0()
             .right_0()
             .mb_2()
-            .rounded(rems(0.75))
+            .rounded(cx.theme().radius_lg)
             .border_1()
             .border_color(p.border())
             .bg(p.input())
@@ -111,7 +112,7 @@ impl RenderOnce for CommandMenu {
                     .px_1()
                     .pb_1()
                     .when(candidates.is_empty(), |list| {
-                        list.child(div().p_3().text_color(p.muted()).child(empty))
+                        list.child(div().p_3().text_sm().text_color(p.muted()).child(empty))
                     })
                     .children(candidates.into_iter().enumerate().map(|(index, command)| {
                         let name = command.name.clone();
@@ -137,8 +138,8 @@ impl RenderOnce for CommandMenu {
                             .min_w_0()
                             .px_3()
                             .py_2()
-                            .rounded(rems(0.5))
-                            .when(index == selected, |row| row.bg(p.hover()))
+                            .rounded(cx.theme().radius)
+                            .when(index == selected, |row| row.bg(cx.theme().primary.opacity(0.12)))
                             .hover(|row| row.bg(p.hover()))
                             .aria_label(format!("/{}：{}", command.name, command.description))
                             .tooltip(move |window, cx| {
@@ -158,6 +159,7 @@ impl RenderOnce for CommandMenu {
                                     .max_w(relative(0.4))
                                     .truncate()
                                     .line_clamp(1)
+                                    .text_sm()
                                     .font_weight(FontWeight::MEDIUM)
                                     .child(format!("/{}", command.name)),
                             )
@@ -184,7 +186,7 @@ impl RenderOnce for CommandMenu {
                     .py_2()
                     .border_t_1()
                     .border_color(p.border())
-                    .text_size(rems(0.6875))
+                    .text_xs()
                     .text_color(p.muted())
                     .child("↑ ↓ 选择，Enter / Tab 填入，Esc 关闭"),
             )

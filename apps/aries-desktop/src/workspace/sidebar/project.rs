@@ -3,8 +3,7 @@ use std::path::Path;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::menu::{DropdownMenu, PopupMenuItem};
-use gpui_kit::component::separator::Separator;
-use gpui_kit::component::{Disableable, Icon, Sizable};
+use gpui_kit::component::{ActiveTheme, Disableable, Icon, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -47,7 +46,7 @@ impl<'a> ProjectView<'a> {
         let delete_enabled = self.owner.can_manage_sessions() && has_sessions;
         let view = cx.weak_entity();
         div()
-            .mb_2()
+            .mb_1()
             .child(
                 div()
                     .flex()
@@ -57,6 +56,8 @@ impl<'a> ProjectView<'a> {
                         Button::new(SharedString::from(format!("cwd:{}", cwd.display())))
                             .ghost()
                             .small()
+                            .px_2()
+                            .rounded(cx.theme().radius)
                             .flex_1()
                             .min_w_0()
                             .child(
@@ -187,11 +188,6 @@ impl<'a> ProjectView<'a> {
                 cx,
                 |cx| {
                     div()
-                        .mt_1()
-                        .ml_2()
-                        .pl_2()
-                        .border_l_1()
-                        .border_color(p.border())
                         .children(sessions.iter().take(visible_count).map(|row| {
                             SessionRowView::new(self.sidebar, self.owner)
                                 .render_session_row(row, expanded, p, cx)
@@ -210,28 +206,14 @@ impl<'a> ProjectView<'a> {
                                     div()
                                         .flex()
                                         .items_center()
-                                        .gap_2()
+                                        .pl(rems(1.125))
                                         .w_full()
                                         .min_w_0()
-                                        .child(
-                                            Separator::horizontal_dashed()
-                                                .relative()
-                                                .flex_1()
-                                                .min_w_0()
-                                                .color(p.border()),
-                                        )
                                         .child(div().flex_shrink_0().child(if sessions_expanded {
                                             "收起"
                                         } else {
                                             "展开更多"
-                                        }))
-                                        .child(
-                                            Separator::horizontal_dashed()
-                                                .relative()
-                                                .flex_1()
-                                                .min_w_0()
-                                                .color(p.border()),
-                                        ),
+                                        })),
                                 )
                                 .accessibility_label(format!(
                                     "{}目录 {} 的会话",

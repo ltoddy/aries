@@ -576,15 +576,30 @@ impl SessionView {
     ) -> impl IntoElement {
         self.sidebar.render(self, self.tab_host.clone(), p, window, cx)
     }
-    fn render_main_area(&mut self, p: Palette, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_main_area(
+        &mut self,
+        p: Palette,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let timeline = self.timeline.render_timeline(
             self.execution.conversation(),
             self.execution.is_loading(),
             p,
             cx,
         );
-        let composer = self.composer.render(self, p, cx);
-        div().flex_1().min_w_0().size_full().flex().flex_col().child(timeline).child(composer)
+        let composer = self.composer.render(self, p, window, cx);
+        div()
+            .flex_1()
+            .min_w_0()
+            .min_h_0()
+            .size_full()
+            .bg(p.background())
+            .text_color(p.foreground())
+            .flex()
+            .flex_col()
+            .child(timeline)
+            .child(composer)
     }
     fn render_layout(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let p = Palette::new(cx.theme().mode);
@@ -603,7 +618,7 @@ impl SessionView {
                             .size_range(cx.theme().font_size * 12.5..cx.theme().font_size * 32.5)
                             .child(self.render_sidebar(p, window, cx)),
                     )
-                    .child(resizable_panel().child(self.render_main_area(p, cx))),
+                    .child(resizable_panel().child(self.render_main_area(p, window, cx))),
             )
     }
 }
@@ -614,7 +629,7 @@ impl Render for SessionView {
         match self.render_mode {
             SessionRenderMode::Full => self.render_layout(window, cx).into_any_element(),
             SessionRenderMode::Sidebar => self.render_sidebar(p, window, cx).into_any_element(),
-            SessionRenderMode::Main => self.render_main_area(p, cx).into_any_element(),
+            SessionRenderMode::Main => self.render_main_area(p, window, cx).into_any_element(),
         }
     }
 }

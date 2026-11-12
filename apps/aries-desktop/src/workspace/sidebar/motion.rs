@@ -242,6 +242,10 @@ impl RenderOnce for SessionSurface {
         div()
             .id(SharedString::from(format!("session-surface:{}", self.row.session.session_id)))
             .bg(background)
+            .rounded(cx.theme().radius)
+            .when(!self.row.is_exiting(), |row| {
+                row.hover(|row| row.bg(if self.selected { background } else { cx.theme().accent }))
+            })
             .opacity(opacity)
             .when(
                 self.row.entered_at.is_some() && !self.row.is_exiting() && !cx.reduce_motion(),

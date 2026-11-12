@@ -31,9 +31,12 @@ impl<'a> SessionListView<'a> {
             .min_h_0()
             .flex()
             .flex_col()
-            .px_3()
-            .child(SessionToolbar::new(self.sidebar, self.owner).render_session_toolbar(p, cx))
-            .child(self.owner.render_session_actions(p))
+            .child(
+                div().px_2().child(
+                    SessionToolbar::new(self.sidebar, self.owner).render_session_toolbar(p, cx),
+                ),
+            )
+            .child(div().px_2().child(self.owner.render_session_actions(p)))
             .child(
                 div()
                     .id("session-list")
@@ -41,20 +44,21 @@ impl<'a> SessionListView<'a> {
                     .min_h_0()
                     .overflow_y_scroll()
                     .track_scroll(self.sidebar.scroll())
-                    .pb_3()
+                    .px_2()
+                    .pb_2()
                     .children(groups.into_iter().map(|(cwd, sessions)| {
                         ProjectView::new(self.sidebar, self.owner)
                             .render_project(cwd, &sessions, p, window, cx)
                     }))
                     .when(list.is_loading(), |list| {
                         list.child(
-                            div().p_3().text_xs().text_color(p.muted()).child("正在加载会话…"),
+                            div().p_2().text_xs().text_color(p.muted()).child("正在加载会话…"),
                         )
                     })
                     .when(list.is_unsupported(), |list| {
                         list.child(
                             div()
-                                .p_3()
+                                .p_2()
                                 .text_xs()
                                 .text_color(p.muted())
                                 .child("Agent 不支持会话列表"),
@@ -67,14 +71,14 @@ impl<'a> SessionListView<'a> {
                             && empty,
                         |list| {
                             list.child(
-                                div().p_3().text_xs().text_color(p.muted()).child("暂无历史会话"),
+                                div().p_2().text_xs().text_color(p.muted()).child("暂无历史会话"),
                             )
                         },
                     )
                     .when_some(list.error().map(str::to_owned), |list, error| {
                         list.child(
                             div()
-                                .p_3()
+                                .p_2()
                                 .text_xs()
                                 .text_color(p.danger())
                                 .child(SelectableText::new("session-list-error-text", error)),

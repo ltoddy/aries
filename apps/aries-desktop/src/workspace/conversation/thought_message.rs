@@ -11,6 +11,7 @@ use gpui_kit::*;
 use crate::workspace::conversation::ClickHandler;
 use crate::workspace::conversation::model::Message;
 use crate::workspace::settings::palette::Palette;
+use crate::workspace::settings::typography;
 
 #[derive(IntoElement)]
 pub struct ThoughtMessage {
@@ -116,6 +117,7 @@ impl RenderOnce for ThoughtMessage {
                         .min_w_0()
                         .child(
                             TextView::new(&markdown)
+                                .map(typography::style_markdown)
                                 .selectable(true)
                                 .scrollable(false)
                                 .w_full()
@@ -129,7 +131,7 @@ impl RenderOnce for ThoughtMessage {
                                             el.child(
                                                 div()
                                                     .text_xs()
-                                                    .text_color(cx.theme().muted)
+                                                    .text_color(cx.theme().muted_foreground)
                                                     .child(lang.to_string()),
                                             )
                                         })
@@ -145,13 +147,11 @@ impl RenderOnce for ThoughtMessage {
                                                 .child(
                                                     Icon::new(IconName::Copy)
                                                         .xsmall()
-                                                        .text_color(cx.theme().muted),
+                                                        .text_color(cx.theme().muted_foreground),
                                                 )
                                         })
                                         .into_any_element()
                                 })
-                                .text_xs()
-                                .line_height(rems(1.375))
                                 .text_color(p.muted()),
                         )
                         .into_any_element(),

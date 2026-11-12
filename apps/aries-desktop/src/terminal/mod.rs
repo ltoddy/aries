@@ -25,6 +25,7 @@ pub fn init(cx: &mut App) {
 
 pub use self::session::Status;
 use self::session::{Dimensions, Session, StartError, WriteError};
+use crate::workspace::settings::typography;
 
 pub struct TerminalView {
     directory: PathBuf,
@@ -212,7 +213,7 @@ impl TerminalView {
     }
 
     fn measure(&mut self, bounds: Bounds<Pixels>, window: &Window) {
-        let font_size = window.rem_size() * 0.875;
+        let font_size = typography::code_size_in_window(window);
         let cell_width = self::paint::cell_width(window, font_size);
         self.bounds = bounds;
         let cell_size = size(cell_width, font_size * 1.4);

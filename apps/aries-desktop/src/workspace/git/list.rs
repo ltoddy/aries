@@ -59,7 +59,8 @@ impl<'a> GitChangeList<'a> {
                                 .min_w_0()
                                 .flex()
                                 .items_center()
-                                .gap_2()
+                                .gap_1()
+                                .px_1()
                                 .opacity(row.visibility().sample(now))
                                 .child(
                                     div()
@@ -148,11 +149,19 @@ impl<'a> GitChangeList<'a> {
                             .min_w_0()
                             .flex()
                             .items_center()
-                            .gap_2()
-                            .rounded_md()
+                            .gap_1()
+                            .px_1()
+                            .rounded(cx.theme().radius_tokens().md)
+                            .when(selected, |row| row.bg(cx.theme().foreground.opacity(0.115)))
                             .opacity(row.visibility().sample(now))
                             .when(!row.is_exiting() && !busy, |row| {
-                                row.hover(|style| style.bg(cx.theme().accent))
+                                row.hover(|style| {
+                                    style.bg(cx.theme().foreground.opacity(if selected {
+                                        0.115
+                                    } else {
+                                        0.07
+                                    }))
+                                })
                             })
                             .aria_label(format!("{path} · {status}"))
                             .child(
@@ -213,6 +222,9 @@ impl<'a> GitChangeList<'a> {
                                     .min_w_0()
                                     .px_0()
                                     .selected(selected)
+                                    .bg(cx.theme().transparent)
+                                    .text_color(cx.theme().foreground)
+                                    .when(selected, |button| button.font_weight(FontWeight::MEDIUM))
                                     .disabled(row.is_exiting())
                                     .accessibility_label(format!(
                                         "查看 diff：{path} · {}",

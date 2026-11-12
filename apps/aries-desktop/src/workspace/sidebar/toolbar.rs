@@ -29,7 +29,7 @@ impl<'a> SessionToolbar<'a> {
             .justify_between()
             .flex_shrink_0()
             .pl_2()
-            .mb_2()
+            .mb_1()
             .text_xs()
             .text_color(p.muted())
             .child("对话")
@@ -45,6 +45,7 @@ impl<'a> SessionToolbar<'a> {
                             .accessibility_label("展开全部项目")
                             .ghost()
                             .small()
+                            .text_color(p.muted())
                             .on_click(cx.listener(|this, _, _, cx| {
                                 let directory = this.directory().to_owned();
                                 this.with_sidebar(|sidebar| {
@@ -61,6 +62,7 @@ impl<'a> SessionToolbar<'a> {
                             .accessibility_label("收起全部项目")
                             .ghost()
                             .small()
+                            .text_color(p.muted())
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.with_sidebar(|sidebar| sidebar.collapse_all());
                                 cx.notify();
@@ -73,6 +75,7 @@ impl<'a> SessionToolbar<'a> {
                             .accessibility_label("定位当前会话")
                             .ghost()
                             .small()
+                            .text_color(p.muted())
                             .on_click(cx.listener(|this, _, window, cx| {
                                 this.locate_current_session(window, cx);
                             })),
@@ -84,6 +87,7 @@ impl<'a> SessionToolbar<'a> {
                             .accessibility_label("刷新会话列表")
                             .ghost()
                             .small()
+                            .text_color(p.muted())
                             .disabled(
                                 list.is_loading()
                                     || !list.is_supported()

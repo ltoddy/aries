@@ -5,7 +5,7 @@ use std::time::Duration;
 use agent_client_protocol::v1::schema::{SessionId, SessionInfo};
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
-use gpui_kit::component::{ActiveTheme, Disableable, Icon, Selectable};
+use gpui_kit::component::{ActiveTheme, Disableable, Icon, Selectable, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -122,16 +122,18 @@ impl Sidebar {
             .flex_shrink_0()
             .flex()
             .flex_col()
-            .bg(p.sidebar())
+            .bg(p.sidebar().opacity(0.))
             .child(
-                div().p_3().child(
+                div().px_2().py_1().child(
                     Button::new("new-chat")
+                        .ghost()
+                        .small()
                         .label("新建会话…")
                         .tooltip("选择项目目录并新建会话")
                         .icon(Icon::new(IconName::Plus).size(rems(0.9375)))
                         .w_full()
-                        .h(rems(2.375))
-                        .rounded(cx.theme().radius_lg)
+                        .text_color(p.muted())
+                        .rounded(cx.theme().radius)
                         .disabled(!new_enabled)
                         .on_click(cx.listener(|this, _, window, cx| {
                             if this.uses_sidebar_tab_host() {
@@ -146,9 +148,8 @@ impl Sidebar {
             .child(
                 div()
                     .flex_shrink_0()
-                    .p_3()
-                    .border_t_1()
-                    .border_color(p.border())
+                    .px_2()
+                    .py_2()
                     .flex()
                     .items_center()
                     .gap_2()
@@ -156,17 +157,17 @@ impl Sidebar {
                     .child(
                         Button::new("open-usage")
                             .ghost()
-                            .icon(Icon::new(IconName::ChartNoAxesColumn).size(rems(1.125)))
-                            .size_8()
+                            .small()
+                            .icon(Icon::new(IconName::ChartNoAxesColumn).size(rems(0.9375)))
                             .tooltip("统计")
                             .accessibility_label("打开统计")
                             .selected(usage_selected)
-                            .bg(if usage_selected { cx.theme().muted } else { cx.theme().sidebar })
-                            .text_color(if usage_selected {
-                                cx.theme().primary
+                            .bg(if usage_selected {
+                                cx.theme().sidebar_accent
                             } else {
-                                cx.theme().muted_foreground
+                                cx.theme().transparent
                             })
+                            .text_color(if usage_selected { p.foreground() } else { p.muted() })
                             .disabled(usage_host.is_none())
                             .on_click(cx.listener(move |_, _, window, cx| {
                                 if let Some(host) = usage_host.clone() {

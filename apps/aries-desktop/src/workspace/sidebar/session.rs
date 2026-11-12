@@ -1,8 +1,8 @@
 use gpui_kit::assets::IconName;
-use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants};
 use gpui_kit::component::menu::{DropdownMenu, PopupMenuItem};
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{Disableable, Icon, Sizable};
+use gpui_kit::component::{ActiveTheme, Disableable, Icon, Selectable, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -67,25 +67,26 @@ impl<'a> SessionRowView<'a> {
         SessionSurface::new(
             row.clone(),
             selected,
-            p.hover(),
+            cx.theme().sidebar_accent,
             div()
                 .id(SharedString::from(format!("session:{id}")))
                 .when(current, |row| row.anchor_scroll(Some(self.sidebar.anchor().clone())))
                 .pl_2()
-                .py_1()
-                .mb_1()
                 .tooltip(move |window, cx| Tooltip::new(details.clone()).build(window, cx))
                 .child(
                     div()
                         .flex()
                         .items_center()
-                        .gap_2()
+                        .gap_1()
                         .child(
                             Button::new(SharedString::from(format!("load-session:{id}")))
-                                .ghost()
+                                .custom(
+                                    ButtonCustomVariant::new(cx).active(cx.theme().sidebar_accent),
+                                )
                                 .small()
-                                .h_auto()
                                 .px_0()
+                                .selected(selected)
+                                .bg(cx.theme().transparent)
                                 .flex_1()
                                 .min_w_0()
                                 .disabled(!enabled || !can_open_session)
@@ -99,9 +100,14 @@ impl<'a> SessionRowView<'a> {
                                     div()
                                         .w_full()
                                         .min_w_0()
+                                        .pl(rems(1.125))
                                         .text_left()
                                         .truncate()
-                                        .font_weight(FontWeight::MEDIUM)
+                                        .font_weight(if selected {
+                                            FontWeight::MEDIUM
+                                        } else {
+                                            FontWeight::NORMAL
+                                        })
                                         .child(display_title),
                                 )
                                 .on_click(cx.listener(move |this, _, _window, cx| {
@@ -122,6 +128,7 @@ impl<'a> SessionRowView<'a> {
                                         .icon(Icon::new(IconName::Ellipsis).size(rems(0.8125)))
                                         .ghost()
                                         .small()
+                                        .text_color(p.muted())
                                         .tooltip("会话操作")
                                         .accessibility_label(action_label)
                                         .disabled(!enabled || !self.owner.can_manage_sessions())

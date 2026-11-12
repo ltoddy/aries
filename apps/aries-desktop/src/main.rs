@@ -4,6 +4,8 @@ mod terminal;
 mod workspace;
 
 use gpui_kit::assets::AllAssets;
+use gpui_kit::base::Root;
+use gpui_kit::component::{ActiveTheme, TitleBar};
 use gpui_kit::*;
 
 use crate::acp::aries_config;
@@ -108,25 +110,42 @@ fn run() -> Result<(), StartupError> {
         let options = WindowOptions {
             window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
                 None,
-                size(px(1200.), px(800.)),
+                size(px(1180.), px(760.)),
                 cx,
             ))),
             window_min_size: Some(size(px(760.), px(520.))),
+            window_background: if cfg!(target_os = "macos") {
+                WindowBackgroundAppearance::Blurred
+            } else {
+                WindowBackgroundAppearance::Opaque
+            },
             titlebar: Some(TitlebarOptions {
                 title: Some("Aries Desktop".into()),
-                ..Default::default()
+                ..TitleBar::title_bar_options()
             }),
-            ..Default::default()
+            ..TitleBar::window_options()
         };
-        if let Err(error) = gpui_kit::open_window(options, cx, |window, cx| {
+        match gpui_kit::open_window(options, cx, |window, cx| {
             window.on_window_should_close(cx, |_, cx| {
                 cx.quit();
                 false
             });
             cx.new(|cx| WorkspaceView::new(cwd, Preferences::path(), aries_config(), window, cx))
         }) {
-            error::log("无法创建窗口", error.as_ref());
-            cx.quit();
+            Ok((handle, _)) => {
+                if let Err(error) = cx.update_window(handle, |_, window, cx| {
+                    Root::update(window, cx, |root, _, cx| {
+                        root.style().background = Some(cx.theme().background.opacity(0.).into());
+                        cx.notify();
+                    });
+                }) {
+                    error::log("无法配置窗口外观", error.as_ref());
+                }
+            },
+            Err(error) => {
+                error::log("无法创建窗口", error.as_ref());
+                cx.quit();
+            },
         }
         cx.activate(true);
     });
