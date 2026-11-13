@@ -582,7 +582,7 @@ impl Render for UsageView {
         let loading = matches!(self.state, LoadState::Loading);
         div().id("usage-page").size_full().min_h_0().overflow_y_scroll()
             .bg(cx.theme().background).text_color(cx.theme().foreground)
-            .child(div().p_6().flex().flex_col().gap_6()
+            .child(div().w_full().max_w(rems(72.)).mx_auto().min_w_0().p_6().flex().flex_col().gap_6()
                 .child(div().flex().items_center().gap_3()
                     .child(Button::new("return-to-sessions").ghost().small().label("返回会话")
                         .icon(Icon::new(IconName::ArrowLeft))
