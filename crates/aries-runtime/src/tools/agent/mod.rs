@@ -111,11 +111,11 @@ impl Tool for AgentTool {
             return Err(AgentError::AgentNotFound(args.name));
         };
 
-        let tool_names = extension.frontmatter.filter_tool_names(crate::ALL_TOOL_NAMES);
+        let tool_names = extension.frontmatter.filter_tool_names(crate::tools::ALL_TOOL_NAMES);
         let cwd = self.ctx.cwd();
         let mut state = self.state.clone();
         state.cwd(&cwd);
-        let tools = crate::create_tools(
+        let tools = crate::tools::create_agent_tools(
             state,
             self.gctx.clone(),
             &tool_names,

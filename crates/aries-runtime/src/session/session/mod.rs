@@ -171,7 +171,7 @@ impl Session {
         self.state.agent(agent);
 
         // 不同的模式, 注册的工具是不同的，所以先删除全部内置的，然后再重新添加
-        for tool_name in crate::ALL_TOOL_NAMES {
+        for tool_name in crate::tools::ALL_TOOL_NAMES {
             self.tool_server_handle.remove_tool(tool_name);
         }
         let agent = Builder::new(

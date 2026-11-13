@@ -36,10 +36,10 @@ impl Builder {
     where
         P: AgentHook + 'static,
     {
-        let tools = crate::create_tools(
+        let tools = crate::tools::create_tools(
             self.state.clone(),
             self.gctx.clone(),
-            crate::ALL_TOOL_NAMES,
+            crate::tools::ALL_TOOL_NAMES,
             self.extensions.clone(),
             self.notifier.clone(),
             self.db.clone(),
@@ -52,11 +52,11 @@ impl Builder {
             .description(&self.state.agent.frontmatter.description)
             .preamble(&self.state.agent.body)
             .append_preamble(&preamble::skill::section(&self.extensions.skills))
-            .append_preamble(&preamble::env::section(&cwd))
+            .append_preamble(&preamble::env::section(cwd))
             .append_preamble(&preamble::memory::section(
-                &self.gctx.memory_root_dir().join(path_to_slug(&cwd)),
+                self.gctx.memory_root_dir().join(path_to_slug(cwd)),
             ))
-            .append_preamble(&preamble::agentsmd::section(&cwd))
+            .append_preamble(&preamble::agentsmd::section(cwd))
             .tool_server_handle(self.tool_server_handle)
             .add_hook(hook)
             .reasoning(self.state.effort)

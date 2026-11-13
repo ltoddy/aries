@@ -88,8 +88,8 @@ async fn test_bash_background() {
     let result = tool.call(&mut context, args).await.expect("test operation should succeed");
     let task_id = result.task_id.expect("background task id");
 
-    let task = crate::task_output::TaskOutputTool::new(ctx)
-        .call(&mut context, crate::task_output::TaskOutputArgs { task_id, block: true })
+    let task = crate::tools::task_output::TaskOutputTool::new(ctx)
+        .call(&mut context, crate::tools::task_output::TaskOutputArgs { task_id, block: true })
         .await
         .expect("test operation should succeed");
 

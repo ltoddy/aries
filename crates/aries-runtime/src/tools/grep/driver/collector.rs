@@ -6,7 +6,7 @@ use std::time::SystemTime;
 use parking_lot::Mutex;
 
 use super::state::ResultLimit;
-use crate::grep::{GrepOutput, OutputMode};
+use crate::tools::grep::{GrepOutput, OutputMode};
 
 pub struct Collector {
     mode: OutputMode,

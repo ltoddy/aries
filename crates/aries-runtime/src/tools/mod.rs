@@ -195,3 +195,82 @@ pub fn create_tools<'a>(
 
     tool_set
 }
+
+pub fn create_agent_tools<'a>(
+    state: State,
+    gctx: GlobalContext,
+    tool_names: impl AsRef<[&'a str]>,
+    extensions: AgentExtensions,
+    notifier: Notifier,
+    db: Db,
+) -> ToolSet {
+    let tool_names = tool_names.as_ref().iter().unique().collect_vec();
+    let mut tool_set = ToolSet::default();
+    let ctx = ToolContext::new(&state.session_id, notifier.clone(), &state.cwd);
+
+    for &tool_name in tool_names {
+        match tool_name {
+            bash::NAME => {
+                tool_set.add_tool(bash::BashTool::new(ctx.clone()));
+            },
+            batch::NAME => {
+                tool_set.add_tool(batch::BatchTool::new(
+                    state.clone(),
+                    ctx.clone(),
+                    gctx.clone(),
+                    notifier.clone(),
+                    extensions.clone(),
+                    db.clone(),
+                ));
+            },
+            codesearch::NAME => {
+                tool_set.add_tool(codesearch::CodeSearchTool::new());
+            },
+            edit::NAME => {
+                tool_set.add_tool(edit::EditTool::new(ctx.clone()));
+            },
+            glob::NAME => {
+                tool_set.add_tool(glob::GlobTool::new(ctx.clone()));
+            },
+            grep::NAME => {
+                tool_set.add_tool(grep::GrepTool::new(ctx.clone()));
+            },
+            monitor::NAME => {
+                tool_set.add_tool(monitor::MonitorTool::new(ctx.clone()));
+            },
+            multiedit::NAME => {
+                tool_set.add_tool(multiedit::MultiEditTool::new(ctx.clone()));
+            },
+            read::NAME => {
+                tool_set.add_tool(read::ReadTool::new(ctx.clone()));
+            },
+            skill::NAME => {
+                if extensions.skills.is_empty() {
+                    continue;
+                }
+                tool_set.add_tool(skill::SkillTool::new(extensions.skills.clone()));
+            },
+            task_output::NAME => {
+                tool_set.add_tool(task_output::TaskOutputTool::new(ctx.clone()));
+            },
+            task_stop::NAME => {
+                tool_set.add_tool(task_stop::TaskStopTool::new(ctx.clone()));
+            },
+            update_plan::NAME => {
+                tool_set.add_tool(update_plan::UpdatePlanTool::new());
+            },
+            webfetch::NAME => {
+                tool_set.add_tool(webfetch::WebFetchTool::new());
+            },
+            websearch::NAME => {
+                tool_set.add_tool(websearch::WebSearchTool::new());
+            },
+            write::NAME => {
+                tool_set.add_tool(write::WriteTool::new(ctx.clone()));
+            },
+            _ => {},
+        }
+    }
+
+    tool_set
+}
