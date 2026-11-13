@@ -23,7 +23,7 @@ use serde_json::Value;
 use tokio::sync::Mutex;
 use tracing::warn;
 
-use crate::compact::{ContextWindow, TokenEstimator, micro_compact};
+use crate::compaction::{ContextWindow, TokenEstimator, micro_compact};
 use crate::session::session::instruction::InstructionContext;
 use crate::session::session::{system_reminder, system_reminders};
 use crate::tools::agent::AgentArgs;

@@ -3,7 +3,7 @@ use rig::message::{
     ToolResultContent, UserContent,
 };
 
-use crate::compact::{TokenEstimator, micro_compact};
+use crate::compaction::{TokenEstimator, micro_compact};
 use crate::session::ChatContext;
 
 #[test]

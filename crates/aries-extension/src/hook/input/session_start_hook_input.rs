@@ -73,7 +73,7 @@ impl Display for SessionStartSource {
             SessionStartSource::Startup => write!(f, "startup"),
             SessionStartSource::Resume => write!(f, "resume"),
             SessionStartSource::Clear => write!(f, "clear"),
-            SessionStartSource::Compact => write!(f, "compact"),
+            SessionStartSource::Compact => write!(f, "compaction"),
         }
     }
 }
