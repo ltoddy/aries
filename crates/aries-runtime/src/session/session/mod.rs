@@ -37,7 +37,7 @@ use tokio_util::sync::CancellationToken;
 pub use self::error::SessionError;
 use self::hook::SessionPromptHook;
 use self::instruction::InstructionContext;
-use crate::agent::{AgentBuilder, AriesAgent};
+use crate::agent::{AriesAgent, Builder};
 use crate::compact::ContextCompactor;
 use crate::memory::{MemoryRetriever, MemoryStore};
 use crate::session::{ChatContext, ChatHistory};
@@ -174,14 +174,15 @@ impl Session {
         for tool_name in crate::ALL_TOOL_NAMES {
             self.tool_server_handle.remove_tool(tool_name);
         }
-        let agent = AgentBuilder::new(
+        let agent = Builder::new(
             self.state.clone(),
             self.extensions.clone(),
+            self.tool_server_handle.clone(),
             self.gctx.clone(),
             Notifier::clone(&self.notifier),
             self.db.clone(),
         )
-        .build(self.tool_server_handle.clone(), self.hook.clone())
+        .build(self.hook.clone())
         .await;
         self.agent = agent;
 
@@ -202,14 +203,15 @@ impl Session {
 
         self.state.effort(effort);
 
-        let agent = AgentBuilder::new(
+        let agent = Builder::new(
             self.state.clone(),
             self.extensions.clone(),
+            self.tool_server_handle.clone(),
             self.gctx.clone(),
             Notifier::clone(&self.notifier),
             self.db.clone(),
         )
-        .build(self.tool_server_handle.clone(), self.hook.clone())
+        .build(self.hook.clone())
         .await;
         self.agent = agent;
 
@@ -448,14 +450,15 @@ impl Session {
             .ok_or_else(|| SessionError::agent_not_found(DEFAULT_AGENT_NAME))?;
         let state = State::new(model, agent, cwd, session_dir, &id);
 
-        let agent = AgentBuilder::new(
+        let agent = Builder::new(
             state.clone(),
             extensions.clone(),
+            tool_server_handle.clone(),
             gctx.clone(),
             Notifier::clone(&notifier),
             db.clone(),
         )
-        .build(tool_server_handle.clone(), hook.clone())
+        .build(hook.clone())
         .await;
 
         let compactor = ContextCompactor::new(
