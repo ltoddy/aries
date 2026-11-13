@@ -2,7 +2,6 @@ use gpui_kit::assets::IconName;
 use gpui_kit::base::SelectableText;
 use gpui_kit::base::motion::{self, Transition};
 use gpui_kit::component::spinner::Spinner;
-use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme, Icon, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
@@ -124,35 +123,33 @@ pub fn render_execution_context(
                 .flex_wrap()
                 .items_center()
                 .gap_2()
-                .aria_label(directory.clone())
-                .tooltip(move |window, cx| {
-                    let directory = directory.clone();
-                    Tooltip::element(move |_, _| {
-                        div().max_w(rems(36.)).whitespace_normal().child(directory.clone())
-                    })
-                    .build(window, cx)
-                })
+                .aria_label(directory)
                 .child(Icon::new(IconName::Folder).size_3().flex_shrink_0())
                 .child(
                     div()
                         .min_w_0()
-                        .truncate()
+                        .max_w_full()
+                        .whitespace_normal()
                         .child(SelectableText::new("execution-project-text", project)),
                 )
                 .when_some(branch, |row, branch| {
                     row.child(
-                        div().min_w_0().max_w(relative(0.5)).truncate().child(SelectableText::new(
-                            "execution-branch-text",
-                            format!("· {branch}"),
-                        )),
+                        div()
+                            .min_w_0()
+                            .max_w_full()
+                            .whitespace_normal()
+                            .child(SelectableText::new(
+                                "execution-branch-text",
+                                format!("· {branch}"),
+                            )),
                     )
                 })
                 .when_some(owner.execution().session_id(), |row, id| {
                     row.child(
                         div()
                             .min_w_0()
-                            .max_w(relative(0.5))
-                            .truncate()
+                            .max_w_full()
+                            .whitespace_normal()
                             .font_family(cx.theme().mono_font_family.clone())
                             .child(SelectableText::new(
                                 "execution-session-text",
