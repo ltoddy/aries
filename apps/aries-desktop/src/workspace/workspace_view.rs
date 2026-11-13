@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use agent_client_protocol::AcpAgentConfig;
 use agent_client_protocol::v1::schema::{SessionId, SessionInfo};
 use gpui_kit::assets::IconName;
+use gpui_kit::base::GlobalState;
 use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants};
 use gpui_kit::component::menu::{ContextMenuExt, PopupMenu, PopupMenuItem};
 use gpui_kit::component::{
@@ -416,6 +417,11 @@ impl WorkspaceView {
             .justify_center()
             .child(
                 div()
+                    .id("floating-terminal-panel")
+                    .occlude()
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| {
+                        GlobalState::suppress_text_selection(cx);
+                    })
                     .w_full()
                     .h(relative(0.8))
                     .max_w(rems(64.))
@@ -775,8 +781,8 @@ impl WorkspaceView {
     ) -> PopupMenu {
         for (label, command, disabled) in [
             ("关闭", TabCommand::close(id), false),
-            ("关闭全部 Tab", TabCommand::close_all(), false),
             ("关闭其他 Tab", TabCommand::close_others(id), !has_others),
+            ("关闭全部 Tab", TabCommand::close_all(), false),
         ] {
             let owner = owner.clone();
             menu = menu.item(PopupMenuItem::new(label).disabled(disabled).on_click(
