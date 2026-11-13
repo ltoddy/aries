@@ -5,9 +5,9 @@ use grep_regex::RegexMatcher;
 use ignore::{WalkBuilder, WalkState};
 use parking_lot::Mutex;
 
-use crate::grep::{GrepArgs, GrepError, OutputMode};
 use crate::tools::grep::driver::collector::Collector;
 use crate::tools::grep::driver::search::{build_searcher, search_file};
+use crate::tools::grep::{GrepArgs, GrepError, OutputMode};
 
 pub fn walk_parallel(
     cwd: impl AsRef<Path>,

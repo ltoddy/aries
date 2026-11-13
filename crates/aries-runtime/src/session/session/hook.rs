@@ -24,10 +24,10 @@ use tokio::sync::Mutex;
 use tracing::warn;
 
 use crate::compact::{ContextWindow, TokenEstimator, micro_compact};
-use crate::read::ReadArgs;
 use crate::session::session::instruction::InstructionContext;
 use crate::session::session::{system_reminder, system_reminders};
 use crate::tools::agent::AgentArgs;
+use crate::tools::read::ReadArgs;
 
 const MICRO_COMPACT_KEEP_MESSAGES_AT_80_PERCENT: usize = 10;
 const MICRO_COMPACT_KEEP_MESSAGES_AT_75_PERCENT: usize = 15;
@@ -285,7 +285,7 @@ impl AgentHook for SessionPromptHook {
                     HookDecision::Terminate { reason } => return DispatchAction::stop(reason),
                 }
             },
-            crate::read::NAME => {
+            crate::tools::read::NAME => {
                 if let Ok(args) = ReadArgs::deserialize(&tool_input) {
                     let file_path = args.file_path;
                     if let Some(parent) = file_path.parent() {

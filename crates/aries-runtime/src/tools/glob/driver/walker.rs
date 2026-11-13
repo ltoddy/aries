@@ -3,7 +3,7 @@ use std::time::SystemTime;
 
 use ignore::{DirEntry, WalkBuilder, WalkState};
 
-use crate::glob::GlobError;
+use crate::tools::glob::GlobError;
 use crate::tools::glob::driver::Collector;
 
 pub fn walk_parallel(

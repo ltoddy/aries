@@ -14,9 +14,8 @@ pub use self::args::{BatchArgs, BatchCall, NAME};
 pub use self::error::BatchError;
 pub use self::output::{BatchOutput, ToolOutput};
 use crate::state::State;
-use crate::tools::agent;
 use crate::tools::context::ToolContext;
-use crate::{codesearch, glob, grep, read, task_output, webfetch, websearch};
+use crate::tools::{agent, codesearch, glob, grep, read, task_output, webfetch, websearch};
 
 const MAX_BATCH_CALLS: usize = 25;
 

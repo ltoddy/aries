@@ -7,9 +7,9 @@ use grep_searcher::{
     sinks,
 };
 
-use crate::grep::{GrepArgs, OutputMode};
 use crate::tools::grep::driver::collector::FileMatch;
 use crate::tools::grep::driver::state::ResultLimit;
+use crate::tools::grep::{GrepArgs, OutputMode};
 
 struct ContentSink<'a> {
     path_display: String,

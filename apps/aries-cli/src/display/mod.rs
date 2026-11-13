@@ -1,26 +1,25 @@
 use std::io::Write;
 
 use aries_communicate::AgentEvent;
-use aries_runtime::bash::BashArgs;
-use aries_runtime::batch::BatchArgs;
-use aries_runtime::codesearch::CodeSearchArgs;
-use aries_runtime::edit::EditArgs;
-use aries_runtime::glob::GlobArgs;
-use aries_runtime::grep::GrepArgs;
-use aries_runtime::monitor::MonitorArgs;
-use aries_runtime::multiedit::MultiEditArgs;
-use aries_runtime::read::ReadArgs;
-use aries_runtime::skill::SkillArgs;
-use aries_runtime::task_output::TaskOutputArgs;
-use aries_runtime::task_stop::TaskStopArgs;
-use aries_runtime::tools::agent;
 use aries_runtime::tools::agent::AgentArgs;
-use aries_runtime::update_plan::UpdatePlanArgs;
-use aries_runtime::webfetch::WebFetchArgs;
-use aries_runtime::websearch::WebSearchArgs;
-use aries_runtime::write::WriteArgs;
-use aries_runtime::{
-    bash, batch, codesearch, edit, glob, grep, monitor, multiedit, read, skill, task_output,
+use aries_runtime::tools::bash::BashArgs;
+use aries_runtime::tools::batch::BatchArgs;
+use aries_runtime::tools::codesearch::CodeSearchArgs;
+use aries_runtime::tools::edit::EditArgs;
+use aries_runtime::tools::glob::GlobArgs;
+use aries_runtime::tools::grep::GrepArgs;
+use aries_runtime::tools::monitor::MonitorArgs;
+use aries_runtime::tools::multiedit::MultiEditArgs;
+use aries_runtime::tools::read::ReadArgs;
+use aries_runtime::tools::skill::SkillArgs;
+use aries_runtime::tools::task_output::TaskOutputArgs;
+use aries_runtime::tools::task_stop::TaskStopArgs;
+use aries_runtime::tools::update_plan::UpdatePlanArgs;
+use aries_runtime::tools::webfetch::WebFetchArgs;
+use aries_runtime::tools::websearch::WebSearchArgs;
+use aries_runtime::tools::write::WriteArgs;
+use aries_runtime::tools::{
+    agent, bash, batch, codesearch, edit, glob, grep, monitor, multiedit, read, skill, task_output,
     task_stop, update_plan, webfetch, websearch, write,
 };
 use colored::Colorize;
@@ -86,7 +85,7 @@ pub fn format_tool_call_args(
 ) -> (String, Option<String>) {
     let tool_name = tool_name.as_ref();
     let args = args.as_ref();
-    if !aries_runtime::is_builtin_tool(tool_name) {
+    if !aries_runtime::tools::is_builtin_tool(tool_name) {
         return format_unknown_call(tool_name, args);
     }
 

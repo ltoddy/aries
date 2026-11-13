@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::update_plan::PlanEntry;
+use crate::tools::update_plan::PlanEntry;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct UpdatePlanOutput {
