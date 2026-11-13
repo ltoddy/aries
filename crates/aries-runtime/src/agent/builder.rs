@@ -38,12 +38,9 @@ impl AgentBuilder {
                 .await;
 
         let tools = crate::create_tools(
-            &self.state.session_id,
+            self.state.clone(),
             self.gctx,
             crate::ALL_TOOL_NAMES,
-            self.state.model.clone(),
-            &self.state.session_dir,
-            &self.state.cwd,
             self.extensions,
             self.notifier.clone(),
             self.db.clone(),

@@ -24,19 +24,16 @@ pub mod websearch;
 pub mod worktree;
 pub mod write;
 
-use std::path::Path;
-
 use aries_communicate::Notifier;
 use aries_extension::AgentExtensions;
 use aries_init::GlobalContext;
 use git2::Repository;
 use itertools::Itertools;
-use rig::Model;
-use rig::providers::openai::wire::OpenAiWire;
 use rig::tool::ToolSet;
 use toasty::Db;
 
 use self::context::ToolContext;
+use crate::state::State;
 
 pub fn format_tool_output(tool_name: impl AsRef<str>, raw_json: serde_json::Value) -> String {
     let result = match tool_name.as_ref() {
@@ -91,32 +88,25 @@ pub fn is_builtin_tool(tool_name: impl AsRef<str>) -> bool {
     ALL_TOOL_NAMES.contains(&tool_name.as_ref())
 }
 
-#[expect(clippy::too_many_arguments)]
 pub fn create_tools<'a>(
-    session_id: impl Into<String>,
+    state: State,
     gctx: GlobalContext,
     tool_names: impl AsRef<[&'a str]>,
-    model: Model<OpenAiWire>,
-    parent_dir: impl AsRef<Path>,
-    cwd: impl AsRef<Path>,
     extensions: AgentExtensions,
     notifier: Notifier,
     db: Db,
 ) -> ToolSet {
-    let parent_dir = parent_dir.as_ref();
-    let cwd = cwd.as_ref();
     let tool_names = tool_names.as_ref().iter().unique().collect_vec();
     let mut tool_set = ToolSet::default();
-    let ctx = ToolContext::new(session_id, notifier.clone(), cwd);
+    let ctx = ToolContext::new(&state.session_id, notifier.clone(), &state.cwd);
 
     for &tool_name in tool_names {
         match tool_name {
             agent::NAME => {
                 tool_set.add_tool(agent::AgentTool::new(
+                    state.clone(),
                     ctx.clone(),
                     gctx.clone(),
-                    model.clone(),
-                    parent_dir,
                     notifier.clone(),
                     extensions.clone(),
                     db.clone(),
@@ -127,10 +117,9 @@ pub fn create_tools<'a>(
             },
             batch::NAME => {
                 tool_set.add_tool(batch::BatchTool::new(
+                    state.clone(),
                     ctx.clone(),
                     gctx.clone(),
-                    model.clone(),
-                    parent_dir,
                     notifier.clone(),
                     extensions.clone(),
                     db.clone(),
@@ -144,7 +133,7 @@ pub fn create_tools<'a>(
             },
             enter_worktree::NAME => {
                 if let Some(repository) =
-                    Repository::discover(cwd).ok().filter(|repo| repo.workdir().is_some())
+                    Repository::discover(&state.cwd).ok().filter(|repo| repo.workdir().is_some())
                 {
                     tool_set.add_tool(enter_worktree::EnterGitWorktreeTool::new(
                         ctx.clone(),
@@ -155,7 +144,7 @@ pub fn create_tools<'a>(
             },
             exit_worktree::NAME => {
                 if let Some(repository) =
-                    Repository::discover(cwd).ok().filter(|repo| repo.workdir().is_some())
+                    Repository::discover(&state.cwd).ok().filter(|repo| repo.workdir().is_some())
                 {
                     tool_set
                         .add_tool(exit_worktree::ExitGitWorktreeTool::new(ctx.clone(), repository));
