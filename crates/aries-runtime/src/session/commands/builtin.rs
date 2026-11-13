@@ -5,11 +5,11 @@ use nanoid::nanoid;
 use tokio::process::Command;
 
 use crate::agent::AriesAgent;
-use crate::compact::ContextCompactor;
+use crate::compaction::ContextCompactor;
 
 const EXIT: &str = "exit";
 const SHELL: &str = "shell";
-const COMPACT: &str = "compact";
+const COMPACT: &str = "compaction";
 const SYSTEM_PROMPT: &str = "system-prompt";
 
 pub const BUILTIN_COMMANDS: &[(&str, &str, Option<&str>); 4] = &[

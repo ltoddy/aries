@@ -13,6 +13,12 @@ use tracing::info;
 #[derive(Debug, Clone)]
 pub struct McpServers(pub Vec<McpServer>);
 
+impl McpServers {
+    pub fn new(servers: Vec<McpServer>) -> Self {
+        Self(servers)
+    }
+}
+
 impl From<McpServers> for McpDefinition {
     fn from(val: McpServers) -> Self {
         let mut mcp_servers = HashMap::new();

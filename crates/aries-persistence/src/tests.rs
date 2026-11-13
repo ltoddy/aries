@@ -129,8 +129,8 @@ async fn token_audit_repository_uses_memory_database() {
     let db = memory_db().await.unwrap();
     let mut repo = TokenAuditRepository::new(db);
 
-    let audit = repo.create("compact", 100, 60).await.unwrap();
-    assert_eq!(audit.command, "compact");
+    let audit = repo.create("compaction", 100, 60).await.unwrap();
+    assert_eq!(audit.command, "compaction");
     assert_eq!(audit.original_tokens, 100);
     assert_eq!(audit.optimized_tokens, 60);
     assert_eq!(audit.saved_tokens, 40);

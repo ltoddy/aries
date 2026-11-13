@@ -38,7 +38,7 @@ pub use self::error::SessionError;
 use self::hook::SessionPromptHook;
 use self::instruction::InstructionContext;
 use crate::agent::{AriesAgent, Builder};
-use crate::compact::ContextCompactor;
+use crate::compaction::ContextCompactor;
 use crate::memory::{MemoryRetriever, MemoryStore};
 use crate::session::{ChatContext, ChatHistory};
 use crate::state::State;
