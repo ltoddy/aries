@@ -2,16 +2,12 @@ mod args;
 mod error;
 mod output;
 
-use std::path::PathBuf;
-
 use aries_communicate::{Notifier, SubagentUpdate};
 use aries_extension::AgentExtensions;
 use aries_extension::agent::AgentDefinition;
 use aries_init::GlobalContext;
 use futures::StreamExt;
-use rig::Model;
 use rig::agent::{MultiTurnStreamItem, PromptResponse};
-use rig::providers::openai::wire::OpenAiWire;
 use rig::tool::server::ToolServer;
 use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
@@ -22,7 +18,7 @@ pub use self::error::AgentError;
 pub use self::output::AgentOutput;
 use crate::hooks::{TokenUsageHook, ToolCallHook};
 use crate::jsonl;
-use crate::state::MaxTurn;
+use crate::state::State;
 
 pub const NAME: &str = "Agent";
 
@@ -30,42 +26,24 @@ const DESCRIPTION_HEAD: &str = include_str!("description-head.md");
 const DESCRIPTION_TAIL: &str = include_str!("description-tail.md");
 
 pub struct AgentTool {
+    state: State,
     gctx: GlobalContext,
     ctx: crate::tools::context::ToolContext,
-    model: Model<OpenAiWire>,
-    parent_dir: PathBuf,
     notifier: Notifier,
     extensions: AgentExtensions,
-    token_usage_hook: TokenUsageHook,
-    tool_call_hook: ToolCallHook,
     db: Db,
 }
 
 impl AgentTool {
     pub fn new(
+        state: State,
         ctx: crate::tools::context::ToolContext,
         gctx: GlobalContext,
-        model: Model<OpenAiWire>,
-        parent_dir: impl Into<PathBuf>,
         notifier: Notifier,
         extensions: AgentExtensions,
         db: Db,
     ) -> Self {
-        let parent_dir = parent_dir.into();
-        let token_usage_hook = TokenUsageHook::new(gctx.current_dir(), db.clone());
-        let tool_call_hook = ToolCallHook::new(gctx.current_dir(), db.clone());
-
-        Self {
-            gctx,
-            ctx,
-            model,
-            parent_dir,
-            notifier,
-            extensions,
-            token_usage_hook,
-            tool_call_hook,
-            db,
-        }
+        Self { state, gctx, ctx, notifier, extensions, db }
     }
 }
 
@@ -135,15 +113,13 @@ impl Tool for AgentTool {
 
         let tool_names = extension.frontmatter.filter_tool_names(crate::ALL_TOOL_NAMES);
         let cwd = self.ctx.cwd();
-        let extensions = AgentExtensions::empty();
+        let mut state = self.state.clone();
+        state.cwd(&cwd);
         let tools = crate::create_tools(
-            self.ctx.session_id(),
+            state,
             self.gctx.clone(),
             &tool_names,
-            self.model.clone(),
-            &self.parent_dir,
-            cwd,
-            extensions,
+            self.extensions.clone(),
             self.notifier.clone(),
             self.db.clone(),
         );
@@ -151,18 +127,18 @@ impl Tool for AgentTool {
         let tool_server_handle = ToolServer::new().run();
         tool_server_handle.add_tools(tools);
 
-        let cwd = self
-            .ctx
-            .worktree()
-            .map_or_else(|| self.ctx.cwd(), |worktree| worktree.path().to_owned());
-        let agent = rig::agent::AgentBuilder::new(self.model.clone())
+        let token_usage_hook = TokenUsageHook::new(self.gctx.current_dir(), self.db.clone());
+        let tool_call_hook = ToolCallHook::new(self.gctx.current_dir(), self.db.clone());
+
+        let agent = rig::agent::AgentBuilder::new(self.state.model.clone())
             .name(&extension.frontmatter.name)
             .preamble(&extension.body)
-            .append_preamble(&crate::preamble::env::section(cwd, self.model.name()))
+            .append_preamble(&crate::preamble::env::section(cwd, self.state.model.name()))
             .tool_server_handle(tool_server_handle)
-            .add_hook(self.token_usage_hook.clone())
-            .add_hook(self.tool_call_hook.clone())
-            .default_max_turns(MaxTurn::default().as_usize())
+            .add_hook(token_usage_hook)
+            .add_hook(tool_call_hook)
+            .reasoning(self.state.effort)
+            .default_max_turns(self.state.turns.as_usize())
             .build();
 
         let session_id = format!("agent-{}", nanoid::nanoid!());
@@ -175,7 +151,7 @@ impl Tool for AgentTool {
 
         self.notifier.send_session_message(
             &message_id,
-            self.ctx.session_id(),
+            &self.state.session_id,
             &session_id,
             &message_id,
             &message_id,
@@ -190,7 +166,7 @@ impl Tool for AgentTool {
             }
         }
 
-        let mut file_path = self.parent_dir.join("subagent").join(&task_id);
+        let mut file_path = self.state.session_dir.join("subagent").join(&task_id);
         let messages = final_res.messages();
         if let Some(parent) = file_path.parent() {
             _ = tokio::fs::create_dir_all(parent).await;

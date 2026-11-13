@@ -2,14 +2,10 @@ mod args;
 mod error;
 mod output;
 
-use std::path::PathBuf;
-
 use aries_communicate::Notifier;
 use aries_extension::AgentExtensions;
 use aries_init::GlobalContext;
 use futures::future::join_all;
-use rig::Model;
-use rig::providers::openai::wire::OpenAiWire;
 use rig::tool::Tool;
 use serde_json::Value;
 use toasty::Db;
@@ -17,6 +13,7 @@ use toasty::Db;
 pub use self::args::{BatchArgs, BatchCall, NAME};
 pub use self::error::BatchError;
 pub use self::output::{BatchOutput, ToolOutput};
+use crate::state::State;
 use crate::tools::agent;
 use crate::tools::context::ToolContext;
 use crate::{codesearch, glob, grep, read, task_output, webfetch, websearch};
@@ -24,10 +21,9 @@ use crate::{codesearch, glob, grep, read, task_output, webfetch, websearch};
 const MAX_BATCH_CALLS: usize = 25;
 
 pub struct BatchTool {
+    state: State,
     gctx: GlobalContext,
     ctx: ToolContext,
-    model: Model<OpenAiWire>,
-    parent_dir: PathBuf,
     notifier: Notifier,
     extensions: AgentExtensions,
     db: Db,
@@ -35,17 +31,14 @@ pub struct BatchTool {
 
 impl BatchTool {
     pub fn new(
+        state: State,
         ctx: ToolContext,
         gctx: GlobalContext,
-        model: Model<OpenAiWire>,
-        parent_dir: impl Into<PathBuf>,
         notifier: Notifier,
         extensions: AgentExtensions,
         db: Db,
     ) -> Self {
-        let parent_dir = parent_dir.into();
-
-        Self { gctx, ctx, model, parent_dir, notifier, extensions, db }
+        Self { state, gctx, ctx, notifier, extensions, db }
     }
 
     async fn dispatch(
@@ -62,10 +55,9 @@ impl BatchTool {
                 let args = serde_json::from_value::<agent::AgentArgs>(params)
                     .map_err(|e| BatchError::invalid_parameters(tool_name, e))?;
                 let tool = agent::AgentTool::new(
+                    self.state.clone(),
                     ctx,
                     self.gctx.clone(),
-                    self.model.clone(),
-                    &self.parent_dir,
                     self.notifier.clone(),
                     self.extensions.clone(),
                     self.db.clone(),
