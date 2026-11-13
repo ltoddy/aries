@@ -19,8 +19,6 @@
 
 ### Aries Desktop (`aries-desktop`)
 
-原生 macOS 终端模拟器，内置 AI 能力。基于 GPUI 构建，提供高性能的原生体验。
-
 ![orbit](docs/assets/aries-desktop.png)
 
 以 Agent 为核心，统一承接终端、桌面与 IDE 的交互，通过上下文管理、工具执行和子智能体协作完成任务。

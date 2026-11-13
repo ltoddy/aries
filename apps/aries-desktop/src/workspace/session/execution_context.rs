@@ -134,14 +134,9 @@ pub fn render_execution_context(
                 )
                 .when_some(branch, |row, branch| {
                     row.child(
-                        div()
-                            .min_w_0()
-                            .max_w_full()
-                            .whitespace_normal()
-                            .child(SelectableText::new(
-                                "execution-branch-text",
-                                format!("· {branch}"),
-                            )),
+                        div().min_w_0().max_w_full().whitespace_normal().child(
+                            SelectableText::new("execution-branch-text", format!("· {branch}")),
+                        ),
                     )
                 })
                 .when_some(owner.execution().session_id(), |row, id| {

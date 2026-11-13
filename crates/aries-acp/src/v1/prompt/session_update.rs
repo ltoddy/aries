@@ -334,16 +334,35 @@ impl SessionUpdates {
     }
 
     fn from_session_message_chunk(chunk: aries_communicate::SessionMessageChunk) -> SessionUpdate {
-        let content: ContentBlock =
-            if let MultiTurnStreamItem::StreamAssistantItem(Item::Event(StreamEvent::Text {
-                part: _,
-                text,
-            })) = chunk.content
-            {
-                ContentBlock::Text(TextContent::new(text))
-            } else {
-                ContentBlock::Text(TextContent::new(""))
-            };
+        let content: ContentBlock = match chunk.content {
+            MultiTurnStreamItem::StreamAssistantItem(item) => match item {
+                Item::Event(event) => match event {
+                    StreamEvent::Text { part: _, text } => {
+                        ContentBlock::Text(TextContent::new(text))
+                    },
+                    StreamEvent::Reasoning { part: _, text } => {
+                        ContentBlock::Text(TextContent::new(text))
+                    },
+                    StreamEvent::End { part: _, content: _ } => {
+                        ContentBlock::Text(TextContent::new("\n"))
+                    },
+                    _ => ContentBlock::Text(TextContent::new("")),
+                },
+                Item::Unknown(payload) => {
+                    ContentBlock::Text(TextContent::new(payload.value().to_string()))
+                },
+            },
+            MultiTurnStreamItem::ToolCall { tool_call } => {
+                let (title, _) = parse_tool_call(&tool_call.function);
+                ContentBlock::Text(TextContent::new(format!("\n{title}\n")))
+            },
+            // MultiTurnStreamItem::ToolExecutionCommitted { .. } => {},
+            // MultiTurnStreamItem::ToolResult { .. } => {},
+            // MultiTurnStreamItem::CompletionCall(_) => {},
+            // MultiTurnStreamItem::ModelTurnRetried { .. } => {},
+            // MultiTurnStreamItem::FinalResponse(_) => {},
+            _ => ContentBlock::Text(TextContent::new("")),
+        };
 
         SessionUpdate::SessionMessageChunk(SessionMessageChunk::new(chunk.message_id, content))
     }
