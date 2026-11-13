@@ -6,6 +6,7 @@ use std::path::PathBuf;
 
 use alacritty_terminal::grid::Scroll;
 use alacritty_terminal::term::TermMode;
+use gpui_kit::base::GlobalState;
 use gpui_kit::component::ActiveTheme;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::prelude::*;
@@ -282,6 +283,7 @@ impl Render for TerminalView {
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, event: &MouseDownEvent, window, cx| {
+                    GlobalState::suppress_text_selection(cx);
                     window.focus(&this.focus_handle, cx);
                     this.start_selection(event, cx);
                 }),
@@ -346,7 +348,6 @@ impl Render for TerminalView {
                                     if this.selecting {
                                         if event.dragging() {
                                             this.update_selection(event.position, cx);
-                                            cx.stop_propagation();
                                         } else {
                                             this.selecting = false;
                                         }
@@ -361,7 +362,6 @@ impl Render for TerminalView {
                                     if this.selecting {
                                         this.update_selection(event.position, cx);
                                         this.selecting = false;
-                                        cx.stop_propagation();
                                     }
                                 });
                             }
