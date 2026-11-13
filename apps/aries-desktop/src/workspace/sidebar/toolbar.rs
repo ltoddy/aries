@@ -1,5 +1,5 @@
 use gpui_kit::assets::IconName;
-use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::button::{Button, ButtonVariants, Toggle};
 use gpui_kit::component::{Disableable, Icon, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
@@ -38,6 +38,25 @@ impl<'a> SessionToolbar<'a> {
                     .flex()
                     .items_center()
                     .gap_1()
+                    .when(self.owner.management().capabilities().archive.is_some(), |toolbar| {
+                        toolbar.child(
+                            Toggle::new("show-archived-sessions")
+                                .label("已归档")
+                                .checked(list.show_archived())
+                                .small()
+                                .disabled(
+                                    self.owner.management().is_pending()
+                                        || self.owner.deletion().is_busy()
+                                        || !list.is_supported(),
+                                )
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.with_sidebar(|sidebar| sidebar.toggle_archived());
+                                    this.refresh_sessions(cx);
+                                    this.sync_sidebar_rows(cx);
+                                    cx.notify();
+                                })),
+                        )
+                    })
                     .child(
                         Button::new("expand-all-sessions")
                             .icon(Icon::new(IconName::ListChevronsUpDown).size(rems(0.875)))
@@ -93,6 +112,7 @@ impl<'a> SessionToolbar<'a> {
                                     || !list.is_supported()
                                     || self.owner.execution().is_disconnected()
                                     || self.owner.deletion().is_busy()
+                                    || self.owner.management().is_pending()
                                     || self.owner.execution().is_loading(),
                             )
                             .on_click(cx.listener(|this, _, _, cx| this.refresh_sessions(cx))),

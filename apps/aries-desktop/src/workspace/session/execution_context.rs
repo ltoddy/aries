@@ -13,6 +13,7 @@ use crate::workspace::{SessionView, number};
 pub enum ExecutionState {
     Disconnected,
     Deleting,
+    Updating,
     Stopping,
     Permission,
     Connecting,
@@ -26,6 +27,9 @@ pub enum ExecutionState {
 }
 
 impl ExecutionState {
+    pub fn updating() -> Self {
+        Self::Updating
+    }
     pub fn render_tab_indicator(self, p: Palette) -> AnyElement {
         let indicator = match self {
             Self::Idle => None,
@@ -57,6 +61,7 @@ impl ExecutionState {
         match self {
             Self::Disconnected => "连接已断开，请新建会话",
             Self::Deleting => "删除会话中",
+            Self::Updating => "更新会话中",
             Self::Stopping => "正在停止",
             Self::Permission => "等待授权",
             Self::Connecting => "连接中",

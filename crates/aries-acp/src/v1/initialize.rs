@@ -3,9 +3,10 @@ use agent_client_protocol::v1::schema::{
     AgentAuthCapabilities, AgentCapabilities, AuthMethod, AuthMethodTerminal,
     AuthStatusCapabilities, Implementation, InitializeRequest, InitializeResponse,
     LogoutCapabilities, McpCapabilities, PromptCapabilities, ProvidersCapabilities,
-    SessionAdditionalDirectoriesCapabilities, SessionCapabilities, SessionCloseCapabilities,
-    SessionDeleteCapabilities, SessionForkCapabilities, SessionListCapabilities,
-    SessionResumeCapabilities, SessionSystemPromptCapabilities,
+    SessionAdditionalDirectoriesCapabilities, SessionArchiveCapabilities, SessionCapabilities,
+    SessionCloseCapabilities, SessionDeleteCapabilities, SessionForkCapabilities,
+    SessionListCapabilities, SessionOptionsCapabilities, SessionResumeCapabilities,
+    SessionStatusCapabilities, SessionSystemPromptCapabilities, SessionTitleCapabilities,
 };
 use agent_client_protocol::v1::{ConnectionTo, Responder};
 use agent_client_protocol::{Client, Error};
@@ -31,6 +32,10 @@ pub async fn initialize(
                 .additional_directories(SessionAdditionalDirectoriesCapabilities::new())
                 .system_prompt(SessionSystemPromptCapabilities::new())
                 .fork(SessionForkCapabilities::new())
+                .archive(SessionArchiveCapabilities::new())
+                .status(SessionStatusCapabilities::new())
+                .options(SessionOptionsCapabilities::new())
+                .title(SessionTitleCapabilities::new())
                 .resume(SessionResumeCapabilities::new())
                 .close(SessionCloseCapabilities::new()),
         )

@@ -19,6 +19,12 @@ pub enum RequestError {
     CancellationTimeout,
 }
 
+impl RequestError {
+    pub fn timeout(message: &'static str, source: Elapsed) -> Self {
+        Self::Timeout { message, source }
+    }
+}
+
 impl From<RequestError> for Error {
     fn from(error: RequestError) -> Self {
         match error {
@@ -39,4 +45,5 @@ pub mod list_sessions;
 pub mod load_session;
 pub mod new_session;
 pub mod prompt;
+pub mod session_management;
 pub mod set_session_config_option;

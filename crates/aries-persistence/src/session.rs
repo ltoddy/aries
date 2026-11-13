@@ -14,6 +14,7 @@ pub struct Session {
     pub session_id: String,
 
     pub title: Option<String>,
+    pub archived: bool,
 
     #[index]
     pub cwd: String,
@@ -49,6 +50,7 @@ impl SessionRepository {
         Session::create()
             .session_id(session_id)
             .title(UNTITLED_SESSION)
+            .archived(false)
             .cwd(cwd)
             .root_dir(root_dir)
             .transcript_path(transcript_path)
@@ -112,6 +114,18 @@ impl SessionRepository {
     ) -> toasty::Result<()> {
         Session::update_by_session_id(session_id)
             .title(title)
+            .updated_at(Timestamp::now())
+            .exec(&mut self.db)
+            .await
+    }
+
+    pub async fn update_archived_by_session_id(
+        &mut self,
+        session_id: impl IntoExpr<String>,
+        archived: bool,
+    ) -> toasty::Result<()> {
+        Session::update_by_session_id(session_id)
+            .archived(archived)
             .updated_at(Timestamp::now())
             .exec(&mut self.db)
             .await

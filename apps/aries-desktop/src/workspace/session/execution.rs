@@ -55,6 +55,7 @@ pub struct SessionParts<'a> {
     deletion: &'a mut SessionDeletion,
     tab_host: Option<WeakEntity<WorkspaceView>>,
     render_mode: SessionRenderMode,
+    management_pending: bool,
 }
 impl<'a> SessionParts<'a> {
     pub fn new(
@@ -74,7 +75,13 @@ impl<'a> SessionParts<'a> {
             deletion,
             tab_host: None,
             render_mode: SessionRenderMode::Full,
+            management_pending: false,
         }
+    }
+
+    pub fn with_management_pending(mut self, pending: bool) -> Self {
+        self.management_pending = pending;
+        self
     }
 
     pub fn for_presentation(
@@ -177,6 +184,21 @@ impl Execution {
     }
     pub fn prompt_capabilities(&self) -> &PromptCapabilities {
         &self.prompt_capabilities
+    }
+    pub fn set_session_title(&mut self, id: &SessionId, title: String) {
+        if self.matches_session(id) {
+            self.conversation.set_title(Some(title.clone()));
+        }
+        if let Some(session) = &mut self.loading_session
+            && session.session_id() == id
+        {
+            session.set_title(title.clone());
+        }
+        if let Some(session) = &mut self.queued_session_load
+            && &session.session_id == id
+        {
+            session.title = Some(title);
+        }
     }
     pub fn conversation(&self) -> &Conversation {
         &self.conversation
@@ -371,7 +393,9 @@ impl Execution {
         cx: &mut Context<SessionView>,
     ) -> bool {
         if self.conversation.is_busy()
-            || !self.is_prompt_available(ui.deletion.is_busy() || ui.configuration.is_pending())
+            || !self.is_prompt_available(
+                (ui.deletion.is_busy() || ui.management_pending) || ui.configuration.is_pending(),
+            )
         {
             return false;
         }
@@ -409,12 +433,16 @@ impl Execution {
     }
     pub fn is_session_idle(&self, ui: &SessionParts<'_>) -> bool {
         self.is_idle(
-            ui.deletion.is_busy() || ui.configuration.is_pending() || ui.composer.is_loading(),
+            (ui.deletion.is_busy() || ui.management_pending)
+                || ui.configuration.is_pending()
+                || ui.composer.is_loading(),
         )
     }
     pub fn can_send(&self, ui: &SessionParts<'_>, cx: &App) -> bool {
         self.is_prompt_available(
-            ui.deletion.is_busy() || ui.configuration.is_pending() || ui.composer.is_loading(),
+            (ui.deletion.is_busy() || ui.management_pending)
+                || ui.configuration.is_pending()
+                || ui.composer.is_loading(),
         ) && !self.is_prompt_queue_full()
             && ui.composer.has_content(cx)
     }
@@ -540,7 +568,7 @@ impl Execution {
     ) {
         let mut sidebar_synced = false;
         match event {
-            Event::Connected { list_sessions, load_session, prompt_capabilities } => {
+            Event::Connected { list_sessions, load_session, prompt_capabilities, .. } => {
                 ui.sidebar.list_mut().connected(list_sessions);
                 self.load_supported = load_session;
                 self.prompt_capabilities = prompt_capabilities;
@@ -552,7 +580,7 @@ impl Execution {
                 }
             },
             Event::Sessions(result) => {
-                let received = ui.sidebar.list_mut().is_loading() && result.is_ok();
+                let received = ui.sidebar.list().accepts_response() && result.is_ok();
                 ui.sidebar.list_mut().receive(result);
                 if received {
                     ui.sidebar.receive_sidebar_rows(
@@ -567,6 +595,9 @@ impl Execution {
                     self.refresh_sessions(ui, cx);
                 }
             },
+            Event::SessionTitleSet { .. }
+            | Event::SessionArchived { .. }
+            | Event::SessionForked { .. } => {},
             Event::SessionsDeleted(result) => self.finish_deletion(ui, result, window, cx),
             Event::SessionLoaded { session_id, result } => {
                 self.finish_session_load(ui, &session_id, result, window, cx);
@@ -583,9 +614,11 @@ impl Execution {
                         self.cwd.clone(),
                     )
                     .title(self.conversation.title());
-                    ui.sidebar
-                        .motion_mut()
-                        .add_created(session.clone(), cx.background_executor().now());
+                    if !ui.sidebar.list().show_archived() {
+                        ui.sidebar
+                            .motion_mut()
+                            .add_created(session.clone(), cx.background_executor().now());
+                    }
                     ui.sidebar.set_created_session(session);
                 }
                 self.conversation.end_segment();
@@ -949,7 +982,7 @@ impl Execution {
             return;
         }
         if ui.sidebar.list_mut().is_loading()
-            || ui.deletion.is_busy()
+            || (ui.deletion.is_busy() || ui.management_pending)
             || self.loading_session.is_some()
         {
             ui.sidebar.list_mut().defer_refresh();
@@ -958,7 +991,9 @@ impl Execution {
         if !ui.sidebar.list_mut().begin_refresh() {
             return;
         }
-        if !self.bridge.as_ref().is_some_and(|bridge| bridge.send(Command::ListSessions).is_ok()) {
+        if !self.bridge.as_ref().is_some_and(|bridge| {
+            bridge.send(Command::ListSessions(ui.sidebar.list().archive_filter())).is_ok()
+        }) {
             ui.sidebar
                 .list_mut()
                 .fail_refresh("无法获取会话列表，请新建对话重新连接 Aries。".into());

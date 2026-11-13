@@ -3,7 +3,7 @@ use std::ops::ControlFlow;
 use std::sync::Arc;
 
 use agent_client_protocol::v1::ConnectionTo;
-use agent_client_protocol::v1::schema::AgentCapabilities;
+use agent_client_protocol::v1::schema::{AgentCapabilities, SessionArchiveFilter};
 use agent_client_protocol::{AcpAgent, AcpAgentConfig, Agent, Error};
 use async_channel::{Receiver, Sender};
 use tokio::sync::watch;
@@ -14,7 +14,7 @@ use crate::acp::handlers::{
 };
 use crate::acp::requests::{
     delete_sessions, initialize, list_sessions, load_session, new_session, prompt,
-    set_session_config_option,
+    session_management, set_session_config_option,
 };
 use crate::acp::terminal::Terminals;
 use crate::acp::{Command, DeletionReport, Event};
@@ -36,6 +36,16 @@ impl std::fmt::Debug for AgentConnection {
 }
 
 impl AgentConnection {
+    fn new(
+        client: ConnectionTo<Agent>,
+        commands: Receiver<Command>,
+        events: Sender<Event>,
+        cancel: watch::Sender<bool>,
+        capabilities: AgentCapabilities,
+    ) -> Self {
+        Self { client, commands, events, cancel, capabilities }
+    }
+
     pub fn client(&self) -> &ConnectionTo<Agent> {
         &self.client
     }
@@ -52,12 +62,15 @@ impl AgentConnection {
         let _ = self.events.send(event).await;
     }
 
-    pub async fn request_sessions(&self) {
-        let result = if self.capabilities.session_capabilities.list.is_some() {
-            list_sessions::request(&self.client, &self.events)
-        } else {
-            Err(Error::internal_error().data("Agent 不支持会话列表"))
-        };
+    pub async fn request_sessions(&self, archived: Option<SessionArchiveFilter>) {
+        let result =
+            if archived.is_some() && self.capabilities.session_capabilities.archive.is_none() {
+                Err(Error::internal_error().data("Agent 不支持会话归档筛选"))
+            } else if self.capabilities.session_capabilities.list.is_some() {
+                list_sessions::request(&self.client, &self.events, archived)
+            } else {
+                Err(Error::internal_error().data("Agent 不支持会话列表"))
+            };
         if let Err(error) = result {
             let _ = self.events.send(Event::Sessions(Err(error))).await;
         }
@@ -65,7 +78,7 @@ impl AgentConnection {
 
     pub async fn handle_busy_command(&self, command: Command) {
         match command {
-            Command::ListSessions => self.request_sessions().await,
+            Command::ListSessions(archived) => self.request_sessions(archived).await,
             Command::DeleteSessions(ids) => {
                 let _ = self
                     .events
@@ -92,6 +105,36 @@ impl AgentConnection {
                 })
                 .await;
             },
+            Command::SetSessionTitle(request) => {
+                self.emit(Event::session_title_set(
+                    request.session_id,
+                    Err(Error::internal_error().data("请等待当前操作结束后再重命名会话")),
+                ))
+                .await;
+            },
+            Command::ArchiveSession(session_id) => {
+                self.emit(Event::session_archived(
+                    session_id,
+                    true,
+                    Err(Error::internal_error().data("请等待当前操作结束后再归档会话")),
+                ))
+                .await;
+            },
+            Command::UnarchiveSession(session_id) => {
+                self.emit(Event::session_archived(
+                    session_id,
+                    false,
+                    Err(Error::internal_error().data("请等待当前操作结束后再恢复会话")),
+                ))
+                .await;
+            },
+            Command::ForkSession(request) => {
+                self.emit(Event::session_forked(
+                    request.session_id,
+                    Err(Error::internal_error().data("请等待当前操作结束后再复制会话")),
+                ))
+                .await;
+            },
             Command::NewSession(_) | Command::Prompt { .. } | Command::Cancel => {},
         }
     }
@@ -116,7 +159,7 @@ impl AgentConnection {
                     };
                     self.emit(Event::Ready(Box::new(response))).await;
                 },
-                Command::ListSessions => self.request_sessions().await,
+                Command::ListSessions(archived) => self.request_sessions(archived).await,
                 Command::DeleteSessions(ids) => {
                     let result = delete_sessions::request(&self.client, ids).await;
                     let _ = self.events.send(Event::SessionsDeleted(result)).await;
@@ -143,6 +186,46 @@ impl AgentConnection {
                         .await
                         .map_err(Error::from);
                     self.emit(Event::SessionConfigSet { session_id, config_id, result }).await;
+                },
+                Command::SetSessionTitle(request) => {
+                    let session_id = request.session_id.clone();
+                    let result = if self.capabilities.session_capabilities.title.is_some() {
+                        session_management::set_title(&self.client, *request)
+                            .await
+                            .map_err(Error::from)
+                    } else {
+                        Err(Error::internal_error().data("Agent 不支持重命名会话"))
+                    };
+                    self.emit(Event::session_title_set(session_id, result)).await;
+                },
+                Command::ArchiveSession(session_id) => {
+                    let result = if self.capabilities.session_capabilities.archive.is_some() {
+                        session_management::archive(&self.client, session_id.clone())
+                            .await
+                            .map_err(Error::from)
+                    } else {
+                        Err(Error::internal_error().data("Agent 不支持归档会话"))
+                    };
+                    self.emit(Event::session_archived(session_id, true, result)).await;
+                },
+                Command::UnarchiveSession(session_id) => {
+                    let result = if self.capabilities.session_capabilities.archive.is_some() {
+                        session_management::unarchive(&self.client, session_id.clone())
+                            .await
+                            .map_err(Error::from)
+                    } else {
+                        Err(Error::internal_error().data("Agent 不支持恢复会话"))
+                    };
+                    self.emit(Event::session_archived(session_id, false, result)).await;
+                },
+                Command::ForkSession(request) => {
+                    let session_id = request.session_id.clone();
+                    let result = if self.capabilities.session_capabilities.fork.is_some() {
+                        session_management::fork(&self.client, *request).await.map_err(Error::from)
+                    } else {
+                        Err(Error::internal_error().data("Agent 不支持复制会话"))
+                    };
+                    self.emit(Event::session_forked(session_id, result)).await;
                 },
                 Command::Cancel => {},
             }
@@ -231,12 +314,13 @@ pub async fn connect(
                     }
                 }
             };
-            let _ = events.send(Event::Connected {
-                list_sessions: capabilities.session_capabilities.list.is_some(),
-                load_session: capabilities.load_session,
-                prompt_capabilities: capabilities.prompt_capabilities.clone(),
-            }).await;
-            AgentConnection { client, commands, events, cancel, capabilities }
+            let _ = events.send(Event::connected(
+                capabilities.session_capabilities.list.is_some(),
+                capabilities.load_session,
+                capabilities.prompt_capabilities.clone(),
+                capabilities.session_capabilities.clone(),
+            )).await;
+            AgentConnection::new(client, commands, events, cancel, capabilities)
                 .run(pending).await
         })
         .await

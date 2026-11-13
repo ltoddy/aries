@@ -20,6 +20,11 @@ impl SessionLoad {
         Self { session, conversation, tokens: None }
     }
 
+    pub fn set_title(&mut self, title: String) {
+        self.session.title = Some(title.clone());
+        self.conversation.set_title(Some(title));
+    }
+
     pub fn session_id(&self) -> &SessionId {
         &self.session.session_id
     }

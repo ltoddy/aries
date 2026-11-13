@@ -24,8 +24,14 @@ impl<'a> SessionListView<'a> {
         cx: &mut Context<SessionView>,
     ) -> impl IntoElement {
         let list = &self.sidebar.list();
-        let groups = self.sidebar.motion().projects();
-        let empty = groups.is_empty();
+        let mut groups = self.sidebar.motion().projects();
+        if !list.show_archived() {
+            for directory in list.projects() {
+                groups.entry(directory).or_default();
+            }
+            groups.entry(self.owner.directory()).or_default();
+        }
+        let empty = groups.values().all(Vec::is_empty);
         div()
             .flex_1()
             .min_h_0()
@@ -37,6 +43,14 @@ impl<'a> SessionListView<'a> {
                 ),
             )
             .child(div().px_2().child(self.owner.render_session_actions(p)))
+            .when(self.owner.management().is_pending(), |list| {
+                list.child(
+                    div().px_4().py_1().text_xs().text_color(p.muted()).child("正在更新会话…"),
+                )
+            })
+            .when_some(self.owner.management().error().map(str::to_owned), |list, error| {
+                list.child(div().px_4().py_1().text_xs().text_color(p.danger()).child(error))
+            })
             .child(
                 div()
                     .id("session-list")
@@ -70,9 +84,13 @@ impl<'a> SessionListView<'a> {
                             && list.error().is_none()
                             && empty,
                         |list| {
-                            list.child(
-                                div().p_2().text_xs().text_color(p.muted()).child("暂无历史会话"),
-                            )
+                            list.child(div().p_2().text_xs().text_color(p.muted()).child(
+                                if self.sidebar.list().show_archived() {
+                                    "暂无已归档会话"
+                                } else {
+                                    "暂无历史会话"
+                                },
+                            ))
                         },
                     )
                     .when_some(list.error().map(str::to_owned), |list, error| {

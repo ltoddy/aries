@@ -6,7 +6,7 @@ use tracing::info;
 pub async fn archive_session(
     req: ArchiveSessionRequest,
     responder: Responder<ArchiveSessionResponse>,
-    _: ConnectionTo<Client>,
+    _cx: ConnectionTo<Client>,
 ) -> Result<(), Error> {
     info!("Received archive session request {req:?}");
 
