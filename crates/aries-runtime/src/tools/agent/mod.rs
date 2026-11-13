@@ -100,9 +100,7 @@ impl Tool for AgentTool {
         _context: &mut ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
-        let task_id = nanoid::nanoid!();
-
-        let Some(extension) = self
+        let Some(mode) = self
             .extensions
             .agents
             .iter()
@@ -111,7 +109,8 @@ impl Tool for AgentTool {
             return Err(AgentError::AgentNotFound(args.name));
         };
 
-        let tool_names = extension.frontmatter.filter_tool_names(crate::tools::ALL_TOOL_NAMES);
+        let task_id = nanoid::nanoid!();
+        let tool_names = mode.frontmatter.filter_tool_names(crate::tools::ALL_TOOL_NAMES);
         let cwd = self.ctx.cwd();
         let mut state = self.state.clone();
         state.cwd(&cwd);
@@ -131,8 +130,8 @@ impl Tool for AgentTool {
         let tool_call_hook = ToolCallHook::new(self.gctx.current_dir(), self.db.clone());
 
         let agent = rig::agent::AgentBuilder::new(self.state.model.clone())
-            .name(&extension.frontmatter.name)
-            .preamble(&extension.body)
+            .name(&mode.frontmatter.name)
+            .preamble(&mode.body)
             .append_preamble(&preamble::env::section(&cwd))
             .append_preamble(&preamble::skill::section(&self.extensions.skills))
             .append_preamble(&preamble::agentsmd::section(&cwd))

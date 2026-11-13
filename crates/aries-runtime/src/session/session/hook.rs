@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time;
@@ -8,7 +9,6 @@ use aries_extension::hook::input::{
     SubagentStopHookInput,
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
-use aries_persistence::{TokenUsageRepository, ToolCallRepository};
 use rig::agent::{
     AgentHook, CompletionCall, CompletionCallAction, CompletionCallEvent, DispatchAction,
     DispatchEvent, HookContext, InvalidToolCallAction, InvalidToolCallContext, ModelSelection,
@@ -17,9 +17,9 @@ use rig::agent::{
     RunStart, RunStartAction, StepEventKind, TextDelta, ToolCallDelta,
 };
 use rig::effect::{Answered, EffectKind};
+use rig::message::CallId;
 use serde::Deserialize;
 use serde_json::Value;
-use toasty::Db;
 use tokio::sync::Mutex;
 use tracing::warn;
 
@@ -42,24 +42,19 @@ pub struct SessionPromptHook {
     cwd: PathBuf,
     transcript_path: PathBuf,
     agent_id: String,
-    last_tool_call_at: Arc<Mutex<Option<time::Instant>>>,
-
-    tool_call_repo: ToolCallRepository,
-    token_usage_repo: TokenUsageRepository,
+    tool_call_started_at: Arc<Mutex<HashMap<CallId, time::Instant>>>,
     instruction_ctx: InstructionContext,
     window: ContextWindow,
     notifier: Notifier,
 }
 
 impl SessionPromptHook {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         executor: Arc<HooksExecutor>,
         session_id: impl Into<String>,
         cwd: impl Into<PathBuf>,
         transcript_path: impl Into<PathBuf>,
         agent_id: impl Into<String>,
-        db: Db,
         instruction_ctx: InstructionContext,
         notifier: Notifier,
     ) -> Self {
@@ -68,8 +63,6 @@ impl SessionPromptHook {
         let transcript_path = transcript_path.into();
         let agent_id = agent_id.into();
 
-        let tool_call_repo = ToolCallRepository::new(db.clone());
-        let token_usage_repo = TokenUsageRepository::new(db);
         let window = ContextWindow::new();
 
         Self {
@@ -78,9 +71,7 @@ impl SessionPromptHook {
             cwd,
             transcript_path,
             agent_id,
-            last_tool_call_at: Default::default(),
-            tool_call_repo,
-            token_usage_repo,
+            tool_call_started_at: Arc::new(Mutex::new(HashMap::new())),
             instruction_ctx,
             window,
             notifier,
@@ -181,29 +172,6 @@ impl AgentHook for SessionPromptHook {
         _ctx: &HookContext,
         event: ModelTurnFinished<'_>,
     ) -> ModelTurnAction {
-        let usage = event.usage;
-
-        let cwd = self.cwd.display().to_string();
-        let input_tokens = usage.input_tokens.unwrap_or(0);
-        let output_tokens = usage.output_tokens.unwrap_or(0);
-        let total_tokens = usage.total_tokens.unwrap_or(0);
-        let cached_input_tokens = usage.cached_input_tokens.unwrap_or(0);
-        let reasoning_tokens = usage.reasoning_tokens.unwrap_or(0);
-
-        let mut repo = self.token_usage_repo.clone();
-        tokio::task::spawn(async move {
-            let _ = repo
-                .create(
-                    cwd,
-                    input_tokens,
-                    output_tokens,
-                    total_tokens,
-                    cached_input_tokens,
-                    reasoning_tokens,
-                )
-                .await;
-        });
-
         self.notifier.send_stream_item(MultiTurnStreamItem::CompletionCall(CompletionCall::new(
             event.turn,
             event.usage,
@@ -248,9 +216,7 @@ impl AgentHook for SessionPromptHook {
             return DispatchAction::proceed();
         };
 
-        let mut last_tool_call_at = self.last_tool_call_at.lock().await;
-        *last_tool_call_at = Some(time::Instant::now());
-        drop(last_tool_call_at);
+        self.tool_call_started_at.lock().await.insert(call_id.clone(), time::Instant::now());
 
         let mut tool_input: Value =
             serde_json::from_str(args).unwrap_or_else(|_| Value::String(args.clone()));
@@ -327,22 +293,15 @@ impl AgentHook for SessionPromptHook {
                 Some(call_id),
             ) => {
                 let duration_ms = self
-                    .last_tool_call_at
+                    .tool_call_started_at
                     .lock()
                     .await
-                    .take()
+                    .remove(call_id)
                     .map(|started_at| started_at.elapsed().as_millis() as u64);
 
                 let tool_output = result.output();
                 let tool_input: Value =
                     serde_json::from_str(args).unwrap_or_else(|_| Value::String(args.clone()));
-
-                let cwd = self.cwd.display().to_string();
-                let was_successful = result.is_success();
-                let mut repo = self.tool_call_repo.clone();
-                let _ = repo
-                    .create(cwd, call_id.to_string(), name, args, duration_ms, was_successful)
-                    .await;
 
                 if let Some(error) = result.error() {
                     self.fire_post_tool_use_failure(
@@ -400,16 +359,12 @@ impl AgentHook for SessionPromptHook {
                 OutcomeAction::proceed()
             },
             (EffectKind::ToolCall { name, args }, Err(err), Some(call_id)) => {
-                let cwd = self.cwd.display().to_string();
                 let duration_ms = self
-                    .last_tool_call_at
+                    .tool_call_started_at
                     .lock()
                     .await
-                    .take()
+                    .remove(call_id)
                     .map(|started_at| started_at.elapsed().as_millis() as u64);
-
-                let mut repo = self.tool_call_repo.clone();
-                let _ = repo.create(cwd, call_id.to_string(), name, args, duration_ms, false).await;
 
                 self.fire_post_tool_use_failure(
                     name,

@@ -436,7 +436,6 @@ impl Session {
             &cwd,
             &transcript_path,
             DEFAULT_AGENT_NAME,
-            db.clone(),
             instruction_ctx.clone(),
             Notifier::clone(&notifier),
         );
