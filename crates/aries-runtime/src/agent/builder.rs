@@ -10,23 +10,22 @@ use crate::state::State;
 
 pub struct AgentBuilder {
     state: State,
-
+    extensions: AgentExtensions,
     gctx: GlobalContext,
 
-    extensions: AgentExtensions,
     db: Db,
-
     notifier: Notifier,
 }
 
 impl AgentBuilder {
-    pub fn new(state: State, gctx: GlobalContext, notifier: Notifier, db: Db) -> Self {
-        Self { state, gctx, extensions: AgentExtensions::empty(), db, notifier }
-    }
-
-    pub fn with_extensions(mut self, extensions: AgentExtensions) -> Self {
-        self.extensions = extensions;
-        self
+    pub fn new(
+        state: State,
+        extensions: AgentExtensions,
+        gctx: GlobalContext,
+        notifier: Notifier,
+        db: Db,
+    ) -> Self {
+        Self { state, gctx, extensions, db, notifier }
     }
 
     pub async fn build<P>(self, tool_server_handle: ToolServerHandle, hook: P) -> AriesAgent

@@ -13,15 +13,13 @@ use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariant, ButtonVariants};
 use gpui_kit::component::diff::{DiffDecoration, DiffLinePosition, DiffLineRange, DiffSide};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::component::menu::{DropdownMenu, PopupMenuItem};
+use gpui_kit::component::menu::{DropdownMenu, PopupMenu, PopupMenuItem};
 use gpui_kit::component::{ActiveTheme, Disableable, Sizable, WindowExt};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
 use crate::workspace::git::diff_operations::{DiffAction, DiffRequest, DiscardBackup};
-use crate::workspace::git::diff_patch::{
-    LineEndpoint, LineSelection, PatchDirection, PatchScope, SourceSide,
-};
+use crate::workspace::git::diff_patch::{LineEndpoint, LineSelection, PatchScope, SourceSide};
 use crate::workspace::git::diff_view::GitDiffView;
 use crate::workspace::git::repository::ChangeGroup;
 
@@ -56,7 +54,6 @@ pub struct ToolSnapshot {
     revision: u64,
     patch: Arc<String>,
     range: Option<DiffLineRange>,
-    scope: ToolScope,
     hunk: Option<usize>,
     location: Option<DiffLinePosition>,
     available: [bool; 3],
@@ -68,7 +65,6 @@ impl ToolSnapshot {
             revision: view.revision,
             patch: view.patch.clone(),
             range: view.selection_snapshot.clone(),
-            scope: view.scope,
             hunk: view.current_hunk,
             location: view.location.clone(),
             available: [
@@ -110,7 +106,6 @@ impl GitDiffView {
             state.set_selected_lines(snapshot.range.clone(), cx);
         });
         self.selection_changed(cx);
-        self.scope = snapshot.scope;
         self.current_hunk = snapshot.hunk;
         self.location = snapshot.location.clone();
         cx.notify();
@@ -120,7 +115,6 @@ impl GitDiffView {
     pub fn reset_tools(&mut self) {
         self.model = None;
         self.tool_error = None;
-        self.scope = ToolScope::file();
         self.selected_scope = None;
         self.selection_snapshot = None;
         self.selected_count = 0;
@@ -426,67 +420,100 @@ impl GitDiffView {
             ChangeGroup::Unstaged => ("暂存", DiffAction::stage()),
             ChangeGroup::Staged => ("取消暂存", DiffAction::unstage()),
         };
-        let view = cx.weak_entity();
-        let selected = self.scope;
-        let snapshot = self.tool_snapshot();
-        let menu_snapshot = snapshot.clone();
-        div()
-            .flex()
-            .items_center()
-            .gap_1()
-            .flex_shrink_0()
-            .child(
-                Button::new("diff-operation-scope")
-                    .small()
-                    .ghost()
-                    .compact()
-                    .label(selected.label())
-                    .icon(IconName::ChevronDown)
-                    .tooltip("选中行需点击行号，Shift 扩展；仅操作真正变更的行")
-                    .dropdown_menu(move |menu, _, cx| {
-                        let restored = view
-                            .upgrade()
-                            .is_some_and(|view| menu_snapshot.is_current(view.read(cx)));
-                        let mut menu = menu;
-                        for scope in [ToolScope::file(), ToolScope::hunk(), ToolScope::lines()] {
-                            let enabled = restored && menu_snapshot.scope_available(scope);
-                            let view = view.clone();
-                            let snapshot = menu_snapshot.clone();
-                            menu = menu.item(
-                                PopupMenuItem::new(scope.label())
-                                    .checked(selected == scope)
-                                    .disabled(!enabled)
-                                    .on_click(move |_, _, cx| {
-                                        let _ = view.update(cx, |this, cx| {
-                                            if this.restore_tool_snapshot(&snapshot, cx) {
-                                                this.scope = scope;
-                                                cx.notify();
-                                            }
-                                        });
-                                    }),
-                            );
-                        }
-                        menu
-                    }),
-            )
-            .child(
-                Button::new("diff-index-operation")
-                    .small()
-                    .compact()
-                    .secondary()
-                    .label(label)
-                    .disabled(self.writes_busy(cx) || !self.scope_available(self.scope))
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        if this.restore_tool_snapshot(&snapshot, cx) {
-                            this.request_change(action, window, cx);
-                        }
-                    })),
-            )
+        Button::new("diff-index-operation")
+            .small()
+            .compact()
+            .secondary()
+            .label(format!("{label}整个文件"))
+            .disabled(self.writes_busy(cx) || !self.scope_available(ToolScope::file()))
+            .on_click(cx.listener(move |this, _, window, cx| {
+                this.request_change(action, ToolScope::file(), window, cx);
+            }))
             .into_any_element()
     }
 
-    fn request_change(&mut self, action: DiffAction, window: &mut Window, cx: &mut Context<Self>) {
-        if self.writes_busy(cx) || !self.scope_available(self.scope) {
+    pub fn selection_menu(&mut self, mut menu: PopupMenu, cx: &mut Context<Self>) -> PopupMenu {
+        self.selection_changed(cx);
+        let Some(target) = &self.target else {
+            return menu;
+        };
+        let Some(range) = &self.selection_snapshot else {
+            return menu.item(PopupMenuItem::new("先点击或拖动行号选择变更行").disabled(true));
+        };
+        let hunk = self.model.as_ref().and_then(|model| {
+            let start = model.source_position(endpoint(range.side(), range.start()).ok()?)?;
+            let end = model.source_position(endpoint(range.end_side(), range.end()).ok()?)?;
+            let start = model.source_lines().iter().find(|line| line.position() == start)?;
+            let end = model.source_lines().iter().find(|line| line.position() == end)?;
+            (start.hunk_index() == end.hunk_index()).then_some(start.hunk_index())
+        });
+        let (label, action) = match target.group {
+            ChangeGroup::Unstaged => ("暂存", DiffAction::stage()),
+            ChangeGroup::Staged => ("取消暂存", DiffAction::unstage()),
+        };
+        let discardable = target.group == ChangeGroup::Unstaged
+            && self.model.as_ref().is_some_and(|model| model.is_discardable());
+        let mut snapshot = self.tool_snapshot();
+        snapshot.hunk = hunk;
+        snapshot.available[1] = hunk.is_some()
+            && self.model.as_ref().is_some_and(|model| model.partial_error().is_none());
+        let busy = self.writes_busy(cx);
+        let scopes = [
+            (ToolScope::lines(), format!("选中行（{} 个变更行）", self.selected_count)),
+            (
+                ToolScope::hunk(),
+                hunk.map_or_else(
+                    || "选区所在变更块（需选在同一块内）".to_owned(),
+                    |index| format!("选区所在变更块（第 {} 块）", index + 1),
+                ),
+            ),
+        ];
+        for (scope, name) in &scopes {
+            let view = cx.weak_entity();
+            let snapshot = snapshot.clone();
+            let scope = *scope;
+            menu = menu.item(
+                PopupMenuItem::new(format!("{label}{name}"))
+                    .disabled(busy || !snapshot.scope_available(scope))
+                    .on_click(move |_, window, cx| {
+                        let _ = view.update(cx, |this, cx| {
+                            if this.restore_tool_snapshot(&snapshot, cx) {
+                                this.request_change(action, scope, window, cx);
+                            }
+                        });
+                    }),
+            );
+        }
+        if discardable {
+            menu = menu.item(PopupMenuItem::separator());
+            for (scope, name) in scopes {
+                let view = cx.weak_entity();
+                let snapshot = snapshot.clone();
+                menu = menu.item(
+                    PopupMenuItem::new(format!("丢弃{name}…"))
+                        .icon(IconName::Trash)
+                        .disabled(busy || !snapshot.scope_available(scope))
+                        .on_click(move |_, window, cx| {
+                            let _ = view.update(cx, |this, cx| {
+                                if this.restore_tool_snapshot(&snapshot, cx) {
+                                    this.request_change(DiffAction::discard(), scope, window, cx);
+                                }
+                            });
+                        }),
+                );
+            }
+        }
+        menu
+    }
+
+    fn request_change(
+        &mut self,
+        action: DiffAction,
+        scope: ToolScope,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.writes_busy(cx) || !self.scope_available(scope) {
             return;
         }
         let Some(target) = &self.target else {
@@ -497,7 +524,7 @@ impl GitDiffView {
         {
             return;
         }
-        let Some(scope) = self.scope_patch(self.scope) else {
+        let Some(patch_scope) = self.scope_patch(scope) else {
             return;
         };
         let request = DiffRequest::new(
@@ -505,7 +532,7 @@ impl GitDiffView {
             target.path.clone(),
             target.group,
             self.patch.clone(),
-            scope,
+            patch_scope,
             action,
         );
         let owner = self.owner.clone();
@@ -513,11 +540,11 @@ impl GitDiffView {
             if target.group != ChangeGroup::Unstaged {
                 return;
             }
-            let title = format!("丢弃{}？", self.scope.label());
+            let title = format!("丢弃{}？", scope.label());
             let description = format!(
                 "将丢弃 {} 的{}，仅影响未暂存变更。执行前会创建持久备份，可从「恢复丢弃」菜单恢复（重启后仍保留）。未跟踪文件可能被移除；恢复前会检查文件是否已变化。操作期间请暂停编辑该文件。",
                 target.path.display(),
-                self.scope.label()
+                scope.label()
             );
             window.open_alert_dialog(cx, move |dialog, _, _| {
                 let owner = owner.clone();
@@ -537,31 +564,6 @@ impl GitDiffView {
         } else {
             dispatch_change(owner, request, window, cx);
         }
-    }
-
-    fn copy_patch(&mut self, scope: ToolScope, window: &mut Window, cx: &mut Context<Self>) {
-        let result = if scope == ToolScope::File {
-            Ok(self.patch.as_ref().clone())
-        } else {
-            self.model
-                .as_ref()
-                .zip(self.scope_patch(scope))
-                .ok_or_else(ToolError::selection_required)
-                .and_then(|(model, scope)| {
-                    model.selected_patch(&scope, PatchDirection::forward()).map_err(ToolError::from)
-                })
-        };
-        match result {
-            Ok(patch) => {
-                cx.write_to_clipboard(ClipboardItem::new_string(patch));
-                self.tool_error = None;
-            },
-            Err(error) => {
-                self.tool_error = Some(format!("无法复制 patch：{}", details(&error)));
-                report("无法复制 patch", &error, window, cx);
-            },
-        }
-        cx.notify();
     }
 
     fn choose_hunk(&mut self, index: usize, cx: &mut Context<Self>) {
@@ -605,10 +607,8 @@ impl GitDiffView {
         let current = self.current_hunk;
         let count = self.model.as_ref().map_or(0, |model| model.hunks().len());
         let hunk_view = view.clone();
-        let more_view = view.clone();
         let restore_view = view;
         let hunk_snapshot = self.tool_snapshot();
-        let more_snapshot = hunk_snapshot.clone();
         let restore_snapshot = hunk_snapshot.clone();
         div()
             .flex()
@@ -696,92 +696,6 @@ impl GitDiffView {
                     .on_click(cx.listener(|this, _, window, cx| this.show_search(window, cx))),
             )
             .child(
-                Button::new("diff-more-tools")
-                    .small()
-                    .ghost()
-                    .compact()
-                    .label("更多")
-                    .icon(IconName::ChevronDown)
-                    .dropdown_menu(move |menu, _, cx| {
-                        let Some(view) = more_view.upgrade() else {
-                            return menu;
-                        };
-                        let restored = more_snapshot.is_current(view.read(cx));
-                        let this = view.read(cx);
-                        let discard_enabled = restored
-                            && !this.writes_busy(cx)
-                            && this
-                                .target
-                                .as_ref()
-                                .is_some_and(|target| target.group == ChangeGroup::Unstaged)
-                            && more_snapshot.scope_available(more_snapshot.scope)
-                            && this.model.as_ref().is_some_and(|model| model.is_discardable());
-                        let discard_label = format!("丢弃{}…", more_snapshot.scope.label());
-                        let mut menu = menu;
-                        for (scope, label) in [
-                            (ToolScope::file(), "复制文件 patch"),
-                            (ToolScope::hunk(), "复制当前块 patch"),
-                            (ToolScope::lines(), "复制选中行 patch"),
-                        ] {
-                            let enabled = restored && more_snapshot.scope_available(scope);
-                            let view = more_view.clone();
-                            let snapshot = more_snapshot.clone();
-                            menu =
-                                menu.item(PopupMenuItem::new(label).disabled(!enabled).on_click(
-                                    move |_, window, cx| {
-                                        let _ = view.update(cx, |this, cx| {
-                                            if this.restore_tool_snapshot(&snapshot, cx) {
-                                                this.copy_patch(scope, window, cx);
-                                            }
-                                        });
-                                    },
-                                ));
-                        }
-                        menu = menu.item(PopupMenuItem::separator());
-                        let view = more_view.clone();
-                        let location_snapshot = more_snapshot.clone();
-                        menu = menu.item(
-                            PopupMenuItem::new("复制 diff 行位置")
-                                .disabled(!restored || more_snapshot.location.is_none())
-                                .on_click(move |_, _, cx| {
-                                    let _ = view.update(cx, |this, cx| {
-                                        if !this.restore_tool_snapshot(&location_snapshot, cx) {
-                                            return;
-                                        }
-                                        if let Some(position) = &location_snapshot.location {
-                                            let side = if position.side() == DiffSide::Original {
-                                                "原始侧"
-                                            } else {
-                                                "修改侧"
-                                            };
-                                            cx.write_to_clipboard(ClipboardItem::new_string(
-                                                format!(
-                                                    "{}:{} ({side})",
-                                                    position.path(),
-                                                    position.line()
-                                                ),
-                                            ));
-                                        }
-                                    });
-                                }),
-                        );
-                        let view = more_view.clone();
-                        let snapshot = more_snapshot.clone();
-                        menu.item(PopupMenuItem::separator()).item(
-                            PopupMenuItem::new(discard_label)
-                                .icon(IconName::Trash)
-                                .disabled(!discard_enabled)
-                                .on_click(move |_, window, cx| {
-                                    let _ = view.update(cx, |this, cx| {
-                                        if this.restore_tool_snapshot(&snapshot, cx) {
-                                            this.request_change(DiffAction::discard(), window, cx);
-                                        }
-                                    });
-                                }),
-                        )
-                    }),
-            )
-            .child(
                 Button::new("restore-discarded-diff")
                     .small()
                     .ghost()
@@ -842,7 +756,7 @@ impl GitDiffView {
             )
             .child(div().min_w_0().text_xs().text_color(cx.theme().muted_foreground).child(
                 format!(
-                    "已选 {} 个变更行{}",
+                    "已选 {} 个变更行{} · 行号选择，右键操作",
                     self.selected_count,
                     self.location.as_ref().map_or(String::new(), |position| format!(
                         " · {}侧:{}",
@@ -950,16 +864,11 @@ fn dispatch_change(
 enum ToolError {
     #[error(transparent)]
     Patch { source: PatchError },
-    #[error("请先选择包含变更的行或块")]
-    SelectionRequired,
     #[error("line number {line} exceeds supported patch coordinates")]
     LineNumber { line: usize, source: std::num::TryFromIntError },
 }
 
 impl ToolError {
-    fn selection_required() -> Self {
-        Self::SelectionRequired
-    }
     fn line_number(line: usize, source: std::num::TryFromIntError) -> Self {
         Self::LineNumber { line, source }
     }

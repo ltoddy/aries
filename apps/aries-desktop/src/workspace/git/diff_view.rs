@@ -2,25 +2,25 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use gpui_kit::assets::IconName;
-use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::button::{Button, ButtonGroup, ButtonVariants};
 use gpui_kit::component::clipboard::Clipboard;
 use gpui_kit::component::diff::{
-    Diff, DiffDecoration, DiffFile, DiffLinePosition, DiffLineRange, DiffMode, DiffState,
+    Diff, DiffDecoration, DiffFile, DiffFileStatus, DiffLinePosition, DiffLineRange, DiffMode,
+    DiffState,
 };
 use gpui_kit::component::input::InputState;
+use gpui_kit::component::menu::{ContextMenuExt, DropdownMenu, PopupMenuItem};
 use gpui_kit::component::spinner::Spinner;
-use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme, Disableable, Icon, Selectable, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
-use self::tools::ToolScope;
 use crate::error::details;
 use crate::workspace::SessionView;
 use crate::workspace::git::diff_operations::DiscardBackupEntry;
 use crate::workspace::git::diff_patch::{DiffPatch, PatchScope};
 use crate::workspace::git::error::DiffLoadError;
-use crate::workspace::git::repository::{ChangeGroup, read_file_diff};
+use crate::workspace::git::repository::{ChangeGroup, GitInfo, read_file_diff};
 
 mod tools;
 
@@ -36,6 +36,18 @@ impl DiffTarget {
     }
 }
 
+pub struct StageNavigation {
+    target: DiffTarget,
+    revision: u64,
+    index: usize,
+}
+
+impl StageNavigation {
+    fn new(target: DiffTarget, revision: u64, index: usize) -> Self {
+        Self { target, revision, index }
+    }
+}
+
 pub struct DiffTargetChanged;
 
 impl DiffTargetChanged {
@@ -48,12 +60,12 @@ pub struct GitDiffView {
     owner: WeakEntity<SessionView>,
     directory: PathBuf,
     target: Option<DiffTarget>,
+    targets: Vec<DiffTarget>,
     state: Entity<DiffState>,
     patch: Arc<String>,
     error: Option<String>,
     model: Option<Arc<DiffPatch>>,
     tool_error: Option<String>,
-    scope: ToolScope,
     selected_scope: Option<PatchScope>,
     selection_snapshot: Option<DiffLineRange>,
     selected_count: usize,
@@ -91,12 +103,12 @@ impl GitDiffView {
             owner,
             directory,
             target: None,
+            targets: Vec::new(),
             state,
             patch: Arc::new(String::new()),
             error: None,
             model: None,
             tool_error: None,
-            scope: ToolScope::file(),
             selected_scope: None,
             selection_snapshot: None,
             selected_count: 0,
@@ -137,6 +149,7 @@ impl GitDiffView {
         self.directory = directory.to_owned();
         let was_open = self.is_open();
         self.target = None;
+        self.targets.clear();
         self.previous_focus = None;
         self.reset(cx);
         if was_open {
@@ -262,6 +275,288 @@ impl GitDiffView {
         cx.notify();
     }
 
+    pub fn set_targets(&mut self, info: Option<&GitInfo>, cx: &mut Context<Self>) {
+        let files = info.and_then(GitInfo::changed_files).unwrap_or_default();
+        let targets = [ChangeGroup::Staged, ChangeGroup::Unstaged]
+            .into_iter()
+            .flat_map(|group| {
+                files.iter().filter_map(move |file| {
+                    file.change(group)
+                        .map(|change| DiffTarget::new(change.path().to_owned(), group))
+                })
+            })
+            .collect::<Vec<_>>();
+        if self.targets != targets {
+            self.targets = targets;
+            cx.notify();
+        }
+    }
+
+    pub fn stage_navigation(&self, path: &Path) -> Option<StageNavigation> {
+        let target = self.target.as_ref()?;
+        if target.group != ChangeGroup::Unstaged || target.path != path {
+            return None;
+        }
+        let index = self.group_targets(target.group).position(|candidate| candidate == target)?;
+        Some(StageNavigation::new(target.clone(), self.revision, index))
+    }
+
+    pub fn advance_after_stage(
+        &mut self,
+        navigation: StageNavigation,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.revision != navigation.revision
+            || self.target.as_ref() != Some(&navigation.target)
+            || self.targets.contains(&navigation.target)
+        {
+            return;
+        }
+        let next = self
+            .group_targets(ChangeGroup::Unstaged)
+            .nth(navigation.index)
+            .or_else(|| self.group_targets(ChangeGroup::Unstaged).last())
+            .cloned();
+        if let Some(target) = next {
+            self.open(target.path, target.group, window, cx);
+        }
+    }
+
+    fn group_targets(&self, group: ChangeGroup) -> impl Iterator<Item = &DiffTarget> {
+        self.targets.iter().filter(move |target| target.group == group)
+    }
+
+    fn adjacent_target(&self, offset: isize) -> Option<&DiffTarget> {
+        let target = self.target.as_ref()?;
+        let ix = self.group_targets(target.group).position(|candidate| candidate == target);
+        let ix = match ix {
+            Some(ix) => ix.checked_add_signed(offset)?,
+            None if offset > 0 => 0,
+            None => return None,
+        };
+        self.group_targets(target.group).nth(ix)
+    }
+
+    fn set_group(&mut self, group: ChangeGroup, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(current) = self.target.as_ref() else {
+            return;
+        };
+        if current.group == group {
+            return;
+        }
+        let target = self
+            .group_targets(group)
+            .find(|target| target.path == current.path)
+            .or_else(|| self.group_targets(group).next())
+            .cloned();
+        if let Some(target) = target {
+            self.switch_file(target, window, cx);
+        }
+    }
+
+    fn render_groups(&self, cx: &mut Context<Self>) -> AnyElement {
+        let busy = self.controls_busy(cx);
+        div()
+            .flex()
+            .items_center()
+            .flex_shrink_0()
+            .px_3()
+            .py_1()
+            .border_b_1()
+            .border_color(cx.theme().border.opacity(0.5))
+            .child(ButtonGroup::new("diff-groups").small().outline().children(
+                [ChangeGroup::Unstaged, ChangeGroup::Staged].map(|group| {
+                    let count = self.group_targets(group).count();
+                    let id = match group {
+                        ChangeGroup::Unstaged => "unstaged-diff",
+                        ChangeGroup::Staged => "staged-diff",
+                    };
+                    Button::new(id)
+                        .label(format!("{} {count}", group.title()))
+                        .selected(self.target.as_ref().is_some_and(|target| target.group == group))
+                        .disabled(busy || count == 0)
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.set_group(group, window, cx);
+                        }))
+                }),
+            ))
+            .into_any_element()
+    }
+
+    fn switch_file(&mut self, target: DiffTarget, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.is_open() || self.controls_busy(cx) || !self.targets.contains(&target) {
+            return;
+        }
+        self.open(target.path, target.group, window, cx);
+    }
+
+    fn move_file(&mut self, offset: isize, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(target) = self.adjacent_target(offset).cloned() {
+            self.switch_file(target, window, cx);
+        }
+    }
+
+    fn render_file_selector(&self, path: &str, cx: &mut Context<Self>) -> AnyElement {
+        let view = cx.weak_entity();
+        let directory = self.directory.clone();
+        let group = self.target.as_ref().map(|target| target.group);
+        div()
+            .flex_1()
+            .min_w_0()
+            .flex()
+            .flex_col()
+            .child(
+                Button::new("select-diff-file")
+                    .small()
+                    .ghost()
+                    .w_full()
+                    .min_w_0()
+                    .disabled(
+                        self.controls_busy(cx)
+                            || group.is_none_or(|group| self.group_targets(group).next().is_none()),
+                    )
+                    .accessibility_label(format!("切换 diff 文件：{path}"))
+                    .tooltip(path.to_owned())
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_1()
+                            .w_full()
+                            .min_w_0()
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .truncate()
+                                    .text_left()
+                                    .child(path.to_owned()),
+                            )
+                            .child(Icon::new(IconName::ChevronDown).size_3().flex_shrink_0()),
+                    )
+                    .dropdown_menu(move |mut menu, window, cx| {
+                        menu = menu.scrollable(true);
+                        let Some(entity) = view.upgrade() else {
+                            return menu;
+                        };
+                        let current = entity.read(cx);
+                        let Some(group) = group else {
+                            return menu;
+                        };
+                        if current.directory != directory
+                            || current.target.as_ref().is_none_or(|target| target.group != group)
+                        {
+                            return menu;
+                        }
+                        let busy = current.controls_busy(cx);
+                        for target in current.group_targets(group) {
+                            let selected = current.target.as_ref() == Some(target);
+                            let target = target.clone();
+                            let view = view.clone();
+                            let directory = directory.clone();
+                            menu = menu.item(
+                                PopupMenuItem::new(target.path.to_string_lossy().into_owned())
+                                    .checked(selected)
+                                    .disabled(busy)
+                                    .on_click(move |_, window, cx| {
+                                        let _ = view.update(cx, |this, cx| {
+                                            if this.directory == directory
+                                                && this
+                                                    .target
+                                                    .as_ref()
+                                                    .is_some_and(|current| current.group == group)
+                                            {
+                                                this.switch_file(target.clone(), window, cx);
+                                            }
+                                        });
+                                    }),
+                            );
+                        }
+                        menu.max_w(window.rem_size() * 32.)
+                    }),
+            )
+            .into_any_element()
+    }
+
+    fn render_file_navigation(&self, cx: &mut Context<Self>) -> AnyElement {
+        let Some(target) = self.target.as_ref() else {
+            return div().into_any_element();
+        };
+        let ix = self.group_targets(target.group).position(|candidate| candidate == target);
+        let count = self.group_targets(target.group).count();
+        let position = ix.map(|ix| (ix + 1).to_string()).unwrap_or_else(|| "—".into());
+        let busy = self.controls_busy(cx);
+        div()
+            .flex()
+            .items_center()
+            .gap_1()
+            .flex_shrink_0()
+            .child(
+                div()
+                    .id("diff-file-position")
+                    .text_xs()
+                    .text_color(cx.theme().muted_foreground)
+                    .aria_label(format!(
+                        "{}：当前第 {position} 个文件，共 {count} 个",
+                        target.group.title()
+                    ))
+                    .child(format!("{position}/{count}")),
+            )
+            .child(
+                Button::new("previous-diff-file")
+                    .small()
+                    .ghost()
+                    .compact()
+                    .icon(IconName::ChevronLeft)
+                    .accessibility_label("上一个 diff 文件")
+                    .tooltip("上一个文件")
+                    .disabled(busy || self.adjacent_target(-1).is_none())
+                    .on_click(cx.listener(|this, _, window, cx| this.move_file(-1, window, cx))),
+            )
+            .child(
+                Button::new("next-diff-file")
+                    .small()
+                    .ghost()
+                    .compact()
+                    .icon(IconName::ChevronRight)
+                    .accessibility_label("下一个 diff 文件")
+                    .tooltip("下一个文件")
+                    .disabled(busy || self.adjacent_target(1).is_none())
+                    .on_click(cx.listener(|this, _, window, cx| this.move_file(1, window, cx))),
+            )
+            .into_any_element()
+    }
+
+    fn render_file_summary(&self, cx: &mut Context<Self>) -> AnyElement {
+        let state = self.state.read(cx);
+        let Some(file) = state.files().first().filter(|_| !self.loading && self.error.is_none())
+        else {
+            return div().into_any_element();
+        };
+        let status = match file.status() {
+            DiffFileStatus::Added => Some("新增"),
+            DiffFileStatus::Deleted => Some("删除"),
+            DiffFileStatus::Renamed => Some("重命名"),
+            DiffFileStatus::Copied => Some("复制"),
+            DiffFileStatus::Conflicted => Some("冲突"),
+            _ => None,
+        };
+        div()
+            .flex()
+            .items_center()
+            .gap_2()
+            .flex_shrink_0()
+            .text_xs()
+            .text_color(cx.theme().muted_foreground)
+            .when(
+                !matches!(file.status(), DiffFileStatus::Unchanged | DiffFileStatus::Conflicted),
+                |summary| summary.child(format!("+{} −{}", file.additions(), file.deletions())),
+            )
+            .children(status)
+            .into_any_element()
+    }
+
     fn set_mode(&mut self, mode: DiffMode, cx: &mut Context<Self>) {
         self.state.update(cx, |state, cx| state.set_mode(mode, cx));
     }
@@ -273,14 +568,16 @@ impl Render for GitDiffView {
             return div().into_any_element();
         };
         let path = target.path.to_string_lossy().into_owned();
-        let (comparison, source_icon, destination_icon) = match target.group {
-            ChangeGroup::Staged => {
-                ("已暂存 · HEAD → 暂存区", IconName::GitCommitHorizontal, IconName::Layers)
-            },
-            ChangeGroup::Unstaged => {
-                ("未暂存 · 暂存区 → 工作目录", IconName::Layers, IconName::Folder)
-            },
-        };
+        let title = self
+            .state
+            .read(cx)
+            .files()
+            .first()
+            .and_then(|file| match (file.original_path(), file.modified_path()) {
+                (Some(old), Some(new)) if old != new => Some(format!("{old} → {new}")),
+                _ => None,
+            })
+            .unwrap_or_else(|| path.clone());
         let toolbar_snapshot = self.tool_snapshot();
         let mode = self.state.read(cx).mode();
         let has_diff = self.error.is_none() && !self.state.read(cx).files().is_empty();
@@ -308,12 +605,30 @@ impl Render for GitDiffView {
                 .into_any_element()
         } else {
             let view = cx.weak_entity();
-            Diff::new(&self.state)
-                .decorations(self.decorations.clone())
-                .on_line_click(move |position, _, _, cx| {
-                    let _ = view.update(cx, |this, cx| this.set_location(position.clone(), cx));
-                })
+            let menu_view = view.clone();
+            div()
+                .id("git-diff-selection-menu")
                 .size_full()
+                .min_w_0()
+                .min_h_0()
+                .child(
+                    Diff::new(&self.state)
+                        .header_visible(false)
+                        .decorations(self.decorations.clone())
+                        .on_line_click(move |position, _, _, cx| {
+                            let _ = view.update(cx, |this, cx| {
+                                this.set_location(position.clone(), cx);
+                            });
+                        })
+                        .size_full(),
+                )
+                .context_menu(move |menu, _, cx| {
+                    if let Some(view) = menu_view.upgrade() {
+                        view.update(cx, |this, cx| this.selection_menu(menu, cx))
+                    } else {
+                        menu
+                    }
+                })
                 .into_any_element()
         };
         div()
@@ -357,11 +672,13 @@ impl Render for GitDiffView {
                     cx.stop_propagation();
                 },
             ))
+            .child(self.render_groups(cx))
             .child(
                 div()
                     .flex()
                     .items_center()
                     .gap_2()
+                    .flex_wrap()
                     .flex_shrink_0()
                     .px_3()
                     .py_1()
@@ -369,46 +686,26 @@ impl Render for GitDiffView {
                     .border_color(cx.theme().border.opacity(0.5))
                     .child(
                         div()
-                            .flex_1()
-                            .min_w_0()
                             .flex()
                             .items_center()
-                            .gap_2()
+                            .gap_1()
+                            .flex_1()
+                            .min_w(rems(12.))
+                            .child(self.render_file_selector(&title, cx))
                             .child(
-                                div()
-                                    .flex()
-                                    .items_center()
-                                    .gap_1()
-                                    .flex_1()
-                                    .min_w_0()
-                                    .child(div().min_w_0().text_sm().truncate().child(path.clone()))
-                                    .child(
-                                        Clipboard::new(SharedString::from(format!(
-                                            "copy-diff-path:{path}"
-                                        )))
-                                        .small()
-                                        .value(path)
-                                        .accessibility_label("复制文件路径")
-                                        .tooltip("复制文件路径"),
-                                    ),
-                            )
-                            .child(
-                                div()
-                                    .id("diff-comparison")
-                                    .flex()
-                                    .flex_shrink_0()
-                                    .items_center()
-                                    .gap_1()
-                                    .text_color(cx.theme().muted_foreground)
-                                    .aria_label(comparison)
-                                    .tooltip(move |window, cx| {
-                                        Tooltip::new(comparison).build(window, cx)
-                                    })
-                                    .child(Icon::new(source_icon).size_3())
-                                    .child(Icon::new(IconName::ArrowRight).size_3())
-                                    .child(Icon::new(destination_icon).size_3()),
+                                div().flex().items_center().flex_shrink_0().child(
+                                    Clipboard::new(SharedString::from(format!(
+                                        "copy-diff-path:{path}"
+                                    )))
+                                    .small()
+                                    .value(path)
+                                    .accessibility_label("复制文件路径")
+                                    .tooltip("复制文件路径"),
+                                ),
                             ),
                     )
+                    .child(self.render_file_summary(cx))
+                    .child(self.render_file_navigation(cx))
                     .when(self.loading, |toolbar| toolbar.child(Spinner::new().small()))
                     .child(
                         Button::new("refresh-diff")

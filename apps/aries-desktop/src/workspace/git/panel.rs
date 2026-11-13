@@ -11,9 +11,9 @@ use gpui_kit::*;
 use crate::error::{details, log, report};
 use crate::workspace::SessionView;
 use crate::workspace::git::diff_operations::{
-    DiffRequest, DiscardBackup, DiscardBackupEntry, GitOperationError, with_git_write,
+    DiffAction, DiffRequest, DiscardBackup, DiscardBackupEntry, GitOperationError, with_git_write,
 };
-use crate::workspace::git::diff_view::{DiffTargetChanged, GitDiffView};
+use crate::workspace::git::diff_view::{DiffTargetChanged, GitDiffView, StageNavigation};
 use crate::workspace::git::error::RepositoryError;
 use crate::workspace::git::index::{IndexAction, update_index};
 use crate::workspace::git::list::GitChangeList;
@@ -81,7 +81,10 @@ impl GitPanel {
         cx: &mut Context<SessionView>,
     ) {
         self.set_collapsed(true, window, cx);
-        self.diff.update(cx, |diff, cx| diff.open(path, group, window, cx));
+        self.diff.update(cx, |diff, cx| {
+            diff.set_targets(self.info.as_ref(), cx);
+            diff.open(path, group, window, cx);
+        });
     }
     pub fn directory(&self) -> &Path {
         &self.cwd
@@ -406,7 +409,10 @@ impl GitPanel {
         );
         self.info = info;
         self.read_error = error;
-        self.diff.update(cx, |diff, cx| diff.refresh(cx));
+        self.diff.update(cx, |diff, cx| {
+            diff.set_targets(self.info.as_ref(), cx);
+            diff.refresh(cx);
+        });
         if changed {
             if !duration.is_zero() {
                 cx.spawn(async move |view, cx| {
@@ -660,7 +666,10 @@ impl GitPanel {
             return;
         }
         let path = request.path().to_owned();
-        self.run_diff_operation(path, move || request.execute(), window, cx);
+        let navigation = (request.action() == DiffAction::stage())
+            .then(|| self.diff.read(cx).stage_navigation(&path))
+            .flatten();
+        self.run_diff_operation(path, move || request.execute(), navigation, window, cx);
     }
 
     pub fn restore_diff(
@@ -689,6 +698,7 @@ impl GitPanel {
                     Ok(None)
                 })
             },
+            None,
             window,
             cx,
         );
@@ -698,6 +708,7 @@ impl GitPanel {
         &mut self,
         path: PathBuf,
         operation: impl FnOnce() -> Result<Option<DiscardBackup>, GitOperationError> + Send + 'static,
+        navigation: Option<StageNavigation>,
         window: &mut Window,
         cx: &mut Context<SessionView>,
     ) {
@@ -718,7 +729,7 @@ impl GitPanel {
                     (result, info, directory)
                 })
                 .await;
-            let _ = view.update(cx, |session, cx| {
+            let _ = view.update_in(cx, |session, window, cx| {
                 session.with_git_panel(|panel| {
                     panel.index_busy = false;
                     let current = accept_result(&panel.cwd, panel.revision, &directory, revision);
@@ -726,6 +737,13 @@ impl GitPanel {
                         panel.sync_info(info, result.is_ok(), cx);
                     }
                     panel.diff.update(cx, |diff, cx| {
+                        if current
+                            && result.is_ok()
+                            && panel.info.as_ref().and_then(GitInfo::changed_files).is_some()
+                            && let Some(navigation) = navigation
+                        {
+                            diff.advance_after_stage(navigation, window, cx);
+                        }
                         diff.refresh(cx);
                         cx.notify();
                     });
