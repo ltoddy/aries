@@ -870,11 +870,12 @@ impl WorkspaceView {
         let drag_title = title.clone().into();
         let tab = div()
             .id(("tab", id))
-            .relative()
             .h_7()
             .flex_shrink_0()
             .w(rems(11.25))
             .min_w(rems(11.25))
+            .pr_0p5()
+            .gap_1()
             .rounded(cx.theme().radius_tokens().md)
             .flex()
             .items_center()
@@ -885,8 +886,7 @@ impl WorkspaceView {
                     .custom(ButtonCustomVariant::new(cx).active(cx.theme().button_active))
                     .small()
                     .h_full()
-                    .px_2()
-                    .pr_8()
+                    .px_0()
                     .rounded(cx.theme().radius_tokens().md)
                     .flex_1()
                     .min_w_0()
@@ -909,20 +909,19 @@ impl WorkspaceView {
                     ),
             )
             .child(
-                div().absolute().right_1().top_0().bottom_0().flex().items_center().child(
-                    Button::new(("close-tab", id))
-                        .icon(Icon::new(IconName::X).size(rems(0.6875)))
-                        .ghost()
-                        .xsmall()
-                        .text_color(p.muted())
-                        .tooltip_with_action("关闭标签", &CloseTab, None)
-                        .accessibility_label("关闭标签")
-                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            cx.stop_propagation();
-                            this.execute_tab_command(TabCommand::close(id), window, cx);
-                        })),
-                ),
+                Button::new(("close-tab", id))
+                    .icon(Icon::new(IconName::X).size(rems(0.6875)))
+                    .ghost()
+                    .xsmall()
+                    .flex_shrink_0()
+                    .text_color(p.muted())
+                    .tooltip_with_action("关闭标签", &CloseTab, None)
+                    .accessibility_label("关闭标签")
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        cx.stop_propagation();
+                        this.execute_tab_command(TabCommand::close(id), window, cx);
+                    })),
             );
         self.with_tab_interactions(tab, id, drag_title, cx)
     }
