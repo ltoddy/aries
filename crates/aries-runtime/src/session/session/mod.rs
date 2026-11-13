@@ -176,11 +176,11 @@ impl Session {
         }
         let agent = AgentBuilder::new(
             self.state.clone(),
+            self.extensions.clone(),
             self.gctx.clone(),
             Notifier::clone(&self.notifier),
             self.db.clone(),
         )
-        .with_extensions(self.extensions.clone())
         .build(self.tool_server_handle.clone(), self.hook.clone())
         .await;
         self.agent = agent;
@@ -204,11 +204,11 @@ impl Session {
 
         let agent = AgentBuilder::new(
             self.state.clone(),
+            self.extensions.clone(),
             self.gctx.clone(),
             Notifier::clone(&self.notifier),
             self.db.clone(),
         )
-        .with_extensions(self.extensions.clone())
         .build(self.tool_server_handle.clone(), self.hook.clone())
         .await;
         self.agent = agent;
@@ -448,11 +448,15 @@ impl Session {
             .ok_or_else(|| SessionError::agent_not_found(DEFAULT_AGENT_NAME))?;
         let state = State::new(model, agent, cwd, session_dir, &id);
 
-        let agent =
-            AgentBuilder::new(state.clone(), gctx.clone(), Notifier::clone(&notifier), db.clone())
-                .with_extensions(extensions.clone())
-                .build(tool_server_handle.clone(), hook.clone())
-                .await;
+        let agent = AgentBuilder::new(
+            state.clone(),
+            extensions.clone(),
+            gctx.clone(),
+            Notifier::clone(&notifier),
+            db.clone(),
+        )
+        .build(tool_server_handle.clone(), hook.clone())
+        .await;
 
         let compactor = ContextCompactor::new(
             &id,

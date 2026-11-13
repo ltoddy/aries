@@ -61,6 +61,10 @@ impl DiffRequest {
         &self.path
     }
 
+    pub fn action(&self) -> DiffAction {
+        self.action
+    }
+
     pub fn execute(&self) -> Result<Option<DiscardBackup>> {
         with_git_write(|| {
             execute(&self.directory, &self.path, self.group, &self.patch, &self.scope, self.action)
