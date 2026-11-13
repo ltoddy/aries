@@ -133,7 +133,7 @@ impl Tool for AgentTool {
         let agent = rig::agent::AgentBuilder::new(self.state.model.clone())
             .name(&extension.frontmatter.name)
             .preamble(&extension.body)
-            .append_preamble(&crate::preamble::env::section(cwd, self.state.model.name()))
+            .append_preamble(&crate::preamble::env::section(cwd))
             .tool_server_handle(tool_server_handle)
             .add_hook(token_usage_hook)
             .add_hook(tool_call_hook)

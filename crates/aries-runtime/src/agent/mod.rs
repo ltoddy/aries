@@ -8,7 +8,7 @@ use rig::completion::Message;
 use rig::providers::openai::wire::OpenAiWire;
 use rig::{Agent, Model};
 
-pub use self::builder::AgentBuilder;
+pub use self::builder::Builder;
 pub use self::error::AriesError;
 
 pub type AriesResult<T, E = AriesError> = Result<T, E>;
