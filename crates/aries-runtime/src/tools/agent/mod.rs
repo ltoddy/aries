@@ -17,8 +17,8 @@ pub use self::args::AgentArgs;
 pub use self::error::AgentError;
 pub use self::output::AgentOutput;
 use crate::hooks::{TokenUsageHook, ToolCallHook};
-use crate::jsonl;
 use crate::state::State;
+use crate::{jsonl, preamble};
 
 pub const NAME: &str = "Agent";
 
@@ -133,7 +133,9 @@ impl Tool for AgentTool {
         let agent = rig::agent::AgentBuilder::new(self.state.model.clone())
             .name(&extension.frontmatter.name)
             .preamble(&extension.body)
-            .append_preamble(&crate::preamble::env::section(cwd))
+            .append_preamble(&preamble::env::section(&cwd))
+            .append_preamble(&preamble::skill::section(&self.extensions.skills))
+            .append_preamble(&preamble::agentsmd::section(&cwd))
             .tool_server_handle(tool_server_handle)
             .add_hook(token_usage_hook)
             .add_hook(tool_call_hook)
@@ -167,11 +169,11 @@ impl Tool for AgentTool {
         }
 
         let mut file_path = self.state.session_dir.join("subagent").join(&task_id);
+        file_path.set_extension("jsonl");
         let messages = final_res.messages();
         if let Some(parent) = file_path.parent() {
             _ = tokio::fs::create_dir_all(parent).await;
         }
-        file_path.set_extension("jsonl");
         let _ = jsonl::write(&file_path, messages).await;
 
         Ok(AgentOutput::new(task_id, final_res.output(), file_path))
