@@ -48,6 +48,10 @@ impl Sidebar {
             expanded_sessions: HashSet::new(),
         }
     }
+    pub fn toggle_archived(&mut self) {
+        self.list.toggle_archived();
+        self.motion.clear_rows();
+    }
     pub fn scroll(&self) -> &ScrollHandle {
         &self.scroll
     }
@@ -103,13 +107,14 @@ impl Sidebar {
         window: &mut Window,
         cx: &mut Context<SessionView>,
     ) -> impl IntoElement {
-        let new_enabled = tab_host
-            .as_ref()
-            .and_then(|host| host.upgrade())
-            .and_then(|host| {
-                host.read(cx).active_view().map(|view| view.read(cx).can_start_new_chat())
-            })
-            .unwrap_or_else(|| owner.can_start_new_chat());
+        let new_enabled = !owner.management().is_pending()
+            && tab_host
+                .as_ref()
+                .and_then(|host| host.upgrade())
+                .and_then(|host| {
+                    host.read(cx).active_view().map(|view| view.read(cx).can_start_new_chat())
+                })
+                .unwrap_or_else(|| owner.can_start_new_chat());
         let usage_selected = tab_host
             .as_ref()
             .and_then(|host| host.upgrade())
@@ -215,7 +220,9 @@ impl Sidebar {
     ) -> Vec<SessionInfo> {
         let mut sessions: Vec<_> =
             self.list.projects().flat_map(|cwd| self.list.project_sessions(cwd).cloned()).collect();
-        if let Some(id) = current
+        if !self.list.show_archived()
+            && let Some(id) = current
+            && !self.list.is_archived(id)
             && !sessions.iter().any(|session| &session.session_id == id)
         {
             sessions.insert(0, SessionInfo::new(id.clone(), cwd.as_ref().to_owned()).title(title));

@@ -32,8 +32,13 @@ pub enum SessionRenderMode {
     Main,
 }
 
+#[path = "management.rs"]
+pub mod management;
+use self::management::SessionManagement;
+
 pub struct SessionView {
     execution: Execution,
+    management: SessionManagement,
     configuration: Configuration,
     deletion: SessionDeletion,
     composer: Composer,
@@ -92,6 +97,7 @@ impl SessionView {
             execution: Execution::new(cwd, agent),
             configuration: Configuration::default(),
             deletion: SessionDeletion::default(),
+            management: SessionManagement::new(),
             composer,
             timeline: Timeline::new(cx),
             sidebar: Sidebar::new(),
@@ -114,7 +120,8 @@ impl SessionView {
             &mut self.configuration,
             &mut self.deletion,
         )
-        .for_presentation(self.tab_host.clone(), self.render_mode);
+        .for_presentation(self.tab_host.clone(), self.render_mode)
+        .with_management_pending(self.management.is_pending());
         operation(&mut self.execution, &mut parts)
     }
     pub fn execution(&self) -> &Execution {
@@ -153,7 +160,7 @@ impl SessionView {
         self.execution.session_id().is_some()
             && !self.execution.is_disconnected()
             && self.execution.is_prompt_available(
-                self.deletion.is_busy()
+                (self.deletion.is_busy() || self.management.is_pending())
                     || self.configuration.is_pending()
                     || self.composer.is_loading(),
             )
@@ -170,7 +177,7 @@ impl SessionView {
     }
     pub fn is_session_idle(&self) -> bool {
         self.execution.is_idle(
-            self.deletion.is_busy()
+            (self.deletion.is_busy() || self.management.is_pending())
                 || self.configuration.is_pending()
                 || self.composer.is_loading(),
         )
@@ -179,8 +186,10 @@ impl SessionView {
         self.is_session_idle()
     }
     pub fn is_prompt_ready(&self) -> bool {
-        self.execution
-            .is_prompt_available(self.deletion.is_busy() || self.configuration.is_pending())
+        self.execution.is_prompt_available(
+            (self.deletion.is_busy() || self.management.is_pending())
+                || self.configuration.is_pending(),
+        )
     }
     pub fn can_send(&self, cx: &App) -> bool {
         self.is_prompt_ready()
@@ -234,7 +243,51 @@ impl SessionView {
         self.coordinate(|execution, parts| execution.connect(parts, window, cx));
     }
     pub fn apply_event(&mut self, event: Event, window: &mut Window, cx: &mut Context<Self>) {
-        self.coordinate(|execution, parts| execution.apply_event(parts, event, window, cx));
+        if self.render_mode == SessionRenderMode::Main && !self.management.has_local_pending() {
+            if matches!(
+                &event,
+                Event::SessionTitleSet { .. }
+                    | Event::SessionArchived { .. }
+                    | Event::SessionForked { .. }
+            ) {
+                if let Some(host) = self.tab_host() {
+                    window.defer(cx, move |window, cx| {
+                        let _ = host.update(cx, |host, cx| {
+                            host.forward_session_management_event(event, window, cx)
+                        });
+                    });
+                    return;
+                }
+            } else if let Event::Update(notification) = &event
+                && matches!(
+                    &notification.update,
+                    agent_client_protocol::v1::schema::SessionUpdate::SessionInfoUpdate(_)
+                )
+                && let Some(host) = self.tab_host()
+            {
+                let notification = notification.clone();
+                window.defer(cx, move |window, cx| {
+                    let _ = host.update(cx, |host, cx| {
+                        host.forward_session_management_event(
+                            Event::Update(notification),
+                            window,
+                            cx,
+                        )
+                    });
+                });
+            } else if matches!(&event, Event::Disconnected(_))
+                && self.management.is_locked()
+                && let Some(id) = self.active_session_id().cloned()
+                && let Some(host) = self.tab_host()
+            {
+                cx.defer(move |cx| {
+                    let _ = host.update(cx, |host, cx| host.fail_session_management(&id, cx));
+                });
+            }
+        }
+        if !self.apply_management_event(&event, window, cx) {
+            self.coordinate(|execution, parts| execution.apply_event(parts, event, window, cx));
+        }
     }
     pub fn new_chat(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.coordinate(|execution, parts| execution.new_chat(parts, window, cx));
@@ -336,7 +389,9 @@ impl SessionView {
         cx: &mut Context<Self>,
     ) {
         self.sidebar.list_mut().expand_project(&session.cwd);
-        self.sidebar.motion_mut().add_created(session, cx.background_executor().now());
+        if !self.sidebar.list().show_archived() {
+            self.sidebar.motion_mut().add_created(session, cx.background_executor().now());
+        }
         self.refresh_sessions(cx);
         cx.notify();
     }
@@ -377,10 +432,13 @@ impl SessionView {
         snapshot: Option<(Option<SessionId>, PathBuf, String, Option<SessionId>)>,
         cx: &mut Context<Self>,
     ) {
-        let (id, cwd, title, loading) = match snapshot {
+        let (id, cwd, mut title, loading) = match snapshot {
             Some((id, cwd, title, loading)) => (id, Some(cwd), Some(title), loading),
             None => (None, None, None, None),
         };
+        if let Some(actual) = id.as_ref().and_then(|id| self.sidebar.list().confirmed_title(id)) {
+            title = Some(actual.to_owned());
+        }
         let changed_loading = self.sidebar.loading_session() != loading.as_ref();
         self.sidebar.set_loading_session(loading);
         if self.execution.sync_active(id, cwd, title) || changed_loading {
@@ -413,8 +471,10 @@ impl SessionView {
     }
     pub fn session_ids(&self, cwd: Option<&Path>) -> Vec<SessionId> {
         let mut ids = self.sidebar.motion().session_ids(cwd);
-        if cwd.is_none_or(|cwd| cwd == self.directory())
+        if !self.sidebar.list().show_archived()
+            && cwd.is_none_or(|cwd| cwd == self.directory())
             && let Some(id) = self.execution.session_id()
+            && !self.sidebar.list().is_archived(id)
             && !ids.contains(id)
         {
             ids.push(id.clone());
@@ -445,7 +505,7 @@ impl SessionView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if !self.can_manage_sessions() {
+        if !self.can_manage_sessions() || !self.supports_session_deletion() {
             return;
         }
         let cwd = cwd.as_ref();
@@ -506,7 +566,13 @@ impl SessionView {
         anchor: String,
         cx: &mut Context<Self>,
     ) {
-        if !self.can_manage_sessions() {
+        if !self.can_manage_sessions() || !self.supports_session_deletion() {
+            return;
+        }
+        let ids: Vec<_> = ids.into_iter().collect();
+        if self.tab_host().and_then(|host| host.upgrade()).is_some_and(|host| {
+            ids.iter().any(|id| !host.read(cx).session_management_available(id, cx))
+        }) {
             return;
         }
         if self.deletion.prepare_available(ids, anchor, self.session_ids(None)) {
@@ -517,7 +583,9 @@ impl SessionView {
     pub fn confirm_session_deletion(&mut self, cx: &mut Context<Self>) {
         let blocked = self.execution.is_disconnected()
             || self.execution.conversation().is_busy()
-            || self.sidebar.list().is_loading();
+            || self.sidebar.list().is_loading()
+            || self.management.is_pending()
+            || !self.supports_session_deletion();
         if self.deletion.confirm(self.execution.bridge(), blocked) {
             cx.notify();
         }
@@ -555,6 +623,7 @@ impl SessionView {
             (self.execution.is_disconnected(), ExecutionState::Disconnected),
             (self.execution.is_stopping(), ExecutionState::Stopping),
             (self.deletion.is_busy(), ExecutionState::Deleting),
+            (self.management.is_pending(), ExecutionState::updating()),
             (self.execution.permission().is_some(), ExecutionState::Permission),
             (self.sidebar.list().is_connecting(), ExecutionState::Connecting),
             (self.execution.is_choosing_directory(), ExecutionState::ChoosingProject),

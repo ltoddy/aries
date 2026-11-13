@@ -52,6 +52,19 @@ pub struct SidebarMotion {
 }
 
 impl SidebarMotion {
+    pub fn set_title(&mut self, id: &SessionId, title: &str) {
+        for row in &mut self.rows {
+            if &row.session.session_id == id {
+                row.session.title = Some(title.to_owned());
+            }
+        }
+    }
+    pub fn remove_session(&mut self, id: &SessionId) {
+        self.rows.retain(|row| &row.session.session_id != id);
+    }
+    pub fn clear_rows(&mut self) {
+        self.rows.clear();
+    }
     pub fn receive(
         &mut self,
         sessions: Vec<SessionInfo>,

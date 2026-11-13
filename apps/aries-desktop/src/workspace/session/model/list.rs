@@ -2,7 +2,9 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use agent_client_protocol::Error;
-use agent_client_protocol::v1::schema::{SessionId, SessionInfo, SessionInfoUpdate};
+use agent_client_protocol::v1::schema::{
+    SessionArchiveFilter, SessionId, SessionInfo, SessionInfoUpdate,
+};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum ListState {
@@ -23,9 +25,52 @@ pub struct SessionList {
     state: ListState,
     refresh_pending: bool,
     error: Option<String>,
+    show_archived: bool,
+    stale_response: bool,
+    archived_ids: HashSet<SessionId>,
+    titles: HashMap<SessionId, String>,
 }
 
 impl SessionList {
+    pub fn confirmed_title(&self, id: &SessionId) -> Option<&str> {
+        self.titles.get(id).map(String::as_str)
+    }
+    pub fn show_archived(&self) -> bool {
+        self.show_archived
+    }
+    pub fn archive_filter(&self) -> Option<SessionArchiveFilter> {
+        self.show_archived.then_some(SessionArchiveFilter::Only)
+    }
+    pub fn accepts_response(&self) -> bool {
+        self.state == ListState::Loading && !self.stale_response
+    }
+    pub fn toggle_archived(&mut self) {
+        self.show_archived = !self.show_archived;
+        if self.state == ListState::Loading {
+            self.stale_response = true;
+        }
+        self.entries.clear();
+        self.rebuild_indices();
+        self.defer_refresh();
+    }
+    pub fn is_archived(&self, id: &SessionId) -> bool {
+        self.archived_ids.contains(id)
+    }
+    pub fn set_title(&mut self, id: &SessionId, title: String) {
+        if let Some(&index) = self.indices.get(id) {
+            self.entries[index].title = Some(title.clone());
+        }
+        self.titles.insert(id.clone(), title);
+    }
+    pub fn set_archived(&mut self, id: &SessionId, archived: bool) {
+        if archived {
+            self.archived_ids.insert(id.clone());
+        } else {
+            self.archived_ids.remove(id);
+        }
+        self.entries.retain(|session| &session.session_id != id);
+        self.rebuild_indices();
+    }
     pub fn entries(&self) -> &[SessionInfo] {
         &self.entries
     }
@@ -51,7 +96,9 @@ impl SessionList {
     }
 
     fn rebuild_projects(&mut self) {
-        self.projects.clear();
+        for indices in self.projects.values_mut() {
+            indices.clear();
+        }
         for (index, session) in self.entries.iter().enumerate() {
             if let Some(indices) = self.projects.get_mut(session.cwd.as_path()) {
                 indices.push(index);
@@ -105,6 +152,7 @@ impl SessionList {
     pub fn disconnect(&mut self, error: String) {
         self.state = ListState::Disconnected;
         self.refresh_pending = false;
+        self.stale_response = false;
         self.error = Some(error);
     }
 
@@ -121,6 +169,8 @@ impl SessionList {
             return false;
         }
         self.state = ListState::Loading;
+        self.refresh_pending = false;
+        self.stale_response = false;
         self.error = None;
         true
     }
@@ -138,8 +188,24 @@ impl SessionList {
             return;
         }
         self.state = ListState::Ready;
+        if std::mem::take(&mut self.stale_response) {
+            return;
+        }
         match result {
             Ok(mut sessions) => {
+                for session in &mut sessions {
+                    if session.archived.unwrap_or(false) {
+                        self.archived_ids.insert(session.session_id.clone());
+                    } else {
+                        self.archived_ids.remove(&session.session_id);
+                    }
+                    if session.title.as_ref() == self.titles.get(&session.session_id) {
+                        self.titles.remove(&session.session_id);
+                    } else if let Some(title) = self.titles.get(&session.session_id) {
+                        session.title = Some(title.clone());
+                    }
+                }
+                sessions.retain(|session| session.archived.unwrap_or(false) == self.show_archived);
                 self.indices.clear();
                 sessions.retain(|session| {
                     if self.indices.contains_key(&session.session_id) {
@@ -161,6 +227,9 @@ impl SessionList {
             let session = &mut self.entries[index];
             update.title.clone().update_to(&mut session.title);
             update.updated_at.clone().update_to(&mut session.updated_at);
+            if let Some(title) = self.titles.get(id) {
+                session.title = Some(title.clone());
+            }
         }
     }
 

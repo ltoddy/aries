@@ -7,6 +7,7 @@ use gpui_kit::prelude::*;
 use gpui_kit::*;
 
 use crate::workspace::SessionView;
+use crate::workspace::session::SessionOperation;
 use crate::workspace::settings::palette::Palette;
 use crate::workspace::sidebar::Sidebar;
 use crate::workspace::sidebar::motion::{SessionSurface, SidebarRow};
@@ -56,7 +57,16 @@ impl<'a> SessionRowView<'a> {
         let action_label = format!("会话 {title} 的更多操作");
         let delete_anchor = format!("session:{}", delete_id);
         let load_session = session.clone();
-        let can_open_session = self.owner.tab_host().is_some() || self.owner.can_load_sessions();
+        let can_open_session = !session.archived.unwrap_or(false)
+            && !self.owner.management().is_pending()
+            && self.owner.execution().supports_load()
+            && !self.owner.execution().is_disconnected()
+            && (self.owner.tab_host().is_some() || self.owner.can_load_sessions());
+        let capabilities = self.owner.session_management_capabilities(&session.session_id, cx);
+        let has_actions = capabilities.title.is_some()
+            || capabilities.fork.is_some()
+            || capabilities.archive.is_some()
+            || capabilities.delete.is_some();
         let view = cx.weak_entity();
         let selected = current
             && !self
@@ -123,7 +133,7 @@ impl<'a> SessionRowView<'a> {
                             div()
                                 .relative()
                                 .flex_shrink_0()
-                                .child(
+                                .when(has_actions, |actions| actions.child(
                                     Button::new(SharedString::from(format!("session-menu:{id}")))
                                         .icon(Icon::new(IconName::Ellipsis).size(rems(0.8125)))
                                         .ghost()
@@ -134,27 +144,46 @@ impl<'a> SessionRowView<'a> {
                                         .disabled(!enabled || !self.owner.can_manage_sessions())
                                         .dropdown_menu_with_anchor(Anchor::TopRight, {
                                             let delete_anchor = delete_anchor.clone();
-                                            move |menu, _, _| {
-                                                let view = view.clone();
-                                                let delete_id = delete_id.clone();
-                                                let delete_anchor = delete_anchor.clone();
-                                                menu.item(
-                                                    PopupMenuItem::new("删除会话")
-                                                        .icon(IconName::Trash)
-                                                        .disabled(!enabled)
-                                                        .on_click(move |_, _, cx| {
-                                                            let _ = view.update(cx, |this, cx| {
-                                                                this.prepare_session_deletion(
-                                                                    vec![delete_id.clone()],
-                                                                    delete_anchor.clone(),
-                                                                    cx,
-                                                                );
+                                            let session = session.clone();
+                                            move |mut menu, _, cx| {
+                                                let Some(owner) = view.upgrade() else { return menu; };
+                                                let owner = owner.read(cx);
+                                                let caps = owner.session_management_capabilities(&session.session_id, cx);
+                                                let available = enabled && owner.management_available(&session.session_id, cx);
+                                                for (label, operation, supported) in [
+                                                    ("重命名…", SessionOperation::title(), caps.title.is_some()),
+                                                    ("复制会话", SessionOperation::fork(), caps.fork.is_some()),
+                                                    (if session.archived.unwrap_or(false) { "恢复会话" } else { "归档会话" }, SessionOperation::archive(!session.archived.unwrap_or(false)), caps.archive.is_some()),
+                                                ] {
+                                                    if !supported { continue; }
+                                                    let view = view.clone();
+                                                    let session = session.clone();
+                                                    menu = menu.item(PopupMenuItem::new(label).disabled(!available).on_click(move |_, window, cx| {
+                                                        let view = view.clone(); let session = session.clone();
+                                                        window.defer(cx, move |window, cx| {
+                                                            let _ = view.update(cx, |this, cx| match operation {
+                                                                SessionOperation::Title => this.rename_session(session, window, cx),
+                                                                SessionOperation::Fork => this.fork_session(session, cx),
+                                                                SessionOperation::Archive(_) => this.archive_session(session, cx),
                                                             });
-                                                        }),
-                                                )
+                                                        });
+                                                    }));
+                                                }
+                                                if owner.supports_session_deletion() {
+                                                    if caps.title.is_some() || caps.fork.is_some() || caps.archive.is_some() {
+                                                        menu = menu.separator();
+                                                    }
+                                                    let view = view.clone();
+                                                    let delete_id = delete_id.clone();
+                                                    let delete_anchor = delete_anchor.clone();
+                                                    menu = menu.item(PopupMenuItem::new("删除会话").icon(IconName::Trash).disabled(!available).on_click(move |_, _, cx| {
+                                                        let _ = view.update(cx, |this, cx| this.prepare_session_deletion(vec![delete_id.clone()], delete_anchor.clone(), cx));
+                                                    }));
+                                                }
+                                                menu
                                             }
                                         }),
-                                )
+                                ))
                                 .when_some(
                                     enabled
                                         .then(|| {

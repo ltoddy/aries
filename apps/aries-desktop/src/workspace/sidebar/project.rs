@@ -43,7 +43,9 @@ impl<'a> ProjectView<'a> {
         let more_path = path.clone();
         let delete_anchor = format!("project:{}", delete_path.display());
         let has_sessions = sessions.iter().any(|row| !row.is_exiting());
-        let delete_enabled = self.owner.can_manage_sessions() && has_sessions;
+        let delete_enabled = self.owner.can_manage_sessions()
+            && self.owner.supports_session_deletion()
+            && has_sessions;
         let view = cx.weak_entity();
         div()
             .mb_1()
@@ -99,24 +101,26 @@ impl<'a> ProjectView<'a> {
                                 cx.notify();
                             })),
                     )
-                    .child(
-                        div()
-                            .relative()
-                            .flex_shrink_0()
-                            .child(
-                                Button::new(SharedString::from(format!(
-                                    "project-menu:{}",
-                                    cwd.display()
-                                )))
-                                .icon(Icon::new(IconName::Ellipsis).size(rems(0.8125)))
-                                .ghost()
-                                .small()
-                                .tooltip("项目操作")
-                                .accessibility_label(format!("项目 {} 的更多操作", cwd.display()))
-                                .disabled(!delete_enabled)
-                                .dropdown_menu_with_anchor(
-                                    Anchor::TopRight,
-                                    {
+                    .when(self.owner.supports_session_deletion(), |project| {
+                        project.child(
+                            div()
+                                .relative()
+                                .flex_shrink_0()
+                                .child(
+                                    Button::new(SharedString::from(format!(
+                                        "project-menu:{}",
+                                        cwd.display()
+                                    )))
+                                    .icon(Icon::new(IconName::Ellipsis).size(rems(0.8125)))
+                                    .ghost()
+                                    .small()
+                                    .tooltip("项目操作")
+                                    .accessibility_label(format!(
+                                        "项目 {} 的更多操作",
+                                        cwd.display()
+                                    ))
+                                    .disabled(!delete_enabled)
+                                    .dropdown_menu_with_anchor(Anchor::TopRight, {
                                         let delete_anchor = delete_anchor.clone();
                                         move |menu, _, cx| {
                                             let mut menu = menu;
@@ -172,14 +176,14 @@ impl<'a> ProjectView<'a> {
                                                     }),
                                             )
                                         }
-                                    },
+                                    }),
+                                )
+                                .when_some(
+                                    self.owner.render_session_delete_popup(&delete_anchor, p, cx),
+                                    |button, popup| button.child(popup),
                                 ),
-                            )
-                            .when_some(
-                                self.owner.render_session_delete_popup(&delete_anchor, p, cx),
-                                |button, popup| button.child(popup),
-                            ),
-                    ),
+                        )
+                    }),
             )
             .child(project_body(
                 SharedString::from(format!("project:{}", cwd.display())).into(),

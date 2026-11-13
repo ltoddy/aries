@@ -6,7 +6,7 @@ use tracing::info;
 pub async fn unarchive_session(
     req: UnarchiveSessionRequest,
     responder: Responder<UnarchiveSessionResponse>,
-    _: ConnectionTo<Client>,
+    _cx: ConnectionTo<Client>,
 ) -> Result<(), Error> {
     info!("Received unarchive session request {req:?}");
 

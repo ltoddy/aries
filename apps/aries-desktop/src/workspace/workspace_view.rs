@@ -14,6 +14,7 @@ use gpui_kit::component::{
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
+use crate::acp::Event;
 use crate::terminal::TerminalView;
 use crate::workspace::settings::palette::Palette;
 use crate::workspace::settings::{Preferences, SettingsState};
@@ -101,6 +102,7 @@ pub struct WorkspaceView {
     diff_layout: Entity<ResizableState>,
     _sidebar_subscription: Subscription,
     tabs: Vec<SessionTab>,
+    archived_tabs: Vec<SessionTab>,
     active: usize,
     next_id: usize,
     tab_scroll: ScrollHandle,
@@ -156,6 +158,7 @@ impl WorkspaceView {
             diff_layout: cx.new(|_| ResizableState::default()),
             _sidebar_subscription: sidebar_subscription,
             tabs: Vec::new(),
+            archived_tabs: Vec::new(),
             active: 0,
             next_id: 0,
             tab_scroll: ScrollHandle::new(),
@@ -515,10 +518,22 @@ impl WorkspaceView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if session.archived.unwrap_or(false) || self.sidebar.read(cx).management().is_pending() {
+            return;
+        }
         if self.usage_visible {
             self.show_sessions(window, cx);
         }
         let session_id = session.session_id.clone();
+        if let Some(index) =
+            self.archived_tabs.iter().position(|tab| tab.view.read(cx).matches_session(&session_id))
+        {
+            let tab = self.archived_tabs.remove(index);
+            tab.view.update(cx, |view, cx| view.reload_archived_session(session, window, cx));
+            self.tabs.push(tab);
+            self.select_tab(self.tabs.len() - 1, window, cx);
+            return;
+        }
         if let Some(index) = self.find_session_tab(&session_id, cx) {
             self.select_tab(index, window, cx);
             self.set_sidebar_session(session_id, cx);
@@ -551,7 +566,86 @@ impl WorkspaceView {
         self.tabs.iter().position(|tab| tab.view.read(cx).matches_session(id))
     }
 
+    pub fn session_management_source(
+        &self,
+        id: &SessionId,
+        cx: &App,
+    ) -> Option<&Entity<SessionView>> {
+        self.tabs
+            .iter()
+            .chain(&self.archived_tabs)
+            .find(|tab| tab.view.read(cx).matches_session(id))
+            .map(|tab| &tab.view)
+    }
+
+    pub fn forward_session_management_event(
+        &mut self,
+        event: Event,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let sidebar = self.sidebar.clone();
+        window.defer(cx, move |window, cx| {
+            sidebar.update(cx, |sidebar, cx| sidebar.apply_event(event, window, cx));
+        });
+    }
+
+    pub fn fail_session_management(&mut self, id: &SessionId, cx: &mut Context<Self>) {
+        let sidebar = self.sidebar.clone();
+        let id = id.clone();
+        cx.defer(move |cx| {
+            sidebar.update(cx, |sidebar, cx| sidebar.fail_session_management(&id, cx));
+        });
+    }
+
+    pub fn session_management_available(&self, id: &SessionId, cx: &App) -> bool {
+        self.tabs
+            .iter()
+            .chain(&self.archived_tabs)
+            .filter(|tab| tab.view.read(cx).matches_session(id))
+            .all(|tab| {
+                let view = tab.view.read(cx);
+                view.is_session_idle() && !view.execution().is_disconnected()
+            })
+    }
+    pub fn lock_session_management(
+        &mut self,
+        id: &SessionId,
+        locked: bool,
+        cx: &mut Context<Self>,
+    ) {
+        for tab in self.tabs.iter().chain(&self.archived_tabs) {
+            if tab.view.read(cx).matches_session(id) {
+                tab.view.update(cx, |view, cx| view.set_management_lock(locked, cx));
+            }
+        }
+    }
+    pub fn sync_session_title(&mut self, id: &SessionId, title: String, cx: &mut Context<Self>) {
+        for tab in self.tabs.iter().chain(&self.archived_tabs) {
+            tab.view.update(cx, |view, cx| view.sync_session_title(id, title.clone(), cx));
+        }
+        self.sync_sidebar_active_session(cx);
+        cx.notify();
+    }
+    pub fn close_archived_session(&mut self, id: &SessionId, cx: &mut Context<Self>) {
+        let active_id = self.tabs.get(self.active).map(|tab| tab.id);
+        let mut index = 0;
+        while index < self.tabs.len() {
+            if self.tabs[index].view.read(cx).matches_session(id) {
+                self.archived_tabs.push(self.tabs.remove(index));
+            } else {
+                index += 1;
+            }
+        }
+        self.active = active_id
+            .and_then(|id| self.tabs.iter().position(|tab| tab.id == id))
+            .unwrap_or_else(|| self.active.min(self.tabs.len().saturating_sub(1)));
+        self.sync_sidebar_active_session(cx);
+        cx.notify();
+    }
     pub fn close_deleted_sessions(&mut self, deleted: &HashSet<SessionId>, cx: &mut Context<Self>) {
+        self.archived_tabs
+            .retain(|tab| !deleted.iter().any(|id| tab.view.read(cx).matches_session(id)));
         let ids: Vec<_> = self
             .tabs
             .iter()
@@ -567,6 +661,9 @@ impl WorkspaceView {
         let Some(index) = self.tabs.iter().position(|tab| tab.id == id) else {
             return;
         };
+        if self.tabs[index].view.read(cx).management().is_pending() {
+            return;
+        }
         self.tabs.remove(index);
         if self.tabs.is_empty() {
             self.active = 0;
@@ -614,7 +711,7 @@ impl WorkspaceView {
         match command {
             TabCommand::Close(id) => self.close_tab(id, cx),
             TabCommand::CloseAll => {
-                self.tabs.clear();
+                self.tabs.retain(|tab| tab.view.read(cx).management().is_pending());
                 self.active = 0;
                 self.sync_sidebar_active_session(cx);
             },
@@ -622,7 +719,8 @@ impl WorkspaceView {
                 if !self.tab_order().contains(&target) {
                     return;
                 }
-                self.tabs.retain(|tab| target == tab.id);
+                self.tabs
+                    .retain(|tab| target == tab.id || tab.view.read(cx).management().is_pending());
                 self.active = 0;
                 self.sync_sidebar_active_session(cx);
             },
@@ -921,6 +1019,7 @@ impl WorkspaceView {
                     .xsmall()
                     .flex_shrink_0()
                     .text_color(p.muted())
+                    .disabled(view.management().is_pending())
                     .tooltip_with_action("关闭标签", &CloseTab, None)
                     .accessibility_label("关闭标签")
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())

@@ -1,4 +1,6 @@
-use agent_client_protocol::v1::schema::{ListSessionsRequest, ListSessionsResponse, SessionInfo};
+use agent_client_protocol::v1::schema::{
+    ListSessionsRequest, ListSessionsResponse, SessionArchiveFilter, SessionInfo,
+};
 use agent_client_protocol::v1::{ConnectionTo, Responder};
 use agent_client_protocol::{Client, Error};
 use aries_runtime::session::SharedRegistry;
@@ -19,12 +21,20 @@ pub async fn list_session(
             return responder.respond_with_internal_error(err.to_string());
         },
     };
+
     let sessions = sessions
         .into_iter()
+        .filter(|session| match req.archived.as_ref().unwrap_or(&SessionArchiveFilter::Exclude) {
+            SessionArchiveFilter::Include => true,
+            SessionArchiveFilter::Only => session.archived,
+            _ => !session.archived,
+        })
         .map(|s| {
             SessionInfo::new(s.session_id, s.cwd)
+                .additional_directories(vec![])
                 .title(s.title)
                 .updated_at(s.updated_at.to_string())
+                .archived(s.archived)
         })
         .collect();
 
