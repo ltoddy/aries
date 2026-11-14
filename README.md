@@ -1,7 +1,7 @@
 # Aries
 
 [![CI](https://github.com/ltoddy/aries/actions/workflows/ci.yml/badge.svg)](https://github.com/ltoddy/aries/actions/workflows/ci.yml)
-![Rust](https://img.shields.io/badge/rust-nightly-blue)
+![Rust](https://img.shields.io/badge/rust-stable-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Rust](https://img.shields.io/badge/rust-2024-orange)
 
@@ -72,7 +72,7 @@ flowchart TB
 
 ## Rust toolchain
 
-本项目使用 **nightly** 工具链（Rust 2024 edition）。
+本项目使用 **stable** 工具链（Rust 2024 edition）。
 
 ## 安装
 
