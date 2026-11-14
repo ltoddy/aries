@@ -18,6 +18,7 @@ pub async fn delete_session(
     if let Err(err) = registry.delete_session(session_id).await {
         return responder.respond_with_internal_error(err.to_string());
     }
+    drop(registry);
 
     let resp = DeleteSessionResponse::new();
     responder.respond(resp)

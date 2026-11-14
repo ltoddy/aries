@@ -21,6 +21,7 @@ pub async fn set_session_title(
         return responder
             .respond_with_error(schema::Error::resource_not_found(Some(session_id)).into());
     };
+    drop(registry);
 
     let _ = match session.set_session_title(&req.title).await {
         Ok(_) => cx.send_notification(SessionNotification::new(

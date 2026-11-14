@@ -3,8 +3,13 @@ use std::path::PathBuf;
 
 use aries_init::SettingError;
 
+use crate::session::ParseSessionConfigError;
+
 #[derive(Debug, thiserror::Error)]
 pub enum SessionError {
+    #[error("{0}")]
+    ParseConfig(#[from] ParseSessionConfigError),
+
     #[error("agent not found: {0}")]
     AgentNotFound(String),
 
@@ -32,6 +37,10 @@ pub enum SessionError {
 }
 
 impl SessionError {
+    pub fn parse_config(error: ParseSessionConfigError) -> Self {
+        Self::ParseConfig(error)
+    }
+
     pub fn agent_not_found(name: impl Into<String>) -> Self {
         Self::AgentNotFound(name.into())
     }

@@ -22,6 +22,7 @@ pub async fn session_status(
         return responder
             .respond_with_error(schema::Error::resource_not_found(Some(session_id)).into());
     };
+    drop(registry);
 
     let status = match session.session_status() {
         session::SessionStatus::Open => SessionStatus::Open,

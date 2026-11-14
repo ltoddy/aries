@@ -1,73 +1,11 @@
-use std::fmt::{Display, Formatter};
-use std::str::FromStr;
-
 use agent_client_protocol::v1::schema::{
-    SessionConfigId, SessionConfigOption, SessionConfigOptionCategory, SessionConfigSelectOption,
+    SessionConfigOption, SessionConfigOptionCategory, SessionConfigSelectOption,
     SessionConfigSelectOptions, SessionMode, SessionModeId, SessionModeState,
 };
 use aries_extension::agent::AgentDefinition;
 use aries_init::Setting;
+use aries_runtime::session::SessionConfig;
 use rig::completion::Effort;
-
-#[derive(Debug, Copy, Clone)]
-pub enum SessionConfig {
-    Mode,
-    Model,
-    ThoughtLevel,
-}
-
-impl Display for SessionConfig {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SessionConfig::Mode => write!(f, "mode"),
-            SessionConfig::Model => write!(f, "model"),
-            SessionConfig::ThoughtLevel => write!(f, "thought level"),
-        }
-    }
-}
-
-impl From<SessionConfig> for SessionConfigId {
-    fn from(val: SessionConfig) -> Self {
-        match val {
-            SessionConfig::Mode => SessionConfigId::new("mode"),
-            SessionConfig::Model => SessionConfigId::new("model"),
-            SessionConfig::ThoughtLevel => SessionConfigId::new("thought level"),
-        }
-    }
-}
-
-impl From<SessionConfig> for String {
-    fn from(val: SessionConfig) -> Self {
-        match val {
-            SessionConfig::Mode => String::from("mode"),
-            SessionConfig::Model => String::from("model"),
-            SessionConfig::ThoughtLevel => String::from("thought level"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-#[error("invalid session config ID `{0}`: expected `mode`, `model`, or `thought level`")]
-pub struct ParseSessionConfigError(String);
-
-impl ParseSessionConfigError {
-    pub fn new(config_id: impl Into<String>) -> Self {
-        Self(config_id.into())
-    }
-}
-
-impl FromStr for SessionConfig {
-    type Err = ParseSessionConfigError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.trim() {
-            "mode" => Ok(Self::Mode),
-            "model" => Ok(Self::Model),
-            "thought level" => Ok(Self::ThoughtLevel),
-            _ => Err(ParseSessionConfigError::new(s)),
-        }
-    }
-}
 
 pub fn config_options(
     setting: &Setting,
@@ -101,8 +39,8 @@ fn mode_option(
     }
 
     SessionConfigOption::select(
-        SessionConfig::Mode,
-        SessionConfig::Mode,
+        SessionConfig::Mode.to_string(),
+        SessionConfig::Mode.to_string(),
         current,
         SessionConfigSelectOptions::Ungrouped(options),
     )
@@ -123,8 +61,8 @@ fn model_option(setting: &Setting) -> SessionConfigOption {
         .collect::<Vec<_>>();
 
     SessionConfigOption::select(
-        SessionConfig::Model,
-        SessionConfig::Model,
+        SessionConfig::Model.to_string(),
+        SessionConfig::Model.to_string(),
         setting.active.clone(),
         SessionConfigSelectOptions::Ungrouped(options),
     )
@@ -141,8 +79,8 @@ fn thought_level_option(current: Effort) -> SessionConfigOption {
         .collect::<Vec<_>>();
 
     SessionConfigOption::select(
-        SessionConfig::ThoughtLevel,
-        SessionConfig::ThoughtLevel,
+        SessionConfig::ThoughtLevel.to_string(),
+        SessionConfig::ThoughtLevel.to_string(),
         current.as_str(),
         options,
     )
