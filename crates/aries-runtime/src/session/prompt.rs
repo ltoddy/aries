@@ -120,7 +120,7 @@ impl Session {
         prompt: impl Into<String>,
     ) -> crate::agent::AriesResult<VecDeque<String>> {
         let input = UserPromptSubmitHookInput::new(&self.state.session_id, &self.state.cwd, prompt)
-            .transcript_path(&self.transcript_path);
+            .transcript_dir(&self.state.transcript_dir);
         match self.hooks_executor.fire_user_prompt_submit(input).await {
             HookDecision::Terminate { reason } => {
                 Err(crate::agent::AriesError::hook_terminated(reason))
@@ -132,7 +132,7 @@ impl Session {
     async fn fire_stop_failure(&self, error: impl Into<String>) {
         let error = error.into();
         let input = StopFailureHookInput::new(&self.state.session_id, &self.state.cwd, &error)
-            .transcript_path(&self.transcript_path)
+            .transcript_dir(&self.state.transcript_dir)
             .error_details(&error);
 
         let input = match &self.last_assistant_message {

@@ -14,6 +14,7 @@ pub struct State {
     pub cwd: PathBuf,
     pub session_dir: PathBuf,
     pub session_id: String,
+    pub transcript_dir: PathBuf,
 }
 
 impl State {
@@ -23,10 +24,12 @@ impl State {
         cwd: impl Into<PathBuf>,
         session_dir: impl Into<PathBuf>,
         session_id: impl Into<String>,
+        transcript_dir: impl Into<PathBuf>,
     ) -> Self {
         let cwd = cwd.into();
         let session_dir = session_dir.into();
         let session_id = session_id.into();
+        let transcript_dir = transcript_dir.into();
 
         Self {
             effort: Effort::High,
@@ -36,6 +39,7 @@ impl State {
             cwd,
             session_dir,
             session_id,
+            transcript_dir,
         }
     }
 }

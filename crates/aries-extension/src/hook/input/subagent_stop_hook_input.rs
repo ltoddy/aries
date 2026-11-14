@@ -11,7 +11,7 @@ const HOOK_EVENT_NAME: &str = "SubagentStop";
 pub struct SubagentStopHookInput {
     pub session_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub transcript_path: Option<PathBuf>,
+    pub transcript_dir: Option<PathBuf>,
     pub cwd: PathBuf,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub permission_mode: Option<String>,
@@ -23,7 +23,7 @@ pub struct SubagentStopHookInput {
     pub stop_hook_active: bool,
     pub agent_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub agent_transcript_path: Option<PathBuf>,
+    pub agent_transcript_dir: Option<PathBuf>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_assistant_message: Option<String>,
 }
@@ -42,8 +42,8 @@ impl SubagentStopHookInput {
         Self { session_id, cwd, stop_hook_active, agent_id, ..Default::default() }
     }
 
-    pub fn transcript_path(mut self, transcript_path: impl Into<PathBuf>) -> Self {
-        self.transcript_path = Some(transcript_path.into());
+    pub fn transcript_dir(mut self, transcript_dir: impl Into<PathBuf>) -> Self {
+        self.transcript_dir = Some(transcript_dir.into());
         self
     }
 
@@ -57,8 +57,8 @@ impl SubagentStopHookInput {
         self
     }
 
-    pub fn agent_transcript_path(mut self, agent_transcript_path: impl Into<PathBuf>) -> Self {
-        self.agent_transcript_path = Some(agent_transcript_path.into());
+    pub fn agent_transcript_dir(mut self, agent_transcript_dir: impl Into<PathBuf>) -> Self {
+        self.agent_transcript_dir = Some(agent_transcript_dir.into());
         self
     }
 

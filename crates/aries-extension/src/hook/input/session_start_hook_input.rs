@@ -11,7 +11,7 @@ const HOOK_EVENT_NAME: &str = "SessionStart";
 pub struct SessionStartHookInput {
     pub session_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub transcript_path: Option<PathBuf>,
+    pub transcript_dir: Option<PathBuf>,
     pub cwd: PathBuf,
     #[serde(serialize_with = "serialize_hook_event_name")]
     hook_event_name: String,
@@ -36,8 +36,8 @@ impl SessionStartHookInput {
         Self { session_id, cwd, source, model, ..Default::default() }
     }
 
-    pub fn transcript_path(mut self, transcript_path: impl Into<PathBuf>) -> Self {
-        self.transcript_path = Some(transcript_path.into());
+    pub fn transcript_dir(mut self, transcript_dir: impl Into<PathBuf>) -> Self {
+        self.transcript_dir = Some(transcript_dir.into());
         self
     }
 

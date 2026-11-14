@@ -6,20 +6,20 @@ use serde::{Deserialize, Serialize};
 pub struct AgentOutput {
     pub task_id: String,
     pub result: String,
-    pub transcript_path: PathBuf,
+    pub transcript_dir: PathBuf,
 }
 
 impl AgentOutput {
     pub fn new(
         task_id: impl Into<String>,
         result: impl Into<String>,
-        transcript_path: impl Into<PathBuf>,
+        transcript_dir: impl Into<PathBuf>,
     ) -> Self {
         let task_id = task_id.into();
         let result = result.into();
-        let transcript_path = transcript_path.into();
+        let transcript_dir = transcript_dir.into();
 
-        Self { task_id, result, transcript_path }
+        Self { task_id, result, transcript_dir }
     }
 
     pub fn render_output(raw: serde_json::Value) -> Result<String, serde_json::Error> {

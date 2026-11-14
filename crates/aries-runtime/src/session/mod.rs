@@ -68,8 +68,6 @@ pub struct Session {
 
     session_repo: SessionRepository,
 
-    transcript_path: PathBuf,
-
     tool_server_handle: ToolServerHandle,
     cancel_token: Arc<parking_lot::Mutex<CancellationToken>>,
     receiver: Arc<Mutex<UnboundedReceiver<AgentEvent>>>,
@@ -90,9 +88,7 @@ pub struct Session {
 }
 
 impl Session {
-    #[allow(clippy::too_many_arguments)]
     pub async fn new(
-        id: impl Into<String>,
         gctx: GlobalContext,
         cwd: impl Into<PathBuf>,
         config: ModelConfig,
@@ -100,7 +96,7 @@ impl Session {
         db: Db,
         external_mcp_config: McpDefinition,
     ) -> Result<Self, SessionError> {
-        let id = id.into();
+        let id = nanoid::nanoid!();
         let cwd: PathBuf = cwd.into();
 
         Self::build(
@@ -239,8 +235,8 @@ impl Session {
         &self.state.cwd
     }
 
-    pub fn transcript_path(&self) -> &Path {
-        &self.transcript_path
+    pub fn transcript_dir(&self) -> &Path {
+        &self.state.transcript_dir
     }
 
     pub fn list_available_commands(&self) -> Vec<aries_extension::AvailableCommand> {
@@ -261,10 +257,10 @@ impl Session {
         let id = id.into();
         let cwd: PathBuf = cwd.into();
         let session_dir = gctx.root_dir().join(format!("session-{id}"));
-        let transcript_path = session_dir.join("transcripts");
+        let transcript_dir = session_dir.join("transcripts");
 
         let _ = tokio::fs::create_dir_all(&session_dir).await;
-        let _ = tokio::fs::create_dir_all(&transcript_path).await;
+        let _ = tokio::fs::create_dir_all(&transcript_dir).await;
 
         aries_logger::register(&id, &session_dir);
 
@@ -272,6 +268,7 @@ impl Session {
 
         let mut extensions = AgentExtensions::new(&cwd, gctx.root_dir()).await;
         extensions.mcps.push(external_mcp_config);
+
         let tool_server_handle = ToolServer::new().run();
         let mcp_clients = mcp::connect(&extensions.mcps, tool_server_handle.clone()).await;
 
@@ -284,13 +281,13 @@ impl Session {
 
         let hooks_executor = Arc::new(HooksExecutor::new(extensions.hooks.clone()));
         let instruction_ctx = InstructionContext::new(&cwd);
-        let session_repo = SessionRepository::new(db.clone());
+        let mut session_repo = SessionRepository::new(db.clone());
 
         let hook = SessionPromptHook::new(
             hooks_executor.clone(),
             &id,
             &cwd,
-            &transcript_path,
+            &transcript_dir,
             DEFAULT_AGENT_NAME,
             instruction_ctx.clone(),
             Notifier::clone(&notifier),
@@ -303,8 +300,8 @@ impl Session {
             .find(|agent| agent.frontmatter.name.eq_ignore_ascii_case(DEFAULT_AGENT_NAME))
             .cloned()
             .ok_or_else(|| SessionError::agent_not_found(DEFAULT_AGENT_NAME))?;
-        let state = State::new(model, agent, cwd, session_dir, &id);
 
+        let state = State::new(model, agent, cwd, session_dir, &id, transcript_dir);
         let agent = crate::agent::Builder::new(
             state.clone(),
             extensions.clone(),
@@ -317,14 +314,21 @@ impl Session {
         .await;
 
         let compactor = ContextCompactor::new(
-            &id,
-            &state.cwd,
-            &transcript_path,
-            state.model.clone(),
+            state.clone(),
             chat_context.clone(),
             hooks_executor.clone(),
             Notifier::clone(&notifier),
         );
+
+        session_repo
+            .create(
+                &id,
+                state.cwd.display().to_string(),
+                state.session_dir.display().to_string(),
+                state.transcript_dir.display().to_string(),
+            )
+            .await
+            .map_err(SessionError::db)?;
 
         let input = SessionStartHookInput::new(&id, &state.cwd, source, state.model.name());
         if let HookDecision::Continue { contexts } = hooks_executor.fire_session_start(input).await
@@ -341,7 +345,6 @@ impl Session {
             chat_history,
             chat_context,
             session_repo,
-            transcript_path,
             tool_server_handle,
             cancel_token: Arc::new(parking_lot::Mutex::new(CancellationToken::new())),
             notifier,

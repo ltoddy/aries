@@ -9,7 +9,7 @@ impl Session {
             &self.state.cwd,
             SessionEndReason::Logout,
         )
-        .transcript_path(&self.transcript_path);
+        .transcript_dir(&self.state.transcript_dir);
 
         self.hooks_executor.fire_session_end(input).await;
     }

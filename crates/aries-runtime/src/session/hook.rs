@@ -40,7 +40,7 @@ pub struct SessionPromptHook {
     executor: Arc<HooksExecutor>,
     session_id: String,
     cwd: PathBuf,
-    transcript_path: PathBuf,
+    transcript_dir: PathBuf,
     agent_id: String,
     tool_call_started_at: Arc<Mutex<HashMap<CallId, time::Instant>>>,
     instruction_ctx: InstructionContext,
@@ -53,14 +53,14 @@ impl SessionPromptHook {
         executor: Arc<HooksExecutor>,
         session_id: impl Into<String>,
         cwd: impl Into<PathBuf>,
-        transcript_path: impl Into<PathBuf>,
+        transcript_dir: impl Into<PathBuf>,
         agent_id: impl Into<String>,
         instruction_ctx: InstructionContext,
         notifier: Notifier,
     ) -> Self {
         let session_id = session_id.into();
         let cwd = cwd.into();
-        let transcript_path = transcript_path.into();
+        let transcript_dir = transcript_dir.into();
         let agent_id = agent_id.into();
 
         let window = ContextWindow::new();
@@ -69,7 +69,7 @@ impl SessionPromptHook {
             executor,
             session_id,
             cwd,
-            transcript_path,
+            transcript_dir,
             agent_id,
             tool_call_started_at: Arc::new(Mutex::new(HashMap::new())),
             instruction_ctx,
@@ -96,7 +96,7 @@ impl SessionPromptHook {
             call_id,
             error_message,
         )
-        .transcript_path(&self.transcript_path)
+        .transcript_dir(&self.transcript_dir)
         .is_interrupt(false);
         let input = match duration_ms {
             Some(duration_ms) => input.duration_ms(duration_ms),
@@ -226,7 +226,7 @@ impl AgentHook for SessionPromptHook {
             crate::tools::agent::NAME => {
                 let input =
                     SubagentStartHookInput::new(&self.session_id, &self.cwd, &self.agent_id)
-                        .transcript_path(&self.transcript_path);
+                        .transcript_dir(&self.transcript_dir);
 
                 match self.executor.fire_subagent_start(input).await {
                     HookDecision::Continue { contexts } => {
@@ -269,7 +269,7 @@ impl AgentHook for SessionPromptHook {
             &tool_input,
             call_id.to_string(),
         )
-        .transcript_path(&self.transcript_path)
+        .transcript_dir(&self.transcript_dir)
         .agent_id(&self.agent_id);
 
         match self.executor.fire_pre_tool_use(input).await {
@@ -322,7 +322,7 @@ impl AgentHook for SessionPromptHook {
                         false,
                         &self.agent_id,
                     )
-                    .transcript_path(&self.transcript_path);
+                    .transcript_dir(&self.transcript_dir);
 
                     let input = match tool_output.as_text() {
                         Some(text) => input.last_assistant_message(text),
@@ -343,7 +343,7 @@ impl AgentHook for SessionPromptHook {
                     tool_output.as_json().unwrap_or_default(),
                     call_id.to_string(),
                 )
-                .transcript_path(&self.transcript_path)
+                .transcript_dir(&self.transcript_dir)
                 .agent_id(&self.agent_id);
                 let input = match duration_ms {
                     Some(duration_ms) => input.duration_ms(duration_ms),
