@@ -127,7 +127,15 @@ pub async fn run(
             },
             on_receive_request!(),
         )
-        .on_receive_request(set_session_mode, on_receive_request!())
+        .on_receive_request(
+            {
+                let registry = registry.clone();
+                async move |req, responder, cx| {
+                    set_session_mode(req, responder, cx, &registry).await
+                }
+            },
+            on_receive_request!(),
+        )
         .on_receive_request(
             {
                 let registry = registry.clone();

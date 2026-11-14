@@ -52,7 +52,7 @@ pub async fn set_session_config_option(
     };
 
     let result = match session_config {
-        SessionConfig::Mode => session.set_mode(&value).await,
+        SessionConfig::Mode => session.set_session_mode(&value).await,
         SessionConfig::Model => session.set_model(value).await,
         SessionConfig::ThoughtLevel => session.set_thought_level(value).await,
     };
