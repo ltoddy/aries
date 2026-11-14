@@ -9,7 +9,8 @@ use agent_client_protocol::v1::schema::{
 use agent_client_protocol::v1::{ConnectionTo, Responder};
 use agent_client_protocol::{Client, Error};
 use aries_communicate::AgentEvent;
-use aries_runtime::session::{PromptOutcome, SharedRegistry};
+use aries_runtime::registry::SharedRegistry;
+use aries_runtime::session::PromptOutcome;
 use tracing::{info, instrument};
 
 use self::message::UserMessage;

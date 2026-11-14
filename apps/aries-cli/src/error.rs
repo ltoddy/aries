@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use aries_init::SettingError;
 use aries_runtime::agent::AriesError;
-use aries_runtime::session::RegistryError;
+use aries_runtime::registry::RegistryError;
 use rustyline::error::ReadlineError;
 
 #[derive(Debug, thiserror::Error)]

@@ -1,7 +1,8 @@
 use agent_client_protocol::v1::schema::{ForkSessionRequest, ForkSessionResponse};
 use agent_client_protocol::v1::{ConnectionTo, Responder};
 use agent_client_protocol::{Client, Error};
-use aries_runtime::session::{DEFAULT_AGENT_NAME, SharedRegistry};
+use aries_runtime::registry::SharedRegistry;
+use aries_runtime::session::DEFAULT_AGENT_NAME;
 use tracing::info;
 
 use crate::v1::mcp::McpServers;

@@ -4,7 +4,8 @@ use agent_client_protocol::v1::schema::{
 use agent_client_protocol::v1::{ConnectionTo, Responder};
 use agent_client_protocol::{Client, Error};
 use aries_init::SettingError;
-use aries_runtime::session::{SessionError, SharedRegistry};
+use aries_runtime::registry::SharedRegistry;
+use aries_runtime::session::SessionError;
 use tracing::{info, instrument};
 
 use crate::v1::session::config::{SessionConfig, config_options};

@@ -1,6 +1,6 @@
 use aries_communicate::AgentEvent;
 use aries_init::{GlobalContext, SettingLoader};
-use aries_runtime::session::SessionRegistry;
+use aries_runtime::registry::SessionRegistry;
 use clap::Parser;
 use colored::Colorize;
 use tracing::info_span;
