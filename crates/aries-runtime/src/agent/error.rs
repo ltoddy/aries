@@ -10,13 +10,11 @@ pub enum AriesError {
     HookTerminated(String),
 }
 
-impl From<PromptError> for AriesError {
-    fn from(err: PromptError) -> Self {
+impl AriesError {
+    pub fn streaming(err: PromptError) -> Self {
         Self::Streaming(Box::new(err))
     }
-}
 
-impl AriesError {
     pub fn hook_terminated(reason: impl Into<String>) -> Self {
         let reason = reason.into();
         Self::HookTerminated(reason)

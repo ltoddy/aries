@@ -1,9 +1,11 @@
 use std::path::PathBuf;
 
-use anyhow::Context;
 use aries_init::GlobalContext;
 use clap::Parser;
 use prettytable::{Cell, Row, Table, row};
+
+use crate::Result;
+use crate::error::Error;
 
 #[derive(Clone, Debug, Parser)]
 #[command(about = "List chat sessions")]
@@ -12,12 +14,11 @@ pub struct ListSessionsArgs {
     cwd: Option<PathBuf>,
 }
 
-pub async fn execute(args: ListSessionsArgs, gctx: GlobalContext) -> anyhow::Result<()> {
+pub async fn execute(args: ListSessionsArgs, gctx: GlobalContext) -> Result<()> {
     let root_dir = gctx.root_dir();
     let db = aries_persistence::connect(root_dir)
         .await
-        .with_context(|| format!("failed to connect local storage: {}", root_dir.display()))
-        .expect("Run `aries init -h` for initialization");
+        .map_err(|source| Error::database("failed to connect local storage:", root_dir, source))?;
     let mut session_repo = aries_persistence::SessionRepository::new(db);
 
     let sessions = match args.cwd {

@@ -21,12 +21,12 @@ use tokio::sync::Mutex;
 pub use self::commands::BUILTIN_COMMANDS;
 pub use self::context::ChatContext;
 pub use self::history::ChatHistory;
-pub use self::registry::SessionRegistry;
-pub use self::session::{DEFAULT_AGENT_NAME, DEFAULT_EFFORT, PromptOutcome, Session};
+pub use self::registry::{RegistryError, SessionRegistry};
+pub use self::session::{DEFAULT_AGENT_NAME, DEFAULT_EFFORT, PromptOutcome, Session, SessionError};
 
 pub type SharedRegistry = Arc<Mutex<SessionRegistry>>;
 
-pub fn create_model(config: &ModelConfig) -> Model<OpenAiWire> {
+pub fn create_model(config: &ModelConfig) -> Result<Model<OpenAiWire>, SessionError> {
     let mut default_headers = HeaderMap::new();
     default_headers.insert("HTTP-Referer", header::HeaderValue::from_static("")); // TODO
     default_headers.insert("X-Title", header::HeaderValue::from_static("Aries"));
@@ -34,7 +34,7 @@ pub fn create_model(config: &ModelConfig) -> Model<OpenAiWire> {
         .default_headers(default_headers)
         .connect_timeout(Duration::from_mins(1))
         .build()
-        .expect("Failed to build http client for llm provider");
+        .map_err(SessionError::build_client)?;
 
     let retry = RetryTransientMiddleware::new_with_policy_and_strategy(
         ExponentialBackoff::builder().base(1).build_with_max_retries(5),
@@ -58,7 +58,7 @@ pub fn create_model(config: &ModelConfig) -> Model<OpenAiWire> {
             .with_base_url(&c.base_url)
             .with_route(openai::Route::Chat),
     };
-    config.connect(ReqwestMiddlewareClient::from(http_client)).completion(model)
+    Ok(config.connect(ReqwestMiddlewareClient::from(http_client)).completion(model))
 }
 
 #[derive(Debug)]

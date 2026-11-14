@@ -1,9 +1,11 @@
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 
+use rustyline::error::ReadlineError;
 use rustyline::history::DefaultHistory;
 use rustyline::{Config, Editor};
 
+use crate::Result;
 use crate::commands::completer::CommandCompleter;
 
 pub struct InputReader {
@@ -12,7 +14,7 @@ pub struct InputReader {
 }
 
 impl InputReader {
-    pub fn new(root_dir: impl AsRef<Path>) -> anyhow::Result<Self> {
+    pub fn new(root_dir: impl AsRef<Path>) -> Result<Self, ReadlineError> {
         let root_dir = root_dir.as_ref();
         let file_path = root_dir.join("history.txt");
 

@@ -7,31 +7,35 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum SettingError {
-    #[error("model alias `{0}` already exists")]
-    DuplicateModelAlias(String),
-
     #[error("active model `{0}` not found in configuration")]
     ActiveModelNotFound(String),
 
-    #[error("io error: {0}")]
-    Io(#[from] std::io::Error),
+    #[error("io error for {}: {source}", path.display())]
+    Io { path: PathBuf, source: std::io::Error },
 
-    #[error("toml parse error: {0}")]
-    TomlParse(#[from] toml::de::Error),
+    #[error("toml parse error in {}: {source}", path.display())]
+    TomlParse { path: PathBuf, source: toml::de::Error },
 
     #[error("toml serialize error: {0}")]
     TomlSerialize(#[from] toml::ser::Error),
 }
 
 impl SettingError {
-    pub fn duplicate(alias: impl Into<String>) -> Self {
-        let alias = alias.into();
-        Self::DuplicateModelAlias(alias)
-    }
-
     pub fn not_found(alias: impl Into<String>) -> Self {
         let alias = alias.into();
         Self::ActiveModelNotFound(alias)
+    }
+
+    pub fn io(path: impl Into<PathBuf>, source: std::io::Error) -> Self {
+        Self::Io { path: path.into(), source }
+    }
+
+    pub fn toml_parse(path: impl Into<PathBuf>, source: toml::de::Error) -> Self {
+        Self::TomlParse { path: path.into(), source }
+    }
+
+    pub fn toml_serialize(source: toml::ser::Error) -> Self {
+        Self::TomlSerialize(source)
     }
 }
 
@@ -51,9 +55,12 @@ impl SettingLoader {
     pub async fn load(&self) -> Result<Setting, SettingError> {
         let file_path = &self.file_path;
 
-        let content = tokio::fs::read_to_string(file_path).await.map_err(SettingError::Io)?;
+        let content = tokio::fs::read_to_string(file_path)
+            .await
+            .map_err(|source| SettingError::io(file_path, source))?;
 
-        let setting = toml::from_str(&content).map_err(SettingError::TomlParse)?;
+        let setting = toml::from_str(&content)
+            .map_err(|source| SettingError::toml_parse(file_path, source))?;
 
         Ok(setting)
     }
@@ -61,9 +68,11 @@ impl SettingLoader {
     pub async fn save(&self, s: &Setting) -> Result<(), SettingError> {
         let file_path = &self.file_path;
 
-        let content = toml::to_string_pretty(s).map_err(SettingError::TomlSerialize)?;
+        let content = toml::to_string_pretty(s).map_err(SettingError::toml_serialize)?;
 
-        tokio::fs::write(file_path, &content).await.map_err(SettingError::Io)?;
+        tokio::fs::write(file_path, &content)
+            .await
+            .map_err(|source| SettingError::io(file_path, source))?;
         Ok(())
     }
 

@@ -15,8 +15,8 @@ pub enum BatchError {
     #[error("failed to serialize output for tool '{tool}': {source}")]
     SerializeOutput { tool: String, source: serde_json::Error },
 
-    #[error("tool '{tool}' failed: {message}")]
-    ToolExecution { tool: String, message: String },
+    #[error("tool '{tool}' failed: {source}")]
+    ToolExecution { tool: String, source: Box<dyn std::error::Error + Send + Sync + 'static> },
 }
 
 impl BatchError {
@@ -44,10 +44,12 @@ impl BatchError {
         Self::SerializeOutput { tool, source }
     }
 
-    pub fn tool_execution(tool: impl Into<String>, source: impl std::fmt::Display) -> Self {
+    pub fn tool_execution(
+        tool: impl Into<String>,
+        source: impl std::error::Error + Send + Sync + 'static,
+    ) -> Self {
         let tool = tool.into();
-        let message = source.to_string();
 
-        Self::ToolExecution { tool, message }
+        Self::ToolExecution { tool, source: Box::new(source) }
     }
 }

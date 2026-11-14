@@ -49,7 +49,7 @@ impl AriesAgent {
 
                     self.notifier.send_stream_item(item);
                 },
-                Err(err) => return Err(err.into()),
+                Err(err) => return Err(AriesError::streaming(err)),
             }
         }
 

@@ -1,5 +1,8 @@
+use std::io;
+use std::sync::Arc;
 use std::time::Duration;
 
+use rig::completion::PromptError;
 use thiserror::Error;
 
 #[derive(Debug, Clone, Error)]
@@ -13,7 +16,7 @@ pub enum CompactionError {
     PromptTooLong,
 
     #[error("压缩遇到临时错误（不计入失败）：{0}")]
-    Transient(String),
+    Transient(#[source] Arc<CompactionFailure>),
 
     #[error("压缩结果为空。")]
     Empty,
@@ -31,8 +34,8 @@ impl CompactionError {
         Self::PromptTooLong
     }
 
-    pub fn transient(error: impl Into<String>) -> Self {
-        Self::Transient(error.into())
+    pub fn transient(error: CompactionFailure) -> Self {
+        Self::Transient(Arc::new(error))
     }
 
     pub fn empty() -> Self {
@@ -41,5 +44,24 @@ impl CompactionError {
 
     pub fn too_many_failures(failures: usize, cooldown_minutes: u64) -> Self {
         Self::TooManyFailures { failures, cooldown_minutes }
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum CompactionFailure {
+    #[error("save transcript failed: {0}")]
+    SaveTranscript(#[source] io::Error),
+
+    #[error("{0}")]
+    Prompt(#[source] Box<PromptError>),
+}
+
+impl CompactionFailure {
+    pub fn save_transcript(error: io::Error) -> Self {
+        Self::SaveTranscript(error)
+    }
+
+    pub fn prompt(error: PromptError) -> Self {
+        Self::Prompt(Box::new(error))
     }
 }

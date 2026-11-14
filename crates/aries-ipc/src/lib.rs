@@ -26,6 +26,20 @@ pub enum ServeError {
     Transport(#[from] tonic::transport::Error),
 }
 
+impl ServeError {
+    pub fn database(err: toasty::Error) -> Self {
+        Self::Database(err)
+    }
+
+    pub fn bind(err: io::Error) -> Self {
+        Self::Bind(err)
+    }
+
+    pub fn transport(err: tonic::transport::Error) -> Self {
+        Self::Transport(err)
+    }
+}
+
 pub async fn serve(
     root_dir: impl AsRef<Path>,
     shutdown: impl Future<Output = ()>,

@@ -37,10 +37,17 @@ pub async fn init(root_dir: impl AsRef<Path>) {
 pub async fn gc(root_dir: impl AsRef<Path>) {
     let root_dir = root_dir.as_ref();
 
-    let mut db = aries_persistence::connect(root_dir)
-        .await
-        .expect("Unable to connect to local aries database");
-    let _ = aries_persistence::migrate(&mut db).await;
+    let mut db = match aries_persistence::connect(root_dir).await {
+        Ok(db) => db,
+        Err(err) => {
+            warn!(path = %root_dir.display(), error = %err, "failed to connect database for garbage collection");
+            return;
+        },
+    };
+    if let Err(err) = aries_persistence::migrate(&mut db).await {
+        warn!(path = %root_dir.display(), error = %err, "failed to migrate database for garbage collection");
+        return;
+    }
 
     let lock_file_path = root_dir.join("aries-db.lock");
     match aries_filesystem::lock::lock(lock_file_path).await {

@@ -9,24 +9,27 @@ use tracing::info_span;
 
 use crate::cli::session::display_elapsed;
 use crate::display::print_agent_event;
-use crate::{commands, input, welcome};
+use crate::error::Error;
+use crate::{Result, commands, input, welcome};
 
-pub async fn execute(gctx: GlobalContext) -> anyhow::Result<()> {
+pub async fn execute(gctx: GlobalContext) -> Result<()> {
     let loader = SettingLoader::new(gctx.root_dir());
-    let setting = loader.load().await?;
-    let model_config = setting.active_model()?;
+    let setting = loader.load().await.map_err(Error::setting)?;
+    let model_config = setting.active_model().map_err(Error::setting)?;
 
-    let mut registry = SessionRegistry::new(gctx.clone(), setting).await?;
+    let mut registry =
+        SessionRegistry::new(gctx.clone(), setting).await.map_err(Error::registry)?;
 
     aries_logger::init(gctx.root_dir().join("logs"));
 
     let current_dir = gctx.current_dir();
 
-    let mut session = registry.new_session(current_dir, McpDefinition::empty()).await?;
+    let mut session =
+        registry.new_session(current_dir, McpDefinition::empty()).await.map_err(Error::registry)?;
     let session_id = session.id();
     let _session_span = info_span!("session", session_id = %session_id).entered();
 
-    let mut reader = input::InputReader::new(gctx.root_dir())?;
+    let mut reader = input::InputReader::new(gctx.root_dir()).map_err(Error::readline)?;
     welcome::welcome(
         model_config.provider().as_str(),
         model_config.model(),
@@ -54,7 +57,6 @@ pub async fn execute(gctx: GlobalContext) -> anyhow::Result<()> {
                         print_agent_event(event);
                     })
                     .await
-                    .map_err(anyhow::Error::from)
                 {
                     eprintln!("\n{}: {}", "Error".red(), err);
                     continue;

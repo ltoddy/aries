@@ -69,26 +69,28 @@ impl Tool for ExitGitWorktreeTool {
             ExitGitWorktreeAction::Remove => {
                 {
                     let repository = self.repository.lock();
-                    let worktree = repository
-                        .find_worktree(session.worktree_name())
-                        .map_err(|err| ExitGitWorktreeError::find_worktree(err.message()))?;
+                    let worktree =
+                        repository.find_worktree(session.worktree_name()).map_err(|err| {
+                            ExitGitWorktreeError::find_worktree(session.worktree_name(), err)
+                        })?;
 
                     let mut options = WorktreePruneOptions::new();
                     options.valid(true).working_tree(true);
-                    worktree
-                        .prune(Some(&mut options))
-                        .map_err(|err| ExitGitWorktreeError::remove_worktree(err.message()))?;
+                    worktree.prune(Some(&mut options)).map_err(|err| {
+                        ExitGitWorktreeError::remove_worktree(session.path(), err)
+                    })?;
 
-                    let mut branch = repository
-                        .find_branch(session.branch(), BranchType::Local)
-                        .map_err(|err| ExitGitWorktreeError::delete_branch(err.message()))?;
-                    branch
-                        .delete()
-                        .map_err(|err| ExitGitWorktreeError::delete_branch(err.message()))?;
+                    self.ctx.set_cwd(session.origin_cwd());
+                    self.ctx.set_worktree(None);
+
+                    let mut branch =
+                        repository.find_branch(session.branch(), BranchType::Local).map_err(
+                            |err| ExitGitWorktreeError::delete_branch(session.branch(), err),
+                        )?;
+                    branch.delete().map_err(|err| {
+                        ExitGitWorktreeError::delete_branch(session.branch(), err)
+                    })?;
                 }
-
-                self.ctx.set_cwd(session.origin_cwd());
-                self.ctx.set_worktree(None);
 
                 Ok(ExitGitWorktreeOutput::remove(
                     session.origin_cwd(),

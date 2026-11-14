@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use anyhow::Context;
 use aries_init::GlobalContext;
 use aries_persistence::ToolCallRepository;
 use aries_runtime::tools::bash;
@@ -9,15 +8,18 @@ use itertools::Itertools;
 use jiff::{Span, Timestamp, Zoned};
 use prettytable::{Cell, Row, Table, row};
 
+use crate::Result;
+use crate::error::Error;
+
 #[derive(Parser, Debug, Clone)]
 #[command(about = "Show bash command usage statistics")]
 pub struct BashArgs {}
 
-pub async fn execute(gctx: GlobalContext, _: BashArgs) -> anyhow::Result<()> {
+pub async fn execute(gctx: GlobalContext, _: BashArgs) -> Result<()> {
     let root_dir = gctx.root_dir();
     let db = aries_persistence::connect(root_dir)
         .await
-        .with_context(|| format!("connecting to database at {}", root_dir.display()))?;
+        .map_err(|source| Error::database("connecting to database at", root_dir, source))?;
 
     let now = Zoned::now();
     let thirty_days_ago = now.saturating_sub(Span::new().days(30));
@@ -27,14 +29,14 @@ pub async fn execute(gctx: GlobalContext, _: BashArgs) -> anyhow::Result<()> {
     let tool_calls = tool_call_repo
         .find_by_created_at_greater_than(Timestamp::from(&thirty_days_ago))
         .await
-        .with_context(|| format!("finding tool calls from {}", root_dir.display()))?;
+        .map_err(|source| Error::database("finding tool calls from", root_dir, source))?;
 
     let bash_tool_calls =
         tool_calls.into_iter().filter(|t| t.tool_name.eq(bash::NAME)).collect::<Vec<_>>();
 
     let mut parser = tree_sitter::Parser::new();
     let language = tree_sitter_bash::LANGUAGE.into();
-    parser.set_language(&language).with_context(|| "setting tree-sitter bash language")?;
+    parser.set_language(&language).map_err(Error::bash_language)?;
 
     let mut calls = BTreeMap::<String, usize>::new();
     for call in bash_tool_calls {

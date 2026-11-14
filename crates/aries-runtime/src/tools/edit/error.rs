@@ -69,4 +69,8 @@ impl EditError {
     pub fn multiple_matches(count: usize) -> Self {
         Self::MultipleMatches { count }
     }
+
+    pub fn guard(source: GuardWriteError) -> Self {
+        Self::Guard(source)
+    }
 }

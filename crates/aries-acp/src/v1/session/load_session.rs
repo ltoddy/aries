@@ -33,11 +33,17 @@ pub async fn load_session(
     drop(registry);
 
     let session_id = session.id();
-    if let Ok(messages) = session.history().await {
-        SessionUpdates::from_history(messages).into_iter().for_each(|update| {
-            let _ = cx.send_notification(SessionNotification::new(session_id.clone(), update));
-        });
-    }
+    let messages = match session.history().await {
+        Ok(messages) => messages,
+        Err(err) => {
+            return responder.respond_with_internal_error(format!(
+                "failed to load history for session `{session_id}`: {err}"
+            ));
+        },
+    };
+    SessionUpdates::from_history(messages).into_iter().for_each(|update| {
+        let _ = cx.send_notification(SessionNotification::new(session_id.clone(), update));
+    });
 
     let available_commands = session
         .list_available_commands()

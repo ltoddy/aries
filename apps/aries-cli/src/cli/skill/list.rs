@@ -3,13 +3,13 @@ use aries_init::GlobalContext;
 use clap::Parser;
 use prettytable::{Cell, Row, Table, row};
 
-use crate::text;
+use crate::{Result, text};
 
 #[derive(Clone, Debug, Parser)]
 #[command(about = "List available skills")]
 pub struct ListSkillArgs {}
 
-pub async fn execute(_args: ListSkillArgs, gctx: GlobalContext) -> anyhow::Result<()> {
+pub async fn execute(_args: ListSkillArgs, gctx: GlobalContext) -> Result<()> {
     let cwd = gctx.current_dir();
 
     let loader = SkillsLoader::new(cwd, gctx.home_dir(), gctx.root_dir());

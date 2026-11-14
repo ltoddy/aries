@@ -18,6 +18,9 @@ pub enum SessionError {
 
     #[error("{0}")]
     Db(#[source] toasty::Error),
+
+    #[error("failed to build model http client: {0}")]
+    BuildClient(#[source] reqwest::Error),
 }
 
 impl SessionError {
@@ -39,5 +42,9 @@ impl SessionError {
 
     pub fn db(error: toasty::Error) -> Self {
         Self::Db(error)
+    }
+
+    pub fn build_client(source: reqwest::Error) -> Self {
+        Self::BuildClient(source)
     }
 }

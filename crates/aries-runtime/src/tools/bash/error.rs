@@ -26,4 +26,8 @@ impl BashError {
 
         Self::Io { shell, cwd, command, source }
     }
+
+    pub fn spawn_task(source: SpawnTaskError) -> Self {
+        Self::SpawnTask(source)
+    }
 }

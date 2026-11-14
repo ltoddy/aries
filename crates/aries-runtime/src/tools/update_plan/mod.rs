@@ -68,10 +68,10 @@ impl Tool for UpdatePlanTool {
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
         if args.items.iter().any(|v| v.content.trim().is_empty()) {
-            return Err(UpdatePlanError::EmptyContent);
+            return Err(UpdatePlanError::empty_content());
         }
         if args.items.iter().any(|v| v.active_form.trim().is_empty()) {
-            return Err(UpdatePlanError::EmptyActiveForm);
+            return Err(UpdatePlanError::empty_active_form());
         }
 
         let all_done = args.items.iter().all(|v| v.status.is_completed());

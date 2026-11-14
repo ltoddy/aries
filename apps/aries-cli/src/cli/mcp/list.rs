@@ -3,11 +3,13 @@ use aries_init::GlobalContext;
 use clap::Parser;
 use prettytable::{Cell, Row, Table, row};
 
+use crate::Result;
+
 #[derive(Clone, Debug, Parser)]
 #[command(about = "List configured MCP servers")]
 pub struct ListMcpArgs {}
 
-pub async fn execute(_args: ListMcpArgs, gctx: GlobalContext) -> anyhow::Result<()> {
+pub async fn execute(_args: ListMcpArgs, gctx: GlobalContext) -> Result<()> {
     let cwd = gctx.current_dir();
 
     let loader = McpsLoader::new(cwd, gctx.home_dir());

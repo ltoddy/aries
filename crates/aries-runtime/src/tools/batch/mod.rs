@@ -63,7 +63,7 @@ impl BatchTool {
                 );
                 let res = Tool::call(&tool, context, args)
                     .await
-                    .map_err(|e| BatchError::tool_execution(tool_name, &e))?;
+                    .map_err(|e| BatchError::tool_execution(tool_name, e))?;
                 serde_json::to_value(res).map_err(|e| BatchError::serialize_output(tool_name, e))
             },
             read::NAME => {
@@ -71,7 +71,7 @@ impl BatchTool {
                     .map_err(|e| BatchError::invalid_parameters(tool_name, e))?;
                 let res = Tool::call(&read::ReadTool::new(ctx), context, args)
                     .await
-                    .map_err(|e| BatchError::tool_execution(tool_name, &e))?;
+                    .map_err(|e| BatchError::tool_execution(tool_name, e))?;
                 serde_json::to_value(res).map_err(|e| BatchError::serialize_output(tool_name, e))
             },
             glob::NAME => {
@@ -79,7 +79,7 @@ impl BatchTool {
                     .map_err(|e| BatchError::invalid_parameters(tool_name, e))?;
                 let res = Tool::call(&glob::GlobTool::new(ctx), context, args)
                     .await
-                    .map_err(|e| BatchError::tool_execution(tool_name, &e))?;
+                    .map_err(|e| BatchError::tool_execution(tool_name, e))?;
                 serde_json::to_value(res).map_err(|e| BatchError::serialize_output(tool_name, e))
             },
             grep::NAME => {
@@ -87,7 +87,7 @@ impl BatchTool {
                     .map_err(|e| BatchError::invalid_parameters(tool_name, e))?;
                 let res = Tool::call(&grep::GrepTool::new(ctx), context, args)
                     .await
-                    .map_err(|e| BatchError::tool_execution(tool_name, &e))?;
+                    .map_err(|e| BatchError::tool_execution(tool_name, e))?;
                 serde_json::to_value(res).map_err(|e| BatchError::serialize_output(tool_name, e))
             },
             task_output::NAME => {
@@ -95,7 +95,7 @@ impl BatchTool {
                     .map_err(|e| BatchError::invalid_parameters(tool_name, e))?;
                 let res = Tool::call(&task_output::TaskOutputTool::new(ctx), context, args)
                     .await
-                    .map_err(|e| BatchError::tool_execution(tool_name, &e))?;
+                    .map_err(|e| BatchError::tool_execution(tool_name, e))?;
                 serde_json::to_value(res).map_err(|e| BatchError::serialize_output(tool_name, e))
             },
             webfetch::NAME => {
@@ -103,7 +103,7 @@ impl BatchTool {
                     .map_err(|e| BatchError::invalid_parameters(tool_name, e))?;
                 let res = Tool::call(&webfetch::WebFetchTool::new(), context, args)
                     .await
-                    .map_err(|e| BatchError::tool_execution(tool_name, &e))?;
+                    .map_err(|e| BatchError::tool_execution(tool_name, e))?;
                 serde_json::to_value(res).map_err(|e| BatchError::serialize_output(tool_name, e))
             },
             websearch::NAME => {
@@ -111,7 +111,7 @@ impl BatchTool {
                     .map_err(|e| BatchError::invalid_parameters(tool_name, e))?;
                 let res = Tool::call(&websearch::WebSearchTool::new(), context, args)
                     .await
-                    .map_err(|e| BatchError::tool_execution(tool_name, &e))?;
+                    .map_err(|e| BatchError::tool_execution(tool_name, e))?;
                 serde_json::to_value(res).map_err(|e| BatchError::serialize_output(tool_name, e))
             },
             codesearch::NAME => {
@@ -119,7 +119,7 @@ impl BatchTool {
                     .map_err(|e| BatchError::invalid_parameters(tool_name, e))?;
                 let res = Tool::call(&codesearch::CodeSearchTool::new(), context, args)
                     .await
-                    .map_err(|e| BatchError::tool_execution(tool_name, &e))?;
+                    .map_err(|e| BatchError::tool_execution(tool_name, e))?;
                 serde_json::to_value(res).map_err(|e| BatchError::serialize_output(tool_name, e))
             },
             _ => Err(BatchError::unsupported_tool(tool_name)),

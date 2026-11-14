@@ -10,4 +10,8 @@ impl AgentError {
     pub fn execution(err: rig::completion::PromptError) -> Self {
         Self::Execution(Box::new(err))
     }
+
+    pub fn agent_not_found(name: impl Into<String>) -> Self {
+        Self::AgentNotFound(name.into())
+    }
 }

@@ -30,7 +30,7 @@ pub async fn execute_bash_command_hook(
         .stderr(Stdio::piped())
         .kill_on_drop(true)
         .spawn()
-        .map_err(BashHookError::Spawn)?;
+        .map_err(BashHookError::spawn)?;
 
     let stdin = child.stdin.take();
     let stdin_payload = stdin_payload.as_ref();
@@ -39,14 +39,14 @@ pub async fn execute_bash_command_hook(
         let write_stdin = async move {
             if let Some(mut stdin) = stdin {
                 if !stdin_payload.is_empty() {
-                    stdin.write_all(stdin_payload).await.map_err(BashHookError::Stdin)?;
+                    stdin.write_all(stdin_payload).await.map_err(BashHookError::stdin)?;
                 }
-                stdin.shutdown().await.map_err(BashHookError::Stdin)?;
+                stdin.shutdown().await.map_err(BashHookError::stdin)?;
             }
             Ok::<_, BashHookError>(())
         };
         let wait_output =
-            async move { child.wait_with_output().await.map_err(BashHookError::Wait) };
+            async move { child.wait_with_output().await.map_err(BashHookError::wait) };
 
         let ((), output) = tokio::try_join!(write_stdin, wait_output)?;
         Ok::<_, BashHookError>(output)
@@ -55,7 +55,7 @@ pub async fn execute_bash_command_hook(
     {
         Ok(res) => res?,
         Err(elapsed) => {
-            return Err(BashHookError::Timeout { timeout: timeout_duration, source: elapsed });
+            return Err(BashHookError::timeout(timeout_duration, elapsed));
         },
     };
 
@@ -154,5 +154,21 @@ pub enum BashHookError {
 impl BashHookError {
     pub fn invalid_timeout(timeout: f64, source: TryFromFloatSecsError) -> Self {
         Self::InvalidTimeout { timeout, source }
+    }
+
+    pub fn spawn(source: io::Error) -> Self {
+        Self::Spawn(source)
+    }
+
+    pub fn stdin(source: io::Error) -> Self {
+        Self::Stdin(source)
+    }
+
+    pub fn wait(source: io::Error) -> Self {
+        Self::Wait(source)
+    }
+
+    pub fn timeout(timeout: Duration, source: Elapsed) -> Self {
+        Self::Timeout { timeout, source }
     }
 }
