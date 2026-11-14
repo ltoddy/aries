@@ -21,11 +21,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
 
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
 
-      - run: cargo +nightly fmt --all -- --check
+      - run: cargo fmt --all -- --check
 
   lint-crates:
     name: lint (crates)
@@ -33,13 +33,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
 
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
 
       - uses: Swatinem/rust-cache@v2.9.3
 
-      - run: cargo +nightly clippy --workspace --exclude aries-cli --exclude aries-desktop --all-targets -- -D warnings
+      - run: cargo clippy --workspace --exclude aries-cli --exclude aries-desktop --all-targets -- -D warnings
 
   test-crates:
     name: test (crates)
@@ -47,11 +47,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
 
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2.9.3
 
-      - run: cargo +nightly test --workspace --exclude aries-cli --exclude aries-desktop
+      - run: cargo test --workspace --exclude aries-cli --exclude aries-desktop
 
   lint-cli:
     name: lint (cli)
@@ -59,13 +59,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
 
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
 
       - uses: Swatinem/rust-cache@v2.9.3
 
-      - run: cargo +nightly clippy -p aries-cli --all-targets -- -D warnings
+      - run: cargo clippy -p aries-cli --all-targets -- -D warnings
 
   test-cli:
     name: test (aries-cli)
@@ -73,11 +73,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
 
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2.9.3
 
-      - run: cargo +nightly test -p aries-cli --bins --tests
+      - run: cargo test -p aries-cli --bins --tests
 
   lint-orbit:
     name: lint (aries-desktop)
@@ -85,13 +85,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
 
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
 
       - uses: Swatinem/rust-cache@v2.9.3
 
-      - run: cargo +nightly clippy -p aries-desktop --all-targets -- -D warnings
+      - run: cargo clippy -p aries-desktop --all-targets -- -D warnings
 
   test-orbit:
     name: test (aries-desktop)
@@ -99,11 +99,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
 
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2.9.3
 
-      - run: cargo +nightly test -p aries-desktop --bins --tests
+      - run: cargo test -p aries-desktop --bins --tests
 
   security:
     name: security
@@ -111,7 +111,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
 
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2.9.3
 
@@ -119,6 +119,6 @@ jobs:
         with:
           tool: cargo-audit,cargo-deny
 
-      - run: cargo +nightly audit --ignore RUSTSEC-2023-0071
+      - run: cargo audit --ignore RUSTSEC-2023-0071
 
-      - run: cargo +nightly deny check
+      - run: cargo deny check
