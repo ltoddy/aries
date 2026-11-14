@@ -1,6 +1,7 @@
 mod error;
 mod hook;
 mod instruction;
+mod set_session_title;
 
 use std::collections::VecDeque;
 use std::future::Future;
@@ -380,15 +381,6 @@ impl Session {
             .await
             .map_err(SessionError::db)?;
         Ok(())
-    }
-
-    pub async fn set_session_title(&mut self, title: impl AsRef<str>) -> Result<(), SessionError> {
-        let title = title.as_ref();
-
-        self.session_repo
-            .update_title_by_session_id(&self.state.session_id, title)
-            .await
-            .map_err(SessionError::db)
     }
 
     pub async fn close(&self) {
