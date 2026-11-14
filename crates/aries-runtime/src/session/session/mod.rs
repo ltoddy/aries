@@ -142,7 +142,7 @@ impl Session {
     pub async fn set_model(&mut self, alias: impl Into<String>) -> Result<(), SessionError> {
         let alias = alias.into();
 
-        let config = self.setting.activate(alias)?;
+        let config = self.setting.activate(alias).map_err(SessionError::setting)?;
 
         let model = crate::session::create_model(&config);
 
@@ -365,6 +365,22 @@ impl Session {
         &self.transcript_path
     }
 
+    pub async fn archive(&mut self) -> Result<(), SessionError> {
+        self.session_repo
+            .update_archived_by_session_id(&self.state.session_id, true)
+            .await
+            .map_err(SessionError::db)?;
+        Ok(())
+    }
+
+    pub async fn unarchive(&mut self) -> Result<(), SessionError> {
+        self.session_repo
+            .update_archived_by_session_id(&self.state.session_id, false)
+            .await
+            .map_err(SessionError::db)?;
+        Ok(())
+    }
+
     pub async fn close(&self) {
         let input = SessionEndHookInput::new(
             &self.state.session_id,
@@ -423,8 +439,8 @@ impl Session {
             MemoryStore::new(gctx.memory_root_dir().join(aries_filesystem::path_to_slug(&cwd)))
                 .await;
 
-        let chat_history = ChatHistory::new(&session_dir).await?;
-        let chat_context = ChatContext::new(&session_dir).await?;
+        let chat_history = ChatHistory::new(&session_dir).await.map_err(SessionError::io)?;
+        let chat_context = ChatContext::new(&session_dir).await.map_err(SessionError::io)?;
 
         let hooks_executor = Arc::new(HooksExecutor::new(extensions.hooks.clone()));
         let instruction_ctx = InstructionContext::new(&cwd);
