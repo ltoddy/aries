@@ -1,4 +1,3 @@
-use gpui_kit::base::SelectableText;
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -48,9 +47,6 @@ impl<'a> SessionListView<'a> {
                     div().px_4().py_1().text_xs().text_color(p.muted()).child("正在更新会话…"),
                 )
             })
-            .when_some(self.owner.management().error().map(str::to_owned), |list, error| {
-                list.child(div().px_4().py_1().text_xs().text_color(p.danger()).child(error))
-            })
             .child(
                 div()
                     .id("session-list")
@@ -92,16 +88,7 @@ impl<'a> SessionListView<'a> {
                                 },
                             ))
                         },
-                    )
-                    .when_some(list.error().map(str::to_owned), |list, error| {
-                        list.child(
-                            div()
-                                .p_2()
-                                .text_xs()
-                                .text_color(p.danger())
-                                .child(SelectableText::new("session-list-error-text", error)),
-                        )
-                    }),
+                    ),
             )
     }
 }

@@ -1,3 +1,4 @@
+mod agents;
 mod archive_session;
 mod close_session;
 mod commands;

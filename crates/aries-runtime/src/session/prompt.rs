@@ -15,6 +15,7 @@ use tokio::pin;
 use tokio_util::sync::CancellationToken;
 
 use crate::memory::MemoryRetriever;
+use crate::session::agents::TitleAgent;
 use crate::session::{
     PromptOutcome, Session, message_to_simple_text, system_reminder, system_reminders,
 };
@@ -31,6 +32,8 @@ impl Session {
         Fut: Future<Output = ()>,
     {
         let mut prompt: Message = prompt.into();
+        self.summarize_title(prompt.clone()).await;
+
         let cancel_token = {
             let mut guard = self.cancel_token.lock();
             *guard = CancellationToken::new();
@@ -47,14 +50,12 @@ impl Session {
             prompt = Message::user(slash_command);
         }
 
-        let title = self.update_title(&prompt).await;
-        let now = Zoned::now();
-        self.notifier.send_session_info_update(&title, now.to_string());
+        let user_input = message_to_simple_text(&prompt);
 
-        let hook_context = self.fire_user_prompt_submit(&title).await?;
+        let hook_context = self.fire_user_prompt_submit(&user_input).await?;
         self.compactor.pre_compact(&prompt).await;
 
-        let context = self.recall_context(&title).await;
+        let context = self.recall_context(&user_input).await;
         let mut history = self.chat_context.history().await.to_vec();
         history.extend(system_reminders(hook_context));
         if let Some(reminder) = context {
@@ -115,6 +116,32 @@ impl Session {
         Ok(PromptOutcome::Completed(message_id))
     }
 
+    async fn summarize_title(&mut self, prompt: impl Into<Message>) {
+        let Ok(Some(session)) =
+            self.session_repo.find_last_by_session_id(&self.state.session_id).await
+        else {
+            return;
+        };
+        if session.has_title() {
+            return;
+        }
+
+        let prompt = prompt.into();
+        let mut session_repo = self.session_repo.clone();
+        let session_id = self.state.session_id.clone();
+        let agent = TitleAgent::new(self.state.clone(), self.db.clone());
+        let notifier = self.notifier.clone();
+
+        tokio::spawn(async move {
+            if let Some(title) = agent.title(prompt).await {
+                let _ = session_repo.update_title_by_session_id(session_id, &title).await;
+
+                let now = Zoned::now();
+                notifier.send_session_info_update(&title, now.to_string());
+            }
+        });
+    }
+
     async fn fire_user_prompt_submit(
         &self,
         prompt: impl Into<String>,
@@ -149,12 +176,6 @@ impl Session {
         if let HookDecision::Continue { contexts } = self.hooks_executor.fire_stop(input).await {
             self.chat_context.append(&system_reminders(contexts)).await;
         }
-    }
-
-    async fn update_title(&mut self, prompt: &Message) -> String {
-        let title = message_to_simple_text(prompt);
-        let _ = self.session_repo.update_title_by_session_id(&self.state.session_id, &title).await;
-        title
     }
 
     async fn try_execute_slash_command(&self, input: impl AsRef<str>) -> Option<String> {
