@@ -15,6 +15,9 @@ pub enum SessionError {
 
     #[error("{0}")]
     Setting(#[source] SettingError),
+
+    #[error("{0}")]
+    Db(#[source] toasty::Error),
 }
 
 impl SessionError {
@@ -33,16 +36,8 @@ impl SessionError {
     pub fn setting(error: SettingError) -> Self {
         Self::Setting(error)
     }
-}
 
-impl From<io::Error> for SessionError {
-    fn from(error: io::Error) -> Self {
-        Self::io(error)
-    }
-}
-
-impl From<SettingError> for SessionError {
-    fn from(error: SettingError) -> Self {
-        Self::setting(error)
+    pub fn db(error: toasty::Error) -> Self {
+        Self::Db(error)
     }
 }

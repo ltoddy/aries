@@ -117,7 +117,9 @@ impl SessionRegistry {
     }
 
     pub fn putback_session(&mut self, session: Session) {
-        self.active_sessions.insert(session.id(), session);
+        if let Some(active_session) = self.active_sessions.get_mut(&session.id()) {
+            *active_session = session;
+        }
     }
 
     pub async fn new_session(
