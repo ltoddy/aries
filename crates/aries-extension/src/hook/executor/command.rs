@@ -38,10 +38,19 @@ pub async fn execute_bash_command_hook(
     let output = match tokio::time::timeout(timeout_duration, async move {
         let write_stdin = async move {
             if let Some(mut stdin) = stdin {
-                if !stdin_payload.is_empty() {
-                    stdin.write_all(stdin_payload).await.map_err(BashHookError::stdin)?;
+                let result = async {
+                    if !stdin_payload.is_empty() {
+                        stdin.write_all(stdin_payload).await?;
+                    }
+                    stdin.shutdown().await
                 }
-                stdin.shutdown().await.map_err(BashHookError::stdin)?;
+                .await;
+
+                if let Err(source) = result
+                    && source.kind() != io::ErrorKind::BrokenPipe
+                {
+                    return Err(BashHookError::stdin(source));
+                }
             }
             Ok::<_, BashHookError>(())
         };
