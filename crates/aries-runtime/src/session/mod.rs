@@ -189,7 +189,7 @@ impl Session {
 
         let hooks_executor = Arc::new(HooksExecutor::new(extensions.hooks.clone()));
         let instruction_ctx = InstructionContext::new(&cwd);
-        let mut session_repo = SessionRepository::new(db.clone());
+        let session_repo = SessionRepository::new(db.clone());
 
         let hook = SessionPromptHook::new(
             hooks_executor.clone(),
@@ -227,16 +227,6 @@ impl Session {
             hooks_executor.clone(),
             Notifier::clone(&notifier),
         );
-
-        session_repo
-            .create(
-                &id,
-                state.cwd.display().to_string(),
-                state.session_dir.display().to_string(),
-                state.transcript_dir.display().to_string(),
-            )
-            .await
-            .map_err(SessionError::db)?;
 
         let input = SessionStartHookInput::new(&id, &state.cwd, source, state.model.name());
         if let HookDecision::Continue { contexts } = hooks_executor.fire_session_start(input).await
