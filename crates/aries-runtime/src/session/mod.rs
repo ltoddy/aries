@@ -59,7 +59,6 @@ pub enum PromptOutcome {
 }
 
 pub const DEFAULT_AGENT_NAME: &str = "build";
-pub const DEFAULT_EFFORT: Effort = Effort::High;
 
 #[derive(Clone)]
 pub struct Session {

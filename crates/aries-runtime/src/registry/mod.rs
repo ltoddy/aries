@@ -194,14 +194,19 @@ impl SessionRegistry {
         &mut self,
         session_id: impl AsRef<str>,
     ) -> Result<(), RegistryError> {
+        let model_config = self.setting.active_model()?;
         let session_id = session_id.as_ref();
 
-        let session = self
-            .sessions
-            .get_mut(session_id)
-            .ok_or_else(|| RegistryError::session_not_found(session_id))?;
+        let mut session = Session::resume_session(
+            session_id,
+            self.gctx.clone(),
+            model_config,
+            self.setting.clone(),
+            self.db.clone(),
+            McpDefinition::empty(),
+        )
+        .await?;
         session.delete_session().await.map_err(RegistryError::session)?;
-
         self.sessions.remove(session_id);
 
         Ok(())
