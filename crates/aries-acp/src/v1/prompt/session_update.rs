@@ -131,13 +131,13 @@ impl SessionUpdates {
                 },
                 StreamEvent::Arguments { part: _, json: _ } => {},
                 StreamEvent::End { part: _, content } => match content {
-                    rig::message::AssistantContent::Text(_text) => {},
-                    rig::message::AssistantContent::ToolCall(tool_call) => {
+                    AssistantContent::Text(_text) => {},
+                    AssistantContent::ToolCall(tool_call) => {
                         return vec![Self::from_tool_call(tool_call)];
                     },
-                    rig::message::AssistantContent::Reasoning(_reasoning) => {},
-                    rig::message::AssistantContent::Image(_image) => {},
-                    rig::message::AssistantContent::Opaque(_) => {},
+                    AssistantContent::Reasoning(_reasoning) => {},
+                    AssistantContent::Image(_image) => {},
+                    AssistantContent::Opaque(_) => {},
                     _ => {},
                 },
             },
