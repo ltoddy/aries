@@ -1,6 +1,6 @@
-use std::io;
-
 use aries_init::SettingError;
+use std::io;
+use std::path::PathBuf;
 
 #[derive(Debug, thiserror::Error)]
 pub enum SessionError {
@@ -21,6 +21,13 @@ pub enum SessionError {
 
     #[error("failed to build model http client: {0}")]
     BuildClient(#[source] reqwest::Error),
+
+    #[error("failed to remove session directory {}: {source}", path.display())]
+    RemoveSessionDir {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
 }
 
 impl SessionError {
@@ -46,5 +53,9 @@ impl SessionError {
 
     pub fn build_client(source: reqwest::Error) -> Self {
         Self::BuildClient(source)
+    }
+
+    pub fn remove_session_dir(path: impl Into<PathBuf>, source: io::Error) -> Self {
+        Self::RemoveSessionDir { path: path.into(), source }
     }
 }

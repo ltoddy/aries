@@ -1,7 +1,6 @@
 mod error;
 
 use std::collections::HashMap;
-use std::io;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -22,7 +21,7 @@ pub struct SessionRegistry {
     setting: Setting,
 
     db: Db,
-    active_sessions: HashMap<String, Session>,
+    sessions: HashMap<String, Session>,
     session_repo: SessionRepository,
 }
 
@@ -32,7 +31,7 @@ impl SessionRegistry {
         let db = aries_persistence::connect(root_dir).await?;
         let session_repo = SessionRepository::new(db.clone());
 
-        Ok(Self { gctx, setting, db, active_sessions: Default::default(), session_repo })
+        Ok(Self { gctx, setting, db, sessions: Default::default(), session_repo })
     }
 
     pub async fn list_sessions(
@@ -52,34 +51,19 @@ impl SessionRegistry {
         Ok(sessions)
     }
 
-    pub async fn close_session(&mut self, session_id: impl AsRef<str>) {
-        let session_id = session_id.as_ref();
-
-        if let Some(removed) = self.active_sessions.remove(session_id) {
-            removed.close().await;
-        };
-    }
-
     pub async fn delete_session(
         &mut self,
         session_id: impl AsRef<str>,
     ) -> Result<(), RegistryError> {
         let session_id = session_id.as_ref();
 
-        let session = self.session_repo.find_last_by_session_id(session_id).await?;
+        let session = self
+            .sessions
+            .get_mut(session_id)
+            .ok_or_else(|| RegistryError::session_not_found(session_id))?;
+        session.delete_session().await.map_err(RegistryError::session)?;
 
-        if let Some(removed) = self.active_sessions.remove(session_id) {
-            removed.close().await;
-        }
-
-        if let Some(session) = session {
-            if let Err(source) = tokio::fs::remove_dir_all(&session.root_dir).await
-                && source.kind() != io::ErrorKind::NotFound
-            {
-                return Err(RegistryError::remove_session_dir(session.root_dir, source));
-            }
-            self.session_repo.delete_by_session_id(session_id).await?;
-        }
+        self.sessions.remove(session_id);
 
         Ok(())
     }
@@ -91,7 +75,7 @@ impl SessionRegistry {
     ) -> Result<Session, RegistryError> {
         let cwd: PathBuf = cwd.into();
         let session_id = session_id.as_ref();
-        if let Some(session) = self.active_sessions.get(session_id) {
+        if let Some(session) = self.sessions.get(session_id) {
             return Ok(session.to_owned());
         }
 
@@ -103,13 +87,13 @@ impl SessionRegistry {
     }
 
     pub fn session(&self, session_id: impl AsRef<str>) -> Option<Session> {
-        let session = self.active_sessions.get(session_id.as_ref())?;
+        let session = self.sessions.get(session_id.as_ref())?;
 
         Some(session.to_owned())
     }
 
     pub fn putback_session(&mut self, session: Session) {
-        if let Some(active_session) = self.active_sessions.get_mut(&session.id()) {
+        if let Some(active_session) = self.sessions.get_mut(&session.id()) {
             *active_session = session;
         }
     }
@@ -143,7 +127,7 @@ impl SessionRegistry {
                 session.transcript_path().display().to_string(),
             )
             .await?;
-        self.active_sessions.insert(session.id(), session.clone());
+        self.sessions.insert(session.id(), session.clone());
 
         Ok(session)
     }
@@ -175,7 +159,7 @@ impl SessionRegistry {
         .instrument(info_span!("session_init", session_id = %session_id))
         .await?;
 
-        self.active_sessions.insert(session.id(), session.clone());
+        self.sessions.insert(session.id(), session.clone());
 
         Ok(session)
     }
@@ -191,7 +175,7 @@ impl SessionRegistry {
         let session_id = nanoid::nanoid!();
 
         let parent_session = self
-            .active_sessions
+            .sessions
             .get(parent_session_id)
             .ok_or_else(|| RegistryError::session_not_active(parent_session_id))?;
 
@@ -219,7 +203,7 @@ impl SessionRegistry {
                 session.transcript_path().display().to_string(),
             )
             .await?;
-        self.active_sessions.insert(session.id(), session.clone());
+        self.sessions.insert(session.id(), session.clone());
 
         Ok(session)
     }

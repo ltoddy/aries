@@ -1,6 +1,3 @@
-use std::io;
-use std::path::PathBuf;
-
 use aries_init::SettingError;
 
 use crate::session::SessionError;
@@ -16,15 +13,11 @@ pub enum RegistryError {
     #[error("{0}")]
     Session(#[from] SessionError),
 
-    #[error("parent session {0} is not active")]
+    #[error("session {0} is not active")]
     SessionNotActive(String),
 
-    #[error("failed to remove session directory {}: {source}", path.display())]
-    RemoveSessionDir {
-        path: PathBuf,
-        #[source]
-        source: io::Error,
-    },
+    #[error("session {0} not found")]
+    SessionNotFound(String),
 }
 
 impl RegistryError {
@@ -44,7 +37,7 @@ impl RegistryError {
         Self::SessionNotActive(session_id.into())
     }
 
-    pub fn remove_session_dir(path: impl Into<PathBuf>, source: io::Error) -> Self {
-        Self::RemoveSessionDir { path: path.into(), source }
+    pub fn session_not_found(session_id: impl Into<String>) -> Self {
+        Self::SessionNotFound(session_id.into())
     }
 }
