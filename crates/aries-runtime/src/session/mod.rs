@@ -9,7 +9,10 @@ mod error;
 mod history;
 mod hook;
 mod instruction;
+mod load_session;
+mod new_session;
 mod prompt;
+mod resume_session;
 mod session_status;
 mod set_session_config_option;
 mod set_session_mode;
@@ -92,56 +95,6 @@ pub struct Session {
 }
 
 impl Session {
-    pub async fn new(
-        gctx: GlobalContext,
-        cwd: impl Into<PathBuf>,
-        config: ModelConfig,
-        setting: Setting,
-        db: Db,
-        external_mcp_config: McpDefinition,
-    ) -> Result<Self, SessionError> {
-        let id = nanoid::nanoid!();
-        let cwd: PathBuf = cwd.into();
-
-        Self::build(
-            id,
-            cwd,
-            gctx,
-            config,
-            setting,
-            db,
-            external_mcp_config,
-            SessionStartSource::Startup,
-        )
-        .await
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub async fn load(
-        id: impl Into<String>,
-        gctx: GlobalContext,
-        cwd: impl Into<PathBuf>,
-        config: ModelConfig,
-        setting: Setting,
-        db: Db,
-        external_mcp_config: McpDefinition,
-    ) -> Result<Self, SessionError> {
-        let id = id.into();
-        let cwd: PathBuf = cwd.into();
-
-        Self::build(
-            id,
-            cwd,
-            gctx,
-            config,
-            setting,
-            db,
-            external_mcp_config,
-            SessionStartSource::Resume,
-        )
-        .await
-    }
-
     pub fn id(&self) -> String {
         self.state.session_id.clone()
     }

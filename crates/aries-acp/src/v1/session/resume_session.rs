@@ -23,7 +23,7 @@ pub async fn resume_session(
     let session_id = req.session_id.to_string();
     let mcp_config = McpServers::new(req.mcp_servers).into();
     let mut registry = registry.lock().await;
-    let session = match registry.load_session(session_id, mcp_config).await {
+    let session = match registry.resume_session(session_id, mcp_config).await {
         Ok(session) => session,
         Err(err) => return responder.respond_with_internal_error(err.to_string()),
     };

@@ -34,38 +34,113 @@ impl SessionRegistry {
         Ok(Self { gctx, setting, db, sessions: Default::default(), session_repo })
     }
 
-    pub async fn list_sessions(
+    pub async fn new_session(
         &mut self,
-        cwd: Option<PathBuf>,
-    ) -> Result<Vec<aries_persistence::Session>, RegistryError> {
-        let sessions = match &cwd {
-            Some(cwd) => self.session_repo.find_by_cwd(cwd.display().to_string()).await,
-            None => self.session_repo.find().await,
-        }?;
+        cwd: impl Into<PathBuf>,
+        external_mcp_config: McpDefinition,
+    ) -> Result<Session, RegistryError> {
+        let cwd: PathBuf = cwd.into();
+        let model_config = self.setting.active_model()?;
 
-        let sessions = sessions
-            .into_iter()
-            .filter(|s| PathBuf::from(&s.root_dir).exists())
-            .collect::<Vec<_>>();
+        let session = Session::new_session(
+            self.gctx.clone(),
+            cwd,
+            model_config,
+            self.setting.clone(),
+            self.db.clone(),
+            external_mcp_config,
+        )
+        .await?;
+        self.sessions.insert(session.id(), session.clone());
 
-        Ok(sessions)
+        Ok(session)
     }
 
-    pub async fn delete_session(
+    pub async fn load_session(
         &mut self,
         session_id: impl AsRef<str>,
-    ) -> Result<(), RegistryError> {
-        let session_id = session_id.as_ref();
+        external_mcp_config: McpDefinition,
+    ) -> Result<Session, RegistryError> {
+        let model_config = self.setting.active_model()?;
 
-        let session = self
+        let session = Session::load_session(
+            session_id.as_ref(),
+            self.gctx.clone(),
+            model_config,
+            self.setting.clone(),
+            self.db.clone(),
+            external_mcp_config,
+        )
+        .await?;
+
+        self.sessions.insert(session.id(), session.clone());
+
+        Ok(session)
+    }
+
+    pub async fn resume_session(
+        &mut self,
+        session_id: impl AsRef<str>,
+        external_mcp_config: McpDefinition,
+    ) -> Result<Session, RegistryError> {
+        let model_config = self.setting.active_model()?;
+
+        let session = Session::resume_session(
+            session_id.as_ref(),
+            self.gctx.clone(),
+            model_config,
+            self.setting.clone(),
+            self.db.clone(),
+            external_mcp_config,
+        )
+        .await?;
+
+        self.sessions.insert(session.id(), session.clone());
+
+        Ok(session)
+    }
+
+    pub async fn fork_session(
+        &mut self,
+        parent_session_id: impl AsRef<str>,
+        cwd: impl Into<PathBuf>,
+        external_mcp_config: McpDefinition,
+    ) -> Result<Session, RegistryError> {
+        let parent_session_id = parent_session_id.as_ref();
+        let cwd: PathBuf = cwd.into();
+        let session_id = nanoid::nanoid!();
+
+        let parent_session = self
             .sessions
-            .get_mut(session_id)
-            .ok_or_else(|| RegistryError::session_not_found(session_id))?;
-        session.delete_session().await.map_err(RegistryError::session)?;
+            .get(parent_session_id)
+            .ok_or_else(|| RegistryError::session_not_active(parent_session_id))?;
 
-        self.sessions.remove(session_id);
+        let model_config = self.setting.active_model()?;
+        let session = Session::new_session(
+            self.gctx.clone(),
+            cwd,
+            model_config,
+            self.setting.clone(),
+            self.db.clone(),
+            external_mcp_config,
+        )
+        .instrument(info_span!("session_init", session_id = %session_id))
+        .await?;
 
-        Ok(())
+        let parent_context = parent_session.context().await;
+        session.overwrite_context(parent_context).await;
+
+        self.session_repo
+            .create(
+                &session.id(),
+                session.current_dir().display().to_string(),
+                session.session_dir().display().to_string(),
+                session.transcript_dir().display().to_string(),
+            )
+            .await?;
+        self.sessions.insert(session.id(), session.clone());
+
+        Ok(session)
     }
 
     pub async fn try_session(
@@ -92,106 +167,43 @@ impl SessionRegistry {
         Some(session.to_owned())
     }
 
+    pub async fn list_sessions(
+        &mut self,
+        cwd: Option<PathBuf>,
+    ) -> Result<Vec<aries_persistence::Session>, RegistryError> {
+        let sessions = match &cwd {
+            Some(cwd) => self.session_repo.find_by_cwd(cwd.display().to_string()).await,
+            None => self.session_repo.find().await,
+        }?;
+
+        let sessions = sessions
+            .into_iter()
+            .filter(|s| PathBuf::from(&s.root_dir).exists())
+            .collect::<Vec<_>>();
+
+        Ok(sessions)
+    }
+
     pub fn putback_session(&mut self, session: Session) {
         if let Some(active_session) = self.sessions.get_mut(&session.id()) {
             *active_session = session;
         }
     }
 
-    pub async fn new_session(
-        &mut self,
-        cwd: impl Into<PathBuf>,
-        external_mcp_config: McpDefinition,
-    ) -> Result<Session, RegistryError> {
-        let cwd: PathBuf = cwd.into();
-        let model_config = self.setting.active_model()?;
-
-        let session = Session::new(
-            self.gctx.clone(),
-            cwd,
-            model_config,
-            self.setting.clone(),
-            self.db.clone(),
-            external_mcp_config,
-        )
-        .await?;
-        self.sessions.insert(session.id(), session.clone());
-
-        Ok(session)
-    }
-
-    pub async fn load_session(
+    pub async fn delete_session(
         &mut self,
         session_id: impl AsRef<str>,
-        external_mcp_config: McpDefinition,
-    ) -> Result<Session, RegistryError> {
+    ) -> Result<(), RegistryError> {
         let session_id = session_id.as_ref();
 
         let session = self
-            .session_repo
-            .find_last_by_session_id(session_id)
-            .await?
-            .ok_or_else(|| toasty::Error::record_not_found(format!("session {session_id}")))?;
-
-        let model_config = self.setting.active_model()?;
-
-        let session = Session::load(
-            &session.session_id,
-            self.gctx.clone(),
-            session.cwd,
-            model_config,
-            self.setting.clone(),
-            self.db.clone(),
-            external_mcp_config,
-        )
-        .instrument(info_span!("session_init", session_id = %session_id))
-        .await?;
-
-        self.sessions.insert(session.id(), session.clone());
-
-        Ok(session)
-    }
-
-    pub async fn fork_session(
-        &mut self,
-        parent_session_id: impl AsRef<str>,
-        cwd: impl Into<PathBuf>,
-        external_mcp_config: McpDefinition,
-    ) -> Result<Session, RegistryError> {
-        let parent_session_id = parent_session_id.as_ref();
-        let cwd: PathBuf = cwd.into();
-        let session_id = nanoid::nanoid!();
-
-        let parent_session = self
             .sessions
-            .get(parent_session_id)
-            .ok_or_else(|| RegistryError::session_not_active(parent_session_id))?;
+            .get_mut(session_id)
+            .ok_or_else(|| RegistryError::session_not_found(session_id))?;
+        session.delete_session().await.map_err(RegistryError::session)?;
 
-        let model_config = self.setting.active_model()?;
-        let session = Session::new(
-            self.gctx.clone(),
-            cwd,
-            model_config,
-            self.setting.clone(),
-            self.db.clone(),
-            external_mcp_config,
-        )
-        .instrument(info_span!("session_init", session_id = %session_id))
-        .await?;
+        self.sessions.remove(session_id);
 
-        let parent_context = parent_session.context().await;
-        session.overwrite_context(parent_context).await;
-
-        self.session_repo
-            .create(
-                &session.id(),
-                session.current_dir().display().to_string(),
-                session.session_dir().display().to_string(),
-                session.transcript_dir().display().to_string(),
-            )
-            .await?;
-        self.sessions.insert(session.id(), session.clone());
-
-        Ok(session)
+        Ok(())
     }
 }
