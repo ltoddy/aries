@@ -1,6 +1,7 @@
-use aries_init::SettingError;
 use std::io;
 use std::path::PathBuf;
+
+use aries_init::SettingError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum SessionError {

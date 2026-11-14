@@ -7,7 +7,6 @@ mod tests;
 mod tokens;
 mod window;
 
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use aries_communicate::{CompactionStatus, Notifier};
@@ -27,13 +26,12 @@ pub use self::micro_compact::{KEEP_RECENT, micro_compact};
 pub use self::tokens::TokenEstimator;
 pub use self::window::ContextWindow;
 use crate::session::ChatContext;
+use crate::state::State;
 
 #[derive(Clone)]
 pub struct ContextCompactor {
-    id: String,
-    cwd: PathBuf,
+    state: State,
     agent: CompactAgent,
-    transcript_path: PathBuf,
     breaker: AutoCompactBreaker,
     chat_context: ChatContext,
     hooks_executor: Arc<HooksExecutor>,
@@ -42,21 +40,15 @@ pub struct ContextCompactor {
 
 impl ContextCompactor {
     pub fn new(
-        id: impl Into<String>,
-        cwd: impl Into<PathBuf>,
-        transcript_path: impl Into<PathBuf>,
-        model: Model<OpenAiWire>,
+        state: State,
         chat_context: ChatContext,
         hooks_executor: Arc<HooksExecutor>,
         notifier: Notifier,
     ) -> Self {
-        let id = id.into();
-        let cwd = cwd.into();
-        let transcript_path: PathBuf = transcript_path.into();
         let breaker = AutoCompactBreaker::new();
-        let agent = CompactAgent::new(model, &transcript_path);
+        let agent = CompactAgent::new(state.model.clone(), &state.transcript_dir);
 
-        Self { agent, transcript_path, breaker, chat_context, hooks_executor, id, cwd, notifier }
+        Self { state, agent, breaker, chat_context, hooks_executor, notifier }
     }
 
     pub fn set_model(&mut self, model: Model<OpenAiWire>) {
@@ -161,12 +153,12 @@ impl ContextCompactor {
         }
 
         let input = PreCompactHookInput::new(
-            &self.id,
-            &self.cwd,
+            &self.state.session_id,
+            &self.state.cwd,
             PostCompactTrigger::Auto,
             PreCompactCustomInstructions::Auto,
         )
-        .transcript_path(&self.transcript_path);
+        .transcript_dir(&self.state.transcript_dir);
         if let HookDecision::Terminate { reason: _ } =
             self.hooks_executor.fire_pre_compact(input).await
         {
@@ -184,12 +176,12 @@ impl ContextCompactor {
                 self.breaker.on_success();
 
                 let input = PostCompactHookInput::new(
-                    &self.id,
-                    &self.cwd,
+                    &self.state.session_id,
+                    &self.state.cwd,
                     PostCompactTrigger::Auto,
                     &summary,
                 )
-                .transcript_path(&self.transcript_path);
+                .transcript_dir(&self.state.transcript_dir);
                 self.hooks_executor.fire_post_compact(input).await;
                 Ok(Some(summary))
             },

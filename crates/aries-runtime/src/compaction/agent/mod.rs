@@ -56,14 +56,14 @@ impl CompactOutcome {
 #[derive(Clone)]
 pub struct CompactAgent {
     inner: Agent,
-    transcript_path: PathBuf,
+    transcript_dir: PathBuf,
 }
 
 impl CompactAgent {
     const COMPACTION_MAX_TURNS: usize = 1; // 强制单论,避免陷入循环
 
-    pub fn new(model: Model<OpenAiWire>, transcript_path: impl Into<PathBuf>) -> Self {
-        let transcript_path = transcript_path.into();
+    pub fn new(model: Model<OpenAiWire>, transcript_dir: impl Into<PathBuf>) -> Self {
+        let transcript_dir = transcript_dir.into();
 
         let agent = rig::agent::AgentBuilder::new(model)
             .name(NAME)
@@ -72,7 +72,7 @@ impl CompactAgent {
             .default_max_turns(Self::COMPACTION_MAX_TURNS)
             .build();
 
-        Self { inner: agent, transcript_path }
+        Self { inner: agent, transcript_dir }
     }
 
     pub fn set_model(&mut self, model: Model<OpenAiWire>) {
@@ -132,12 +132,12 @@ impl CompactAgent {
 
     async fn save_transcript(&self, messages: &[Message]) -> io::Result<PathBuf> {
         #[rustfmt::skip]
-        tokio::fs::create_dir_all(&self.transcript_path)
+        tokio::fs::create_dir_all(&self.transcript_dir)
             .await?;
 
         let now = SystemTime::now();
         let ts = now.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
-        let file_path = self.transcript_path.join(format!("transcript_{ts}.json"));
+        let file_path = self.transcript_dir.join(format!("transcript_{ts}.json"));
 
         jsonl::write(&file_path, messages).await?;
 
@@ -145,15 +145,15 @@ impl CompactAgent {
     }
 }
 
-fn resume_prompt(formatted_summary: &str, transcript_path: impl AsRef<Path>) -> Vec<Message> {
-    let transcript_path = transcript_path.as_ref();
+fn resume_prompt(formatted_summary: &str, transcript_dir: impl AsRef<Path>) -> Vec<Message> {
+    let transcript_dir = transcript_dir.as_ref();
 
     let summary = format!(
         "本次会话承接此前一段已超出上下文窗口的对话。下面是早前对话的摘要。\n\n{formatted_summary}"
     );
     let hint = format!(
         r#"如果你需要压缩前的具体细节（例如完整代码片段、错误信息或你之前生成的内容），可以读取完整 transcript：{}。请直接从中断的位置继续，不要再向用户提任何确认问题。直接续做——不要复述摘要、不要回顾刚才在做什么、不要以"我将继续"之类的开场白起头，就当中断从未发生过那样接着完成最后那项任务。"#,
-        transcript_path.display()
+        transcript_dir.display()
     );
 
     vec![Message::user(summary), Message::user(hint), Message::assistant("好的，继续。")]

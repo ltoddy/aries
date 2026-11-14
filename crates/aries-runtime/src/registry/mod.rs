@@ -104,11 +104,9 @@ impl SessionRegistry {
         external_mcp_config: McpDefinition,
     ) -> Result<Session, RegistryError> {
         let cwd: PathBuf = cwd.into();
-        let session_id = nanoid::nanoid!();
         let model_config = self.setting.active_model()?;
 
         let session = Session::new(
-            &session_id,
             self.gctx.clone(),
             cwd,
             model_config,
@@ -116,17 +114,7 @@ impl SessionRegistry {
             self.db.clone(),
             external_mcp_config,
         )
-        .instrument(info_span!("session_init", session_id = %session_id))
         .await?;
-
-        self.session_repo
-            .create(
-                session.id(),
-                session.current_dir().display().to_string(),
-                session.session_dir().display().to_string(),
-                session.transcript_path().display().to_string(),
-            )
-            .await?;
         self.sessions.insert(session.id(), session.clone());
 
         Ok(session)
@@ -181,7 +169,6 @@ impl SessionRegistry {
 
         let model_config = self.setting.active_model()?;
         let session = Session::new(
-            &session_id,
             self.gctx.clone(),
             cwd,
             model_config,
@@ -200,7 +187,7 @@ impl SessionRegistry {
                 &session.id(),
                 session.current_dir().display().to_string(),
                 session.session_dir().display().to_string(),
-                session.transcript_path().display().to_string(),
+                session.transcript_dir().display().to_string(),
             )
             .await?;
         self.sessions.insert(session.id(), session.clone());
