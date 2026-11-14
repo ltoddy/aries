@@ -1,6 +1,8 @@
 use aries_init::GlobalContext;
 
-pub async fn execute(gctx: GlobalContext) -> anyhow::Result<()> {
+use crate::Result;
+
+pub async fn execute(gctx: GlobalContext) -> Result<()> {
     aries_init::gc(gctx.root_dir()).await;
     Ok(())
 }

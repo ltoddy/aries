@@ -98,7 +98,7 @@ impl Tool for GlobTool {
             .map_err(|err| GlobError::glob_set(pattern.clone(), err))?;
         let collector = Collector::new(args.limit);
 
-        walk_parallel(&base_dir, args.hidden, args.respect_ignore, &set, &collector)?;
+        walk_parallel(&base_dir, args.hidden, args.respect_ignore, &set, &collector);
         let (files, truncated) = collector.finish();
 
         Ok(GlobOutput::new(files, truncated))

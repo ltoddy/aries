@@ -1,21 +1,23 @@
 use std::collections::BTreeMap;
 
-use anyhow::Context;
 use aries_init::GlobalContext;
 use aries_persistence::{ToolCall, ToolCallRepository};
 use clap::Parser;
 use jiff::{Span, Timestamp, Zoned};
 use prettytable::{Cell, Row, Table, row};
 
+use crate::Result;
+use crate::error::Error;
+
 #[derive(Parser, Debug, Clone)]
 #[command(about = "Show tool call statistics")]
 pub struct ToolArgs {}
 
-pub async fn execute(gctx: GlobalContext, _: ToolArgs) -> anyhow::Result<()> {
+pub async fn execute(gctx: GlobalContext, _: ToolArgs) -> Result<()> {
     let root_dir = gctx.root_dir();
     let db = aries_persistence::connect(root_dir)
         .await
-        .with_context(|| format!("connecting to database at {}", root_dir.display()))?;
+        .map_err(|source| Error::database("connecting to database at", root_dir, source))?;
 
     let now = Zoned::now();
     let thirty_days_ago = now.saturating_sub(Span::new().days(30));
@@ -25,7 +27,7 @@ pub async fn execute(gctx: GlobalContext, _: ToolArgs) -> anyhow::Result<()> {
     let tool_calls = tool_call_repo
         .find_by_created_at_greater_than(Timestamp::from(&thirty_days_ago))
         .await
-        .with_context(|| format!("finding tool calls from {}", root_dir.display()))?;
+        .map_err(|source| Error::database("finding tool calls from", root_dir, source))?;
 
     let mut calls_by_tool = BTreeMap::<String, Vec<ToolCall>>::new();
     for tool_call in tool_calls {

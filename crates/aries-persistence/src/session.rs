@@ -76,10 +76,10 @@ impl SessionRepository {
     pub async fn find_last_by_session_id(
         &mut self,
         session_id: impl IntoExpr<String>,
-    ) -> toasty::Result<Session> {
+    ) -> toasty::Result<Option<Session>> {
         Session::filter(Session::fields().session_id().eq(session_id))
             .order_by((Session::fields().created_at().desc(), Session::fields().id().desc()))
-            .one()
+            .first()
             .exec(&mut self.db)
             .await
     }

@@ -21,11 +21,11 @@ impl McpParseError {
 #[derive(Debug, thiserror::Error)]
 pub enum McpConnectError {
     #[error("failed to start MCP stdio server process: {0}")]
-    Spawn(std::io::Error),
+    Spawn(#[source] std::io::Error),
     #[error("MCP connection timed out after {0:?}")]
     Timeout(std::time::Duration),
     #[error("MCP client error: {0}")]
-    Client(Box<McpClientError>),
+    Client(#[source] Box<McpClientError>),
 }
 
 impl McpConnectError {

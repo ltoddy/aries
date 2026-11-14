@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -6,7 +7,7 @@ use thiserror::Error;
 #[derive(Debug, Clone)]
 pub struct TavilyClient {
     api_key: String,
-    http_client: reqwest::Client,
+    http_client: Result<reqwest::Client, Arc<reqwest::Error>>,
 }
 
 impl TavilyClient {
@@ -17,7 +18,7 @@ impl TavilyClient {
             .user_agent("Aries")
             .timeout(Duration::from_secs(30))
             .build()
-            .expect("failed to build Tavily HTTP client");
+            .map_err(Arc::new);
 
         Self { api_key, http_client }
     }
@@ -26,8 +27,11 @@ impl TavilyClient {
         &self,
         request: &TavilySearchRequest,
     ) -> Result<TavilySearchResponse, TavilyError> {
-        let response = self
+        let http_client = self
             .http_client
+            .as_ref()
+            .map_err(|source| TavilyError::build_client(Arc::clone(source)))?;
+        let response = http_client
             .post("https://api.tavily.com/search")
             .bearer_auth(&self.api_key)
             .json(request)
@@ -82,6 +86,12 @@ pub struct TavilySearchResult {
 
 #[derive(Debug, Error)]
 pub enum TavilyError {
+    #[error("failed to build tavily HTTP client: {source}")]
+    BuildClient {
+        #[source]
+        source: Arc<reqwest::Error>,
+    },
+
     #[error("tavily request failed: {0}")]
     Request(#[from] reqwest::Error),
 
@@ -90,6 +100,10 @@ pub enum TavilyError {
 }
 
 impl TavilyError {
+    pub fn build_client(source: Arc<reqwest::Error>) -> Self {
+        Self::BuildClient { source }
+    }
+
     pub fn request(err: reqwest::Error) -> Self {
         Self::Request(err)
     }

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::io;
 use std::path::PathBuf;
 
 use aries_extension::mcp::McpDefinition;
@@ -23,11 +24,34 @@ pub enum RegistryError {
 
     #[error("parent session {0} is not active")]
     SessionNotActive(String),
+
+    #[error("failed to remove session directory {}: {source}", path.display())]
+    RemoveSessionDir {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
 }
 
 impl RegistryError {
+    pub fn db(source: toasty::Error) -> Self {
+        Self::Db(source)
+    }
+
+    pub fn setting(source: SettingError) -> Self {
+        Self::Setting(source)
+    }
+
+    pub fn session(source: SessionError) -> Self {
+        Self::Session(source)
+    }
+
     pub fn session_not_active(session_id: impl Into<String>) -> Self {
         Self::SessionNotActive(session_id.into())
+    }
+
+    pub fn remove_session_dir(path: impl Into<PathBuf>, source: io::Error) -> Self {
+        Self::RemoveSessionDir { path: path.into(), source }
     }
 }
 
@@ -80,13 +104,19 @@ impl SessionRegistry {
     ) -> Result<(), RegistryError> {
         let session_id = session_id.as_ref();
 
+        let session = self.session_repo.find_last_by_session_id(session_id).await?;
+
         if let Some(removed) = self.active_sessions.remove(session_id) {
             removed.close().await;
         }
 
-        if let Ok(session) = self.session_repo.find_last_by_session_id(session_id).await {
+        if let Some(session) = session {
+            if let Err(source) = tokio::fs::remove_dir_all(&session.root_dir).await
+                && source.kind() != io::ErrorKind::NotFound
+            {
+                return Err(RegistryError::remove_session_dir(session.root_dir, source));
+            }
             self.session_repo.delete_by_session_id(session_id).await?;
-            let _ = tokio::fs::remove_dir_all(&session.root_dir).await;
         }
 
         Ok(())
@@ -104,9 +134,9 @@ impl SessionRegistry {
         }
 
         let mcp_config = McpDefinition::empty();
-        match self.session_repo.find_last_by_session_id(session_id).await {
-            Ok(_) => self.load_session(session_id, mcp_config).await,
-            Err(_) => self.new_session(cwd, mcp_config).await,
+        match self.session_repo.find_last_by_session_id(session_id).await? {
+            Some(_) => self.load_session(session_id, mcp_config).await,
+            None => self.new_session(cwd, mcp_config).await,
         }
     }
 
@@ -143,7 +173,6 @@ impl SessionRegistry {
         .instrument(info_span!("session_init", session_id = %session_id))
         .await?;
 
-        self.active_sessions.insert(session.id(), session.clone());
         self.session_repo
             .create(
                 session.id(),
@@ -152,6 +181,7 @@ impl SessionRegistry {
                 session.transcript_path().display().to_string(),
             )
             .await?;
+        self.active_sessions.insert(session.id(), session.clone());
 
         Ok(session)
     }
@@ -163,7 +193,11 @@ impl SessionRegistry {
     ) -> Result<Session, RegistryError> {
         let session_id = session_id.as_ref();
 
-        let session = self.session_repo.find_last_by_session_id(session_id).await?;
+        let session = self
+            .session_repo
+            .find_last_by_session_id(session_id)
+            .await?
+            .ok_or_else(|| toasty::Error::record_not_found(format!("session {session_id}")))?;
 
         let model_config = self.setting.active_model()?;
 
@@ -215,7 +249,6 @@ impl SessionRegistry {
         let parent_context = parent_session.context().await;
         session.overwrite_context(parent_context).await;
 
-        self.active_sessions.insert(session.id(), session.clone());
         self.session_repo
             .create(
                 &session.id(),
@@ -224,6 +257,7 @@ impl SessionRegistry {
                 session.transcript_path().display().to_string(),
             )
             .await?;
+        self.active_sessions.insert(session.id(), session.clone());
 
         Ok(session)
     }

@@ -296,7 +296,7 @@ impl TaskRegistry {
         let task_id = task_id.as_ref();
         let entry = {
             let guard = self.inner.lock();
-            guard.tasks.get(task_id).cloned().ok_or(StopTaskError::NotFound)?
+            guard.tasks.get(task_id).cloned().ok_or_else(|| StopTaskError::not_found(task_id))?
         };
         let state = entry.state;
         let mut receiver = entry.receiver;
@@ -304,17 +304,17 @@ impl TaskRegistry {
         let stop_sender = {
             let state = state.lock();
             if state.status != TaskStatus::Running {
-                return Err(StopTaskError::NotRunning);
+                return Err(StopTaskError::not_running(task_id));
             }
-            entry.stop_sender.lock().take().ok_or(StopTaskError::NotRunning)?
+            entry.stop_sender.lock().take().ok_or_else(|| StopTaskError::not_running(task_id))?
         };
 
-        stop_sender.send(()).map_err(|_| StopTaskError::Watch)?;
+        stop_sender.send(()).map_err(|_| StopTaskError::stop_request(task_id))?;
 
         match tokio::time::timeout(STOP_GRACE_PERIOD, receiver.changed()).await {
             Ok(Ok(())) => {},
-            Ok(Err(_)) => return Err(StopTaskError::Watch),
-            Err(_) => return Err(StopTaskError::Timeout),
+            Ok(Err(source)) => return Err(StopTaskError::watch(task_id, source)),
+            Err(source) => return Err(StopTaskError::timeout(task_id, source)),
         }
 
         let state = state.lock();
@@ -363,7 +363,7 @@ pub struct SpawnTaskError {
 }
 
 impl SpawnTaskError {
-    fn new(
+    pub fn new(
         kind: TaskKind,
         shell: impl Into<String>,
         cwd: impl Into<PathBuf>,
@@ -377,14 +377,38 @@ impl SpawnTaskError {
 
 #[derive(thiserror::Error, Debug)]
 pub enum StopTaskError {
-    #[error("task not found")]
-    NotFound,
-    #[error("task is not running")]
-    NotRunning,
-    #[error("timed out waiting for task to stop")]
-    Timeout,
-    #[error("failed to watch task status")]
-    Watch,
+    #[error("task not found: {task_id}")]
+    NotFound { task_id: String },
+    #[error("task is not running: {task_id}")]
+    NotRunning { task_id: String },
+    #[error("timed out waiting for task {task_id} to stop: {source}")]
+    Timeout { task_id: String, source: tokio::time::error::Elapsed },
+    #[error("failed to send stop request for task {task_id}")]
+    StopRequest { task_id: String },
+    #[error("failed to watch task {task_id} status: {source}")]
+    Watch { task_id: String, source: watch::error::RecvError },
+}
+
+impl StopTaskError {
+    pub fn not_found(task_id: impl Into<String>) -> Self {
+        Self::NotFound { task_id: task_id.into() }
+    }
+
+    pub fn not_running(task_id: impl Into<String>) -> Self {
+        Self::NotRunning { task_id: task_id.into() }
+    }
+
+    pub fn timeout(task_id: impl Into<String>, source: tokio::time::error::Elapsed) -> Self {
+        Self::Timeout { task_id: task_id.into(), source }
+    }
+
+    pub fn stop_request(task_id: impl Into<String>) -> Self {
+        Self::StopRequest { task_id: task_id.into() }
+    }
+
+    pub fn watch(task_id: impl Into<String>, source: watch::error::RecvError) -> Self {
+        Self::Watch { task_id: task_id.into(), source }
+    }
 }
 
 enum OutputStream {

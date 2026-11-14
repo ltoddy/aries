@@ -44,7 +44,7 @@ async fn session_repository_uses_memory_database() {
     let sessions = repo.find_by_cwd("/workspace").await.unwrap();
     assert_eq!(sessions.len(), 2);
 
-    let session = repo.find_last_by_session_id("session-1").await.unwrap();
+    let session = repo.find_last_by_session_id("session-1").await.unwrap().unwrap();
     assert_eq!(session.transcript_path, "/tmp/session-1.jsonl");
 
     let sessions = repo
@@ -61,7 +61,7 @@ async fn session_repository_uses_memory_database() {
 
     repo.update_title_by_session_id("session-1", Some("title".to_owned())).await.unwrap();
 
-    let session = repo.find_last_by_session_id("session-1").await.unwrap();
+    let session = repo.find_last_by_session_id("session-1").await.unwrap().unwrap();
     assert_eq!(session.title, Some("title".to_owned()));
 
     let sessions = repo.find_by_title(UNTITLED_SESSION).await.unwrap();
@@ -78,14 +78,14 @@ async fn session_repository_uses_memory_database() {
 }
 
 #[tokio::test]
-async fn find_last_by_session_id_returns_latest_created_session() {
+async fn find_last_by_session_id_optional_returns_latest_created_session() {
     let db = memory_db().await.unwrap();
     let mut repo = SessionRepository::new(db);
 
     repo.create("session-1", "/workspace", "/first", "/tmp/first.jsonl").await.unwrap();
     repo.create("session-1", "/workspace", "/second", "/tmp/second.jsonl").await.unwrap();
 
-    let session = repo.find_last_by_session_id("session-1").await.unwrap();
+    let session = repo.find_last_by_session_id("session-1").await.unwrap().unwrap();
 
     assert_eq!(session.transcript_path, "/tmp/second.jsonl");
 }

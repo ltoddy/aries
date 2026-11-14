@@ -4,13 +4,13 @@ use clap::Parser;
 use itertools::Itertools;
 use prettytable::{Cell, Row, Table, row};
 
-use crate::text;
+use crate::{Result, text};
 
 #[derive(Clone, Debug, Parser)]
 #[command(about = "List available hooks")]
 pub struct ListHooksArgs {}
 
-pub async fn execute(_args: ListHooksArgs, gctx: GlobalContext) -> anyhow::Result<()> {
+pub async fn execute(_args: ListHooksArgs, gctx: GlobalContext) -> Result<()> {
     let cwd = gctx.current_dir();
 
     let loader = HooksLoader::new(cwd, gctx.home_dir());

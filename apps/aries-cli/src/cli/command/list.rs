@@ -3,13 +3,13 @@ use aries_init::GlobalContext;
 use clap::Parser;
 use prettytable::{Cell, Row, Table, row};
 
-use crate::text;
+use crate::{Result, text};
 
 #[derive(Clone, Debug, Parser)]
 #[command(about = "List available commands")]
 pub struct ListCommandArgs {}
 
-pub async fn execute(_args: ListCommandArgs, gctx: GlobalContext) -> anyhow::Result<()> {
+pub async fn execute(_args: ListCommandArgs, gctx: GlobalContext) -> Result<()> {
     let cwd = gctx.current_dir();
 
     let loader = CommandsLoader::new(cwd, gctx.home_dir());

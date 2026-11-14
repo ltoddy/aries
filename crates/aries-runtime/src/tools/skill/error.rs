@@ -11,6 +11,10 @@ pub enum SkillError {
 }
 
 impl SkillError {
+    pub fn load(source: io::Error) -> Self {
+        Self::Load(source)
+    }
+
     pub fn not_found(name: impl Into<String>, available: impl Into<String>) -> Self {
         let name = name.into();
         let available = available.into();

@@ -1,4 +1,4 @@
-use super::tavily::TavilyError;
+use crate::tools::websearch::tavily::TavilyError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum WebSearchError {

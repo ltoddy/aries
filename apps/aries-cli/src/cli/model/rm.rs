@@ -1,18 +1,18 @@
-use anyhow::Context;
 use aries_init::{GlobalContext, SettingLoader};
 use clap::Parser;
 use dialoguer::Select;
 use dialoguer::theme::ColorfulTheme;
 
+use crate::Result;
+use crate::error::Error;
+
 #[derive(Clone, Debug, Parser)]
 #[command(about = "Remove a model configuration")]
 pub struct RmModelArgs {}
 
-pub async fn execute(_: RmModelArgs, gctx: GlobalContext) -> anyhow::Result<()> {
+pub async fn execute(_: RmModelArgs, gctx: GlobalContext) -> Result<()> {
     let loader = SettingLoader::new(gctx.root_dir());
-    let mut setting = loader.load().await.with_context(
-        || "failed to load setting; run `aries setup` to initialize the configuration",
-    )?;
+    let mut setting = loader.load().await.map_err(Error::load_setting)?;
 
     if setting.models.is_empty() {
         println!("No models configured yet.");
@@ -26,8 +26,12 @@ pub async fn execute(_: RmModelArgs, gctx: GlobalContext) -> anyhow::Result<()> 
     let aliases = setting.aliases();
 
     let theme = ColorfulTheme::default();
-    let alias = &aliases
-        [Select::with_theme(&theme).with_prompt("alias").items(&aliases).default(0).interact()?];
+    let alias = &aliases[Select::with_theme(&theme)
+        .with_prompt("alias")
+        .items(&aliases)
+        .default(0)
+        .interact()
+        .map_err(Error::dialog)?];
 
     if &setting.active == alias {
         println!(
@@ -44,7 +48,7 @@ pub async fn execute(_: RmModelArgs, gctx: GlobalContext) -> anyhow::Result<()> 
     setting.models =
         setting.models.into_iter().filter(|m| m.alias() != alias.as_str()).collect::<Vec<_>>();
 
-    loader.save(&setting).await?;
+    loader.save(&setting).await.map_err(Error::setting)?;
 
     println!("model `{alias}` removed.");
     Ok(())

@@ -10,6 +10,19 @@ use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use tracing::warn;
 
+#[derive(Debug, thiserror::Error)]
+#[error("failed to serialize element {index} as JSON: {source}")]
+struct SerializeElementError {
+    index: usize,
+    source: serde_json::Error,
+}
+
+impl SerializeElementError {
+    fn new(index: usize, source: serde_json::Error) -> Self {
+        Self { index, source }
+    }
+}
+
 pub async fn write<'a, S: Serialize + ?Sized + 'a>(
     path: impl AsRef<Path>,
     elements: impl IntoIterator<Item = &'a S>,
@@ -19,10 +32,7 @@ pub async fn write<'a, S: Serialize + ?Sized + 'a>(
         .enumerate()
         .map(|(i, ele)| {
             serde_json::to_string(ele).map_err(|e| {
-                io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("failed to serialize element {i} as JSON: {e}"),
-                )
+                io::Error::new(io::ErrorKind::InvalidData, SerializeElementError::new(i, e))
             })
         })
         .collect::<io::Result<Vec<_>>>()?;
@@ -42,7 +52,7 @@ pub async fn read<D: DeserializeOwned>(path: impl AsRef<Path>) -> io::Result<Vec
         .filter_map(|(i, result)| match result {
             Ok(msg) => Some(msg),
             Err(e) => {
-                warn!(path = %path.display(), line = i, error = %e, "dropping line: failed to deserialize");
+                warn!(path = %path.display(), index = i, line = e.line(), column = e.column(), error = %e, "failed to deserialize JSONL record");
                 None
             },
         })
@@ -78,10 +88,7 @@ impl JsonlAppender {
         let mut guard = self.file.lock().await;
         for (i, element) in elements.into_iter().enumerate() {
             let line = serde_json::to_string(element).map_err(|err| {
-                io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("failed to serialize element {i} as JSON: {err}"),
-                )
+                io::Error::new(io::ErrorKind::InvalidData, SerializeElementError::new(i, err))
             })?;
             guard.write_all(format!("{line}\n").as_bytes()).await?;
         }
@@ -96,10 +103,7 @@ impl JsonlAppender {
         guard.set_len(0).await?;
         for (i, element) in elements.into_iter().enumerate() {
             let line = serde_json::to_string(element).map_err(|err| {
-                io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("failed to serialize element {i} as JSON: {err}"),
-                )
+                io::Error::new(io::ErrorKind::InvalidData, SerializeElementError::new(i, err))
             })?;
             guard.write_all(format!("{line}\n").as_bytes()).await?;
         }

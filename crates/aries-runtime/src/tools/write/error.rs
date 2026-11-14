@@ -48,4 +48,8 @@ impl WriteError {
 
         Self::FileNotEmpty(file_path)
     }
+
+    pub fn guard_write(source: GuardWriteError) -> Self {
+        Self::GuardWrite(source)
+    }
 }

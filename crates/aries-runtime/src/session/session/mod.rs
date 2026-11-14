@@ -142,18 +142,19 @@ impl Session {
     pub async fn set_model(&mut self, alias: impl Into<String>) -> Result<(), SessionError> {
         let alias = alias.into();
 
-        let config = self.setting.activate(alias).map_err(SessionError::setting)?;
+        let mut setting = self.setting.clone();
+        let config = setting.activate(alias).map_err(SessionError::setting)?;
+        let model = crate::session::create_model(&config)?;
 
-        let model = crate::session::create_model(&config);
+        let loader = SettingLoader::new(self.gctx.root_dir());
+        loader.save(&setting).await.map_err(SessionError::setting)?;
 
+        self.setting = setting;
         self.state.model(model);
         self.agent.set_model(self.state.model.clone());
 
         self.config = config;
         self.compactor.set_model(self.state.model.clone());
-
-        let loader = SettingLoader::new(self.gctx.root_dir());
-        let _ = loader.save(&self.setting).await;
 
         Ok(())
     }
@@ -456,7 +457,7 @@ impl Session {
             Notifier::clone(&notifier),
         );
 
-        let model = crate::session::create_model(&config);
+        let model = crate::session::create_model(&config)?;
         let agent = extensions
             .agents
             .iter()

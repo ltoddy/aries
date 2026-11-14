@@ -49,13 +49,17 @@ impl LogRouter {
         let session_id = session_id.into();
 
         let log_dir = dir.join("logs");
-        let _ = std::fs::create_dir_all(&log_dir);
-
-        let file_appender = tracing_appender::rolling::Builder::new()
+        let file_appender = match tracing_appender::rolling::Builder::new()
             .rotation(tracing_appender::rolling::Rotation::DAILY)
             .filename_prefix("aries.log")
-            .build(log_dir)
-            .expect("failed to create session log file appender");
+            .build(&log_dir)
+        {
+            Ok(appender) => appender,
+            Err(err) => {
+                tracing::warn!(session_id, path = %log_dir.display(), error = %err, "failed to register session log");
+                return;
+            },
+        };
         let (writer, _guard) = tracing_appender::non_blocking(file_appender);
 
         self.inner.lock().sessions.insert(session_id, SessionWriter::new(_guard, writer));

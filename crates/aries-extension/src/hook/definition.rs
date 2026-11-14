@@ -22,6 +22,16 @@ pub enum HooksFileParseError {
     Json(#[from] serde_json::Error),
 }
 
+impl HooksFileParseError {
+    pub fn io(source: io::Error) -> Self {
+        Self::Io(source)
+    }
+
+    pub fn json(source: serde_json::Error) -> Self {
+        Self::Json(source)
+    }
+}
+
 impl HooksDefinition {
     fn new(
         location: impl Into<PathBuf>,
@@ -323,6 +333,12 @@ pub enum HookMatcherError {
     },
 }
 
+impl HookMatcherError {
+    pub fn invalid_regex(pattern: impl Into<String>, source: regex_lite::Error) -> Self {
+        Self::InvalidRegex { pattern: pattern.into(), source }
+    }
+}
+
 impl HookMatcher {
     pub fn matches(&self, tool_name: impl AsRef<str>) -> Result<bool, HookMatcherError> {
         let tool_name = tool_name.as_ref();
@@ -339,10 +355,8 @@ impl HookMatcher {
         // 完整匹配：用 `\A(?:...)\z` 显式锚定，避免 pattern 内部的 `|`
         // 改变锚点优先级（例如 "Edit|Write" 应等价于 "\A(?:Edit|Write)\z"）。
         let anchored = format!(r"\A(?:{})\z", pattern);
-        let re = Regex::new(&anchored).map_err(|err| HookMatcherError::InvalidRegex {
-            pattern: pattern.to_string(),
-            source: err,
-        })?;
+        let re = Regex::new(&anchored)
+            .map_err(|source| HookMatcherError::invalid_regex(pattern, source))?;
         Ok(re.is_match(tool_name))
     }
 }

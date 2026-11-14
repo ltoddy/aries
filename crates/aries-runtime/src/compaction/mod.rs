@@ -22,7 +22,7 @@ use rig::providers::openai::wire::OpenAiWire;
 
 pub use self::agent::{CompactAgent, CompactOutcome, compact_summary};
 pub use self::breaker::{AutoCompactBreaker, Decision};
-pub use self::error::CompactionError;
+pub use self::error::{CompactionError, CompactionFailure};
 pub use self::micro_compact::{KEEP_RECENT, micro_compact};
 pub use self::tokens::TokenEstimator;
 pub use self::window::ContextWindow;

@@ -3,7 +3,6 @@ use std::time::SystemTime;
 
 use ignore::{DirEntry, WalkBuilder, WalkState};
 
-use crate::tools::glob::GlobError;
 use crate::tools::glob::driver::Collector;
 
 pub fn walk_parallel(
@@ -12,7 +11,7 @@ pub fn walk_parallel(
     respect_ignore: bool,
     set: &globset::GlobSet,
     collector: &Collector,
-) -> Result<(), GlobError> {
+) {
     let base_dir = base_dir.as_ref();
     let mut builder = WalkBuilder::new(base_dir);
     builder
@@ -26,8 +25,6 @@ pub fn walk_parallel(
         let mut worker = GlobWorker::new(base_dir, set, collector);
         Box::new(move |entry| worker.visit(entry))
     });
-
-    Ok(())
 }
 
 struct GlobWorker<'a> {

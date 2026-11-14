@@ -106,7 +106,7 @@ impl Tool for AgentTool {
             .iter()
             .find(|agent| agent.frontmatter.name.eq_ignore_ascii_case(&args.name))
         else {
-            return Err(AgentError::AgentNotFound(args.name));
+            return Err(AgentError::agent_not_found(args.name));
         };
 
         let task_id = nanoid::nanoid!();

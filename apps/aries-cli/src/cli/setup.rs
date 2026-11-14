@@ -3,10 +3,13 @@ use colored::Colorize;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input, Select};
 
-pub async fn execute(gctx: GlobalContext) -> anyhow::Result<()> {
-    let setting = setup()?;
+use crate::Result;
+use crate::error::Error;
+
+pub async fn execute(gctx: GlobalContext) -> Result<()> {
+    let setting = setup().map_err(Error::dialog)?;
     let loader = SettingLoader::new(gctx.root_dir());
-    loader.save(&setting).await?;
+    loader.save(&setting).await.map_err(Error::setting)?;
 
     let file_path = loader.file_path();
 
@@ -14,7 +17,7 @@ pub async fn execute(gctx: GlobalContext) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn setup() -> anyhow::Result<Setting> {
+fn setup() -> Result<Setting, dialoguer::Error> {
     println!("Welcome to Aries! Let's set up your AI model configuration.");
     let theme = ColorfulTheme::default();
 

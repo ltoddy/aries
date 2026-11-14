@@ -37,6 +37,33 @@ pub enum GuardWriteError {
         "file has been modified since read, either by the user or by a linter. read it again before attempting to write it"
     )]
     ModifiedSinceRead,
+
+    #[error("failed to read modification time for {path}: {source}")]
+    ReadModified { path: PathBuf, source: std::io::Error },
+
+    #[error("invalid modification time for {path}: {source}")]
+    InvalidModifiedTime { path: PathBuf, source: std::time::SystemTimeError },
+}
+
+impl GuardWriteError {
+    pub fn not_read() -> Self {
+        Self::NotRead
+    }
+
+    pub fn modified_since_read() -> Self {
+        Self::ModifiedSinceRead
+    }
+
+    pub fn read_modified(path: impl Into<PathBuf>, source: std::io::Error) -> Self {
+        Self::ReadModified { path: path.into(), source }
+    }
+
+    pub fn invalid_modified_time(
+        path: impl Into<PathBuf>,
+        source: std::time::SystemTimeError,
+    ) -> Self {
+        Self::InvalidModifiedTime { path: path.into(), source }
+    }
 }
 
 impl ToolContext {
@@ -73,7 +100,7 @@ impl ToolContext {
     pub async fn on_file_read(&self, file_path: impl AsRef<Path>) {
         let file_path = file_path.as_ref();
 
-        let Some(modified) = Self::modified_at(file_path).await else { return };
+        let Ok(modified) = Self::modified_at(file_path).await else { return };
 
         let file_path = fs::canonicalize(file_path).await.unwrap_or_else(|_| file_path.to_owned());
 
@@ -85,22 +112,26 @@ impl ToolContext {
         let file_path = fs::canonicalize(file_path).await.unwrap_or_else(|_| file_path.to_owned());
 
         let Some(record) = self.read_state.get(&file_path) else {
-            return Err(GuardWriteError::NotRead);
+            return Err(GuardWriteError::not_read());
         };
 
-        if let Some(current) = Self::modified_at(&file_path).await
-            && current > record.timestamp_millis
-        {
-            return Err(GuardWriteError::ModifiedSinceRead);
+        let current = Self::modified_at(&file_path).await?;
+        if current > record.timestamp_millis {
+            return Err(GuardWriteError::modified_since_read());
         }
         Ok(())
     }
 
-    async fn modified_at(file_path: impl AsRef<Path>) -> Option<u128> {
-        let modified =
-            fs::metadata(file_path).await.and_then(|metadata| metadata.modified()).ok()?;
+    async fn modified_at(file_path: impl AsRef<Path>) -> Result<u128, GuardWriteError> {
+        let file_path = file_path.as_ref();
+        let modified = fs::metadata(file_path)
+            .await
+            .and_then(|metadata| metadata.modified())
+            .map_err(|source| GuardWriteError::read_modified(file_path, source))?;
 
-        let since = modified.duration_since(UNIX_EPOCH).ok()?;
-        Some(since.as_millis())
+        let since = modified
+            .duration_since(UNIX_EPOCH)
+            .map_err(|source| GuardWriteError::invalid_modified_time(file_path, source))?;
+        Ok(since.as_millis())
     }
 }

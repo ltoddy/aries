@@ -10,7 +10,8 @@ use tracing::info_span;
 
 use crate::cli::session::display_elapsed;
 use crate::display::print_agent_event;
-use crate::{commands, input, welcome};
+use crate::error::Error;
+use crate::{Result, commands, input, welcome};
 
 #[derive(Clone, Debug, Parser)]
 #[command(about = "Resume a previous chat session")]
@@ -19,21 +20,25 @@ pub struct ResumeSessionsArgs {
     session_id: String,
 }
 
-pub async fn execute(args: ResumeSessionsArgs, gctx: GlobalContext) -> anyhow::Result<()> {
+pub async fn execute(args: ResumeSessionsArgs, gctx: GlobalContext) -> Result<()> {
     let session_id = args.session_id;
     let loader = SettingLoader::new(gctx.root_dir());
-    let setting = loader.load().await?;
-    let model_config = setting.active_model()?;
+    let setting = loader.load().await.map_err(Error::setting)?;
+    let model_config = setting.active_model().map_err(Error::setting)?;
 
-    let mut registry = SessionRegistry::new(gctx.clone(), setting).await?;
+    let mut registry =
+        SessionRegistry::new(gctx.clone(), setting).await.map_err(Error::registry)?;
 
     aries_logger::init(gctx.root_dir().join("logs"));
 
-    let mut session = registry.load_session(&session_id, McpDefinition::empty()).await?;
+    let mut session = registry
+        .load_session(&session_id, McpDefinition::empty())
+        .await
+        .map_err(Error::registry)?;
     let session_id = session.id();
     let _span = info_span!("session", session_id = %session_id).entered();
 
-    let mut reader = input::InputReader::new(gctx.root_dir())?;
+    let mut reader = input::InputReader::new(gctx.root_dir()).map_err(Error::readline)?;
     welcome::welcome(
         model_config.provider().as_str(),
         model_config.model(),
@@ -61,7 +66,6 @@ pub async fn execute(args: ResumeSessionsArgs, gctx: GlobalContext) -> anyhow::R
                         print_agent_event(event);
                     })
                     .await
-                    .map_err(anyhow::Error::from)
                 {
                     eprintln!("\n{}: {}", "Error".red(), err);
                     continue;

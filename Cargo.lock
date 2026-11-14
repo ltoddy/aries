@@ -409,7 +409,6 @@ name = "aries-cli"
 version = "0.1.0"
 dependencies = [
  "agent-client-protocol",
- "anyhow",
  "aries-acp",
  "aries-communicate",
  "aries-extension",
@@ -431,6 +430,8 @@ dependencies = [
  "rustyline",
  "rustyline-derive",
  "serde_json",
+ "thiserror 2.0.21",
+ "toasty",
  "tokio",
  "tracing",
  "tree-sitter",

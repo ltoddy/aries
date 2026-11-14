@@ -12,6 +12,7 @@ use rig::providers::openai::wire::OpenAiWire;
 use rig::{Agent, Model, ProviderError};
 use tokio::pin;
 
+use crate::compaction::CompactionFailure;
 use crate::jsonl;
 
 const PREAMBLE: &str = include_str!("preamble.md");
@@ -29,9 +30,27 @@ pub enum CompactOutcome {
     /// 应立刻 trip 熔断器，不要短时间内反复浪费 token。
     PromptTooLong,
     /// 网络/超时/限流等瞬时错误——不该计入熔断器失败计数，留给上层继续重试。
-    Transient(String),
+    Transient(CompactionFailure),
     /// 模型有响应但内容空、或解析后空,按一次正常失败累计。
     Empty,
+}
+
+impl CompactOutcome {
+    pub fn success(messages: Vec<Message>, summary: String) -> Self {
+        Self::Success((messages, summary))
+    }
+
+    pub fn prompt_too_long() -> Self {
+        Self::PromptTooLong
+    }
+
+    pub fn transient(error: CompactionFailure) -> Self {
+        Self::Transient(error)
+    }
+
+    pub fn empty() -> Self {
+        Self::Empty
+    }
 }
 
 #[derive(Clone)]
@@ -64,7 +83,9 @@ impl CompactAgent {
         let messages = messages.as_ref();
         let file_path = match self.save_transcript(messages).await {
             Ok(p) => p,
-            Err(e) => return CompactOutcome::Transient(format!("save transcript failed: {e}")),
+            Err(e) => {
+                return CompactOutcome::transient(CompactionFailure::save_transcript(e));
+            },
         };
 
         let compressed_prompt = compress(messages);
@@ -90,10 +111,10 @@ impl CompactAgent {
                             "input is too long",
                         ];
                         if PATTERNS.iter().any(|p| message.contains(p)) {
-                            return CompactOutcome::PromptTooLong;
+                            return CompactOutcome::prompt_too_long();
                         }
                     }
-                    return CompactOutcome::Transient(err.to_string());
+                    return CompactOutcome::transient(CompactionFailure::prompt(err));
                 },
             }
         }
@@ -101,12 +122,12 @@ impl CompactAgent {
         let output = final_res.output();
         let summary = output.trim();
         if summary.is_empty() {
-            return CompactOutcome::Empty;
+            return CompactOutcome::empty();
         }
 
         let compact_summary = compact_summary(summary);
 
-        CompactOutcome::Success((resume_prompt(&compact_summary, &file_path), compact_summary))
+        CompactOutcome::success(resume_prompt(&compact_summary, &file_path), compact_summary)
     }
 
     async fn save_transcript(&self, messages: &[Message]) -> io::Result<PathBuf> {

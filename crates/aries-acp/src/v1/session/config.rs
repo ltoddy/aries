@@ -46,27 +46,25 @@ impl From<SessionConfig> for String {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParseSessionConfigError;
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("invalid session config ID `{0}`: expected `mode`, `model`, or `thought level`")]
+pub struct ParseSessionConfigError(String);
 
-impl Display for ParseSessionConfigError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        "provided string was not `mode` or `model`".fmt(f)
+impl ParseSessionConfigError {
+    pub fn new(config_id: impl Into<String>) -> Self {
+        Self(config_id.into())
     }
 }
-
-impl std::error::Error for ParseSessionConfigError {}
 
 impl FromStr for SessionConfig {
     type Err = ParseSessionConfigError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let s = s.trim();
-
-        match s {
-            "mode" => Ok(SessionConfig::Mode),
-            "model" => Ok(SessionConfig::Model),
-            _ => Err(ParseSessionConfigError),
+        match s.trim() {
+            "mode" => Ok(Self::Mode),
+            "model" => Ok(Self::Model),
+            "thought level" => Ok(Self::ThoughtLevel),
+            _ => Err(ParseSessionConfigError::new(s)),
         }
     }
 }
@@ -156,6 +154,12 @@ fn thought_level_option(current: Effort) -> SessionConfigOption {
 #[error("session mode `{0}` not found")]
 pub struct SessionModeError(String);
 
+impl SessionModeError {
+    pub fn new(mode: impl Into<String>) -> Self {
+        Self(mode.into())
+    }
+}
+
 pub fn modes(
     current: impl AsRef<str>,
     agents: impl AsRef<[AgentDefinition]>,
@@ -165,7 +169,7 @@ pub fn modes(
     let agent = agents
         .iter()
         .find(|agent| agent.frontmatter.name == current)
-        .ok_or_else(|| SessionModeError(current.to_owned()))?;
+        .ok_or_else(|| SessionModeError::new(current))?;
 
     let available_modes = agents
         .iter()

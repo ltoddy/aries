@@ -1,6 +1,7 @@
 mod cli;
 mod commands;
 mod display;
+mod error;
 mod input;
 mod text;
 mod welcome;
@@ -18,11 +19,13 @@ use crate::cli::session::{self, SessionCommand};
 use crate::cli::skill::{self, SkillCommand};
 use crate::cli::stats::StatsCommand;
 
+pub type Result<T, E = error::Error> = std::result::Result<T, E>;
+
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Result<()> {
     let args = cli::Args::parse();
 
     let gctx = GlobalContext::new().await;

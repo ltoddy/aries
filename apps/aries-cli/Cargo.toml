@@ -16,7 +16,6 @@ path = "src/main.rs"
 
 [dependencies]
 agent-client-protocol = { workspace = true, features = ["stdio"] }
-anyhow = "1"
 aries-acp = { version = "0.1.0", path = "../../crates/aries-acp" }
 aries-communicate = { version = "0.1.0", path = "../../crates/aries-communicate" }
 aries-extension = { version = "0.1.0", path = "../../crates/aries-extension" }
@@ -38,6 +37,8 @@ rig.workspace = true
 rustyline = "19.0"
 rustyline-derive = "0.13"
 serde_json.workspace = true
+thiserror.workspace = true
+toasty.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "fs", "process"] }
 tracing.workspace = true
 tree-sitter = "0.26"
