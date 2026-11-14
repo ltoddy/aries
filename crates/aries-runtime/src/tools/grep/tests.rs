@@ -409,8 +409,8 @@ async fn test_grep_can_disable_gitignore_filtering() {
     args.respect_ignore = false;
     let result = tool.call(&mut context, args).await.expect("test operation should succeed");
 
-    assert!(result.matches.contains(&"visible.rs".to_string()));
-    assert!(result.matches.contains(&"ignored/a.rs".to_string()));
+    assert!(result.matches.iter().any(|i: &String| i == "visible.rs"));
+    assert!(result.matches.iter().any(|i: &String| i == "ignored/a.rs"));
 }
 
 #[tokio::test]

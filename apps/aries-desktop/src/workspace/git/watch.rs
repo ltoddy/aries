@@ -4,7 +4,8 @@ use std::sync::{Arc, Mutex};
 use async_channel::Sender;
 use git2::{ErrorCode, Repository, Status};
 use gpui_kit::BackgroundExecutor;
-use notify::{RecommendedWatcher, RecursiveMode, Watcher};
+use notify::event::{CreateKind, RemoveKind};
+use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
 use crate::workspace::git::error::WatchError;
 
@@ -87,11 +88,26 @@ fn should_refresh(event: &notify::Event, repository_path: Option<&Path>) -> bool
         let Ok(relative_path) = path.strip_prefix(workdir) else {
             return true;
         };
-        if repository.is_path_ignored(relative_path) != Ok(true) {
+        if repository.is_path_ignored(relative_path) != Ok(true)
+            && (!matches!(
+                event.kind,
+                EventKind::Create(CreateKind::Folder) | EventKind::Remove(RemoveKind::Folder)
+            ) || repository.is_path_ignored(relative_path.join("")) != Ok(true))
+        {
             return true;
         }
         match repository.status_file(relative_path) {
             Ok(status) => !status.intersects(Status::IGNORED | Status::WT_NEW),
+            Err(error) if error.code() == ErrorCode::Ambiguous => {
+                let Ok(index) = repository.index() else {
+                    return true;
+                };
+                index.iter().any(|entry| {
+                    std::str::from_utf8(&entry.path)
+                        .map(|path| Path::new(path).starts_with(relative_path))
+                        .unwrap_or(true)
+                })
+            },
             Err(error) => error.code() != ErrorCode::NotFound,
         }
     })
