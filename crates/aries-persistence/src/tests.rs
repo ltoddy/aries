@@ -3,9 +3,9 @@
 use jiff::{Span, Timestamp, Zoned};
 use toasty::Db;
 
-use super::{
+use crate::{
     Session, SessionRepository, TokenAudit, TokenAuditRepository, ToolCall, ToolCallRepository,
-    UNTITLED_SESSION, migrate,
+    migrate,
 };
 
 async fn memory_db() -> toasty::Result<Db> {
@@ -35,8 +35,8 @@ async fn session_repository_uses_memory_database() {
 
     assert_eq!(first.session_id, "session-1");
     assert_eq!(second.session_id, "session-2");
-    assert_eq!(first.title.as_deref(), Some(UNTITLED_SESSION));
-    assert_eq!(second.title.as_deref(), Some(UNTITLED_SESSION));
+    assert_eq!(first.title(), "Untitled Session");
+    assert_eq!(second.title(), "Untitled Session");
 
     let sessions = repo.find().await.unwrap();
     assert_eq!(sessions.len(), 2);
@@ -56,15 +56,15 @@ async fn session_repository_uses_memory_database() {
     let sessions = repo.find_by_updated_at_less_than(future()).await.unwrap();
     assert_eq!(sessions.len(), 2);
 
-    let sessions = repo.find_by_title(UNTITLED_SESSION).await.unwrap();
+    let sessions = repo.find_by_title(None).await.unwrap();
     assert_eq!(sessions.len(), 2);
 
     repo.update_title_by_session_id("session-1", Some("title".to_owned())).await.unwrap();
 
     let session = repo.find_last_by_session_id("session-1").await.unwrap().unwrap();
-    assert_eq!(session.title, Some("title".to_owned()));
+    assert_eq!(session.title(), "title");
 
-    let sessions = repo.find_by_title(UNTITLED_SESSION).await.unwrap();
+    let sessions = repo.find_by_title(None).await.unwrap();
     assert_eq!(sessions.len(), 1);
     assert_eq!(sessions[0].session_id, "session-2");
 

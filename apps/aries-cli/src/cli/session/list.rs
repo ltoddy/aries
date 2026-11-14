@@ -33,19 +33,14 @@ pub async fn execute(args: ListSessionsArgs, gctx: GlobalContext) -> Result<()> 
 
     let mut table = Table::new();
     table.add_row(row!["Session ID", "Cwd", "Title", "Created At"]);
-    sessions
-        .into_iter()
-        .map(|s| {
-            Row::new(vec![
-                Cell::new(s.session_id.as_str()),
-                Cell::new(s.cwd.as_str()),
-                Cell::new(clamp(s.title.unwrap_or_default(), 10).as_str()),
-                Cell::new(s.created_at.to_string().as_str()),
-            ])
-        })
-        .for_each(|row| {
-            table.add_row(row);
-        });
+    for session in sessions {
+        table.add_row(Row::new(vec![
+            Cell::new(&session.session_id),
+            Cell::new(&session.cwd),
+            Cell::new(&clamp(session.title(), 10)),
+            Cell::new(&session.created_at.to_string()),
+        ]));
+    }
 
     table.printstd();
 

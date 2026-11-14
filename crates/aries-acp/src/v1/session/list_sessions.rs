@@ -30,9 +30,10 @@ pub async fn list_session(
             _ => !session.archived,
         })
         .map(|s| {
+            let title = s.title();
             SessionInfo::new(s.session_id, s.cwd)
                 .additional_directories(vec![])
-                .title(s.title)
+                .title(title)
                 .updated_at(s.updated_at.to_string())
                 .archived(s.archived)
         })
