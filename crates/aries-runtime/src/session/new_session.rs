@@ -19,7 +19,7 @@ impl Session {
         let id = nanoid::nanoid!();
         let cwd: PathBuf = cwd.into();
 
-        Self::build(
+        let mut session = Self::build(
             id,
             cwd,
             gctx,
@@ -29,6 +29,19 @@ impl Session {
             external_mcp_config,
             SessionStartSource::Startup,
         )
-        .await
+        .await?;
+
+        session
+            .session_repo
+            .create(
+                &session.state.session_id,
+                session.state.cwd.display().to_string(),
+                session.state.session_dir.display().to_string(),
+                session.state.transcript_dir.display().to_string(),
+            )
+            .await
+            .map_err(SessionError::db)?;
+
+        Ok(session)
     }
 }
