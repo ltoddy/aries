@@ -186,7 +186,8 @@ impl Conversation {
             self.set_config_options(update.config_options);
             return None;
         }
-        if matches!(&notification.update, SessionUpdate::UsageUpdate(_)) {
+        if matches!(&notification.update, SessionUpdate::UsageUpdate(_) | SessionUpdate::Notice(_))
+        {
             return None;
         }
         if let SessionUpdate::SessionMessage(_) = &notification.update {

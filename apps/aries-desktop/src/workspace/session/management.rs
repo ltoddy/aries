@@ -70,9 +70,6 @@ impl SessionManagement {
     pub fn is_pending(&self) -> bool {
         self.pending.is_some() || self.locked
     }
-    pub fn error(&self) -> Option<&str> {
-        self.error.as_deref()
-    }
     pub fn capabilities(&self) -> &SessionCapabilities {
         &self.capabilities
     }

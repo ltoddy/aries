@@ -34,6 +34,10 @@ impl Session {
     pub fn title(&self) -> String {
         self.title.clone().unwrap_or_else(|| Self::UNTITLED_SESSION.to_owned())
     }
+
+    pub fn has_title(&self) -> bool {
+        self.title.is_some()
+    }
 }
 
 #[derive(Clone)]

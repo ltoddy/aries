@@ -1,4 +1,3 @@
-use gpui_kit::base::SelectableText;
 use gpui_kit::component::Sizable;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::prelude::*;
@@ -9,23 +8,9 @@ use crate::workspace::settings::palette::Palette;
 
 pub fn render_session_actions(owner: &SessionView, p: Palette) -> impl IntoElement {
     let actions = &owner.deletion();
-    div()
-        .flex_shrink_0()
-        .when(actions.is_deleting(), |panel| {
-            panel.child(div().p_2().text_xs().text_color(p.muted()).child("正在删除会话…"))
-        })
-        .when_some(actions.error().map(str::to_owned), |panel, error| {
-            panel.child(
-                div()
-                    .id("session-deletion-error")
-                    .max_h(px(120.))
-                    .overflow_y_scroll()
-                    .p_2()
-                    .text_xs()
-                    .text_color(p.danger())
-                    .child(SelectableText::new("session-deletion-error-text", error)),
-            )
-        })
+    div().flex_shrink_0().when(actions.is_deleting(), |panel| {
+        panel.child(div().p_2().text_xs().text_color(p.muted()).child("正在删除会话…"))
+    })
 }
 
 pub fn render_session_delete_popup(

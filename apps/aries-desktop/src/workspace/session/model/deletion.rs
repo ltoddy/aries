@@ -133,8 +133,4 @@ impl SessionDeletion {
             self.cancel_deletion();
         }
     }
-
-    pub fn error(&self) -> Option<&str> {
-        self.error.as_deref()
-    }
 }
