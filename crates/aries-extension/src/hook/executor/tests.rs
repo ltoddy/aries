@@ -17,10 +17,11 @@ async fn bash_hook_exit_zero_does_not_block() {
 
 #[tokio::test]
 async fn bash_hook_exit_two_blocks() {
-    let hook: BashCommandHook =
-        serde_json::from_str(r#"{"command": "exit 2"}"#).expect("test operation should succeed");
+    let hook: BashCommandHook = serde_json::from_str(r#"{"command": "exec 0<&-; exit 2"}"#)
+        .expect("test operation should succeed");
+    let input = "x".repeat(1024 * 1024);
     let outcome =
-        execute_bash_command_hook(&hook, "").await.expect("test operation should succeed");
+        execute_bash_command_hook(&hook, &input).await.expect("test operation should succeed");
     assert_eq!(outcome.exit_code, Some(2));
     assert!(outcome.blocked);
 }

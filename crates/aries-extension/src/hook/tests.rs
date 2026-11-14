@@ -189,7 +189,9 @@ async fn executor_combines_same_event_matchers_from_multiple_presets() {
     let decision = executor.fire_pre_tool_use(pre_tool_use_input("Write")).await;
 
     match decision {
-        HookDecision::Terminate { reason } => assert!(reason.contains("exit code 2")),
+        HookDecision::Terminate { reason } => {
+            assert!(reason.contains("exit code 2"), "unexpected termination reason: {reason}")
+        },
         HookDecision::Continue { contexts: _ } => {
             panic!("expected earlier preset hook to be preserved")
         },
@@ -213,7 +215,9 @@ async fn executor_blocks_pre_tool_use_when_hook_exits_two() {
 
     let decision = executor.fire_pre_tool_use(pre_tool_use_input("Write")).await;
     match decision {
-        HookDecision::Terminate { reason } => assert!(reason.contains("exit code 2")),
+        HookDecision::Terminate { reason } => {
+            assert!(reason.contains("exit code 2"), "unexpected termination reason: {reason}")
+        },
         HookDecision::Continue { contexts: _ } => panic!("expected hook to be blocked"),
     }
 }
@@ -301,7 +305,9 @@ async fn executor_runs_blocking_hook_after_context_hook_in_same_matcher() {
     let decision = executor.fire_pre_tool_use(pre_tool_use_input("Write")).await;
 
     match decision {
-        HookDecision::Terminate { reason } => assert!(reason.contains("exit code 2")),
+        HookDecision::Terminate { reason } => {
+            assert!(reason.contains("exit code 2"), "unexpected termination reason: {reason}")
+        },
         HookDecision::Continue { contexts } => {
             panic!("expected hook to be blocked, got contexts {contexts:?}")
         },
