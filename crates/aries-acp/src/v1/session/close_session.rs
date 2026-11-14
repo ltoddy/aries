@@ -1,5 +1,5 @@
 use agent_client_protocol::v1::schema::{CloseSessionRequest, CloseSessionResponse};
-use agent_client_protocol::v1::{ConnectionTo, Responder};
+use agent_client_protocol::v1::{ConnectionTo, Responder, schema};
 use agent_client_protocol::{Client, Error};
 use aries_runtime::registry::SharedRegistry;
 use tracing::{info, instrument};
@@ -11,11 +11,16 @@ pub async fn close_session(
     _: ConnectionTo<Client>,
     registry: &SharedRegistry,
 ) -> Result<(), Error> {
-    let session_id = req.session_id.to_string();
-    info!("Received close session request for {session_id}");
+    info!("Received close session request {req:?}");
 
-    let mut registry = registry.lock().await;
-    registry.close_session(session_id).await;
+    let session_id = req.session_id.to_string();
+    let registry = registry.lock().await;
+    let Some(session) = registry.session(&session_id) else {
+        return responder
+            .respond_with_error(schema::Error::resource_not_found(Some(session_id)).into());
+    };
+
+    session.close_session().await;
 
     let resp = CloseSessionResponse::new();
     responder.respond(resp)

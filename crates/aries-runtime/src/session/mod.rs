@@ -1,6 +1,8 @@
 mod archive_session;
+mod close_session;
 mod commands;
 mod context;
+mod delete_session;
 mod error;
 mod history;
 mod hook;
@@ -10,7 +12,6 @@ mod session_status;
 mod set_session_mode;
 mod set_session_title;
 
-use std::collections::VecDeque;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -18,14 +19,9 @@ use std::sync::Arc;
 use aries_communicate::{AgentEvent, Notifier};
 use aries_extension::AgentExtensions;
 use aries_extension::agent::AgentDefinition;
-use aries_extension::command::SlashCommandsExecutor;
-use aries_extension::hook::input::{
-    SessionEndHookInput, SessionEndReason, SessionStartHookInput, SessionStartSource,
-    StopFailureHookInput, StopHookInput, UserPromptSubmitHookInput,
-};
+use aries_extension::hook::input::{SessionStartHookInput, SessionStartSource};
 use aries_extension::hook::{HookDecision, HooksExecutor};
 use aries_extension::mcp::{self, McpDefinition};
-use aries_extension::skill::SkillExecutor;
 use aries_init::{GlobalContext, ModelConfig, Setting, SettingLoader};
 use aries_persistence::SessionRepository;
 use itertools::Itertools;
@@ -45,9 +41,9 @@ pub use self::history::ChatHistory;
 use self::hook::SessionPromptHook;
 use self::instruction::InstructionContext;
 pub use self::session_status::SessionStatus;
-use crate::agent::{AriesAgent, Builder};
+use crate::agent::AriesAgent;
 use crate::compaction::ContextCompactor;
-use crate::memory::{MemoryRetriever, MemoryStore};
+use crate::memory::MemoryStore;
 use crate::state::State;
 
 pub enum PromptOutcome {
@@ -180,7 +176,7 @@ impl Session {
 
         self.state.effort(effort);
 
-        let agent = Builder::new(
+        let agent = crate::agent::Builder::new(
             self.state.clone(),
             self.extensions.clone(),
             self.tool_server_handle.clone(),
@@ -247,30 +243,8 @@ impl Session {
         &self.transcript_path
     }
 
-    pub async fn close(&self) {
-        let input = SessionEndHookInput::new(
-            &self.state.session_id,
-            &self.state.cwd,
-            SessionEndReason::Logout,
-        )
-        .transcript_path(&self.transcript_path);
-
-        self.hooks_executor.fire_session_end(input).await;
-    }
-
     pub fn list_available_commands(&self) -> Vec<aries_extension::AvailableCommand> {
         self.extensions.available_commands()
-    }
-
-    async fn try_execute_slash_command(&self, input: impl AsRef<str>) -> Option<String> {
-        let input = input.as_ref();
-        let executor = SlashCommandsExecutor::new(&self.extensions.commands);
-        if let Some(command) = executor.execute(input).await {
-            return Some(command);
-        }
-
-        let executor = SkillExecutor::new(&self.extensions.skills);
-        executor.execute(input).await
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -331,7 +305,7 @@ impl Session {
             .ok_or_else(|| SessionError::agent_not_found(DEFAULT_AGENT_NAME))?;
         let state = State::new(model, agent, cwd, session_dir, &id);
 
-        let agent = Builder::new(
+        let agent = crate::agent::Builder::new(
             state.clone(),
             extensions.clone(),
             tool_server_handle.clone(),
@@ -381,80 +355,6 @@ impl Session {
             compactor,
             db,
         })
-    }
-
-    async fn update_title(&mut self, prompt: &Message) -> String {
-        let title = message_to_simple_text(prompt);
-        let _ = self.session_repo.update_title_by_session_id(&self.state.session_id, &title).await;
-        title
-    }
-
-    async fn recall_context(&self, query: impl AsRef<str>) -> Option<String> {
-        let query = query.as_ref();
-        let memories = self.memory_store.scan().await;
-        let retriever = MemoryRetriever::new(self.state.model.clone());
-        let retrieved = retriever.retrieve(query, &memories).await;
-
-        let mut blocks = Vec::<String>::with_capacity(retrieved.len());
-        for file_name in retrieved {
-            if let Some(body) = self.memory_store.read_memory(&file_name).await {
-                blocks.push(format!("## {file_name}\n\n{body}"));
-            }
-        }
-
-        if blocks.is_empty() {
-            return None;
-        }
-        Some(format!(
-            "以下是与当前对话相关的历史记忆（自动召回，用户不可见）：\n\n{}",
-            blocks.join("\n\n")
-        ))
-    }
-
-    async fn fire_user_prompt_submit(
-        &self,
-        prompt: impl Into<String>,
-    ) -> crate::agent::AriesResult<VecDeque<String>> {
-        let input = UserPromptSubmitHookInput::new(&self.state.session_id, &self.state.cwd, prompt)
-            .transcript_path(&self.transcript_path);
-        match self.hooks_executor.fire_user_prompt_submit(input).await {
-            HookDecision::Terminate { reason } => {
-                Err(crate::agent::AriesError::hook_terminated(reason))
-            },
-            HookDecision::Continue { contexts } => Ok(contexts),
-        }
-    }
-
-    async fn fire_stop(&self, assistant_output: impl Into<String>) {
-        let input = StopHookInput::new(&self.state.session_id, &self.state.cwd, false)
-            .last_assistant_message(assistant_output);
-        if let HookDecision::Continue { contexts } = self.hooks_executor.fire_stop(input).await {
-            self.chat_context.append(&system_reminders(contexts)).await;
-        }
-    }
-
-    async fn fire_stop_failure(&self, error: impl Into<String>) {
-        let error = error.into();
-        let input = StopFailureHookInput::new(&self.state.session_id, &self.state.cwd, &error)
-            .transcript_path(&self.transcript_path)
-            .error_details(&error);
-
-        let input = match &self.last_assistant_message {
-            Some(message) => input.last_assistant_message(message),
-            None => input,
-        };
-
-        self.hooks_executor.fire_stop_failure(input).await;
-    }
-
-    async fn append_messages(&self, messages: impl AsRef<[Message]>) {
-        let messages = messages.as_ref();
-        if messages.is_empty() {
-            return;
-        }
-
-        self.chat_history.append(messages).await;
-        self.chat_context.append(messages).await;
     }
 }
 
