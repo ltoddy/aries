@@ -54,7 +54,7 @@ jobs:
       - run: cargo test --workspace --exclude aries-cli --exclude aries-desktop
 
   lint-cli:
-    name: lint (cli)
+    name: lint (aries-cli)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
