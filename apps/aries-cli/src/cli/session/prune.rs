@@ -28,10 +28,7 @@ pub async fn execute(args: PruneSessionsArgs, gctx: GlobalContext) -> Result<()>
     let sessions = if all {
         session_repo.find().await.map_err(Error::storage)?
     } else if empty {
-        session_repo
-            .find_by_title(aries_persistence::UNTITLED_SESSION)
-            .await
-            .map_err(Error::storage)?
+        session_repo.find_by_title(None).await.map_err(Error::storage)?
     } else if let Some(session_ids) = session_ids {
         session_repo.find_by_session_id_in(session_ids).await.map_err(Error::storage)?
     } else {

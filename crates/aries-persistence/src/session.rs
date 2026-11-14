@@ -13,7 +13,7 @@ pub struct Session {
     #[index]
     pub session_id: String,
 
-    pub title: Option<String>,
+    title: Option<String>,
     pub archived: bool,
 
     #[index]
@@ -28,12 +28,18 @@ pub struct Session {
     pub updated_at: Timestamp,
 }
 
+impl Session {
+    const UNTITLED_SESSION: &str = "Untitled Session";
+
+    pub fn title(&self) -> String {
+        self.title.clone().unwrap_or_else(|| Self::UNTITLED_SESSION.to_owned())
+    }
+}
+
 #[derive(Clone)]
 pub struct SessionRepository {
     db: Db,
 }
-
-pub const UNTITLED_SESSION: &str = "Untitled Session";
 
 impl SessionRepository {
     pub fn new(db: Db) -> Self {
@@ -49,11 +55,11 @@ impl SessionRepository {
     ) -> toasty::Result<Session> {
         Session::create()
             .session_id(session_id)
-            .title(UNTITLED_SESSION)
             .archived(false)
             .cwd(cwd)
             .root_dir(root_dir)
             .transcript_path(transcript_path)
+            .created_at(Timestamp::now())
             .updated_at(Timestamp::now())
             .exec(&mut self.db)
             .await
@@ -104,7 +110,14 @@ impl SessionRepository {
         &mut self,
         title: impl IntoExpr<Option<String>>,
     ) -> toasty::Result<Vec<Session>> {
-        Session::filter(Session::fields().title().eq(title)).exec(&mut self.db).await
+        let title = title.into_expr();
+        let filter = Session::fields()
+            .title()
+            .is_none()
+            .and(title.clone().is_none())
+            .or(Session::fields().title().eq(title));
+
+        Session::filter(filter).exec(&mut self.db).await
     }
 
     pub async fn update_title_by_session_id(

@@ -9,7 +9,7 @@ use std::path::Path;
 
 use jiff::{Span, Timestamp, Zoned};
 
-pub use crate::session::{Session, SessionRepository, UNTITLED_SESSION};
+pub use crate::session::{Session, SessionRepository};
 pub use crate::token_audit::{TokenAudit, TokenAuditRepository};
 pub use crate::token_usage::{TokenUsage, TokenUsageRepository};
 pub use crate::tool_call::{ToolCall, ToolCallRepository};
