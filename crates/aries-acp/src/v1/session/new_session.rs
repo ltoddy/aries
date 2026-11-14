@@ -30,6 +30,7 @@ pub async fn new_session(
             return responder.respond_with_internal_error(err.to_string());
         },
     };
+    drop(registry);
 
     let available_commands = session
         .list_available_commands()

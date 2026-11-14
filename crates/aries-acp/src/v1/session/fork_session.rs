@@ -23,6 +23,7 @@ pub async fn fork_session(
         .fork_session(session_id, req.cwd, mcp_servers.into())
         .await
         .map_err(|e| Error::internal_error().data(e.to_string()))?;
+    drop(registry);
 
     let modes = modes(DEFAULT_AGENT_NAME, session.agents())
         .map_err(|e| Error::internal_error().data(e.to_string()))?;

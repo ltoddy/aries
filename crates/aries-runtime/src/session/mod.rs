@@ -1,6 +1,7 @@
 mod archive_session;
 mod close_session;
 mod commands;
+mod config;
 mod context;
 mod delete_session;
 mod error;
@@ -9,6 +10,7 @@ mod hook;
 mod instruction;
 mod prompt;
 mod session_status;
+mod set_session_config_option;
 mod set_session_mode;
 mod set_session_title;
 
@@ -22,7 +24,7 @@ use aries_extension::agent::AgentDefinition;
 use aries_extension::hook::input::{SessionStartHookInput, SessionStartSource};
 use aries_extension::hook::{HookDecision, HooksExecutor};
 use aries_extension::mcp::{self, McpDefinition};
-use aries_init::{GlobalContext, ModelConfig, Setting, SettingLoader};
+use aries_init::{GlobalContext, ModelConfig, Setting};
 use aries_persistence::SessionRepository;
 use itertools::Itertools;
 use rig::completion::{Effort, Message};
@@ -35,6 +37,7 @@ use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_util::sync::CancellationToken;
 
 pub use self::commands::BUILTIN_COMMANDS;
+pub use self::config::{ParseSessionConfigError, SessionConfig};
 pub use self::context::ChatContext;
 pub use self::error::SessionError;
 pub use self::history::ChatHistory;
@@ -136,55 +139,6 @@ impl Session {
             SessionStartSource::Resume,
         )
         .await
-    }
-
-    pub async fn set_model(&mut self, alias: impl Into<String>) -> Result<(), SessionError> {
-        let alias = alias.into();
-
-        let mut setting = self.setting.clone();
-        let config = setting.activate(alias).map_err(SessionError::setting)?;
-        let model = crate::create_model(&config)?;
-
-        let loader = SettingLoader::new(self.gctx.root_dir());
-        loader.save(&setting).await.map_err(SessionError::setting)?;
-
-        self.setting = setting;
-        self.state.model(model);
-        self.agent.set_model(self.state.model.clone());
-
-        self.config = config;
-        self.compactor.set_model(self.state.model.clone());
-
-        Ok(())
-    }
-
-    pub async fn set_thought_level(&mut self, level: impl AsRef<str>) -> Result<(), SessionError> {
-        let level = level.as_ref();
-        let effort = match level {
-            "minimal" => Effort::Minimal,
-            "low" => Effort::Low,
-            "medium" => Effort::Medium,
-            "high" => Effort::High,
-            "xhigh" => Effort::XHigh,
-            "max" => Effort::Max,
-            _ => return Err(SessionError::invalid_thought_level(level)),
-        };
-
-        self.state.effort(effort);
-
-        let agent = crate::agent::Builder::new(
-            self.state.clone(),
-            self.extensions.clone(),
-            self.tool_server_handle.clone(),
-            self.gctx.clone(),
-            Notifier::clone(&self.notifier),
-            self.db.clone(),
-        )
-        .build(self.hook.clone())
-        .await;
-        self.agent = agent;
-
-        Ok(())
     }
 
     pub fn id(&self) -> String {

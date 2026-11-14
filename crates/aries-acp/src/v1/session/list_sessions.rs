@@ -21,6 +21,7 @@ pub async fn list_session(
             return responder.respond_with_internal_error(err.to_string());
         },
     };
+    drop(registry);
 
     let sessions = sessions
         .into_iter()

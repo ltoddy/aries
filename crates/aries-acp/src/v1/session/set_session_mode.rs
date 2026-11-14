@@ -18,6 +18,7 @@ pub async fn set_session_mode(
         return responder
             .respond_with_error(schema::Error::resource_not_found(Some(session_id)).into());
     };
+    drop(registry);
 
     let mode = req.mode_id.to_string();
     let _ = match session.set_session_mode(&mode).await {

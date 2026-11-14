@@ -21,6 +21,7 @@ pub async fn archive_session(
         return responder
             .respond_with_error(schema::Error::resource_not_found(Some(session_id)).into());
     };
+    drop(registry);
 
     let _ = match session.archive_session().await {
         Ok(_) => cx.send_notification(SessionNotification::new(
