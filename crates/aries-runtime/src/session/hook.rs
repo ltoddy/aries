@@ -24,8 +24,8 @@ use tokio::sync::Mutex;
 use tracing::warn;
 
 use crate::compaction::{ContextWindow, TokenEstimator, micro_compact};
-use crate::session::session::instruction::InstructionContext;
-use crate::session::session::{system_reminder, system_reminders};
+use crate::session::instruction::InstructionContext;
+use crate::session::{system_reminder, system_reminders};
 use crate::tools::agent::AgentArgs;
 use crate::tools::read::ReadArgs;
 

@@ -5,7 +5,8 @@ use agent_client_protocol::v1::schema::{
 };
 use agent_client_protocol::v1::{ConnectionTo, Responder};
 use agent_client_protocol::{Client, Error};
-use aries_runtime::session::{DEFAULT_AGENT_NAME, SharedRegistry};
+use aries_runtime::registry::SharedRegistry;
+use aries_runtime::session::DEFAULT_AGENT_NAME;
 use itertools::Itertools;
 use tracing::info;
 

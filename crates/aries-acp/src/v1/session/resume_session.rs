@@ -4,7 +4,7 @@ use agent_client_protocol::v1::schema::{
 };
 use agent_client_protocol::v1::{ConnectionTo, Responder};
 use agent_client_protocol::{Client, Error};
-use aries_runtime::session::SharedRegistry;
+use aries_runtime::registry::SharedRegistry;
 use itertools::Itertools;
 use tracing::{info, instrument};
 
