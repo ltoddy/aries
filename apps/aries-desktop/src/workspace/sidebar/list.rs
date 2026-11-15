@@ -28,7 +28,6 @@ impl<'a> SessionListView<'a> {
             for directory in list.projects() {
                 groups.entry(directory).or_default();
             }
-            groups.entry(self.owner.directory()).or_default();
         }
         let empty = groups.values().all(Vec::is_empty);
         div()
