@@ -491,7 +491,7 @@ impl Composer {
                                     if session.execution().conversation().is_busy() {
                                         "加入队列"
                                     } else if session.execution().prompt_queue().is_some() {
-                                        "合并发送"
+                                        "逐条发送"
                                     } else {
                                         "发送"
                                     },
@@ -1031,12 +1031,12 @@ impl RenderOnce for ComposerInput {
                             .icon(IconName::Send)
                             .when(!busy && !has_queue, |button| button.size_8())
                             .when(busy || has_queue, |button| {
-                                button.label(if busy { "加入队列" } else { "合并发送" })
+                                button.label(if busy { "加入队列" } else { "逐条发送" })
                             })
                             .accessibility_label(if busy {
                                 "加入待发送队列"
                             } else if has_queue {
-                                "合并队列与消息发送"
+                                "将消息加入队列并逐条发送"
                             } else {
                                 "发送消息"
                             })
