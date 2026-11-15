@@ -55,20 +55,22 @@ impl PromptQueue {
         true
     }
 
-    pub fn content(&self) -> Vec<ContentBlock> {
+    pub fn next_prompt(&self) -> Option<(u64, Vec<ContentBlock>)> {
+        let prompt = self.prompts.first()?;
         let mut content = Vec::new();
-        for prompt in &self.prompts {
-            if !prompt.text.trim().is_empty() {
-                content.push(ContentBlock::from(prompt.text.clone()));
-            }
-            content
-                .extend(prompt.attachments.iter().map(|attachment| attachment.content().clone()));
+        if !prompt.text.trim().is_empty() {
+            content.push(ContentBlock::from(prompt.text.clone()));
         }
-        content
+        content.extend(prompt.attachments.iter().map(|attachment| attachment.content().clone()));
+        Some((prompt.id, content))
     }
 
     pub fn pause(&mut self) {
         self.automatic = false;
+    }
+
+    pub fn resume(&mut self) {
+        self.automatic = true;
     }
 
     pub fn is_automatic(&self) -> bool {
@@ -125,7 +127,7 @@ impl PromptQueue {
                             .text_xs()
                             .text_color(p.muted())
                             .child(if automatic {
-                                "本次回复正常结束后，将按顺序合并发送。"
+                                "按顺序逐条发送，上一条回复正常结束后发送下一条。"
                             } else {
                                 "队列已保留，当前不会自动发送。"
                             }),

@@ -402,13 +402,16 @@ impl Execution {
         let Some(id) = self.session_id.clone() else {
             return false;
         };
-        let Some(queue) = self.prompt_queue() else {
+        let Some((prompt_id, content)) = self.prompt_queue().and_then(PromptQueue::next_prompt)
+        else {
             return false;
         };
-        let content = queue.content();
-        let sent = self.send_content(ui, id.clone(), content, window, cx);
+        let sent = self.send_content(ui, id, content, window, cx);
         if sent {
-            self.prompt_queues.remove(&id);
+            self.with_prompt_queue(|queue| {
+                queue.remove(prompt_id);
+                queue.resume();
+            });
         }
         cx.notify();
         sent
