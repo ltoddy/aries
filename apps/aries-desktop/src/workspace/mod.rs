@@ -1,9 +1,11 @@
 pub mod conversation;
+mod extensions;
 pub mod git;
 mod number;
 pub mod session;
 pub mod settings;
 pub mod sidebar;
+pub mod skill_editor;
 mod usage;
 mod workspace_view;
 

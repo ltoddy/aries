@@ -13,6 +13,8 @@ categories.workspace = true
 agent-client-protocol = { workspace = true, features = ["process", "unstable"] }
 alacritty_terminal = "0.26"
 async-channel = "2.5"
+aries-extension = { path = "../../crates/aries-extension" }
+aries-filesystem = { path = "../../crates/aries-filesystem" }
 aries-persistence = { path = "../../crates/aries-persistence" }
 base64.workspace = true
 dirs = "7.0"

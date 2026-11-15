@@ -73,7 +73,7 @@ impl<'a> SessionRowView<'a> {
                 .owner
                 .tab_host()
                 .and_then(|host| host.upgrade())
-                .is_some_and(|host| host.read(cx).is_usage_visible());
+                .is_some_and(|host| !host.read(cx).is_sessions_visible());
         SessionSurface::new(
             row.clone(),
             selected,
