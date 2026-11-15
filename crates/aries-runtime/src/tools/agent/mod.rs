@@ -16,9 +16,9 @@ use toasty::Db;
 pub use self::args::AgentArgs;
 pub use self::error::AgentError;
 pub use self::output::AgentOutput;
-use crate::hooks::{TokenUsageHook, ToolCallHook};
+use crate::hooks::{TokenUsageHook, ToolCallHook, TranscriptHook};
+use crate::preamble;
 use crate::state::State;
-use crate::{jsonl, preamble};
 
 pub const NAME: &str = "Agent";
 
@@ -128,6 +128,10 @@ impl Tool for AgentTool {
 
         let token_usage_hook = TokenUsageHook::new(self.gctx.current_dir(), self.db.clone());
         let tool_call_hook = ToolCallHook::new(self.gctx.current_dir(), self.db.clone());
+        let dir = self.state.session_dir.join("subagent").join(&task_id);
+        let transcript_hook = TranscriptHook::new(&dir)
+            .await
+            .map_err(|source| AgentError::context_persistence(&dir, source))?;
 
         let agent = rig::agent::AgentBuilder::new(self.state.model.clone())
             .name(&mode.frontmatter.name)
@@ -138,6 +142,7 @@ impl Tool for AgentTool {
             .tool_server_handle(tool_server_handle)
             .add_hook(token_usage_hook)
             .add_hook(tool_call_hook)
+            .add_hook(transcript_hook)
             .reasoning(self.state.effort)
             .default_max_turns(self.state.turns.as_usize())
             .build();
@@ -167,14 +172,6 @@ impl Tool for AgentTool {
             }
         }
 
-        let mut file_path = self.state.session_dir.join("subagent").join(&task_id);
-        file_path.set_extension("jsonl");
-        let messages = final_res.messages();
-        if let Some(parent) = file_path.parent() {
-            _ = tokio::fs::create_dir_all(parent).await;
-        }
-        let _ = jsonl::write(&file_path, messages).await;
-
-        Ok(AgentOutput::new(task_id, final_res.output(), file_path))
+        Ok(AgentOutput::new(task_id, final_res.output(), dir))
     }
 }
