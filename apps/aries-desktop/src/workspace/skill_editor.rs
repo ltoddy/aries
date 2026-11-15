@@ -95,7 +95,7 @@ impl EventEmitter<SkillEditorEvent> for SkillEditor {}
 
 impl SkillEditor {
     pub fn new(location: PathBuf, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let input = cx.new(|cx| EditorState::new(window, cx).language("markdown").soft_wrap(true));
+        let input = cx.new(|cx| EditorState::new(window, cx).language("markdown").soft_wrap(false));
         let subscription = cx.subscribe(&input, |this, input, event, cx| {
             if matches!(event, InputEvent::Change) {
                 let content = input.read(cx).value();
