@@ -82,14 +82,17 @@ pub fn micro_compact(messages: &mut [Message], keep_recent: usize) -> bool {
 
     // 清理思考过程
 
-    // for message in messages.iter_mut() {
-    //     if let Message::Assistant(message) = message {
-    //         for item in message.content.iter_mut() {
-    //             if let AssistantContent::Reasoning(r) = item {
-    //             }
-    //         }
-    //     }
-    // }
+    for message in messages
+        .iter_mut()
+        .rev()
+        .filter_map(|m| match m {
+            Message::Assistant(message) => Some(message),
+            _ => None,
+        })
+        .skip(keep_recent)
+    {
+        message.content.retain(|item| !matches!(item, AssistantContent::Reasoning(_)));
+    }
 
     compacted
 }
