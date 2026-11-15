@@ -21,7 +21,7 @@ use crate::workspace::number;
 pub struct ReturnToSessions;
 
 impl ReturnToSessions {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self
     }
 }

@@ -31,6 +31,14 @@ impl<F> FrontmatterDocument<F> {
             .await
             .map_err(|err| DocumentError::io(&location, err))?;
 
+        Self::parse(location, &content)
+    }
+
+    pub fn parse(location: impl Into<PathBuf>, content: &str) -> Result<Self, DocumentError>
+    where
+        F: DeserializeOwned,
+    {
+        let location = location.into();
         let content =
             content.strip_prefix("---\n").ok_or_else(|| DocumentError::wrong_format(&location))?;
 

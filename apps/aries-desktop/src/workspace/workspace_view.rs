@@ -16,6 +16,7 @@ use gpui_kit::*;
 
 use crate::acp::Event;
 use crate::terminal::TerminalView;
+use crate::workspace::extensions::ExtensionsView;
 use crate::workspace::settings::palette::Palette;
 use crate::workspace::settings::{Preferences, SettingsState};
 use crate::workspace::usage::{ReturnToSessions, UsageView};
@@ -90,6 +91,27 @@ impl TabCommand {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum WorkspacePage {
+    Sessions,
+    Usage,
+    Extensions,
+}
+
+impl WorkspacePage {
+    fn sessions() -> Self {
+        Self::Sessions
+    }
+
+    fn usage() -> Self {
+        Self::Usage
+    }
+
+    fn extensions() -> Self {
+        Self::Extensions
+    }
+}
+
 pub struct WorkspaceView {
     cwd: PathBuf,
     settings: Entity<SettingsState>,
@@ -111,9 +133,11 @@ pub struct WorkspaceView {
     terminal_visible: bool,
     terminal_previous_focus: Option<FocusHandle>,
     usage: Entity<UsageView>,
-    usage_visible: bool,
+    extensions: Entity<ExtensionsView>,
+    _extensions_subscription: Subscription,
+    page: WorkspacePage,
     _usage_subscription: Subscription,
-    usage_previous_focus: Option<FocusHandle>,
+    page_previous_focus: Option<FocusHandle>,
 }
 
 impl fmt::Debug for WorkspaceView {
@@ -144,6 +168,11 @@ impl WorkspaceView {
             cx.subscribe_in(&usage, window, |this, _, _: &ReturnToSessions, window, cx| {
                 this.show_sessions(window, cx);
             });
+        let extensions = cx.new(ExtensionsView::new);
+        let extensions_subscription =
+            cx.subscribe_in(&extensions, window, |this, _, _: &ReturnToSessions, window, cx| {
+                this.show_sessions(window, cx);
+            });
         let focus_handle = cx.focus_handle();
         focus_handle.focus(window, cx);
         Self {
@@ -167,9 +196,11 @@ impl WorkspaceView {
             terminal_visible: false,
             terminal_previous_focus: None,
             usage,
-            usage_visible: false,
+            extensions,
+            _extensions_subscription: extensions_subscription,
+            page: WorkspacePage::sessions(),
             _usage_subscription: usage_subscription,
-            usage_previous_focus: None,
+            page_previous_focus: None,
         }
     }
 }
@@ -179,13 +210,13 @@ impl Render for WorkspaceView {
         let p = Palette::new(cx.theme().mode);
         let active = self.active_view().cloned();
         let view = active.as_ref().unwrap_or(&self.sidebar);
-        let git_info = if self.usage_visible {
+        let git_info = if !self.is_sessions_visible() {
             None
         } else {
             view.update(cx, |session, cx| session.git_panel().render(view, window, cx))
         };
         let diff = view.read(cx).git_panel().diff().clone();
-        let diff_open = !self.usage_visible && diff.read(cx).is_open();
+        let diff_open = self.is_sessions_visible() && diff.read(cx).is_open();
         let font_size = cx.theme().font_size;
         let width = window.viewport_size().width;
         let content_minimum = font_size * if diff_open { 28. } else { 26. };
@@ -218,10 +249,15 @@ impl Render for WorkspaceView {
             .size_full()
             .min_w_0()
             .min_h_0()
-            .child(if self.usage_visible {
+            .child(if self.is_usage_visible() {
                 div()
                     .size_full()
                     .child(self.usage.clone().cached(panel_style.clone()))
+                    .into_any_element()
+            } else if self.is_extensions_visible() {
+                div()
+                    .size_full()
+                    .child(self.extensions.clone().cached(panel_style.clone()))
                     .into_any_element()
             } else {
                 match active {
@@ -286,7 +322,7 @@ impl Render for WorkspaceView {
                 this.toggle_sidebar(window, cx);
             }))
             .on_action(cx.listener(|this, _: &CloseTab, window, cx| {
-                if !this.usage_visible
+                if this.is_sessions_visible()
                     && let Some(tab) = this.tabs.get(this.active)
                 {
                     let id = tab.id;
@@ -301,14 +337,14 @@ impl Render for WorkspaceView {
                 cx.listener(|this, _: &NextTab, window, cx| this.switch_tab(true, window, cx)),
             )
             .on_action(cx.listener(|this, _: &PreviousUserMessage, _, cx| {
-                if !this.usage_visible
+                if this.is_sessions_visible()
                     && let Some(view) = this.active_view()
                 {
                     view.update(cx, |view, cx| view.jump_user_message(false, cx));
                 }
             }))
             .on_action(cx.listener(|this, _: &NextUserMessage, _, cx| {
-                if !this.usage_visible
+                if this.is_sessions_visible()
                     && let Some(view) = this.active_view()
                 {
                     view.update(cx, |view, cx| view.jump_user_message(true, cx));
@@ -491,7 +527,7 @@ impl WorkspaceView {
     }
 
     fn create_tab(&mut self, directory: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
-        if self.usage_visible {
+        if !self.is_sessions_visible() {
             self.show_sessions(window, cx);
         }
         let id = self.next_id;
@@ -500,7 +536,7 @@ impl WorkspaceView {
             Self::create_chat_view(&directory, &self.agent, SessionRenderMode::Main, window, cx);
         let subscription = Self::observe_tab(&view, window, cx);
         self.tabs.push(SessionTab::new(id, view.clone(), subscription));
-        self.usage_visible = false;
+        self.page = WorkspacePage::sessions();
         self.active = self.tabs.len() - 1;
         self.tab_scroll.scroll_to_item(self.active);
         cx.spawn_in(window, async move |_, cx| {
@@ -521,7 +557,7 @@ impl WorkspaceView {
         if session.archived.unwrap_or(false) || self.sidebar.read(cx).management().is_pending() {
             return;
         }
-        if self.usage_visible {
+        if !self.is_sessions_visible() {
             self.show_sessions(window, cx);
         }
         let session_id = session.session_id.clone();
@@ -555,7 +591,7 @@ impl WorkspaceView {
         let subscription = Self::observe_tab(&view, window, cx);
         view.update(cx, |view, cx| view.queue_session_load(session, cx));
         self.tabs.push(SessionTab::new(id, view, subscription));
-        self.usage_visible = false;
+        self.page = WorkspacePage::sessions();
         self.active = self.tabs.len() - 1;
         self.tab_scroll.scroll_to_item(self.active);
         self.set_sidebar_session(session_id, cx);
@@ -725,7 +761,7 @@ impl WorkspaceView {
                 self.sync_sidebar_active_session(cx);
             },
         }
-        if !self.usage_visible {
+        if self.is_sessions_visible() {
             self.focus_handle.focus(window, cx);
         }
         cx.notify();
@@ -735,7 +771,7 @@ impl WorkspaceView {
         if index >= self.tabs.len() {
             return;
         }
-        if self.usage_visible {
+        if !self.is_sessions_visible() {
             self.show_sessions(window, cx);
         }
         self.active = index;
@@ -746,7 +782,7 @@ impl WorkspaceView {
     }
 
     pub fn switch_tab(&mut self, next: bool, window: &mut Window, cx: &mut Context<Self>) {
-        if self.usage_visible {
+        if !self.is_sessions_visible() {
             self.show_sessions(window, cx);
             return;
         }
@@ -771,7 +807,7 @@ impl WorkspaceView {
         sidebar_available: Option<Pixels>,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let tabs: Vec<_> = if self.usage_visible {
+        let tabs: Vec<_> = if !self.is_sessions_visible() {
             Vec::new()
         } else {
             self.tabs
@@ -964,7 +1000,7 @@ impl WorkspaceView {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let id = tab.id;
-        let active = index == self.active && !self.usage_visible;
+        let active = index == self.active && self.is_sessions_visible();
         let view = tab.view.read(cx);
         let title = view.tab_title();
         let state = view.execution_state();
@@ -1100,26 +1136,46 @@ impl WorkspaceView {
         &self.settings
     }
 
+    pub fn is_sessions_visible(&self) -> bool {
+        self.page == WorkspacePage::sessions()
+    }
+
     pub fn is_usage_visible(&self) -> bool {
-        self.usage_visible
+        self.page == WorkspacePage::usage()
+    }
+
+    pub fn is_extensions_visible(&self) -> bool {
+        self.page == WorkspacePage::extensions()
     }
 
     pub fn open_usage(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.usage_visible {
-            self.usage_previous_focus = window.focused(cx);
+        if self.is_sessions_visible() {
+            self.page_previous_focus = window.focused(cx);
         }
-        self.usage_visible = true;
+        self.page = WorkspacePage::usage();
         self.usage.update(cx, |view, cx| view.open(window, cx));
         self.sidebar.update(cx, |_, cx| cx.notify());
         cx.notify();
     }
 
+    pub fn open_extensions(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let directory =
+            self.active_view().unwrap_or(&self.sidebar).read(cx).execution().directory().to_owned();
+        if self.is_sessions_visible() {
+            self.page_previous_focus = window.focused(cx);
+        }
+        self.page = WorkspacePage::extensions();
+        self.extensions.update(cx, |view, cx| view.open(directory, window, cx));
+        self.sidebar.update(cx, |_, cx| cx.notify());
+        cx.notify();
+    }
+
     fn show_sessions(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.usage_visible {
+        if self.is_sessions_visible() {
             return;
         }
-        self.usage_visible = false;
-        let focus = self.usage_previous_focus.take().unwrap_or_else(|| self.focus_handle.clone());
+        self.page = WorkspacePage::sessions();
+        let focus = self.page_previous_focus.take().unwrap_or_else(|| self.focus_handle.clone());
         focus.focus(window, cx);
         self.sidebar.update(cx, |_, cx| cx.notify());
         cx.notify();

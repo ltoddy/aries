@@ -63,6 +63,7 @@ fn run() -> Result<(), StartupError> {
     gpui_kit::application().with_assets(AllAssets).run(move |cx| {
         gpui_kit::init(cx);
         crate::terminal::init(cx);
+        crate::workspace::skill_editor::init(cx);
         cx.bind_keys([
             KeyBinding::new(
                 if cfg!(target_os = "macos") { "cmd-f" } else { "ctrl-f" },
@@ -70,6 +71,11 @@ fn run() -> Result<(), StartupError> {
                 Some("GitDiff"),
             ),
             KeyBinding::new("escape", gpui_kit::component::input::Escape, Some("GitDiff")),
+            KeyBinding::new(
+                "escape",
+                gpui_kit::component::dialog::Cancel,
+                Some("Dialog || Dialog > (Input || TextView)"),
+            ),
         ]);
         cx.bind_keys([KeyBinding::new("cmd-q", Quit, None), KeyBinding::new("ctrl-q", Quit, None)]);
         #[cfg(target_os = "macos")]
