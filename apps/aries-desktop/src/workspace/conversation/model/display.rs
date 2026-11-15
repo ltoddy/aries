@@ -92,9 +92,6 @@ fn plan_content(plan: &PlanUpdateContent) -> String {
         PlanUpdateContent::Items(plan) => {
             format!("{}\n\n{}", plan.plan_id, plan_entries(&plan.entries))
         },
-        PlanUpdateContent::File(plan) => {
-            format!("{}\n\n{}", plan.plan_id, code_block("", &plan.uri))
-        },
         PlanUpdateContent::Markdown(plan) => format!("{}\n\n{}", plan.plan_id, plan.content),
         other => json(other),
     }
