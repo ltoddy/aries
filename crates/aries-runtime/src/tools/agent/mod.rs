@@ -7,7 +7,7 @@ use aries_extension::AgentExtensions;
 use aries_extension::agent::AgentDefinition;
 use aries_init::GlobalContext;
 use futures::StreamExt;
-use rig::agent::{MultiTurnStreamItem, PromptResponse};
+use rig::agent::{AgentBuilder, MultiTurnStreamItem, PromptResponse};
 use rig::tool::server::ToolServer;
 use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
@@ -133,7 +133,7 @@ impl Tool for AgentTool {
             .await
             .map_err(|source| AgentError::context_persistence(&dir, source))?;
 
-        let agent = rig::agent::AgentBuilder::new(self.state.model.clone())
+        let agent = AgentBuilder::new(self.state.model.clone())
             .name(&mode.frontmatter.name)
             .preamble(&mode.body)
             .append_preamble(&preamble::env::section(&cwd))

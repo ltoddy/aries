@@ -23,13 +23,8 @@ impl<'a> SessionListView<'a> {
         cx: &mut Context<SessionView>,
     ) -> impl IntoElement {
         let list = &self.sidebar.list();
-        let mut groups = self.sidebar.motion().projects();
-        if !list.show_archived() {
-            for directory in list.projects() {
-                groups.entry(directory).or_default();
-            }
-        }
-        let empty = groups.values().all(Vec::is_empty);
+        let groups = self.sidebar.motion().projects();
+        let empty = groups.is_empty();
         div()
             .flex_1()
             .min_h_0()

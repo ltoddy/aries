@@ -22,7 +22,7 @@ use rig::rig_reqwest::ReqwestMiddlewareClient;
 
 pub fn create_model(config: &ModelConfig) -> Result<Model<OpenAiWire>, session::SessionError> {
     let mut default_headers = HeaderMap::new();
-    default_headers.insert("HTTP-Referer", header::HeaderValue::from_static("")); // TODO
+    default_headers.insert("HTTP-Referer", header::HeaderValue::from_static("Aries"));
     default_headers.insert("X-Title", header::HeaderValue::from_static("Aries"));
     let http_client = reqwest::Client::builder()
         .default_headers(default_headers)

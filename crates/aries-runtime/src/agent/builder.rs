@@ -69,6 +69,6 @@ impl Builder {
 
         let inner = builder.build();
 
-        AriesAgent::new(inner, self.state.agent.body, self.notifier)
+        AriesAgent::new(inner, self.notifier)
     }
 }

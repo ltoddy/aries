@@ -9,7 +9,8 @@ use gpui_kit::base::GlobalState;
 use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants};
 use gpui_kit::component::menu::{ContextMenuExt, PopupMenu, PopupMenuItem};
 use gpui_kit::component::{
-    ActiveTheme, Disableable, Icon, ResizableState, Sizable, TitleBar, h_resizable, resizable_panel,
+    ActiveTheme, Disableable, Icon, ResizableState, Sizable, TitleBar, h_resizable,
+    resizable_panel, v_resizable,
 };
 use gpui_kit::prelude::*;
 use gpui_kit::*;
@@ -131,6 +132,8 @@ pub struct WorkspaceView {
     focus_handle: FocusHandle,
     terminal: Option<Entity<TerminalView>>,
     terminal_visible: bool,
+    terminal_zoomed: bool,
+    terminal_layout: Entity<ResizableState>,
     terminal_previous_focus: Option<FocusHandle>,
     usage: Entity<UsageView>,
     extensions: Entity<ExtensionsView>,
@@ -194,6 +197,8 @@ impl WorkspaceView {
             focus_handle,
             terminal: None,
             terminal_visible: false,
+            terminal_zoomed: false,
+            terminal_layout: cx.new(|_| ResizableState::default()),
             terminal_previous_focus: None,
             usage,
             extensions,
@@ -284,6 +289,7 @@ impl Render for WorkspaceView {
         } else {
             chat.into_any_element()
         };
+        let content = self.render_terminal_layout(content, window, cx);
         let main = div()
             .flex_1()
             .min_w_0()
@@ -300,14 +306,11 @@ impl Render for WorkspaceView {
                     .flex_col()
                     .flex_1()
                     .min_h_0()
+                    .min_w_0()
                     .rounded(cx.theme().radius_tokens().lg)
                     .bg(p.background())
                     .overflow_hidden()
-                    .child(content)
-                    .when_some(
-                        self.terminal.as_ref().filter(|_| self.terminal_visible),
-                        |view, terminal| view.child(self.render_terminal(terminal, cx)),
-                    ),
+                    .child(content),
             );
         div()
             .size_full()
@@ -417,6 +420,7 @@ impl WorkspaceView {
     fn toggle_terminal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.terminal_visible {
             self.terminal_visible = false;
+            self.terminal_zoomed = false;
             let focus =
                 self.terminal_previous_focus.take().unwrap_or_else(|| self.focus_handle.clone());
             window.focus(&focus, cx);
@@ -440,71 +444,115 @@ impl WorkspaceView {
         cx.notify();
     }
 
+    fn toggle_terminal_zoom(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.terminal_zoomed = !self.terminal_zoomed;
+        if let Some(terminal) = &self.terminal {
+            window.focus(&terminal.read(cx).focus_handle(cx), cx);
+        }
+        cx.notify();
+    }
+
+    fn render_terminal_layout(
+        &self,
+        content: AnyElement,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let Some(terminal) = self.terminal.as_ref().filter(|_| self.terminal_visible) else {
+            return content;
+        };
+        let terminal = self.render_terminal(terminal, cx).into_any_element();
+        if self.terminal_zoomed {
+            return terminal;
+        }
+        let font_size = cx.theme().font_size;
+        let height = (window.viewport_size().height - font_size * 2.625).max(font_size);
+        let content_minimum = (font_size * 12.).min(height * 0.6);
+        let terminal_minimum = (font_size * 8.).min(height * 0.4);
+        let terminal_maximum = height - content_minimum;
+        let terminal_height = (height / 3.).clamp(terminal_minimum, terminal_maximum);
+        v_resizable("main-terminal-layout")
+            .with_state(&self.terminal_layout)
+            .child(
+                resizable_panel()
+                    .size(height - terminal_height)
+                    .size_range(content_minimum..Pixels::MAX)
+                    .child(content),
+            )
+            .child(
+                resizable_panel()
+                    .size(terminal_height)
+                    .size_range(terminal_minimum..terminal_maximum)
+                    .child(terminal),
+            )
+            .into_any_element()
+    }
+
     fn render_terminal(
         &self,
         terminal: &Entity<TerminalView>,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let directory = terminal.read(cx).directory().display().to_string();
+        let zoom_label = if self.terminal_zoomed { "还原" } else { "满屏" };
         div()
-            .id("floating-terminal")
-            .absolute()
-            .inset_0()
-            .p_4()
+            .id("terminal-panel")
+            .on_mouse_down(MouseButton::Left, |_, _, cx| {
+                GlobalState::suppress_text_selection(cx);
+            })
+            .size_full()
+            .min_w_0()
+            .min_h_0()
             .flex()
-            .items_center()
-            .justify_center()
+            .flex_col()
+            .bg(cx.theme().background)
+            .text_color(cx.theme().foreground)
+            .overflow_hidden()
             .child(
                 div()
-                    .id("floating-terminal-panel")
-                    .occlude()
-                    .on_mouse_down(MouseButton::Left, |_, _, cx| {
-                        GlobalState::suppress_text_selection(cx);
-                    })
-                    .w_full()
-                    .h(relative(0.8))
-                    .max_w(rems(64.))
-                    .min_w_0()
-                    .min_h_0()
                     .flex()
-                    .flex_col()
-                    .bg(cx.theme().popover)
-                    .text_color(cx.theme().foreground)
-                    .border_1()
+                    .flex_shrink_0()
+                    .items_center()
+                    .gap_2()
+                    .px_3()
+                    .py_1()
+                    .border_b_1()
                     .border_color(cx.theme().border)
-                    .rounded(cx.theme().radius_tokens().xl)
-                    .shadow_lg()
-                    .overflow_hidden()
+                    .child("终端")
                     .child(
                         div()
-                            .flex()
-                            .items_center()
-                            .gap_2()
-                            .px_3()
-                            .py_2()
-                            .border_b_1()
-                            .border_color(cx.theme().border)
-                            .child("终端")
-                            .child(
-                                div()
-                                    .flex_1()
-                                    .min_w_0()
-                                    .truncate()
-                                    .text_color(cx.theme().muted_foreground)
-                                    .child(directory),
-                            )
-                            .child(
-                                Button::new("hide-floating-terminal")
-                                    .small()
-                                    .ghost()
-                                    .label("隐藏 ⌘J")
-                                    .on_click(cx.listener(|this, _, window, cx| {
-                                        this.toggle_terminal(window, cx)
-                                    })),
-                            ),
+                            .flex_1()
+                            .min_w_0()
+                            .truncate()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(directory),
                     )
-                    .child(div().flex_1().min_h_0().min_w_0().p_2().child(terminal.clone())),
+                    .child(
+                        Button::new("zoom-terminal")
+                            .small()
+                            .ghost()
+                            .label(zoom_label)
+                            .accessibility_label(if self.terminal_zoomed {
+                                "还原终端面板"
+                            } else {
+                                "终端铺满工作区"
+                            })
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.toggle_terminal_zoom(window, cx)
+                            })),
+                    )
+                    .child(
+                        Button::new("hide-terminal")
+                            .small()
+                            .ghost()
+                            .label("隐藏")
+                            .tooltip_with_action("隐藏终端", &ToggleTerminal, None)
+                            .on_click(
+                                cx.listener(|this, _, window, cx| this.toggle_terminal(window, cx)),
+                            ),
+                    ),
             )
+            .child(div().flex_1().min_h_0().min_w_0().p_2().child(terminal.clone()))
     }
 
     pub fn active_view(&self) -> Option<&Entity<SessionView>> {

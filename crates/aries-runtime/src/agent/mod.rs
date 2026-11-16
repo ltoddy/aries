@@ -16,15 +16,12 @@ pub type AriesResult<T, E = AriesError> = Result<T, E>;
 #[derive(Clone)]
 pub struct AriesAgent {
     inner: Agent,
-    preamble: String,
     notifier: Notifier,
 }
 
 impl AriesAgent {
-    pub fn new(inner: Agent, preamble: impl Into<String>, notifier: Notifier) -> Self {
-        let bare_preamble = preamble.into();
-
-        Self { inner, preamble: bare_preamble, notifier }
+    pub fn new(inner: Agent, notifier: Notifier) -> Self {
+        Self { inner, notifier }
     }
 
     pub async fn prompt<I, T>(
@@ -54,10 +51,6 @@ impl AriesAgent {
         }
 
         Ok(final_res)
-    }
-
-    pub fn preamble(&self) -> &str {
-        &self.preamble
     }
 
     pub fn set_model(&mut self, model: Model<OpenAiWire>) {

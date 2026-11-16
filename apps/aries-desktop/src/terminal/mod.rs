@@ -4,8 +4,10 @@ mod session;
 
 use std::path::PathBuf;
 
-use alacritty_terminal::grid::Scroll;
+use alacritty_terminal::grid::{Dimensions as _, Scroll};
+use alacritty_terminal::index::Line;
 use alacritty_terminal::term::TermMode;
+use alacritty_terminal::vte::ansi::{ClearMode, Handler};
 use gpui_kit::base::GlobalState;
 use gpui_kit::component::ActiveTheme;
 use gpui_kit::component::button::{Button, ButtonVariants};
@@ -15,10 +17,11 @@ use gpui_kit::{
     MouseMoveEvent, MouseUpEvent, Pixels, Subscription, Task, Window, canvas, div, px, size,
 };
 
-gpui_kit::actions!(terminal, [CopyTerminal, PasteTerminal]);
+gpui_kit::actions!(terminal, [ClearTerminal, CopyTerminal, PasteTerminal]);
 
 pub fn init(cx: &mut App) {
     cx.bind_keys([
+        gpui_kit::KeyBinding::new("cmd-k", ClearTerminal, Some("Terminal")),
         gpui_kit::KeyBinding::new("cmd-c", CopyTerminal, Some("Terminal")),
         gpui_kit::KeyBinding::new("cmd-v", PasteTerminal, Some("Terminal")),
     ]);
@@ -148,6 +151,36 @@ impl TerminalView {
         cx.notify();
     }
 
+    fn clear(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(session) = &self.session else {
+            return;
+        };
+        let mut terminal = match session.terminal() {
+            Ok(terminal) => terminal,
+            Err(error) => {
+                crate::error::report("清理终端显示失败", &error, window, cx);
+                return;
+            },
+        };
+        terminal.scroll_display(Scroll::Bottom);
+        if !terminal.mode().contains(TermMode::ALT_SCREEN) {
+            let lines = terminal.screen_lines();
+            let grid = terminal.grid_mut();
+            let cursor_line = grid.cursor.point.line.0 as usize;
+            grid.scroll_up(&(Line(0)..Line(lines as i32)), cursor_line);
+            if lines > 1 {
+                grid.reset_region(Line(1)..);
+            }
+            grid.cursor.point.line = Line(0);
+            terminal.vi_mode_cursor.point = terminal.grid().cursor.point;
+        }
+        terminal.clear_screen(ClearMode::Saved);
+        terminal.selection = None;
+        self.selecting = false;
+        self.scroll_remainder = 0.;
+        cx.notify();
+    }
+
     pub fn paste(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
         if let Err(error) = self.paste_text(text, cx) {
             crate::error::report("粘贴到终端失败", &error, window, cx);
@@ -272,6 +305,9 @@ impl Render for TerminalView {
             .flex_col()
             .overflow_hidden()
             .text_color(cx.theme().foreground)
+            .on_action(cx.listener(|this, _: &ClearTerminal, window, cx| {
+                this.clear(window, cx);
+            }))
             .on_action(cx.listener(|this, _: &CopyTerminal, window, cx| {
                 this.copy_selection(window, cx);
             }))
