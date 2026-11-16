@@ -230,10 +230,8 @@ impl<'a> GitChangeList<'a> {
                                         "查看 diff：{path} · {}",
                                         group.title()
                                     ))
-                                    .tooltip(path.clone())
-                                    .child(
-                                        div().w_full().truncate().text_left().child(path.clone()),
-                                    )
+                                    .tooltip(&path)
+                                    .child(div().w_full().truncate().text_left().child(path))
                                     .on_click(move |_, window, cx| {
                                         diff_view.update(cx, |this, cx| {
                                             if this.directory() == diff_directory {

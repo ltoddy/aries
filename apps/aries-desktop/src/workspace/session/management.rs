@@ -166,8 +166,8 @@ impl SessionView {
             return false;
         }
         if let Some(host) = self.tab_host() {
-            let id = session.session_id.clone();
-            let _ = host.update(cx, |host, cx| host.lock_session_management(&id, true, cx));
+            let id = &session.session_id;
+            let _ = host.update(cx, |host, cx| host.lock_session_management(id, true, cx));
         }
         self.management.error = None;
         self.management.pending = Some((session, operation));

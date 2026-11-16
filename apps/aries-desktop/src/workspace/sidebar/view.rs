@@ -163,7 +163,7 @@ impl Sidebar {
                     .flex()
                     .items_center()
                     .gap_2()
-                    .child(SettingsButton::new(tab_host.clone(), p))
+                    .child(SettingsButton::new(tab_host, p))
                     .child(
                         Button::new("open-extensions")
                             .ghost()
