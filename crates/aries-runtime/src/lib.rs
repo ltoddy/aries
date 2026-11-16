@@ -1,5 +1,5 @@
 pub mod agent;
-pub mod compaction;
+pub mod context;
 pub mod hooks;
 mod jsonl;
 pub mod memory;

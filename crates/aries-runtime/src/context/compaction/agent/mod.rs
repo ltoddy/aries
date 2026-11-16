@@ -12,7 +12,7 @@ use rig::providers::openai::wire::OpenAiWire;
 use rig::{Agent, Model, ProviderError};
 use tokio::pin;
 
-use crate::compaction::CompactionFailure;
+use crate::context::compaction::CompactionFailure;
 use crate::jsonl;
 
 const PREAMBLE: &str = include_str!("preamble.md");

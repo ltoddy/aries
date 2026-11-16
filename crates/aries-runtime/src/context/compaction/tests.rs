@@ -3,8 +3,8 @@ use rig::message::{
     ToolResultContent, UserContent,
 };
 
-use crate::compaction::{TokenEstimator, micro_compact};
-use crate::session::ChatContext;
+use crate::context::ChatContext;
+use crate::context::compaction::{TokenEstimator, micro_compact};
 
 #[test]
 fn empty_text_estimates_to_zero_tokens() {

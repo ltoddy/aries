@@ -4,7 +4,7 @@ use std::path::Path;
 use rig::agent::{AgentHook, CompletionCallAction, CompletionCallEvent, HookContext, RunSettled};
 use rig::message::Message;
 
-use crate::session::ChatHistory;
+use crate::context::ChatHistory;
 
 pub struct TranscriptHook {
     chat_history: ChatHistory,
