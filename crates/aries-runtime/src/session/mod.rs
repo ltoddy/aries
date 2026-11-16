@@ -3,10 +3,8 @@ mod archive_session;
 mod close_session;
 mod commands;
 mod config;
-mod context;
 mod delete_session;
 mod error;
-mod history;
 mod hook;
 mod instruction;
 mod load_session;
@@ -42,14 +40,13 @@ use tokio_util::sync::CancellationToken;
 
 pub use self::commands::BUILTIN_COMMANDS;
 pub use self::config::{ParseSessionConfigError, SessionConfig};
-pub use self::context::ChatContext;
 pub use self::error::SessionError;
-pub use self::history::ChatHistory;
 use self::hook::SessionPromptHook;
 use self::instruction::InstructionContext;
 pub use self::session_status::SessionStatus;
 use crate::agent::AriesAgent;
-use crate::compaction::ContextCompactor;
+use crate::context::compaction::ContextCompactor;
+use crate::context::{ChatContext, ChatHistory};
 use crate::memory::MemoryStore;
 use crate::state::State;
 

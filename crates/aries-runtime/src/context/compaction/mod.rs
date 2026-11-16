@@ -25,7 +25,7 @@ pub use self::error::{CompactionError, CompactionFailure};
 pub use self::micro_compact::{KEEP_RECENT, micro_compact};
 pub use self::tokens::TokenEstimator;
 pub use self::window::ContextWindow;
-use crate::session::ChatContext;
+use crate::context::ChatContext;
 use crate::state::State;
 
 #[derive(Clone)]

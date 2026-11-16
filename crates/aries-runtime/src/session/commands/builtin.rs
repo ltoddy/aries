@@ -5,7 +5,7 @@ use nanoid::nanoid;
 use tokio::process::Command;
 
 use crate::agent::AriesAgent;
-use crate::compaction::ContextCompactor;
+use crate::context::compaction::ContextCompactor;
 
 const EXIT: &str = "exit";
 const SHELL: &str = "shell";
