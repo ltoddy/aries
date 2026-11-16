@@ -497,7 +497,7 @@ impl WorkspaceView {
                                 Button::new("hide-floating-terminal")
                                     .small()
                                     .ghost()
-                                    .label("隐藏 ⌘F")
+                                    .label("隐藏 ⌘J")
                                     .on_click(cx.listener(|this, _, window, cx| {
                                         this.toggle_terminal(window, cx)
                                     })),
@@ -1006,7 +1006,6 @@ impl WorkspaceView {
         let state = view.execution_state();
         let status = state.label();
         let tab_label = format!("切换到标签 {title} · {status}");
-        let details = format!("{title}\n{}\n{status}", view.execution().tab_directory().display());
         let drag_title = title.clone().into();
         let tab = div()
             .id(("tab", id))
@@ -1031,7 +1030,7 @@ impl WorkspaceView {
                     .flex_1()
                     .min_w_0()
                     .accessibility_label(tab_label)
-                    .tooltip(details)
+                    .tooltip(&title)
                     .child(state.render_tab_indicator(p))
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.select_tab(index, window, cx);

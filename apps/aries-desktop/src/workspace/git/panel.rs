@@ -320,7 +320,7 @@ impl GitPanel {
                             .w_full()
                             .whitespace_normal()
                             .opacity(1. - summary_opacity)
-                            .child(previous.clone()),
+                            .child(previous),
                     )
                 }),
         );

@@ -82,7 +82,7 @@ fn run() -> Result<(), StartupError> {
         cx.bind_keys([
             KeyBinding::new("cmd-,", OpenSettings, None),
             KeyBinding::new("cmd-n", NewSession, None),
-            KeyBinding::new("cmd-f", ToggleTerminal, None),
+            KeyBinding::new("cmd-j", ToggleTerminal, None),
             KeyBinding::new("cmd-b", ToggleSidebar, None),
         ]);
         cx.on_action(|_: &Quit, cx| cx.quit());
