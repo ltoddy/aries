@@ -96,9 +96,7 @@ impl SessionList {
     }
 
     fn rebuild_projects(&mut self) {
-        for indices in self.projects.values_mut() {
-            indices.clear();
-        }
+        self.projects.clear();
         for (index, session) in self.entries.iter().enumerate() {
             if let Some(indices) = self.projects.get_mut(session.cwd.as_path()) {
                 indices.push(index);

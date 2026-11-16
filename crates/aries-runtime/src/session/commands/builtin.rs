@@ -10,13 +10,11 @@ use crate::context::compaction::ContextCompactor;
 const EXIT: &str = "exit";
 const SHELL: &str = "shell";
 const COMPACT: &str = "compaction";
-const SYSTEM_PROMPT: &str = "system-prompt";
 
-pub const BUILTIN_COMMANDS: &[(&str, &str, Option<&str>); 4] = &[
+pub const BUILTIN_COMMANDS: &[(&str, &str, Option<&str>); 3] = &[
     (EXIT, "[builtin] quit the aries process", None),
     (SHELL, "[builtin] run a command in the system shell", Some("command")),
     (COMPACT, "[builtin] compress the conversation context", None),
-    (SYSTEM_PROMPT, "[builtin] show the current system prompt", None),
 ];
 
 pub struct BuiltinCommandsExecutor<'a> {
@@ -49,7 +47,6 @@ impl<'a> BuiltinCommandsExecutor<'a> {
             COMPACT => self.compact().await,
             EXIT => self.exit(),
             SHELL => self.shell(args).await,
-            SYSTEM_PROMPT => self.system_prompt(),
             _ => return false,
         }
         true
@@ -117,11 +114,5 @@ impl<'a> BuiltinCommandsExecutor<'a> {
                 self.notifier.notify(err.to_string());
             },
         }
-    }
-
-    fn system_prompt(&self) {
-        self.notifier.notify("```");
-        self.notifier.notify(self.agent.preamble());
-        self.notifier.notify("```");
     }
 }

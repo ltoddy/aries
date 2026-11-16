@@ -16,6 +16,7 @@ gpui_kit::actions!(
     orbit,
     [
         Quit,
+        Hide,
         OpenSettings,
         NewSession,
         CloseTab,
@@ -84,8 +85,11 @@ fn run() -> Result<(), StartupError> {
             KeyBinding::new("cmd-n", NewSession, None),
             KeyBinding::new("cmd-j", ToggleTerminal, None),
             KeyBinding::new("cmd-b", ToggleSidebar, None),
+            KeyBinding::new("cmd-h", Hide, None),
         ]);
         cx.on_action(|_: &Quit, cx| cx.quit());
+        #[cfg(target_os = "macos")]
+        cx.on_action(|_: &Hide, cx| cx.hide());
         #[cfg(target_os = "macos")]
         cx.bind_keys([
             KeyBinding::new("cmd-w", CloseTab, None),
@@ -110,6 +114,8 @@ fn run() -> Result<(), StartupError> {
         #[cfg(target_os = "macos")]
         cx.set_menus([Menu::new("Aries Desktop").items([
             MenuItem::action("设置…", OpenSettings),
+            MenuItem::separator(),
+            MenuItem::action("隐藏 Aries Desktop", Hide),
             MenuItem::separator(),
             MenuItem::action("退出 Aries Desktop", Quit),
         ])]);
