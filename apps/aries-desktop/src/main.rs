@@ -96,7 +96,6 @@ fn run() -> Result<(), StartupError> {
             KeyBinding::new("cmd-shift-e", SwitchSidebar::new(), None),
             KeyBinding::new("cmd-h", Hide, None),
         ]);
-        cx.on_action(|_: &Quit, cx| cx.quit());
         #[cfg(target_os = "macos")]
         cx.on_action(|_: &Hide, cx| cx.hide());
         #[cfg(target_os = "macos")]
@@ -149,14 +148,36 @@ fn run() -> Result<(), StartupError> {
             ..TitleBar::window_options()
         };
         match gpui_kit::open_window(options, cx, |window, cx| {
-            window.on_window_should_close(cx, |_, cx| {
-                cx.quit();
-                false
-            });
             cx.new(|cx| WorkspaceView::new(cwd, Preferences::path(), aries_config(), window, cx))
         }) {
-            Ok((handle, _)) => {
+            Ok((handle, workspace)) => {
+                let quit_workspace = workspace.downgrade();
+                cx.on_action(move |_: &Quit, cx| {
+                    cx.stop_propagation();
+                    let workspace = quit_workspace.clone();
+                    cx.defer(move |cx| {
+                        if let Some(workspace) = workspace.upgrade() {
+                            if let Err(error) = handle.update(cx, |_, window, cx| {
+                                workspace
+                                    .update(cx, |workspace, cx| workspace.request_quit(window, cx));
+                            }) {
+                                error::log("无法请求退出", error.as_ref());
+                            }
+                        } else {
+                            cx.quit();
+                        }
+                    });
+                });
+                let close_workspace = workspace.downgrade();
                 if let Err(error) = cx.update_window(handle, |_, window, cx| {
+                    window.on_window_should_close(cx, move |window, cx| {
+                        let workspace = close_workspace.clone();
+                        window.defer(cx, move |window, cx| {
+                            let _ = workspace
+                                .update(cx, |workspace, cx| workspace.request_quit(window, cx));
+                        });
+                        false
+                    });
                     Root::update(window, cx, |root, _, cx| {
                         root.style().background = Some(cx.theme().background.opacity(0.).into());
                         cx.notify();

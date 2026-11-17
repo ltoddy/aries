@@ -5,4 +5,4 @@ mod git_status;
 
 pub use self::file_actions::FileActionEvent;
 pub use self::file_tree::FileTree;
-pub use self::file_view::{CloseFile, FileView, OpenFile};
+pub use self::file_view::{CloseFile, FileView, OpenFile, SaveFile};
