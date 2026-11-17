@@ -26,8 +26,15 @@ gpui_kit::actions!(
         NextUserMessage,
         ToggleTerminal,
         ToggleSidebar,
+        SwitchSidebar,
     ]
 );
+
+impl SwitchSidebar {
+    fn new() -> Self {
+        Self
+    }
+}
 
 #[derive(Debug, thiserror::Error)]
 enum StartupError {
@@ -65,6 +72,7 @@ fn run() -> Result<(), StartupError> {
         gpui_kit::init(cx);
         crate::terminal::init(cx);
         crate::workspace::skill_editor::init(cx);
+        crate::workspace::files::FileView::init(cx);
         cx.bind_keys([
             KeyBinding::new(
                 if cfg!(target_os = "macos") { "cmd-f" } else { "ctrl-f" },
@@ -85,6 +93,7 @@ fn run() -> Result<(), StartupError> {
             KeyBinding::new("cmd-n", NewSession, None),
             KeyBinding::new("cmd-j", ToggleTerminal, None),
             KeyBinding::new("cmd-b", ToggleSidebar, None),
+            KeyBinding::new("cmd-shift-e", SwitchSidebar::new(), None),
             KeyBinding::new("cmd-h", Hide, None),
         ]);
         cx.on_action(|_: &Quit, cx| cx.quit());
@@ -102,6 +111,7 @@ fn run() -> Result<(), StartupError> {
         cx.bind_keys([
             KeyBinding::new("ctrl-w", CloseTab, None),
             KeyBinding::new("ctrl-b", ToggleSidebar, None),
+            KeyBinding::new("ctrl-shift-e", SwitchSidebar::new(), None),
             KeyBinding::new("ctrl-shift-[", PreviousTab, None),
             KeyBinding::new("ctrl-shift-]", NextTab, None),
             KeyBinding::new("ctrl-alt-up", PreviousUserMessage, None),
@@ -114,6 +124,7 @@ fn run() -> Result<(), StartupError> {
         #[cfg(target_os = "macos")]
         cx.set_menus([Menu::new("Aries Desktop").items([
             MenuItem::action("设置…", OpenSettings),
+            MenuItem::action("切换会话 / 文件", SwitchSidebar::new()),
             MenuItem::separator(),
             MenuItem::action("隐藏 Aries Desktop", Hide),
             MenuItem::separator(),

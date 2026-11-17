@@ -85,6 +85,16 @@ impl GitPanel {
             diff.set_targets(self.info.as_ref(), cx);
             diff.open(path, group, window, cx);
         });
+        let owner = cx.weak_entity();
+        window.defer(cx, move |window, cx| {
+            if let Some(host) = owner.upgrade().and_then(|owner| owner.read(cx).tab_host()) {
+                let _ = host.update(cx, |host, cx| {
+                    if host.is_active_session(&owner) {
+                        host.show_diff(window, cx);
+                    }
+                });
+            }
+        });
     }
     pub fn directory(&self) -> &Path {
         &self.cwd

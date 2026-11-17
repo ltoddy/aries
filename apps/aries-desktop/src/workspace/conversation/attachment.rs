@@ -8,6 +8,9 @@ use gpui_kit::component::{ActiveTheme, Icon};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
+use crate::workspace::SessionView;
+use crate::workspace::conversation::text::file_button;
+use crate::workspace::files::OpenFile;
 use crate::workspace::settings::palette::Palette;
 
 #[derive(Debug)]
@@ -96,6 +99,18 @@ fn file_name<'a>(uri: &'a str, fallback: &'a str) -> &'a str {
         .unwrap_or(fallback)
 }
 
+pub fn resource_uri(content: &ContentBlock) -> Option<&str> {
+    match content {
+        ContentBlock::ResourceLink(resource) => Some(&resource.uri),
+        ContentBlock::Resource(resource) => match &resource.resource {
+            EmbeddedResourceResource::TextResourceContents(resource) => Some(&resource.uri),
+            EmbeddedResourceResource::BlobResourceContents(resource) => Some(&resource.uri),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 #[derive(IntoElement)]
 pub struct Attachment {
     id: SharedString,
@@ -103,6 +118,8 @@ pub struct Attachment {
     icon: IconName,
     image: Option<Arc<Image>>,
     palette: Palette,
+    uri: Option<String>,
+    session: Option<WeakEntity<SessionView>>,
 }
 
 impl Attachment {
@@ -138,6 +155,17 @@ impl Attachment {
             image,
             p,
         )
+        .with_uri(resource_uri(content).map(str::to_owned))
+    }
+
+    pub fn with_session(mut self, session: WeakEntity<SessionView>) -> Self {
+        self.session = Some(session);
+        self
+    }
+
+    fn with_uri(mut self, uri: Option<String>) -> Self {
+        self.uri = uri;
+        self
     }
 
     fn new(
@@ -147,7 +175,7 @@ impl Attachment {
         image: Option<Arc<Image>>,
         palette: Palette,
     ) -> Self {
-        Self { id, text, icon, image, palette }
+        Self { id, text, icon, image, palette, uri: None, session: None }
     }
 }
 
@@ -166,7 +194,23 @@ impl AttachmentText {
 
 impl RenderOnce for Attachment {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        let Self { id, text, icon, image, palette: p } = self;
+        let Self { id, text, icon, image, palette: p, uri, session } = self;
+        let open = session.and_then(|session| {
+            let view = session.upgrade()?;
+            let target = OpenFile::from_location(
+                view.read(cx).execution().directory().to_owned(),
+                uri.as_deref()?,
+            )?;
+            Some(
+                file_button(
+                    SharedString::from(format!("{id}:open-file")),
+                    "打开".into(),
+                    target,
+                    session,
+                )
+                .accessibility_label(format!("打开文件附件：{}", text.name)),
+            )
+        });
         let AttachmentText { label, name, subtitle, details } = text;
         let preview = match image {
             Some(image) => img(image)
@@ -227,6 +271,7 @@ impl RenderOnce for Attachment {
                             .child(SelectableText::new("attachment-subtitle", subtitle)),
                     ),
             )
+            .children(open)
             .into_any_element()
     }
 }

@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use agent_client_protocol::schema::MaybeUndefined;
-use agent_client_protocol::v1::schema::{CompactionStatus, SessionId};
+use agent_client_protocol::v1::schema::{CompactionStatus, SessionId, SessionUpdate};
 use gpui_kit::assets::IconName;
 use gpui_kit::base::SelectableText;
 use gpui_kit::component::button::{Button, ButtonVariants};
@@ -12,11 +12,13 @@ use gpui_kit::prelude::*;
 use gpui_kit::*;
 
 use crate::workspace::SessionView;
+use crate::workspace::conversation::attachment::{Attachment, resource_uri};
 use crate::workspace::conversation::media::MessageImages;
 use crate::workspace::conversation::model::display::UpdateDisplay;
 use crate::workspace::conversation::model::subagent::SubagentState;
 use crate::workspace::conversation::model::{Conversation, Role};
 use crate::workspace::conversation::subagent_message::SubagentMessage;
+use crate::workspace::conversation::text::link_handler;
 use crate::workspace::conversation::thought_message::ThoughtMessage;
 use crate::workspace::conversation::tool_content::ToolDiffs;
 use crate::workspace::conversation::tool_message::{MessageStatusIcon, ToolMessage};
@@ -442,6 +444,7 @@ impl Timeline {
                     cx.notify();
                 }),
             )
+            .with_session(cx.weak_entity())
             .into_any_element();
         }
         let message = &conversation.messages()[index];
@@ -457,6 +460,7 @@ impl Timeline {
                     cx.notify();
                 }),
             )
+            .with_session(cx.weak_entity())
             .into_any_element();
         }
         if let Some(tool) = message.tool_call() {
@@ -466,12 +470,13 @@ impl Timeline {
                 p,
                 cx.entity_id(),
                 session_id,
-                self.tool_diffs.render(index, tool, p),
+                self.tool_diffs.render(index, tool, p, cx.weak_entity()),
             )
             .into_any_element();
         }
         if message.role() == Role::User {
-            return UserMessage::from_message(index, message, &self.images, p).into_any_element();
+            return UserMessage::from_message(index, message, &self.images, p, cx.weak_entity())
+                .into_any_element();
         }
         let markdown = self.markdown_state(index, conversation, cx);
         let message = &conversation.messages()[index];
@@ -563,6 +568,7 @@ impl Timeline {
                         .map(typography::style_markdown)
                         .selectable(true)
                         .scrollable(false)
+                        .on_link_click(link_handler(cx.weak_entity()))
                         .w_full()
                         .code_block_actions(move |code_block, _window, _cx| {
                             let code = code_block.code().to_string();
@@ -598,6 +604,21 @@ impl Timeline {
                         .into_any_element()
                 }),
             )
+            .children(message.updates().iter().enumerate().filter_map(
+                |(attachment_index, update)| {
+                    let content = match &update.update {
+                        SessionUpdate::AgentMessageChunk(chunk)
+                        | SessionUpdate::AgentThoughtChunk(chunk) => &chunk.content,
+                        _ => return None,
+                    };
+                    resource_uri(content)?;
+                    Some(
+                        Attachment::from_content(index, attachment_index, content, None, p)
+                            .with_session(cx.weak_entity())
+                            .into_any_element(),
+                    )
+                },
+            ))
             .when_some(self.images.images(index), |body, images| {
                 body.child(div().id(("images", index)).w_full().flex().flex_col().gap_1().children(
                     images.iter().map(|image| {
