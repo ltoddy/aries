@@ -1,17 +1,20 @@
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 use std::fmt;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use agent_client_protocol::AcpAgentConfig;
 use agent_client_protocol::v1::schema::{SessionId, SessionInfo};
 use gpui_kit::assets::IconName;
 use gpui_kit::base::GlobalState;
+use gpui_kit::base::actions::Confirm;
 use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants};
+use gpui_kit::component::dialog::{Dialog, DialogClose, DialogEntrance, DialogFooter};
 use gpui_kit::component::menu::{ContextMenuExt, PopupMenu, PopupMenuItem};
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::{
-    ActiveTheme, Disableable, Icon, ResizableState, Selectable, Sizable, TitleBar, h_resizable,
-    resizable_panel, v_resizable,
+    ActiveTheme, Disableable, Icon, ResizableState, Selectable, Sizable, TitleBar, WindowExt,
+    h_resizable, resizable_panel, v_resizable,
 };
 use gpui_kit::prelude::*;
 use gpui_kit::*;
@@ -19,7 +22,7 @@ use gpui_kit::*;
 use crate::acp::Event;
 use crate::terminal::TerminalView;
 use crate::workspace::extensions::ExtensionsView;
-use crate::workspace::files::{CloseFile, FileActionEvent, FileTree, FileView, OpenFile};
+use crate::workspace::files::{CloseFile, FileActionEvent, FileTree, FileView, OpenFile, SaveFile};
 use crate::workspace::settings::palette::Palette;
 use crate::workspace::settings::{Preferences, SettingsState};
 use crate::workspace::sidebar::Sidebar;
@@ -48,6 +51,7 @@ struct FileTab {
     _close_subscription: Subscription,
     canonical_path: Option<PathBuf>,
     identity_task: Option<Task<()>>,
+    pending_target: Option<OpenFile>,
 }
 
 impl FileTab {
@@ -62,6 +66,7 @@ impl FileTab {
             _close_subscription: close_subscription,
             canonical_path: None,
             identity_task: None,
+            pending_target: None,
         }
     }
 }
@@ -111,13 +116,18 @@ impl WorkspaceTab {
 }
 
 enum FileTabAction {
-    Reopen(OpenFile),
+    Retarget(OpenFile),
+    Reload,
     Close,
 }
 
 impl FileTabAction {
-    fn reopen(target: OpenFile) -> Self {
-        Self::Reopen(target)
+    fn retarget(target: OpenFile) -> Self {
+        Self::Retarget(target)
+    }
+
+    fn reload() -> Self {
+        Self::Reload
     }
 
     fn close() -> Self {
@@ -251,6 +261,51 @@ impl SidebarPage {
     }
 }
 
+#[derive(Clone, Copy)]
+enum PendingFileOperation {
+    Close(usize),
+    Reload(usize),
+    QuitFile(usize),
+    Quit,
+}
+
+impl PendingFileOperation {
+    fn close(id: usize) -> Self {
+        Self::Close(id)
+    }
+
+    fn reload(id: usize) -> Self {
+        Self::Reload(id)
+    }
+
+    fn quit_file(id: usize) -> Self {
+        Self::QuitFile(id)
+    }
+
+    fn quit() -> Self {
+        Self::Quit
+    }
+
+    fn tab_id(self) -> Option<usize> {
+        match self {
+            Self::Close(id) | Self::Reload(id) | Self::QuitFile(id) => Some(id),
+            Self::Quit => None,
+        }
+    }
+}
+
+struct FileConfirmation {
+    id: usize,
+    saving_requested: bool,
+    focus: Option<FocusHandle>,
+}
+
+impl FileConfirmation {
+    fn new(id: usize, saving_requested: bool) -> Self {
+        Self { id, saving_requested, focus: None }
+    }
+}
+
 pub struct WorkspaceView {
     cwd: PathBuf,
     window: AnyWindowHandle,
@@ -270,6 +325,11 @@ pub struct WorkspaceView {
     diff_layout: Entity<ResizableState>,
     _sidebar_subscription: Subscription,
     tabs: Vec<WorkspaceTab>,
+    pending_file_operations: VecDeque<PendingFileOperation>,
+    file_confirmation: Option<FileConfirmation>,
+    file_operation_focus: Option<FocusHandle>,
+    quit_discarded: HashSet<usize>,
+    file_operation_wait: Option<Task<()>>,
     archived_tabs: Vec<SessionTab>,
     active: usize,
     next_id: usize,
@@ -353,6 +413,11 @@ impl WorkspaceView {
             diff_layout: cx.new(|_| ResizableState::default()),
             _sidebar_subscription: sidebar_subscription,
             tabs: Vec::new(),
+            pending_file_operations: VecDeque::new(),
+            file_confirmation: None,
+            file_operation_focus: None,
+            quit_discarded: HashSet::new(),
+            file_operation_wait: None,
             archived_tabs: Vec::new(),
             active: 0,
             next_id: 0,
@@ -478,6 +543,12 @@ impl Render for WorkspaceView {
         div()
             .size_full()
             .track_focus(&self.focus_handle)
+            .capture_action(cx.listener(|this, _: &SaveFile, window, cx| {
+                if let Some(id) = this.tabs.get(this.active).map(|tab| tab.id) {
+                    this.save_file_tab(id, window, cx);
+                }
+                cx.stop_propagation();
+            }))
             .on_action(cx.listener(|this, _: &OpenSettings, window, cx| {
                 this.open_settings(window, cx);
             }))
@@ -575,6 +646,12 @@ impl Render for WorkspaceView {
 
 impl WorkspaceView {
     pub fn open_file(&mut self, target: OpenFile, window: &mut Window, cx: &mut Context<Self>) {
+        if self.file_confirmation.is_some()
+            || !self.pending_file_operations.is_empty()
+            || window.has_active_dialog(cx)
+        {
+            return;
+        }
         if !self.file_tree.update(cx, |tree, cx| tree.cancel_actions(window, cx)) {
             return;
         }
@@ -595,15 +672,17 @@ impl WorkspaceView {
             let id = self.next_id;
             self.next_id += 1;
             let view = cx.new(|cx| FileView::new(window, cx));
-            let subscription = cx.observe(&view, |_, _, cx| cx.notify());
+            let subscription = cx.observe_in(&view, window, move |_, _, window, cx| {
+                cx.notify();
+                window.refresh();
+                cx.defer_in(window, move |this, window, cx| {
+                    this.on_file_updated(id, window, cx);
+                });
+            });
             let close_subscription =
                 cx.subscribe_in(&view, window, move |_, _, _: &CloseFile, window, cx| {
                     cx.defer_in(window, move |this, window, cx| {
-                        let active = this.tabs.get(this.active).is_some_and(|tab| tab.id == id);
-                        this.close_tab(id, cx);
-                        if active {
-                            this.focus_active_tab(window, cx);
-                        }
+                        this.execute_tab_command(TabCommand::close(id), window, cx);
                     });
                 });
             view.update(cx, |view, cx| view.open(target.clone(), window, cx));
@@ -708,10 +787,29 @@ impl WorkspaceView {
                         _ => None,
                     })
                     .collect();
+                if !this.pending_file_operations.is_empty() {
+                    cx.notify();
+                    return;
+                }
                 duplicates.sort_unstable();
-                let Some((&keep, remove)) = duplicates.split_first() else {
+                let protected: Vec<_> = this
+                    .tabs
+                    .iter()
+                    .filter(|tab| duplicates.contains(&tab.id))
+                    .filter(|tab| {
+                        tab.file().is_some_and(|view| {
+                            view.read(cx).is_dirty() || view.read(cx).is_saving()
+                        })
+                    })
+                    .map(|tab| tab.id)
+                    .collect();
+                let Some(keep) = protected.first().or(duplicates.first()).copied() else {
                     return;
                 };
+                let remove: Vec<_> = duplicates
+                    .into_iter()
+                    .filter(|id| *id != keep && !protected.contains(id))
+                    .collect();
                 if remove.is_empty() {
                     return;
                 }
@@ -781,7 +879,8 @@ impl WorkspaceView {
                     let WorkspaceTabKind::File(file) = &tab.kind else {
                         return None;
                     };
-                    let target = file.view.read(cx).target()?;
+                    let target =
+                        file.pending_target.as_ref().or_else(|| file.view.read(cx).target())?;
                     let primary = tree.normalize_path(target.path());
                     let canonical =
                         file.canonical_path.as_deref().map(|path| tree.normalize_path(path));
@@ -808,10 +907,10 @@ impl WorkspaceView {
                                 if let Some(line) = target.line() {
                                     updated = updated.with_line(line);
                                 }
-                                FileTabAction::reopen(updated)
+                                FileTabAction::retarget(updated)
                             } else if canonical.as_ref().is_some_and(|path| path.starts_with(from))
                             {
-                                FileTabAction::reopen(target.clone())
+                                FileTabAction::retarget(target.clone())
                             } else {
                                 return None;
                             }
@@ -833,7 +932,7 @@ impl WorkspaceView {
                                     .as_ref()
                                     .is_some_and(|canonical| canonical.starts_with(path))
                             {
-                                FileTabAction::reopen(target.clone())
+                                FileTabAction::reload()
                             } else {
                                 return None;
                             }
@@ -846,7 +945,8 @@ impl WorkspaceView {
         };
         for (id, action) in actions {
             match action {
-                FileTabAction::Reopen(target) => self.reopen_file_tab(id, target, window, cx),
+                FileTabAction::Retarget(target) => self.retarget_file_tab(id, target, window, cx),
+                FileTabAction::Reload => self.refresh_file_tab(id, window, cx),
                 FileTabAction::Close => self.close_tab(id, cx),
             }
         }
@@ -854,45 +954,522 @@ impl WorkspaceView {
         cx.notify();
     }
 
-    fn reload_file_tab(&mut self, id: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(target) = self
-            .tabs
-            .iter()
-            .find(|tab| tab.id == id)
-            .and_then(WorkspaceTab::file)
-            .and_then(|view| view.read(cx).target().cloned())
-        else {
-            return;
-        };
-        self.reopen_file_tab(id, target, window, cx);
+    fn file_view(&self, id: usize) -> Option<&Entity<FileView>> {
+        self.tabs.iter().find(|tab| tab.id == id).and_then(WorkspaceTab::file)
     }
 
-    fn reopen_file_tab(
+    fn refresh_file_tab(&mut self, id: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(view) = self.file_view(id).cloned() else {
+            return;
+        };
+        if view.read(cx).is_dirty() || view.read(cx).is_saving() {
+            return;
+        }
+        let focus = window.focused(cx);
+        view.update(cx, |view, cx| view.reload(window, cx));
+        if let Some(focus) = focus {
+            focus.focus(window, cx);
+        }
+        self.resolve_file_identity(id, window, cx);
+    }
+
+    fn retarget_file_tab(
         &mut self,
         id: usize,
         target: OpenFile,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(view) =
-            self.tabs.iter().find(|tab| tab.id == id).and_then(WorkspaceTab::file).cloned()
-        else {
+        let Some(tab) = self.tabs.iter_mut().find(|tab| tab.id == id) else {
             return;
         };
-        if self.tabs.get(self.active).is_some_and(|tab| tab.id == id) {
-            self.invalidate_file_navigation(cx);
+        let WorkspaceTabKind::File(file) = &mut tab.kind else {
+            return;
+        };
+        file.identity_task = None;
+        file.canonical_path = None;
+        if file.view.read(cx).is_saving() {
+            file.pending_target = Some(target);
+            return;
         }
-        let restore_focus = !view.read(cx).focus_handle(cx).contains_focused(window, cx);
+        file.pending_target = None;
         let focus = window.focused(cx);
-        view.update(cx, |view, cx| view.open(target, window, cx));
-        if restore_focus {
-            if let Some(focus) = focus {
-                focus.focus(window, cx);
-            } else {
-                window.blur(cx);
-            }
+        file.view.update(cx, |view, cx| view.retarget(target, window, cx));
+        if let Some(focus) = focus {
+            focus.focus(window, cx);
         }
         self.resolve_file_identity(id, window, cx);
+    }
+
+    fn save_file_tab(&mut self, id: usize, window: &mut Window, cx: &mut Context<Self>) {
+        if self.file_confirmation.is_some()
+            || !self.pending_file_operations.is_empty()
+            || window.has_active_dialog(cx)
+        {
+            return;
+        }
+        if !self.file_tree.update(cx, |tree, cx| tree.cancel_actions(window, cx)) {
+            return;
+        }
+        if let Some(view) = self.file_view(id) {
+            view.update(cx, |view, cx| view.save(window, cx));
+        }
+    }
+
+    fn on_file_updated(&mut self, id: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let target = self.tabs.iter_mut().find_map(|tab| {
+            if tab.id != id {
+                return None;
+            }
+            let WorkspaceTabKind::File(file) = &mut tab.kind else {
+                return None;
+            };
+            (!file.view.read(cx).is_saving()).then(|| file.pending_target.take()).flatten()
+        });
+        if let Some(target) = target {
+            self.retarget_file_tab(id, target, window, cx);
+            self.sync_file_directory(cx);
+        }
+        if self
+            .file_confirmation
+            .as_ref()
+            .is_some_and(|confirmation| confirmation.id == id && confirmation.saving_requested)
+            && let Some(view) = self.file_view(id).cloned()
+            && !view.read(cx).is_saving()
+        {
+            if view.read(cx).save_error().is_none() {
+                if view.read(cx).is_dirty() {
+                    view.update(cx, |view, cx| view.save(window, cx));
+                } else {
+                    self.finish_file_confirmation(id, window, cx);
+                    return;
+                }
+            } else if let Some(confirmation) = &mut self.file_confirmation {
+                confirmation.saving_requested = false;
+                window.refresh();
+                cx.notify();
+            }
+        }
+        if self.file_confirmation.is_none() && !self.pending_file_operations.is_empty() {
+            self.advance_file_operations(window, cx);
+        }
+    }
+
+    pub fn request_quit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.file_confirmation.is_some() || !self.pending_file_operations.is_empty() {
+            return;
+        }
+        self.file_operation_focus = window.focused(cx);
+        self.quit_discarded.clear();
+        self.pending_file_operations.push_back(PendingFileOperation::quit());
+        self.pause_file_operation_auto_save(cx);
+        self.advance_file_operations(window, cx);
+    }
+
+    fn request_file_operations(
+        &mut self,
+        operations: VecDeque<PendingFileOperation>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.pending_file_operations.is_empty()
+            || self.file_confirmation.is_some()
+            || window.has_active_dialog(cx)
+        {
+            return;
+        }
+        self.file_operation_focus = window.focused(cx);
+        self.pending_file_operations = operations;
+        self.pause_file_operation_auto_save(cx);
+        self.advance_file_operations(window, cx);
+    }
+
+    fn pause_file_operation_auto_save(&self, cx: &mut Context<Self>) {
+        let quitting = self
+            .pending_file_operations
+            .iter()
+            .any(|operation| matches!(operation, PendingFileOperation::Quit));
+        for tab in &self.tabs {
+            if (quitting
+                || self
+                    .pending_file_operations
+                    .iter()
+                    .any(|operation| operation.tab_id() == Some(tab.id)))
+                && let Some(view) = tab.file()
+            {
+                view.update(cx, |view, _| view.pause_auto_save());
+            }
+        }
+    }
+
+    fn resume_file_auto_save(&self, window: &mut Window, cx: &mut Context<Self>) {
+        for view in self.tabs.iter().filter_map(WorkspaceTab::file) {
+            view.update(cx, |view, cx| view.resume_auto_save(window, cx));
+        }
+    }
+
+    fn advance_file_operations(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.file_confirmation.is_some() {
+            return;
+        }
+        while let Some(operation) = self.pending_file_operations.front().copied() {
+            if matches!(operation, PendingFileOperation::Quit)
+                && self.tabs.iter().all(|tab| {
+                    self.quit_discarded.contains(&tab.id)
+                        || tab.file().is_none_or(|view| {
+                            !view.read(cx).is_dirty() && !view.read(cx).is_saving()
+                        })
+                })
+            {
+                self.pending_file_operations.clear();
+                self.file_operation_wait = None;
+                cx.quit();
+                return;
+            }
+            if window.has_active_dialog(cx)
+                || !self.file_tree.update(cx, |tree, cx| tree.cancel_actions(window, cx))
+            {
+                self.wait_for_file_operations(window, cx);
+                return;
+            }
+            self.file_operation_wait = None;
+            if let Some(id) = operation.tab_id() {
+                if let Some(view) = self.file_view(id).cloned() {
+                    view.update(cx, |view, _| view.pause_auto_save());
+                    if view.read(cx).is_saving() {
+                        self.wait_for_file_operations(window, cx);
+                        return;
+                    }
+                    let reload = matches!(operation, PendingFileOperation::Reload(_));
+                    if !reload && view.read(cx).is_dirty() && view.read(cx).save_error().is_none() {
+                        view.update(cx, |view, cx| view.save(window, cx));
+                        self.wait_for_file_operations(window, cx);
+                        return;
+                    }
+                    if !reload && !view.read(cx).is_dirty() {
+                        self.pending_file_operations.pop_front();
+                        self.apply_file_operation(operation, window, cx);
+                        continue;
+                    }
+                    self.file_confirmation = Some(FileConfirmation::new(id, false));
+                    self.invalidate_file_navigation(cx);
+                    let owner = cx.weak_entity();
+                    window.open_dialog(cx, move |dialog, _, cx| {
+                        let Some(entity) = owner.upgrade() else {
+                            return dialog.on_ok(|_, _, _| false);
+                        };
+                        entity.read(cx).render_file_confirmation(dialog, id, owner.clone(), cx)
+                    });
+                    if let Some(confirmation) = &mut self.file_confirmation {
+                        confirmation.focus = window.focused(cx);
+                    }
+                    cx.notify();
+                    return;
+                }
+                self.pending_file_operations.pop_front();
+                self.apply_file_operation(operation, window, cx);
+            } else {
+                let dirty = self.tabs.iter().find(|tab| {
+                    !self.quit_discarded.contains(&tab.id)
+                        && tab.file().is_some_and(|view| {
+                            view.read(cx).is_dirty() || view.read(cx).is_saving()
+                        })
+                });
+                if let Some(tab) = dirty {
+                    self.pending_file_operations
+                        .push_front(PendingFileOperation::quit_file(tab.id));
+                }
+            }
+        }
+        self.file_operation_focus = None;
+        self.quit_discarded.clear();
+        self.file_operation_wait = None;
+        self.resume_file_auto_save(window, cx);
+        self.focus_active_tab(window, cx);
+        cx.notify();
+    }
+
+    fn wait_for_file_operations(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.file_operation_wait.is_some() {
+            return;
+        }
+        self.file_operation_wait = Some(cx.spawn_in(window, async move |owner, cx| {
+            cx.background_executor().timer(Duration::from_millis(100)).await;
+            let _ = owner.update_in(cx, |this, window, cx| {
+                this.file_operation_wait = None;
+                this.advance_file_operations(window, cx);
+            });
+        }));
+    }
+
+    fn apply_file_operation(
+        &mut self,
+        operation: PendingFileOperation,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        match operation {
+            PendingFileOperation::Close(id) => self.remove_tab(id, cx),
+            PendingFileOperation::Reload(id) => {
+                if let Some(view) = self.file_view(id) {
+                    view.update(cx, |view, cx| {
+                        view.reload_discarding(window, cx);
+                        view.resume_auto_save(window, cx);
+                    });
+                }
+                self.resolve_file_identity(id, window, cx);
+            },
+            PendingFileOperation::QuitFile(_) => {},
+            PendingFileOperation::Quit => {},
+        }
+    }
+
+    fn confirmation_is_busy(&self, id: usize, cx: &App) -> bool {
+        self.file_confirmation
+            .as_ref()
+            .is_none_or(|confirmation| confirmation.id != id || confirmation.saving_requested)
+            || self.file_view(id).is_some_and(|view| view.read(cx).is_saving())
+    }
+
+    fn save_file_confirmation(&mut self, id: usize, window: &mut Window, cx: &mut Context<Self>) {
+        if self.confirmation_is_busy(id, cx) {
+            return;
+        }
+        let Some(view) = self.file_view(id).cloned() else {
+            return;
+        };
+        if matches!(self.pending_file_operations.front(), Some(PendingFileOperation::Reload(_)))
+            && (!view.read(cx).is_dirty() || view.read(cx).save_error().is_none())
+        {
+            self.discard_file_confirmation(id, window, cx);
+            return;
+        }
+        if !view.read(cx).is_ready()
+            || !view.read(cx).is_dirty()
+            || view.read(cx).save_error().is_none()
+        {
+            return;
+        }
+        view.update(cx, |view, cx| {
+            view.pause_auto_save();
+            view.save(window, cx);
+        });
+        if let Some(confirmation) = &mut self.file_confirmation {
+            confirmation.saving_requested = view.read(cx).is_saving();
+        }
+        window.refresh();
+        cx.notify();
+    }
+
+    fn owns_file_confirmation(&self, id: usize, window: &Window, cx: &App) -> bool {
+        self.file_confirmation.as_ref().is_some_and(|confirmation| {
+            confirmation.id == id
+                && confirmation.focus.as_ref().is_some_and(|focus| {
+                    focus.is_focused(window) || focus.contains_focused(window, cx)
+                })
+        })
+    }
+
+    fn discard_file_confirmation(
+        &mut self,
+        id: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.confirmation_is_busy(id, cx) || !self.owns_file_confirmation(id, window, cx) {
+            return;
+        }
+        if matches!(self.pending_file_operations.front(), Some(PendingFileOperation::QuitFile(_))) {
+            self.quit_discarded.insert(id);
+        }
+        self.finish_file_confirmation(id, window, cx);
+    }
+
+    fn finish_file_confirmation(&mut self, id: usize, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.owns_file_confirmation(id, window, cx) {
+            return;
+        }
+        self.file_confirmation = None;
+        window.close_dialog(cx);
+        if let Some(operation) = self.pending_file_operations.pop_front() {
+            self.apply_file_operation(operation, window, cx);
+        }
+        cx.defer_in(window, |this, window, cx| this.advance_file_operations(window, cx));
+        cx.notify();
+    }
+
+    fn cancel_file_confirmation(
+        &mut self,
+        id: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        if self.confirmation_is_busy(id, cx) {
+            return false;
+        }
+        self.file_confirmation = None;
+        self.pending_file_operations.clear();
+        self.quit_discarded.clear();
+        self.file_operation_wait = None;
+        cx.defer_in(window, |this, window, cx| {
+            if this.pending_file_operations.is_empty() {
+                this.resume_file_auto_save(window, cx);
+            }
+        });
+        if let Some(focus) = self.file_operation_focus.take() {
+            window.defer(cx, move |window, cx| focus.focus(window, cx));
+        }
+        cx.notify();
+        true
+    }
+
+    fn render_file_confirmation(
+        &self,
+        dialog: Dialog,
+        id: usize,
+        owner: WeakEntity<Self>,
+        cx: &App,
+    ) -> Dialog {
+        let busy = self.confirmation_is_busy(id, cx);
+        let view = self.file_view(id).map(|view| view.read(cx));
+        let target = view.and_then(FileView::target);
+        let name = target.map(|target| {
+            target.path().file_name().unwrap_or(target.path().as_os_str()).to_string_lossy()
+        });
+        let reload =
+            matches!(self.pending_file_operations.front(), Some(PendingFileOperation::Reload(_)));
+        let title = if reload {
+            format!("重新读取“{}”？", name.unwrap_or_default())
+        } else if busy {
+            format!("正在保存“{}”", name.unwrap_or_default())
+        } else {
+            format!("“{}”自动保存失败", name.unwrap_or_default())
+        };
+        let save = owner.clone();
+        let cancel = owner.clone();
+        let discard = owner.clone();
+        let enter = owner.clone();
+        let confirm = owner.clone();
+        let dirty = view.is_some_and(FileView::is_dirty);
+        let retry = busy || view.is_some_and(|view| view.is_dirty() && view.save_error().is_some());
+        let disabled_save = busy
+            || view.is_none_or(|view| {
+                if reload && !retry { !view.is_open() } else { !view.is_ready() || !dirty }
+            });
+        dialog
+            .title(title)
+            .w(cx.theme().font_size * 28.)
+            .entrance(DialogEntrance::None)
+            .overlay_closable(false)
+            .close_button(false)
+            .on_ok(move |_, window, cx| {
+                let _ = save.update(cx, |this, cx| this.save_file_confirmation(id, window, cx));
+                false
+            })
+            .on_cancel(move |_, window, cx| {
+                cancel
+                    .update(cx, |this, cx| this.cancel_file_confirmation(id, window, cx))
+                    .unwrap_or(false)
+            })
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .min_w_0()
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(cx.theme().muted_foreground)
+                            .whitespace_normal()
+                            .child(
+                                target
+                                    .map(|target| target.path().display().to_string())
+                                    .unwrap_or_default(),
+                            ),
+                    )
+                    .child(if reload {
+                        "自动保存已暂停。重新读取磁盘内容将丢弃未保存的修改，无法撤销。"
+                    } else if busy {
+                        "正在重试保存，草稿仍保留在当前标签中。"
+                    } else {
+                        "自动保存失败，草稿仍保留在当前标签中。可以重试保存；放弃修改后无法恢复。"
+                    })
+                    .when(busy, |body| {
+                        body.child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap_2()
+                                .child(Spinner::new().small())
+                                .child("正在保存，请稍候"),
+                        )
+                    })
+                    .when_some(view.and_then(FileView::save_error), |body, error| {
+                        body.child(
+                            div().text_sm().text_color(cx.theme().danger).child(error.to_owned()),
+                        )
+                    }),
+            )
+            .footer(
+                div()
+                    .capture_key_down(move |event, window, cx| {
+                        if event.keystroke.key == "enter"
+                            && event.keystroke.modifiers == Modifiers::default()
+                        {
+                            window.prevent_default();
+                            cx.stop_propagation();
+                            let _ = enter
+                                .update(cx, |this, cx| this.save_file_confirmation(id, window, cx));
+                        }
+                    })
+                    .capture_action(move |_: &Confirm, window, cx| {
+                        cx.stop_propagation();
+                        let _ = confirm
+                            .update(cx, |this, cx| this.save_file_confirmation(id, window, cx));
+                    })
+                    .child(
+                        DialogFooter::new()
+                            .when(dirty && (!reload || retry), |footer| {
+                                footer.child(
+                                    Button::new(("discard-file-changes", id))
+                                        .danger()
+                                        .label("放弃修改")
+                                        .disabled(busy)
+                                        .on_click(move |_, window, cx| {
+                                            let _ = discard.update(cx, |this, cx| {
+                                                this.discard_file_confirmation(id, window, cx);
+                                            });
+                                        }),
+                                )
+                            })
+                            .child(div().flex_shrink_0().child(DialogClose::new().trigger(
+                                |button| {
+                                    button.label("取消").accessibility_label("取消").disabled(busy)
+                                },
+                            )))
+                            .when(retry || reload, |footer| {
+                                footer.child(
+                                    Button::new(("save-file-changes", id))
+                                        .primary()
+                                        .when(reload && !retry && dirty, |button| button.danger())
+                                        .label(if retry {
+                                            "重试保存"
+                                        } else if dirty {
+                                            "放弃修改"
+                                        } else {
+                                            "重新读取"
+                                        })
+                                        .disabled(disabled_save)
+                                        .on_click(move |_, window, cx| {
+                                            let _ = owner.update(cx, |this, cx| {
+                                                this.save_file_confirmation(id, window, cx)
+                                            });
+                                        }),
+                                )
+                            }),
+                    ),
+            )
     }
 
     pub fn file_navigation_revision(&self) -> u64 {
@@ -1010,6 +1587,8 @@ impl WorkspaceView {
     fn render_sidebar(&self, panel_style: StyleRefinement, cx: &mut Context<Self>) -> AnyElement {
         let files_available = self.selected_file_directory(cx).is_some();
         let files_selected = files_available && self.sidebar_page == SidebarPage::files();
+        let saving =
+            self.tabs.iter().filter_map(WorkspaceTab::file).any(|view| view.read(cx).is_saving());
         div()
             .size_full()
             .min_h_0()
@@ -1052,7 +1631,48 @@ impl WorkspaceView {
                     }),
             )
             .child(div().flex_1().min_h_0().min_w_0().child(if files_selected {
-                self.file_tree.clone().cached(panel_style).into_any_element()
+                div()
+                    .size_full()
+                    .relative()
+                    .capture_any_mouse_down(cx.listener(|this, _, window, cx| {
+                        if this
+                            .tabs
+                            .iter()
+                            .filter_map(WorkspaceTab::file)
+                            .any(|view| view.read(cx).is_saving())
+                        {
+                            window.prevent_default();
+                            cx.stop_propagation();
+                        }
+                    }))
+                    .capture_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
+                        if event.keystroke.key == "q"
+                            && (event.keystroke.modifiers.platform
+                                || event.keystroke.modifiers.control)
+                        {
+                            return;
+                        }
+                        if this
+                            .tabs
+                            .iter()
+                            .filter_map(WorkspaceTab::file)
+                            .any(|view| view.read(cx).is_saving())
+                        {
+                            window.prevent_default();
+                            cx.stop_propagation();
+                        }
+                    }))
+                    .child(self.file_tree.clone().cached(panel_style))
+                    .when(saving, |tree| {
+                        tree.child(
+                            div()
+                                .absolute()
+                                .inset_0()
+                                .occlude()
+                                .on_any_mouse_down(|_, _, cx| cx.stop_propagation()),
+                        )
+                    })
+                    .into_any_element()
             } else {
                 self.sidebar.clone().cached(panel_style).into_any_element()
             }))
@@ -1248,6 +1868,9 @@ impl WorkspaceView {
     }
 
     fn create_tab(&mut self, directory: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.pending_file_operations.is_empty() {
+            return;
+        }
         if !self.file_tree.update(cx, |tree, cx| tree.cancel_actions(window, cx)) {
             return;
         }
@@ -1286,7 +1909,10 @@ impl WorkspaceView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if session.archived.unwrap_or(false) || self.sidebar.read(cx).management().is_pending() {
+        if session.archived.unwrap_or(false)
+            || self.sidebar.read(cx).management().is_pending()
+            || !self.pending_file_operations.is_empty()
+        {
             return;
         }
         if !self.file_tree.update(cx, |tree, cx| tree.cancel_actions(window, cx)) {
@@ -1462,10 +2088,23 @@ impl WorkspaceView {
     }
 
     pub fn close_tab(&mut self, id: usize, cx: &mut Context<Self>) {
+        if self
+            .file_view(id)
+            .is_some_and(|view| view.read(cx).is_dirty() || view.read(cx).is_saving())
+            || self.pending_file_operations.iter().any(|operation| operation.tab_id() == Some(id))
+        {
+            return;
+        }
+        self.remove_tab(id, cx);
+    }
+
+    fn remove_tab(&mut self, id: usize, cx: &mut Context<Self>) {
         let Some(index) = self.tabs.iter().position(|tab| tab.id == id) else {
             return;
         };
-        if self.tabs[index].is_pending(cx) {
+        if self.tabs[index].is_pending(cx)
+            || self.tabs[index].file().is_some_and(|view| view.read(cx).is_saving())
+        {
             return;
         }
         let active_id = self.tabs.get(self.active).map(|tab| tab.id);
@@ -1516,43 +2155,20 @@ impl WorkspaceView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        match command {
-            TabCommand::Close(id) => {
-                let active = self.tabs.get(self.active).is_some_and(|tab| tab.id == id);
-                self.close_tab(id, cx);
-                if active && !self.tabs.iter().any(|tab| tab.id == id) {
-                    self.focus_active_tab(window, cx);
-                }
-            },
-            TabCommand::CloseAll => {
-                if !self.file_tree.update(cx, |tree, cx| tree.cancel_actions(window, cx)) {
-                    return;
-                }
-                let active = self.tabs.get(self.active).map(|tab| tab.id);
-                self.tabs.retain(|tab| tab.is_pending(cx));
-                self.active = active
-                    .and_then(|id| self.tabs.iter().position(|tab| tab.id == id))
-                    .unwrap_or(0);
-                self.invalidate_file_navigation(cx);
-                self.sync_sidebar_active_session(cx);
-                self.focus_active_tab(window, cx);
-            },
-            TabCommand::CloseOthers(target) => {
-                if !self.tab_order().contains(&target) {
-                    return;
-                }
-                if !self.file_tree.update(cx, |tree, cx| tree.cancel_actions(window, cx)) {
-                    return;
-                }
-                self.tabs.retain(|tab| target == tab.id || tab.is_pending(cx));
-                self.active = self.tabs.iter().position(|tab| tab.id == target).unwrap_or(0);
-                self.invalidate_file_navigation(cx);
-                self.sync_sidebar_active_session(cx);
-                self.focus_active_tab(window, cx);
-            },
-        }
-        self.tab_scroll.scroll_to_item(self.active);
-        cx.notify();
+        let operations = self
+            .tabs
+            .iter()
+            .filter(|tab| {
+                !tab.is_pending(cx)
+                    && match command {
+                        TabCommand::Close(id) => tab.id == id,
+                        TabCommand::CloseAll => true,
+                        TabCommand::CloseOthers(id) => tab.id != id,
+                    }
+            })
+            .map(|tab| PendingFileOperation::close(tab.id))
+            .collect();
+        self.request_file_operations(operations, window, cx);
     }
 
     fn defer_active_tab_focus(&self, cx: &mut Context<Self>) {
@@ -1570,6 +2186,7 @@ impl WorkspaceView {
                     });
                     if this.file_navigation_revision == revision
                         && this.tabs.get(this.active).map(|tab| tab.id) == id
+                        && !window.has_active_dialog(cx)
                         && !already_focused
                     {
                         this.focus_active_tab(window, cx);
@@ -1580,7 +2197,7 @@ impl WorkspaceView {
     }
 
     fn focus_active_tab(&self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.is_sessions_visible() {
+        if !self.is_sessions_visible() || window.has_active_dialog(cx) {
             return;
         }
         self.focus_handle.focus(window, cx);
@@ -1607,7 +2224,11 @@ impl WorkspaceView {
     }
 
     pub fn select_tab(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if index >= self.tabs.len() {
+        if index >= self.tabs.len()
+            || self.file_confirmation.is_some()
+            || !self.pending_file_operations.is_empty()
+            || window.has_active_dialog(cx)
+        {
             return;
         }
         if !self.file_tree.update(cx, |tree, cx| tree.cancel_actions(window, cx)) {
@@ -1776,7 +2397,7 @@ impl WorkspaceView {
             for (label, command, disabled) in [
                 (search, FileTabCommand::search(), !ready),
                 (copy, FileTabCommand::copy_all(), !ready),
-                ("重新读取文件", FileTabCommand::reload(), !open || loading),
+                ("重新读取文件…", FileTabCommand::reload(), !open || loading),
                 ("复制绝对路径", FileTabCommand::copy_absolute_path(), !open),
                 ("复制相对路径", FileTabCommand::copy_relative_path(), !open),
                 ("在文件树中定位", FileTabCommand::locate(), !open),
@@ -1867,7 +2488,11 @@ impl WorkspaceView {
             FileTabCommand::CopyAll => view.update(cx, |view, cx| view.copy_all(cx)),
             FileTabCommand::Reload => {
                 if !view.read(cx).is_loading() {
-                    self.reload_file_tab(id, window, cx);
+                    self.request_file_operations(
+                        VecDeque::from([PendingFileOperation::reload(id)]),
+                        window,
+                        cx,
+                    );
                 }
             },
             FileTabCommand::CopyAbsolutePath => {
@@ -2018,7 +2643,7 @@ impl WorkspaceView {
                     .map(|target| target.path().display().to_string())
                     .unwrap_or_else(|| title.clone());
                 let loading = view.is_loading();
-                let failed = view.has_error();
+                let failed = view.has_error() || view.save_error().is_some();
                 let indicator = div()
                     .size_4()
                     .flex_shrink_0()
@@ -2036,10 +2661,12 @@ impl WorkspaceView {
                     .into_any_element();
                 let status = if loading {
                     "读取中"
+                } else if view.save_error().is_some() {
+                    "自动保存失败"
                 } else if failed {
                     "读取失败"
                 } else {
-                    "只读文件"
+                    "文件"
                 };
                 (title, tooltip, status, indicator)
             },
@@ -2069,7 +2696,7 @@ impl WorkspaceView {
                     .flex_1()
                     .min_w_0()
                     .accessibility_label(tab_label)
-                    .tooltip(tooltip)
+                    .tooltip(format!("{tooltip} · {status}"))
                     .child(indicator)
                     .on_click(cx.listener(move |this, _, window, cx| {
                         if let Some(index) = this.tabs.iter().position(|tab| tab.id == id) {
@@ -2086,6 +2713,10 @@ impl WorkspaceView {
                             .text_sm()
                             .text_color(if active { p.foreground() } else { p.muted() })
                             .child(title),
+                    )
+                    .when(
+                        tab.file().is_some_and(|view| view.read(cx).save_error().is_some()),
+                        |button| button.child(div().text_xs().text_color(p.muted()).child(status)),
                     ),
             )
             .child(
@@ -2226,6 +2857,12 @@ impl WorkspaceView {
     }
 
     pub fn open_settings(&self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.file_confirmation.is_some()
+            || !self.pending_file_operations.is_empty()
+            || window.has_active_dialog(cx)
+        {
+            return;
+        }
         self.settings.update(cx, |settings, cx| settings.open_settings(window, cx));
     }
 

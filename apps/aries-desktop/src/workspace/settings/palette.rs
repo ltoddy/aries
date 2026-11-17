@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use gpui_kit::component::{Theme, ThemeMode};
 use gpui_kit::{App, Hsla, WindowAppearance, rgb};
 
@@ -184,5 +186,13 @@ pub fn sync(mode: ThemeMode, cx: &mut App) {
         theme.colors.link_active = p.primary_hover;
         theme.colors.scrollbar_thumb = p.muted().opacity(0.4);
         theme.colors.scrollbar_thumb_hover = p.muted().opacity(0.6);
+        let highlight = &mut Arc::make_mut(&mut theme.highlight_theme).style;
+        highlight.editor_background = Some(p.background());
+        highlight.editor_foreground = Some(p.foreground());
+        highlight.editor_gutter_background = Some(p.background());
+        highlight.editor_line_number = Some(p.muted());
+        highlight.editor_active_line_number = Some(p.foreground());
+        highlight.editor_active_line = Some(p.hover());
+        highlight.editor_invisible = Some(p.border());
     });
 }
