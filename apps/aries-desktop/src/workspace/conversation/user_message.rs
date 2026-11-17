@@ -3,6 +3,7 @@ use gpui_kit::component::{ActiveTheme, Icon, IconName, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
+use crate::workspace::SessionView;
 use crate::workspace::conversation::ClickHandler;
 use crate::workspace::conversation::attachment::Attachment;
 use crate::workspace::conversation::media::MessageImages;
@@ -25,6 +26,7 @@ impl UserMessage {
         message: &Message,
         images: &MessageImages,
         p: Palette,
+        session: WeakEntity<SessionView>,
     ) -> Self {
         let text = message.text().to_owned();
         let copy_text = text.clone();
@@ -38,6 +40,7 @@ impl UserMessage {
                     images.attachment(index, attachment_index),
                     p,
                 )
+                .with_session(session.clone())
                 .into_any_element()
             })
             .collect();

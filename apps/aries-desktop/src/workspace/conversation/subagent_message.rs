@@ -4,8 +4,10 @@ use gpui_kit::component::{ActiveTheme, Icon, IconName, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
+use crate::workspace::SessionView;
 use crate::workspace::conversation::ClickHandler;
 use crate::workspace::conversation::model::subagent::SubagentState;
+use crate::workspace::conversation::text::link_handler;
 use crate::workspace::settings::palette::Palette;
 use crate::workspace::settings::typography;
 
@@ -52,6 +54,13 @@ impl SubagentMessage {
             p,
             on_toggle,
         )
+    }
+
+    pub fn with_session(mut self, session: WeakEntity<SessionView>) -> Self {
+        for entry in &mut self.entries {
+            entry.session = Some(session.clone());
+        }
+        self
     }
 
     fn new(
@@ -170,17 +179,18 @@ struct SubagentEntry {
     id: String,
     text: String,
     palette: Palette,
+    session: Option<WeakEntity<SessionView>>,
 }
 
 impl SubagentEntry {
     fn new(id: String, text: String, palette: Palette) -> Self {
-        Self { id, text, palette }
+        Self { id, text, palette, session: None }
     }
 }
 
 impl RenderOnce for SubagentEntry {
     fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
-        let Self { id, text, palette: p } = self;
+        let Self { id, text, palette: p, session } = self;
         div()
             .min_w_0()
             .w_full()
@@ -191,6 +201,7 @@ impl RenderOnce for SubagentEntry {
                     .map(typography::style_markdown)
                     .selectable(true)
                     .scrollable(false)
+                    .when_some(session, |view, session| view.on_link_click(link_handler(session)))
                     .w_full()
                     .code_block_actions(move |code_block, _window, _cx| {
                         let code = code_block.code().to_string();

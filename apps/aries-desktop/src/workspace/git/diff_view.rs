@@ -1,3 +1,4 @@
+use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -6,7 +7,7 @@ use gpui_kit::component::button::{Button, ButtonGroup, ButtonVariants};
 use gpui_kit::component::clipboard::Clipboard;
 use gpui_kit::component::diff::{
     Diff, DiffDecoration, DiffFile, DiffFileStatus, DiffLinePosition, DiffLineRange, DiffMode,
-    DiffState,
+    DiffSide, DiffState,
 };
 use gpui_kit::component::input::InputState;
 use gpui_kit::component::menu::{ContextMenuExt, DropdownMenu, PopupMenuItem};
@@ -17,6 +18,7 @@ use gpui_kit::*;
 
 use crate::error::details;
 use crate::workspace::SessionView;
+use crate::workspace::files::OpenFile;
 use crate::workspace::git::diff_operations::DiscardBackupEntry;
 use crate::workspace::git::diff_patch::{DiffPatch, PatchScope};
 use crate::workspace::git::error::DiffLoadError;
@@ -557,6 +559,83 @@ impl GitDiffView {
             .into_any_element()
     }
 
+    fn open_source(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(target) = self.target.as_ref() else {
+            return;
+        };
+        let path = self
+            .state
+            .read(cx)
+            .files()
+            .first()
+            .and_then(|file| file.modified_path())
+            .map(|path| PathBuf::from(path.as_str()))
+            .unwrap_or_else(|| target.path.clone());
+        let line = self
+            .location
+            .as_ref()
+            .filter(|position| {
+                target.group == ChangeGroup::Unstaged && position.side() == DiffSide::Modified
+            })
+            .and_then(|position| NonZeroUsize::new(position.line()));
+        let Some(host) = self.owner.upgrade().and_then(|owner| owner.read(cx).tab_host()) else {
+            return;
+        };
+        let Some(navigation_revision) =
+            host.upgrade().map(|host| host.read(cx).file_navigation_revision())
+        else {
+            return;
+        };
+        let directory = self.directory.clone();
+        let revision = self.revision;
+        let task = cx.background_spawn(async move {
+            let repository = git2::Repository::discover(&directory).map_err(|source| {
+                crate::workspace::git::error::RepositoryError::git(
+                    "discovering Git repository",
+                    &directory,
+                    source,
+                )
+            })?;
+            Ok::<_, crate::workspace::git::error::RepositoryError>(
+                repository.workdir().unwrap_or(&directory).to_owned(),
+            )
+        });
+        cx.spawn_in(window, async move |this, cx| {
+            let result = task.await;
+            let _ = cx.update(|window, cx| {
+                this.update(cx, |this, cx| {
+                    if this.revision != revision || !this.is_open() {
+                        return;
+                    }
+                    match result {
+                        Ok(directory) => {
+                            let target = OpenFile::new(directory, path);
+                            let target = match line {
+                                Some(line) => target.with_line(line),
+                                None => target,
+                            };
+                            let owner = this.owner.clone();
+                            window.defer(cx, move |window, cx| {
+                                let _ = host.update(cx, |host, cx| {
+                                    if host.file_navigation_revision() == navigation_revision
+                                        && host.is_active_session(&owner)
+                                    {
+                                        host.open_file(target, window, cx);
+                                    }
+                                });
+                            });
+                        },
+                        Err(error) => {
+                            this.tool_error = Some(details(&error));
+                            cx.notify();
+                        },
+                    }
+                })
+            });
+        })
+        .detach();
+    }
+
     fn set_mode(&mut self, mode: DiffMode, cx: &mut Context<Self>) {
         self.state.update(cx, |state, cx| state.set_mode(mode, cx));
     }
@@ -613,6 +692,7 @@ impl Render for GitDiffView {
                 .min_h_0()
                 .child(
                     Diff::new(&self.state)
+                        .soft_wrap(true)
                         .header_visible(false)
                         .decorations(self.decorations.clone())
                         .on_line_click(move |position, _, _, cx| {
@@ -706,6 +786,15 @@ impl Render for GitDiffView {
                     )
                     .child(self.render_file_summary(cx))
                     .child(self.render_file_navigation(cx))
+                    .child(
+                        Button::new("open-diff-source")
+                            .small()
+                            .ghost()
+                            .label("查看完整文件")
+                            .on_click(
+                                cx.listener(|this, _, window, cx| this.open_source(window, cx)),
+                            ),
+                    )
                     .when(self.loading, |toolbar| toolbar.child(Spinner::new().small()))
                     .child(
                         Button::new("refresh-diff")

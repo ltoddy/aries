@@ -8,8 +8,10 @@ use gpui_kit::component::{ActiveTheme, Icon, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
+use crate::workspace::SessionView;
 use crate::workspace::conversation::ClickHandler;
 use crate::workspace::conversation::model::Message;
+use crate::workspace::conversation::text::link_handler;
 use crate::workspace::settings::palette::Palette;
 use crate::workspace::settings::typography;
 
@@ -21,6 +23,7 @@ pub struct ThoughtMessage {
     content: ThoughtContent,
     palette: Palette,
     on_toggle: ClickHandler,
+    session: Option<WeakEntity<SessionView>>,
 }
 
 impl ThoughtMessage {
@@ -53,7 +56,20 @@ impl ThoughtMessage {
         palette: Palette,
         on_toggle: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
     ) -> Self {
-        Self { index, id, expanded, content, palette, on_toggle: Box::new(on_toggle) }
+        Self {
+            index,
+            id,
+            expanded,
+            content,
+            palette,
+            on_toggle: Box::new(on_toggle),
+            session: None,
+        }
+    }
+
+    pub fn with_session(mut self, session: WeakEntity<SessionView>) -> Self {
+        self.session = Some(session);
+        self
     }
 }
 
@@ -71,7 +87,7 @@ impl ThoughtContent {
 
 impl RenderOnce for ThoughtMessage {
     fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
-        let Self { index, id, expanded, content, palette: p, on_toggle } = self;
+        let Self { index, id, expanded, content, palette: p, on_toggle, session } = self;
         let ThoughtContent { title, text, markdown } = content;
         div()
             .id(("message", index))
@@ -120,6 +136,9 @@ impl RenderOnce for ThoughtMessage {
                                 .map(typography::style_markdown)
                                 .selectable(true)
                                 .scrollable(false)
+                                .when_some(session, |view, session| {
+                                    view.on_link_click(link_handler(session))
+                                })
                                 .w_full()
                                 .code_block_actions(|code_block, _window, cx| {
                                     let code = code_block.code().to_string();

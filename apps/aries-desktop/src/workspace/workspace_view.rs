@@ -9,7 +9,7 @@ use gpui_kit::base::GlobalState;
 use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants};
 use gpui_kit::component::menu::{ContextMenuExt, PopupMenu, PopupMenuItem};
 use gpui_kit::component::{
-    ActiveTheme, Disableable, Icon, ResizableState, Sizable, TitleBar, h_resizable,
+    ActiveTheme, Disableable, Icon, ResizableState, Selectable, Sizable, TitleBar, h_resizable,
     resizable_panel, v_resizable,
 };
 use gpui_kit::prelude::*;
@@ -18,13 +18,14 @@ use gpui_kit::*;
 use crate::acp::Event;
 use crate::terminal::TerminalView;
 use crate::workspace::extensions::ExtensionsView;
+use crate::workspace::files::{FileActionEvent, FileTree, FileView, OpenFile};
 use crate::workspace::settings::palette::Palette;
 use crate::workspace::settings::{Preferences, SettingsState};
 use crate::workspace::usage::{ReturnToSessions, UsageView};
 use crate::workspace::{SessionRenderMode, SessionView};
 use crate::{
     CloseTab, NewSession, NextTab, NextUserMessage, OpenSettings, PreviousTab, PreviousUserMessage,
-    ToggleSidebar, ToggleTerminal,
+    SwitchSidebar, ToggleSidebar, ToggleTerminal,
 };
 
 struct SessionTab {
@@ -113,14 +114,40 @@ impl WorkspacePage {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SidebarPage {
+    Sessions,
+    Files,
+}
+
+impl SidebarPage {
+    fn sessions() -> Self {
+        Self::Sessions
+    }
+
+    fn files() -> Self {
+        Self::Files
+    }
+}
+
 pub struct WorkspaceView {
     cwd: PathBuf,
+    window: AnyWindowHandle,
+    sidebar_page: SidebarPage,
+    file_tree: Entity<FileTree>,
+    file_view: Entity<FileView>,
+    _file_subscription: Subscription,
+    _file_action_subscription: Subscription,
+    _file_view_subscription: Subscription,
+    file_navigation_revision: u64,
+    observed_file_target: Option<OpenFile>,
     settings: Entity<SettingsState>,
     agent: AcpAgentConfig,
     sidebar: Entity<SessionView>,
     sidebar_visible: bool,
     sidebar_focus_handle: FocusHandle,
     sidebar_toggle_focus_handle: FocusHandle,
+    sidebar_sessions_focus_handle: FocusHandle,
     layout: Entity<ResizableState>,
     diff_layout: Entity<ResizableState>,
     _sidebar_subscription: Subscription,
@@ -166,6 +193,32 @@ impl WorkspaceView {
         let settings = cx.new(|cx| SettingsState::new(preferences_path, host, window, cx));
         let sidebar = Self::create_chat_view(&cwd, &agent, SessionRenderMode::Sidebar, window, cx);
         let sidebar_subscription = Self::observe_tab(&sidebar, window, cx);
+        let file_tree = cx.new(|cx| FileTree::new(cwd.clone(), window, cx));
+        let file_view = cx.new(|cx| FileView::new(window, cx));
+        let file_subscription =
+            cx.subscribe_in(&file_tree, window, |this, _, event: &OpenFile, window, cx| {
+                this.open_file(event.clone(), window, cx);
+            });
+        let file_action_subscription =
+            cx.subscribe_in(&file_tree, window, |_, _, event: &FileActionEvent, window, cx| {
+                let event = event.clone();
+                cx.defer_in(window, move |this, window, cx| {
+                    this.on_file_action(event, window, cx);
+                });
+            });
+        let file_view_subscription = cx.observe(&file_view, |this, view, cx| {
+            let target = view.read(cx).target().cloned();
+            if this.observed_file_target != target {
+                this.observed_file_target = target;
+                this.file_navigation_revision = this.file_navigation_revision.wrapping_add(1);
+            }
+            let current = view.read(cx).target().map(|target| target.path().to_owned());
+            this.file_tree.update(cx, |tree, cx| tree.track_current_file(current, cx));
+            if !view.read(cx).is_open() {
+                this.sync_file_directory(cx);
+            }
+            cx.notify();
+        });
         let usage = cx.new(|cx| UsageView::new(window, cx));
         let usage_subscription =
             cx.subscribe_in(&usage, window, |this, _, _: &ReturnToSessions, window, cx| {
@@ -180,12 +233,22 @@ impl WorkspaceView {
         focus_handle.focus(window, cx);
         Self {
             cwd,
+            window: window.window_handle(),
+            sidebar_page: SidebarPage::sessions(),
+            file_tree,
+            file_view,
+            _file_subscription: file_subscription,
+            _file_action_subscription: file_action_subscription,
+            _file_view_subscription: file_view_subscription,
+            file_navigation_revision: 0,
+            observed_file_target: None,
             settings,
             agent,
             sidebar,
             sidebar_visible: true,
             sidebar_focus_handle: cx.focus_handle(),
             sidebar_toggle_focus_handle: cx.focus_handle().tab_stop(true),
+            sidebar_sessions_focus_handle: cx.focus_handle().tab_stop(true),
             layout: cx.new(|_| ResizableState::default()),
             diff_layout: cx.new(|_| ResizableState::default()),
             _sidebar_subscription: sidebar_subscription,
@@ -221,10 +284,11 @@ impl Render for WorkspaceView {
             view.update(cx, |session, cx| session.git_panel().render(view, window, cx))
         };
         let diff = view.read(cx).git_panel().diff().clone();
-        let diff_open = self.is_sessions_visible() && diff.read(cx).is_open();
+        let file_open = self.is_sessions_visible() && self.file_view.read(cx).is_open();
+        let diff_open = self.is_sessions_visible() && !file_open && diff.read(cx).is_open();
         let font_size = cx.theme().font_size;
         let width = window.viewport_size().width;
-        let content_minimum = font_size * if diff_open { 28. } else { 26. };
+        let content_minimum = font_size * if diff_open || file_open { 28. } else { 26. };
         let sidebar_minimum = font_size * 13.75;
         let sidebar_maximum = (width - content_minimum - font_size).min(font_size * 30.);
         let sidebar_available = (sidebar_maximum >= sidebar_minimum).then_some(sidebar_maximum);
@@ -273,7 +337,12 @@ impl Render for WorkspaceView {
                 }
             })
             .children(git_info);
-        let content = if diff_open {
+        let content = if file_open || diff_open {
+            let detail = if file_open {
+                self.file_view.clone().cached(panel_style.clone()).into_any_element()
+            } else {
+                diff.cached(panel_style.clone()).into_any_element()
+            };
             let diff_width =
                 (content_width * 0.6).clamp(font_size * 16., content_width - font_size * 12.);
             h_resizable("chat-diff-layout")
@@ -283,7 +352,7 @@ impl Render for WorkspaceView {
                     resizable_panel()
                         .size(diff_width)
                         .size_range(font_size * 16. ..Pixels::MAX)
-                        .child(diff.cached(panel_style.clone())),
+                        .child(detail),
                 )
                 .into_any_element()
         } else {
@@ -323,6 +392,9 @@ impl Render for WorkspaceView {
             }))
             .on_action(cx.listener(|this, _: &ToggleSidebar, window, cx| {
                 this.toggle_sidebar(window, cx);
+            }))
+            .on_action(cx.listener(|this, _: &SwitchSidebar, window, cx| {
+                this.switch_sidebar(window, cx);
             }))
             .on_action(cx.listener(|this, _: &CloseTab, window, cx| {
                 if this.is_sessions_visible()
@@ -397,7 +469,7 @@ impl Render for WorkspaceView {
                                 div()
                                     .size_full()
                                     .track_focus(&self.sidebar_focus_handle)
-                                    .child(self.sidebar.clone().cached(panel_style)),
+                                    .child(self.render_sidebar(panel_style, cx)),
                             ),
                     )
                     .child(resizable_panel().child(main))
@@ -409,6 +481,208 @@ impl Render for WorkspaceView {
 }
 
 impl WorkspaceView {
+    pub fn open_file(&mut self, target: OpenFile, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.file_tree.update(cx, |tree, cx| tree.cancel_actions(window, cx)) {
+            return;
+        }
+        self.file_navigation_revision = self.file_navigation_revision.wrapping_add(1);
+        self.show_sessions(window, cx);
+        self.sidebar_page = SidebarPage::files();
+        self.file_tree.update(cx, |tree, cx| {
+            tree.set_directory(target.directory().to_owned(), cx);
+            tree.reveal(target.path(), cx);
+        });
+        self.file_view.update(cx, |view, cx| view.open(target, window, cx));
+        cx.notify();
+    }
+
+    fn on_file_action(
+        &mut self,
+        event: FileActionEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let target = self.file_view.read(cx).target().cloned();
+        let Some(target) = target else {
+            return;
+        };
+        let normalized = self.file_tree.read(cx).normalize_path(target.path());
+        match event {
+            FileActionEvent::Renamed { from, to } => {
+                if let Ok(relative) = normalized.strip_prefix(&from) {
+                    let mut updated =
+                        OpenFile::new(target.directory().to_owned(), to.join(relative));
+                    if let Some(line) = target.line() {
+                        updated = updated.with_line(line);
+                    }
+                    self.file_view.update(cx, |view, cx| view.open(updated, window, cx));
+                }
+            },
+            FileActionEvent::Deleted(path) => {
+                if normalized.starts_with(path) {
+                    self.file_view.update(cx, |view, cx| view.close(window, cx));
+                }
+            },
+            FileActionEvent::Refresh(path) => {
+                if normalized.starts_with(path) {
+                    self.file_view.update(cx, |view, cx| view.open(target, window, cx));
+                }
+            },
+            FileActionEvent::Created(_) => {},
+        }
+    }
+
+    pub fn file_navigation_revision(&self) -> u64 {
+        self.file_navigation_revision
+    }
+
+    pub fn is_active_session(&self, owner: &WeakEntity<SessionView>) -> bool {
+        self.is_sessions_visible()
+            && owner.upgrade().as_ref() == Some(self.active_view().unwrap_or(&self.sidebar))
+    }
+
+    fn invalidate_file_navigation(&mut self, cx: &mut Context<Self>) {
+        self.file_navigation_revision = self.file_navigation_revision.wrapping_add(1);
+        let revision = self.file_navigation_revision;
+        let window = self.window;
+        let owner = cx.weak_entity();
+        cx.defer(move |cx| {
+            let _ = window.update(cx, |_, window, cx| {
+                let _ = owner.update(cx, |this, cx| {
+                    if this.file_navigation_revision == revision {
+                        this.file_view.update(cx, |view, cx| view.close(window, cx));
+                    }
+                });
+            });
+        });
+    }
+
+    pub fn show_diff(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.file_navigation_revision = self.file_navigation_revision.wrapping_add(1);
+        let focus = window.focused(cx);
+        self.file_view.update(cx, |view, cx| view.close(window, cx));
+        if let Some(focus) = focus {
+            focus.focus(window, cx);
+        }
+        cx.notify();
+    }
+
+    fn switch_sidebar(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let page = if self.sidebar_page == SidebarPage::sessions() {
+            SidebarPage::files()
+        } else {
+            SidebarPage::sessions()
+        };
+        self.select_sidebar_page(page, window, cx);
+    }
+
+    fn select_sidebar_page(
+        &mut self,
+        page: SidebarPage,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.sidebar_page = page;
+        self.sidebar_visible = true;
+        if page == SidebarPage::files() {
+            self.sync_file_directory(cx);
+        }
+        let view = cx.weak_entity();
+        window.on_next_frame(move |window, cx| {
+            let _ = view.update(cx, |this, cx| {
+                if this.sidebar_page != page || !this.sidebar_visible {
+                    return;
+                }
+                let detail_open = this.is_sessions_visible()
+                    && (this.file_view.read(cx).is_open()
+                        || this
+                            .active_view()
+                            .unwrap_or(&this.sidebar)
+                            .read(cx)
+                            .git_panel()
+                            .diff()
+                            .read(cx)
+                            .is_open());
+                let minimum = cx.theme().font_size * if detail_open { 42.75 } else { 40.75 };
+                if window.viewport_size().width < minimum {
+                    this.sidebar_toggle_focus_handle.focus(window, cx);
+                } else if page == SidebarPage::files() {
+                    this.file_tree.update(cx, |tree, cx| tree.focus(window, cx));
+                } else {
+                    this.sidebar_sessions_focus_handle.focus(window, cx);
+                }
+            });
+        });
+        cx.notify();
+    }
+
+    fn sync_file_directory(&mut self, cx: &mut Context<Self>) {
+        let directory = self
+            .file_view
+            .read(cx)
+            .target()
+            .map(|target| target.directory().to_owned())
+            .unwrap_or_else(|| {
+                self.active_view()
+                    .unwrap_or(&self.sidebar)
+                    .read(cx)
+                    .execution()
+                    .directory()
+                    .to_owned()
+            });
+        self.file_tree.update(cx, |tree, cx| tree.set_directory(directory, cx));
+    }
+
+    fn render_sidebar(&self, panel_style: StyleRefinement, cx: &mut Context<Self>) -> AnyElement {
+        div()
+            .size_full()
+            .min_h_0()
+            .min_w_0()
+            .flex()
+            .flex_col()
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_1()
+                    .px_2()
+                    .py_1()
+                    .child(
+                        Button::new("sidebar-sessions")
+                            .small()
+                            .ghost()
+                            .label("会话")
+                            .icon(IconName::MessagesSquare)
+                            .track_focus(&self.sidebar_sessions_focus_handle)
+                            .tooltip_with_action("切换会话 / 文件", &SwitchSidebar::new(), None)
+                            .selected(self.sidebar_page == SidebarPage::sessions())
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.select_sidebar_page(SidebarPage::sessions(), window, cx);
+                            })),
+                    )
+                    .child(
+                        Button::new("sidebar-files")
+                            .small()
+                            .ghost()
+                            .label("文件")
+                            .icon(IconName::FolderTree)
+                            .tooltip_with_action("切换会话 / 文件", &SwitchSidebar::new(), None)
+                            .selected(self.sidebar_page == SidebarPage::files())
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.select_sidebar_page(SidebarPage::files(), window, cx);
+                            })),
+                    ),
+            )
+            .child(div().flex_1().min_h_0().min_w_0().child(
+                if self.sidebar_page == SidebarPage::files() {
+                    self.file_tree.clone().cached(panel_style).into_any_element()
+                } else {
+                    self.sidebar.clone().cached(panel_style).into_any_element()
+                },
+            ))
+            .into_any_element()
+    }
+
     fn toggle_sidebar(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.sidebar_visible = !self.sidebar_visible;
         if !self.sidebar_visible && self.sidebar_focus_handle.contains_focused(window, cx) {
@@ -575,6 +849,11 @@ impl WorkspaceView {
     }
 
     fn create_tab(&mut self, directory: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.file_tree.update(cx, |tree, cx| tree.cancel_actions(window, cx)) {
+            return;
+        }
+        self.file_navigation_revision = self.file_navigation_revision.wrapping_add(1);
+        self.file_view.update(cx, |view, cx| view.close(window, cx));
         if !self.is_sessions_visible() {
             self.show_sessions(window, cx);
         }
@@ -584,6 +863,7 @@ impl WorkspaceView {
             Self::create_chat_view(&directory, &self.agent, SessionRenderMode::Main, window, cx);
         let subscription = Self::observe_tab(&view, window, cx);
         self.tabs.push(SessionTab::new(id, view.clone(), subscription));
+        self.file_tree.update(cx, |tree, cx| tree.set_directory(directory.clone(), cx));
         self.page = WorkspacePage::sessions();
         self.active = self.tabs.len() - 1;
         self.tab_scroll.scroll_to_item(self.active);
@@ -605,9 +885,14 @@ impl WorkspaceView {
         if session.archived.unwrap_or(false) || self.sidebar.read(cx).management().is_pending() {
             return;
         }
+        if !self.file_tree.update(cx, |tree, cx| tree.cancel_actions(window, cx)) {
+            return;
+        }
         if !self.is_sessions_visible() {
             self.show_sessions(window, cx);
         }
+        self.file_navigation_revision = self.file_navigation_revision.wrapping_add(1);
+        self.file_view.update(cx, |view, cx| view.close(window, cx));
         let session_id = session.session_id.clone();
         if let Some(index) =
             self.archived_tabs.iter().position(|tab| tab.view.read(cx).matches_session(&session_id))
@@ -713,6 +998,9 @@ impl WorkspaceView {
     }
     pub fn close_archived_session(&mut self, id: &SessionId, cx: &mut Context<Self>) {
         let active_id = self.tabs.get(self.active).map(|tab| tab.id);
+        if self.active_view().is_some_and(|view| view.read(cx).matches_session(id)) {
+            self.invalidate_file_navigation(cx);
+        }
         let mut index = 0;
         while index < self.tabs.len() {
             if self.tabs[index].view.read(cx).matches_session(id) {
@@ -747,6 +1035,9 @@ impl WorkspaceView {
         };
         if self.tabs[index].view.read(cx).management().is_pending() {
             return;
+        }
+        if index == self.active {
+            self.invalidate_file_navigation(cx);
         }
         self.tabs.remove(index);
         if self.tabs.is_empty() {
@@ -795,6 +1086,7 @@ impl WorkspaceView {
         match command {
             TabCommand::Close(id) => self.close_tab(id, cx),
             TabCommand::CloseAll => {
+                self.invalidate_file_navigation(cx);
                 self.tabs.retain(|tab| tab.view.read(cx).management().is_pending());
                 self.active = 0;
                 self.sync_sidebar_active_session(cx);
@@ -803,6 +1095,7 @@ impl WorkspaceView {
                 if !self.tab_order().contains(&target) {
                     return;
                 }
+                self.invalidate_file_navigation(cx);
                 self.tabs
                     .retain(|tab| target == tab.id || tab.view.read(cx).management().is_pending());
                 self.active = 0;
@@ -819,9 +1112,14 @@ impl WorkspaceView {
         if index >= self.tabs.len() {
             return;
         }
+        if !self.file_tree.update(cx, |tree, cx| tree.cancel_actions(window, cx)) {
+            return;
+        }
         if !self.is_sessions_visible() {
             self.show_sessions(window, cx);
         }
+        self.file_navigation_revision = self.file_navigation_revision.wrapping_add(1);
+        self.file_view.update(cx, |view, cx| view.close(window, cx));
         self.active = index;
         self.tab_scroll.scroll_to_item(index);
         self.sync_sidebar_active_session(cx);
@@ -865,7 +1163,7 @@ impl WorkspaceView {
                 .collect()
         };
         let sidebar_visible = self.sidebar_visible && sidebar_available.is_some();
-        let label = if sidebar_visible { "收起会话列表" } else { "展开会话列表" };
+        let label = if sidebar_visible { "收起侧栏" } else { "展开侧栏" };
         let icon = if sidebar_visible { IconName::PanelLeftClose } else { IconName::PanelLeftOpen };
         let shortcut = if cfg!(target_os = "macos") { "⌘B" } else { "Ctrl+B" };
         div()
@@ -890,7 +1188,7 @@ impl WorkspaceView {
                     .tooltip(if sidebar_available.is_some() {
                         format!("{label} {shortcut}")
                     } else {
-                        "窗口较窄，加宽窗口或收起 Diff 后可展开会话列表".into()
+                        "窗口较窄，加宽窗口或收起详情后可展开侧栏".into()
                     })
                     .on_click(|_, window, cx| {
                         cx.stop_propagation();
@@ -1167,10 +1465,12 @@ impl WorkspaceView {
     pub fn sync_sidebar_active_session(&mut self, cx: &mut Context<Self>) {
         let snapshot = self.tabs.get(self.active).map(|tab| tab.view.read(cx).sidebar_snapshot());
         self.sidebar.update(cx, |view, cx| view.sync_sidebar_active(snapshot, cx));
+        self.sync_file_directory(cx);
     }
 
     pub fn set_sidebar_session(&mut self, session_id: SessionId, cx: &mut Context<Self>) {
         self.sidebar.update(cx, |view, cx| view.set_sidebar_session(session_id, cx));
+        self.sync_file_directory(cx);
     }
 }
 

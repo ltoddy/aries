@@ -16,6 +16,7 @@ use crate::workspace::WorkspaceView;
 use crate::workspace::conversation::prompt_queue::PromptQueue;
 use crate::workspace::conversation::timeline::Timeline;
 use crate::workspace::conversation::{CommandMenuAction, Composer};
+use crate::workspace::files::OpenFile;
 use crate::workspace::git::GitPanel;
 use crate::workspace::session::configuration::Configuration;
 use crate::workspace::session::execution::{Execution, SessionParts};
@@ -171,6 +172,18 @@ impl SessionView {
     }
     pub fn tab_host(&self) -> Option<WeakEntity<WorkspaceView>> {
         self.tab_host.clone()
+    }
+    pub fn open_file(&mut self, target: OpenFile, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(host) = self.tab_host() {
+            let owner = cx.weak_entity();
+            window.defer(cx, move |window, cx| {
+                let _ = host.update(cx, |host, cx| {
+                    if host.is_active_session(&owner) {
+                        host.open_file(target, window, cx);
+                    }
+                });
+            });
+        }
     }
     pub fn uses_sidebar_tab_host(&self) -> bool {
         self.render_mode == SessionRenderMode::Sidebar && self.tab_host.is_some()
