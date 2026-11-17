@@ -4,10 +4,10 @@ use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::str::Utf8Error;
 
-use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::button::Button;
 use gpui_kit::component::input::{Editor, EditorState, Escape, RopeExt, Search};
 use gpui_kit::component::spinner::Spinner;
-use gpui_kit::component::{ActiveTheme, Disableable, Sizable};
+use gpui_kit::component::{ActiveTheme, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 use thiserror::Error;
@@ -49,14 +49,13 @@ impl PreviousMatch {
 }
 
 pub fn init(cx: &mut App) {
-    let (find, close, copy, next, previous) = if cfg!(target_os = "macos") {
-        ("cmd-f", "cmd-w", "cmd-shift-c", "cmd-g", "cmd-shift-g")
+    let (find, copy, next, previous) = if cfg!(target_os = "macos") {
+        ("cmd-f", "cmd-shift-c", "cmd-g", "cmd-shift-g")
     } else {
-        ("ctrl-f", "ctrl-w", "ctrl-shift-c", "ctrl-g", "ctrl-shift-g")
+        ("ctrl-f", "ctrl-shift-c", "ctrl-g", "ctrl-shift-g")
     };
     cx.bind_keys([
         KeyBinding::new(find, FindFile::new(), Some(FILE_VIEW_CONTEXT)),
-        KeyBinding::new(close, CloseFile::new(), Some(FILE_VIEW_CONTEXT)),
         KeyBinding::new(copy, CopyFile::new(), Some(FILE_VIEW_CONTEXT)),
         KeyBinding::new(next, NextMatch::new(), Some(FILE_VIEW_CONTEXT)),
         KeyBinding::new(previous, PreviousMatch::new(), Some(FILE_VIEW_CONTEXT)),
@@ -306,7 +305,6 @@ pub struct FileView {
     editor: Entity<EditorState>,
     state: FileLoadState,
     focus_handle: FocusHandle,
-    return_focus: Option<FocusHandle>,
     revision: u64,
     load_task: Option<Task<()>>,
     feedback: Option<SharedString>,
@@ -328,7 +326,6 @@ impl FileView {
             editor,
             state: FileLoadState::new(),
             focus_handle: cx.focus_handle(),
-            return_focus: None,
             revision: 0,
             load_task: None,
             feedback: None,
@@ -344,9 +341,6 @@ impl FileView {
     }
 
     pub fn open(&mut self, target: OpenFile, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.is_open() {
-            self.return_focus = window.focused(cx);
-        }
         self.revision = self.revision.wrapping_add(1);
         let revision = self.revision;
         let path = target.path().to_path_buf();
@@ -401,7 +395,48 @@ impl FileView {
         cx.notify();
     }
 
-    fn reload(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn is_ready(&self) -> bool {
+        self.state.is_ready()
+    }
+
+    pub fn is_loading(&self) -> bool {
+        matches!(self.state, FileLoadState::Loading)
+    }
+
+    pub fn has_error(&self) -> bool {
+        matches!(self.state, FileLoadState::Failed(_))
+    }
+
+    pub fn focus(&self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.state.is_ready() {
+            self.editor.update(cx, |editor, cx| editor.focus(window, cx));
+        } else {
+            self.focus_handle.focus(window, cx);
+        }
+    }
+
+    pub fn reveal(&mut self, target: OpenFile, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(current) = self.target.as_mut() else {
+            return;
+        };
+        if current.path() != target.path() {
+            return;
+        }
+        current.line = target.line();
+        if let Some(line) = current.line
+            && self.state.is_ready()
+        {
+            self.editor.update(cx, |editor, cx| {
+                let row = (line.get() - 1).min(editor.text().lines_len().saturating_sub(1));
+                let offset = editor.text().line_start_offset(row);
+                editor.set_selected_range(offset..offset, cx);
+            });
+        }
+        self.focus(window, cx);
+        cx.notify();
+    }
+
+    pub fn reload(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(target) = self.target.clone() {
             self.open(target, window, cx);
         }
@@ -417,28 +452,7 @@ impl FileView {
         });
     }
 
-    pub fn close(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.is_open() {
-            return;
-        }
-        self.revision = self.revision.wrapping_add(1);
-        self.target = None;
-        self.load_task = None;
-        self.state = FileLoadState::new();
-        self.feedback = None;
-        self.editor.update(cx, |editor, cx| {
-            editor.close_search(cx);
-            editor.set_value("", window, cx);
-        });
-        if let Some(focus) = self.return_focus.take() {
-            focus.focus(window, cx);
-        } else {
-            window.blur(cx);
-        }
-        cx.notify();
-    }
-
-    fn copy_all(&mut self, cx: &mut Context<Self>) {
+    pub fn copy_all(&mut self, cx: &mut Context<Self>) {
         if !self.is_open() || !self.state.is_ready() {
             return;
         }
@@ -467,62 +481,7 @@ impl FileView {
                 editor.close_search(cx);
                 editor.focus(window, cx);
             });
-        } else {
-            self.close(window, cx);
         }
-    }
-
-    fn render_toolbar(&self, cx: &mut Context<Self>) -> AnyElement {
-        div()
-            .flex_shrink_0()
-            .flex()
-            .items_center()
-            .flex_wrap()
-            .gap_2()
-            .px_3()
-            .py_2()
-            .border_b_1()
-            .border_color(cx.theme().border)
-            .child(
-                Button::new("file-view-search")
-                    .small()
-                    .ghost()
-                    .label("搜索")
-                    .disabled(!self.state.is_ready())
-                    .tooltip_with_action("在文件内搜索", &FindFile::new(), Some(FILE_VIEW_CONTEXT))
-                    .on_click(cx.listener(|this, _, window, cx| this.search(window, cx))),
-            )
-            .child(
-                Button::new("file-view-copy-all")
-                    .small()
-                    .ghost()
-                    .label("复制全文")
-                    .disabled(!self.state.is_ready())
-                    .tooltip_with_action("复制全文", &CopyFile::new(), Some(FILE_VIEW_CONTEXT))
-                    .on_click(cx.listener(|this, _, _, cx| this.copy_all(cx))),
-            )
-            .child(
-                Button::new("file-view-refresh")
-                    .small()
-                    .ghost()
-                    .label("刷新文件")
-                    .loading(matches!(self.state, FileLoadState::Loading))
-                    .disabled(!self.is_open() || matches!(self.state, FileLoadState::Loading))
-                    .on_click(cx.listener(|this, _, window, cx| this.reload(window, cx))),
-            )
-            .child(
-                Button::new("file-view-close")
-                    .small()
-                    .ghost()
-                    .label("关闭")
-                    .tooltip_with_action(
-                        "关闭文件查看器",
-                        &CloseFile::new(),
-                        Some(FILE_VIEW_CONTEXT),
-                    )
-                    .on_click(cx.listener(|this, _, window, cx| this.close(window, cx))),
-            )
-            .into_any_element()
     }
 
     fn render_content(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -565,6 +524,8 @@ impl FileView {
     }
 }
 
+impl EventEmitter<CloseFile> for FileView {}
+
 impl Focusable for FileView {
     fn focus_handle(&self, _: &App) -> FocusHandle {
         self.focus_handle.clone()
@@ -576,19 +537,10 @@ impl Render for FileView {
         if !self.is_open() {
             return Empty.into_any_element();
         }
-        let title = self
-            .target
-            .as_ref()
-            .map(|target| target.path().display().to_string())
-            .unwrap_or_default();
         div()
             .id("file-view")
             .key_context(FILE_VIEW_CONTEXT)
             .track_focus(&self.focus_handle)
-            .capture_action(cx.listener(|this, _: &crate::CloseTab, window, cx| {
-                this.close(window, cx);
-                cx.stop_propagation();
-            }))
             .capture_action(cx.listener(|this, _: &Search, window, cx| {
                 this.search(window, cx);
                 cx.stop_propagation();
@@ -598,7 +550,7 @@ impl Render for FileView {
                 cx.stop_propagation();
             }))
             .on_action(cx.listener(|this, _: &FindFile, window, cx| this.search(window, cx)))
-            .on_action(cx.listener(|this, _: &CloseFile, window, cx| this.close(window, cx)))
+            .on_action(cx.listener(|_, _: &CloseFile, _, cx| cx.emit(CloseFile::new())))
             .on_action(cx.listener(|this, _: &CopyFile, _, cx| this.copy_all(cx)))
             .on_action(cx.listener(|this, _: &NextMatch, _, cx| this.navigate_match(false, cx)))
             .on_action(cx.listener(|this, _: &PreviousMatch, _, cx| this.navigate_match(true, cx)))
@@ -609,8 +561,6 @@ impl Render for FileView {
             .flex_col()
             .bg(cx.theme().background)
             .text_color(cx.theme().foreground)
-            .child(div().flex_shrink_0().min_w_0().px_3().py_2().text_sm().truncate().child(title))
-            .child(self.render_toolbar(cx))
             .child(div().flex_1().min_w_0().min_h_0().child(self.render_content(cx)))
             .child(
                 div()

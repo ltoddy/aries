@@ -878,9 +878,11 @@ impl Execution {
                 this.finish_directory_selection();
                 match result {
                     Ok(Some(directory)) => {
-                        if let Some(host) = &this.tab_host() {
-                            let _ = host.update(cx, |host, cx| {
-                                host.new_tab_in_directory(directory, window, cx);
+                        if let Some(host) = this.tab_host().clone() {
+                            window.defer(cx, move |window, cx| {
+                                let _ = host.update(cx, |host, cx| {
+                                    host.new_tab_in_directory(directory, window, cx);
+                                });
                             });
                         } else {
                             this.start_new_chat(directory, window, cx);
@@ -918,9 +920,11 @@ impl Execution {
                 match result {
                     Ok(directory) => {
                         this.with_sidebar(|sidebar| sidebar.list_mut().expand_project(&directory));
-                        if let Some(host) = &this.tab_host() {
-                            let _ = host.update(cx, |host, cx| {
-                                host.new_tab_in_directory(directory, window, cx);
+                        if let Some(host) = this.tab_host().clone() {
+                            window.defer(cx, move |window, cx| {
+                                let _ = host.update(cx, |host, cx| {
+                                    host.new_tab_in_directory(directory, window, cx);
+                                });
                             });
                         } else {
                             this.start_new_chat(directory, window, cx);
