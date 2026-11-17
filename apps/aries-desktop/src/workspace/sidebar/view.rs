@@ -119,12 +119,10 @@ impl Sidebar {
             .as_ref()
             .and_then(|host| host.upgrade())
             .is_some_and(|host| host.read(cx).is_usage_visible());
-        let usage_host = tab_host.clone();
         let extensions_selected = tab_host
             .as_ref()
             .and_then(|host| host.upgrade())
             .is_some_and(|host| host.read(cx).is_extensions_visible());
-        let extensions_host = tab_host.clone();
         div()
             .id("sidebar")
             .w_full()
@@ -155,71 +153,83 @@ impl Sidebar {
                 ),
             )
             .child(SessionListView::new(self, owner).render_sessions(p, window, cx))
+            .when(!owner.uses_sidebar_tab_host(), |sidebar| {
+                sidebar.child(Self::render_footer(
+                    tab_host,
+                    p,
+                    usage_selected,
+                    extensions_selected,
+                    cx,
+                ))
+            })
+    }
+
+    pub fn render_footer(
+        tab_host: Option<WeakEntity<WorkspaceView>>,
+        p: Palette,
+        usage_selected: bool,
+        extensions_selected: bool,
+        cx: &mut App,
+    ) -> Div {
+        let usage_host = tab_host.clone();
+        let extensions_host = tab_host.clone();
+        div()
+            .flex_shrink_0()
+            .px_2()
+            .py_2()
+            .flex()
+            .items_center()
+            .gap_2()
+            .child(SettingsButton::new(tab_host, p))
             .child(
-                div()
-                    .flex_shrink_0()
-                    .px_2()
-                    .py_2()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .child(SettingsButton::new(tab_host, p))
-                    .child(
-                        Button::new("open-extensions")
-                            .ghost()
-                            .small()
-                            .icon(Icon::new(IconName::Bot).size(rems(0.9375)))
-                            .tooltip("Agent 扩展")
-                            .accessibility_label("打开 Agent 扩展")
-                            .selected(extensions_selected)
-                            .bg(if extensions_selected {
-                                cx.theme().sidebar_accent
-                            } else {
-                                cx.theme().transparent
-                            })
-                            .text_color(if extensions_selected {
-                                p.foreground()
-                            } else {
-                                p.muted()
-                            })
-                            .disabled(extensions_host.is_none())
-                            .on_click(cx.listener(move |_, _, window, cx| {
-                                if let Some(host) = extensions_host.clone() {
-                                    cx.spawn_in(window, async move |_, cx| {
-                                        let _ = host.update_in(cx, |host, window, cx| {
-                                            host.open_extensions(window, cx)
-                                        });
-                                    })
-                                    .detach();
-                                }
-                            })),
-                    )
-                    .child(
-                        Button::new("open-usage")
-                            .ghost()
-                            .small()
-                            .icon(Icon::new(IconName::ChartNoAxesColumn).size(rems(0.9375)))
-                            .tooltip("统计")
-                            .accessibility_label("打开统计")
-                            .selected(usage_selected)
-                            .bg(if usage_selected {
-                                cx.theme().sidebar_accent
-                            } else {
-                                cx.theme().transparent
-                            })
-                            .text_color(if usage_selected { p.foreground() } else { p.muted() })
-                            .disabled(usage_host.is_none())
-                            .on_click(cx.listener(move |_, _, window, cx| {
-                                if let Some(host) = usage_host.clone() {
-                                    cx.spawn_in(window, async move |_, cx| {
-                                        let _ = host.update_in(cx, |host, window, cx| {
-                                            host.open_usage(window, cx)
-                                        });
-                                    })
-                                    .detach();
-                                }
-                            })),
-                    ),
+                Button::new("open-extensions")
+                    .ghost()
+                    .small()
+                    .icon(Icon::new(IconName::Bot).size(rems(0.9375)))
+                    .tooltip("Agent 扩展")
+                    .accessibility_label("打开 Agent 扩展")
+                    .selected(extensions_selected)
+                    .bg(if extensions_selected {
+                        cx.theme().sidebar_accent
+                    } else {
+                        cx.theme().transparent
+                    })
+                    .text_color(if extensions_selected { p.foreground() } else { p.muted() })
+                    .disabled(extensions_host.is_none())
+                    .on_click(move |_, window, cx| {
+                        if let Some(host) = extensions_host.clone() {
+                            window.defer(cx, move |window, cx| {
+                                let _ = host.update(cx, |host, cx| {
+                                    host.open_extensions(window, cx);
+                                });
+                            });
+                        }
+                    }),
+            )
+            .child(
+                Button::new("open-usage")
+                    .ghost()
+                    .small()
+                    .icon(Icon::new(IconName::ChartNoAxesColumn).size(rems(0.9375)))
+                    .tooltip("统计")
+                    .accessibility_label("打开统计")
+                    .selected(usage_selected)
+                    .bg(if usage_selected {
+                        cx.theme().sidebar_accent
+                    } else {
+                        cx.theme().transparent
+                    })
+                    .text_color(if usage_selected { p.foreground() } else { p.muted() })
+                    .disabled(usage_host.is_none())
+                    .on_click(move |_, window, cx| {
+                        if let Some(host) = usage_host.clone() {
+                            window.defer(cx, move |window, cx| {
+                                let _ = host.update(cx, |host, cx| {
+                                    host.open_usage(window, cx);
+                                });
+                            });
+                        }
+                    }),
             )
     }
 

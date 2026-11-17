@@ -21,6 +21,7 @@ use crate::workspace::extensions::ExtensionsView;
 use crate::workspace::files::{FileActionEvent, FileTree, FileView, OpenFile};
 use crate::workspace::settings::palette::Palette;
 use crate::workspace::settings::{Preferences, SettingsState};
+use crate::workspace::sidebar::Sidebar;
 use crate::workspace::usage::{ReturnToSessions, UsageView};
 use crate::workspace::{SessionRenderMode, SessionView};
 use crate::{
@@ -482,6 +483,9 @@ impl Render for WorkspaceView {
 
 impl WorkspaceView {
     pub fn open_file(&mut self, target: OpenFile, window: &mut Window, cx: &mut Context<Self>) {
+        if self.selected_file_directory(cx).is_none() {
+            return;
+        }
         if !self.file_tree.update(cx, |tree, cx| tree.cancel_actions(window, cx)) {
             return;
         }
@@ -582,6 +586,11 @@ impl WorkspaceView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        let page = if page == SidebarPage::files() && self.selected_file_directory(cx).is_none() {
+            SidebarPage::sessions()
+        } else {
+            page
+        };
         self.sidebar_page = page;
         self.sidebar_visible = true;
         if page == SidebarPage::files() {
@@ -616,24 +625,44 @@ impl WorkspaceView {
         cx.notify();
     }
 
+    fn selected_file_directory(&self, cx: &App) -> Option<PathBuf> {
+        let execution = self.active_view()?.read(cx).execution();
+        (execution.active_session_id().is_some() || execution.directory_selected())
+            .then(|| execution.tab_directory().to_owned())
+            .filter(|directory| !directory.as_os_str().is_empty())
+    }
+
     fn sync_file_directory(&mut self, cx: &mut Context<Self>) {
+        let Some(directory) = self.selected_file_directory(cx) else {
+            if self.sidebar_page == SidebarPage::files() {
+                self.sidebar_page = SidebarPage::sessions();
+                let owner = cx.weak_entity();
+                let window = self.window;
+                cx.defer(move |cx| {
+                    let _ = window.update(cx, |_, window, cx| {
+                        let _ = owner.update(cx, |this, cx| {
+                            if this.selected_file_directory(cx).is_none() && this.sidebar_visible {
+                                this.sidebar_sessions_focus_handle.focus(window, cx);
+                            }
+                        });
+                    });
+                });
+                cx.notify();
+            }
+            return;
+        };
         let directory = self
             .file_view
             .read(cx)
             .target()
             .map(|target| target.directory().to_owned())
-            .unwrap_or_else(|| {
-                self.active_view()
-                    .unwrap_or(&self.sidebar)
-                    .read(cx)
-                    .execution()
-                    .directory()
-                    .to_owned()
-            });
+            .unwrap_or(directory);
         self.file_tree.update(cx, |tree, cx| tree.set_directory(directory, cx));
     }
 
     fn render_sidebar(&self, panel_style: StyleRefinement, cx: &mut Context<Self>) -> AnyElement {
+        let files_available = self.selected_file_directory(cx).is_some();
+        let files_selected = files_available && self.sidebar_page == SidebarPage::files();
         div()
             .size_full()
             .min_h_0()
@@ -655,30 +684,37 @@ impl WorkspaceView {
                             .icon(IconName::MessagesSquare)
                             .track_focus(&self.sidebar_sessions_focus_handle)
                             .tooltip_with_action("切换会话 / 文件", &SwitchSidebar::new(), None)
-                            .selected(self.sidebar_page == SidebarPage::sessions())
+                            .selected(!files_selected)
                             .on_click(cx.listener(|this, _, window, cx| {
                                 this.select_sidebar_page(SidebarPage::sessions(), window, cx);
                             })),
                     )
-                    .child(
-                        Button::new("sidebar-files")
-                            .small()
-                            .ghost()
-                            .label("文件")
-                            .icon(IconName::FolderTree)
-                            .tooltip_with_action("切换会话 / 文件", &SwitchSidebar::new(), None)
-                            .selected(self.sidebar_page == SidebarPage::files())
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.select_sidebar_page(SidebarPage::files(), window, cx);
-                            })),
-                    ),
+                    .when(files_available, |tabs| {
+                        tabs.child(
+                            Button::new("sidebar-files")
+                                .small()
+                                .ghost()
+                                .label("文件")
+                                .icon(IconName::FolderTree)
+                                .tooltip_with_action("切换会话 / 文件", &SwitchSidebar::new(), None)
+                                .selected(self.sidebar_page == SidebarPage::files())
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    this.select_sidebar_page(SidebarPage::files(), window, cx);
+                                })),
+                        )
+                    }),
             )
-            .child(div().flex_1().min_h_0().min_w_0().child(
-                if self.sidebar_page == SidebarPage::files() {
-                    self.file_tree.clone().cached(panel_style).into_any_element()
-                } else {
-                    self.sidebar.clone().cached(panel_style).into_any_element()
-                },
+            .child(div().flex_1().min_h_0().min_w_0().child(if files_selected {
+                self.file_tree.clone().cached(panel_style).into_any_element()
+            } else {
+                self.sidebar.clone().cached(panel_style).into_any_element()
+            }))
+            .child(Sidebar::render_footer(
+                Some(cx.weak_entity()),
+                Palette::new(cx.theme().mode),
+                self.is_usage_visible(),
+                self.is_extensions_visible(),
+                cx,
             ))
             .into_any_element()
     }
