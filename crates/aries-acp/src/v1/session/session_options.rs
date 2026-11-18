@@ -32,6 +32,7 @@ pub async fn session_options(
             };
             let config_options = config_options(
                 session.setting(),
+                session.sandbox_mode(),
                 session.mode(),
                 session.agents(),
                 session.thought_level(),

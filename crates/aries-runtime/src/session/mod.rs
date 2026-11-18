@@ -48,6 +48,7 @@ use crate::agent::AriesAgent;
 use crate::context::compaction::ContextCompactor;
 use crate::context::{ChatContext, ChatHistory};
 use crate::memory::MemoryStore;
+use crate::sandbox::SandboxMode;
 use crate::state::State;
 
 pub enum PromptOutcome {
@@ -93,6 +94,10 @@ pub struct Session {
 impl Session {
     pub fn id(&self) -> String {
         self.state.session_id()
+    }
+
+    pub fn sandbox_mode(&self) -> SandboxMode {
+        self.state.sandbox_mode()
     }
 
     pub fn mode(&self) -> String {
