@@ -29,6 +29,7 @@ pub async fn fork_session(
         .map_err(|e| Error::internal_error().data(e.to_string()))?;
     let config_options = config_options(
         session.setting(),
+        session.sandbox_mode(),
         session.mode(),
         session.agents(),
         session.thought_level(),

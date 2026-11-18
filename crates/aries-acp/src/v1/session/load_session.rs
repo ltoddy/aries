@@ -66,6 +66,7 @@ pub async fn load_session(
     };
     let config_options = config_options(
         session.setting(),
+        session.sandbox_mode(),
         session.mode(),
         session.agents(),
         session.thought_level(),

@@ -43,6 +43,7 @@ pub async fn set_session_config_option(
 
     let resp = SetSessionConfigOptionResponse::new(config_options(
         session.setting(),
+        session.sandbox_mode(),
         session.mode(),
         session.agents(),
         session.thought_level(),

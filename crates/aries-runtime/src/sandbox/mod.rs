@@ -11,7 +11,7 @@ use std::str::FromStr;
 
 use tokio::process::Command;
 
-#[derive(Clone, Copy, Debug, Default, PartialOrd, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum SandboxMode {
     ReadOnly,
     #[default]
@@ -21,11 +21,7 @@ pub enum SandboxMode {
 
 impl Display for SandboxMode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SandboxMode::ReadOnly => write!(f, "read-only"),
-            SandboxMode::WorkspaceWrite => write!(f, "workspace-write"),
-            SandboxMode::Unrestricted => write!(f, "unrestricted"),
-        }
+        write!(f, "{}", self.as_str())
     }
 }
 
@@ -53,6 +49,14 @@ impl FromStr for SandboxMode {
 }
 
 impl SandboxMode {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SandboxMode::ReadOnly => "read-only",
+            SandboxMode::WorkspaceWrite => "workspace-write",
+            SandboxMode::Unrestricted => "unrestricted",
+        }
+    }
+
     pub async fn command(
         &self,
         shell: impl AsRef<str>,

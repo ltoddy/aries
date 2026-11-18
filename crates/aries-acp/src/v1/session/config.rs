@@ -4,19 +4,22 @@ use agent_client_protocol::v1::schema::{
 };
 use aries_extension::agent::AgentDefinition;
 use aries_init::Setting;
+use aries_runtime::sandbox::SandboxMode;
 use aries_runtime::session::SessionConfig;
 use rig::completion::Effort;
 
 pub fn config_options(
     setting: &Setting,
+    current_sandbox_mode: SandboxMode,
     current_mode: impl Into<String>,
     agents: impl AsRef<[AgentDefinition]>,
-    thought_level: Effort,
+    current_thought_level: Effort,
 ) -> Vec<SessionConfigOption> {
     vec![
+        sandbox_mode_option(current_sandbox_mode),
         mode_option(current_mode, agents),
         model_option(setting),
-        thought_level_option(thought_level),
+        thought_level_option(current_thought_level),
     ]
 }
 
@@ -84,8 +87,26 @@ fn thought_level_option(current: Effort) -> SessionConfigOption {
         current.as_str(),
         options,
     )
-    .description("")
+    .description("Controls the model's reasoning effort. Higher levels may increase response time and token usage.")
     .category(SessionConfigOptionCategory::ThoughtLevel)
+}
+
+fn sandbox_mode_option(current: SandboxMode) -> SessionConfigOption {
+    let modes = [SandboxMode::ReadOnly, SandboxMode::WorkspaceWrite, SandboxMode::Unrestricted];
+
+    let options = modes
+        .iter()
+        .map(|e| SessionConfigSelectOption::new(e.as_str(), e.as_str()))
+        .collect::<Vec<_>>();
+
+    SessionConfigOption::select(
+        SessionConfig::SandboxMode.to_string(),
+        SessionConfig::SandboxMode.to_string(),
+        current.as_str(),
+        options,
+    )
+        .description("Controls command sandbox permissions: read-only workspace access, workspace writes, or unrestricted access.")
+        .category(SessionConfigOptionCategory::ThoughtLevel)
 }
 
 #[derive(Debug, thiserror::Error)]

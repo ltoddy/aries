@@ -48,8 +48,13 @@ pub async fn resume_session(
         Ok(modes) => modes,
         Err(err) => return responder.respond_with_internal_error(err.to_string()),
     };
-    let config_options =
-        config_options(session.setting(), mode, session.agents(), session.thought_level());
+    let config_options = config_options(
+        session.setting(),
+        session.sandbox_mode(),
+        mode,
+        session.agents(),
+        session.thought_level(),
+    );
     let resp = ResumeSessionResponse::new().modes(modes).config_options(config_options);
     responder.respond(resp)
 }
