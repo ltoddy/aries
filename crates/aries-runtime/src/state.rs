@@ -5,6 +5,8 @@ use rig::Model;
 use rig::completion::Effort;
 use rig::providers::openai::wire::OpenAiWire;
 
+use crate::sandbox::SandboxMode;
+
 #[derive(Clone, Debug)]
 pub struct State {
     pub agent: AgentDefinition,
@@ -15,6 +17,7 @@ pub struct State {
     pub session_dir: PathBuf,
     pub session_id: String,
     pub transcript_dir: PathBuf,
+    pub sandbox_mode: SandboxMode,
 }
 
 impl State {
@@ -30,6 +33,7 @@ impl State {
         let session_dir = session_dir.into();
         let session_id = session_id.into();
         let transcript_dir = transcript_dir.into();
+        let sandbox_mode = SandboxMode::default();
 
         Self {
             effort: Effort::High,
@@ -40,6 +44,7 @@ impl State {
             session_dir,
             session_id,
             transcript_dir,
+            sandbox_mode,
         }
     }
 }
@@ -84,5 +89,9 @@ impl State {
     pub fn cwd(&mut self, cwd: impl Into<PathBuf>) {
         let cwd = cwd.into();
         self.cwd = cwd;
+    }
+
+    pub fn sandbox_mode(&mut self, sandbox_mode: SandboxMode) {
+        self.sandbox_mode = sandbox_mode;
     }
 }

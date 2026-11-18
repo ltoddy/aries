@@ -1,0 +1,28 @@
+(version 1)
+(deny default)
+
+(allow process-exec process-fork)
+(allow signal (target same-sandbox))
+(allow sysctl-read)
+
+(allow file-read*
+  (literal "/")
+  (literal "/private/var/select/sh")
+  (subpath "/System")
+  (subpath "/usr/bin")
+  (subpath "/usr/lib")
+  (subpath "/usr/share")
+  (subpath "/usr/local")
+  (subpath "/opt/homebrew")
+  (subpath "/bin")
+  (subpath "/sbin")
+  (subpath "/Library/Developer")
+  (subpath "/private/etc")
+  (subpath "/dev")
+  (subpath (param "HOME"))
+  (subpath (param "WORKSPACE"))
+  (subpath (param "SANDBOX_TMP")))
+
+(allow file-write*
+  (literal "/dev/null")
+  (subpath (param "SANDBOX_TMP")))
