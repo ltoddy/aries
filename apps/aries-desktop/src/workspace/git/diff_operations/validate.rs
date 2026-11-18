@@ -3,10 +3,9 @@ use std::path::{Component, Path, PathBuf};
 
 use git2::{Delta, FileMode, Repository, Status, StatusOptions};
 
+use crate::workspace::git::diff_operations::error::{GitOperationError, Result};
 use crate::workspace::git::diff_patch::PatchError;
 use crate::workspace::git::error::{GitIoError, RepositoryError};
-
-use crate::workspace::git::diff_operations::error::{GitOperationError, Result};
 
 pub fn validate_patch_for_write(raw: &str) -> Result<()> {
     let diff = git2::Diff::from_buffer(raw.as_bytes())

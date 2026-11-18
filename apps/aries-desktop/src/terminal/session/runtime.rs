@@ -1,7 +1,6 @@
-use crate::terminal::session::*;
-
 use crate::terminal::session::error::{ResizeError, StartError, WriteError};
 use crate::terminal::session::worker::{Worker, run};
+use crate::terminal::session::*;
 
 #[cfg_attr(not(unix), allow(dead_code))]
 pub enum Command {

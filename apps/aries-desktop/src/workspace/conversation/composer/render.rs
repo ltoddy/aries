@@ -1,8 +1,6 @@
 use crate::workspace::conversation::composer::*;
-
-use crate::workspace::settings::SendKey;
 use crate::workspace::settings::palette::Palette;
-use crate::workspace::settings::typography;
+use crate::workspace::settings::{SendKey, typography};
 
 impl Composer {
     fn render_attachments(&self, p: Palette, cx: &mut Context<SessionView>) -> AnyElement {

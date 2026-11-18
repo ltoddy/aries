@@ -1,6 +1,5 @@
-use crate::workspace::files::file_tree::*;
-
 use crate::workspace::files::file_tree::render::{build_items, status_item};
+use crate::workspace::files::file_tree::*;
 
 impl FileTree {
     pub fn new(directory: PathBuf, window: &mut Window, cx: &mut Context<Self>) -> Self {

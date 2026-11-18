@@ -7,13 +7,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use git2::Repository;
 use serde::{Deserialize, Serialize};
 
-use crate::workspace::git::error::GitIoError;
-
 use crate::workspace::git::diff_operations::error::{GitOperationError, Result};
 use crate::workspace::git::diff_operations::run_apply;
 use crate::workspace::git::diff_operations::validate::{
     repository_root, validate_relative_path, validate_target,
 };
+use crate::workspace::git::error::GitIoError;
 
 static NEXT_BACKUP: AtomicU64 = AtomicU64::new(0);
 

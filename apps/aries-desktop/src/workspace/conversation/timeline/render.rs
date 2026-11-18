@@ -1,6 +1,6 @@
-use crate::workspace::conversation::timeline::*;
-
 use gpui_kit::IntoElement;
+
+use crate::workspace::conversation::timeline::*;
 
 impl Timeline {
     pub fn render_timeline(
