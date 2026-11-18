@@ -6,6 +6,7 @@ pub enum SessionConfig {
     Mode,
     Model,
     ThoughtLevel,
+    SandboxMode,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -24,6 +25,7 @@ impl Display for SessionConfig {
             SessionConfig::Mode => write!(f, "mode"),
             SessionConfig::Model => write!(f, "model"),
             SessionConfig::ThoughtLevel => write!(f, "thought level"),
+            SessionConfig::SandboxMode => write!(f, "sandbox mode"),
         }
     }
 }
@@ -36,6 +38,7 @@ impl FromStr for SessionConfig {
             "mode" => Ok(Self::Mode),
             "model" => Ok(Self::Model),
             "thought level" => Ok(Self::ThoughtLevel),
+            "sandbox mode" => Ok(Self::SandboxMode),
             _ => Err(ParseSessionConfigError::new(s)),
         }
     }

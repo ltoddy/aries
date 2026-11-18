@@ -7,6 +7,7 @@ mod macos;
 use std::ffi::OsString;
 use std::fmt::{Display, Formatter};
 use std::path::Path;
+use std::str::FromStr;
 
 use tokio::process::Command;
 
@@ -16,6 +17,39 @@ pub enum SandboxMode {
     #[default]
     WorkspaceWrite,
     Unrestricted,
+}
+
+impl Display for SandboxMode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SandboxMode::ReadOnly => write!(f, "read-only"),
+            SandboxMode::WorkspaceWrite => write!(f, "workspace-write"),
+            SandboxMode::Unrestricted => write!(f, "unrestricted"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("invalid sandbox mode `{0}`: expected `read-only`, `workspace-write`, or `unrestricted`")]
+pub struct ParseSandboxModeError(String);
+
+impl ParseSandboxModeError {
+    pub fn new(mode: impl Into<String>) -> Self {
+        Self(mode.into())
+    }
+}
+
+impl FromStr for SandboxMode {
+    type Err = ParseSandboxModeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "read-only" => Ok(SandboxMode::ReadOnly),
+            "workspace-write" => Ok(SandboxMode::WorkspaceWrite),
+            "unrestricted" => Ok(SandboxMode::Unrestricted),
+            _ => Err(ParseSandboxModeError::new(s)),
+        }
+    }
 }
 
 impl SandboxMode {
@@ -54,16 +88,6 @@ impl SandboxMode {
         {
             let _ = (home, cwd);
             Ok(Command::new(shell))
-        }
-    }
-}
-
-impl Display for SandboxMode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SandboxMode::ReadOnly => write!(f, "read-only"),
-            SandboxMode::WorkspaceWrite => write!(f, "workspace-write"),
-            SandboxMode::Unrestricted => write!(f, "unrestricted"),
         }
     }
 }

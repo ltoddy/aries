@@ -4,6 +4,7 @@ use aries_communicate::Notifier;
 use aries_init::SettingLoader;
 use rig::completion::Effort;
 
+use crate::sandbox::SandboxMode;
 use crate::session::{Session, SessionConfig, SessionError};
 
 impl Session {
@@ -20,6 +21,7 @@ impl Session {
             SessionConfig::Mode => self.set_session_mode(value).await?,
             SessionConfig::Model => self.set_session_model(value).await?,
             SessionConfig::ThoughtLevel => self.set_session_thought_level(value).await?,
+            SessionConfig::SandboxMode => self.set_session_sandbox_mode(value).await?,
         };
 
         Ok(())
@@ -73,6 +75,18 @@ impl Session {
         .build(self.hook.clone())
         .await;
         self.agent = agent;
+
+        Ok(())
+    }
+
+    async fn set_session_sandbox_mode(
+        &mut self,
+        mode: impl AsRef<str>,
+    ) -> Result<(), SessionError> {
+        let mode = mode.as_ref();
+        let mode = mode.parse::<SandboxMode>().map_err(SessionError::parse_sandbox_mode)?;
+
+        self.state.sandbox_mode(mode);
 
         Ok(())
     }
