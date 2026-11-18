@@ -132,7 +132,7 @@ impl SessionRegistry {
 
         self.session_repo
             .create(
-                &session.id(),
+                session.id(),
                 session.current_dir().display().to_string(),
                 session.session_dir().display().to_string(),
                 session.transcript_dir().display().to_string(),

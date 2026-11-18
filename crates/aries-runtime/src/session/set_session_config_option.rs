@@ -38,11 +38,11 @@ impl Session {
         loader.save(&setting).await.map_err(SessionError::setting)?;
 
         self.setting = setting;
-        self.state.model(model);
-        self.agent.set_model(self.state.model.clone());
+        self.state.set_model(model.clone());
+        self.agent.set_model(model.clone());
 
         self.config = config;
-        self.compactor.set_model(self.state.model.clone());
+        self.compactor.set_model(model);
 
         Ok(())
     }
@@ -62,7 +62,7 @@ impl Session {
             _ => return Err(SessionError::invalid_thought_level(level)),
         };
 
-        self.state.effort(effort);
+        self.state.set_effort(effort);
 
         let agent = crate::agent::Builder::new(
             self.state.clone(),
@@ -86,7 +86,7 @@ impl Session {
         let mode = mode.as_ref();
         let mode = mode.parse::<SandboxMode>().map_err(SessionError::parse_sandbox_mode)?;
 
-        self.state.sandbox_mode(mode);
+        self.state.set_sandbox_mode(mode);
 
         Ok(())
     }

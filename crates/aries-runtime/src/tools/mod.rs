@@ -24,6 +24,8 @@ pub mod websearch;
 pub mod worktree;
 pub mod write;
 
+use std::path::Path;
+
 use aries_communicate::Notifier;
 use aries_extension::AgentExtensions;
 use aries_init::GlobalContext;
@@ -98,7 +100,7 @@ pub fn create_tools<'a>(
 ) -> ToolSet {
     let tool_names = tool_names.as_ref().iter().unique().collect_vec();
     let mut tool_set = ToolSet::default();
-    let ctx = ToolContext::new(&state.session_id, notifier.clone(), &state.cwd);
+    let ctx = ToolContext::new(state.session_id(), notifier.clone(), state.cwd());
 
     for &tool_name in tool_names {
         match tool_name {
@@ -133,7 +135,7 @@ pub fn create_tools<'a>(
             },
             enter_worktree::NAME => {
                 if let Some(repository) =
-                    Repository::discover(&state.cwd).ok().filter(|repo| repo.workdir().is_some())
+                    Repository::discover(state.cwd()).ok().filter(|repo| repo.workdir().is_some())
                 {
                     tool_set.add_tool(enter_worktree::EnterGitWorktreeTool::new(
                         ctx.clone(),
@@ -144,7 +146,7 @@ pub fn create_tools<'a>(
             },
             exit_worktree::NAME => {
                 if let Some(repository) =
-                    Repository::discover(&state.cwd).ok().filter(|repo| repo.workdir().is_some())
+                    Repository::discover(state.cwd()).ok().filter(|repo| repo.workdir().is_some())
                 {
                     tool_set
                         .add_tool(exit_worktree::ExitGitWorktreeTool::new(ctx.clone(), repository));
@@ -202,6 +204,7 @@ pub fn create_tools<'a>(
 
 pub fn create_agent_tools<'a>(
     state: State,
+    cwd: &Path,
     gctx: GlobalContext,
     tool_names: impl AsRef<[&'a str]>,
     extensions: AgentExtensions,
@@ -210,7 +213,7 @@ pub fn create_agent_tools<'a>(
 ) -> ToolSet {
     let tool_names = tool_names.as_ref().iter().unique().collect_vec();
     let mut tool_set = ToolSet::default();
-    let ctx = ToolContext::new(&state.session_id, notifier.clone(), &state.cwd);
+    let ctx = ToolContext::new(state.session_id(), notifier.clone(), cwd);
 
     for &tool_name in tool_names {
         match tool_name {

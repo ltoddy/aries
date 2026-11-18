@@ -11,9 +11,9 @@ pub struct TitleAgent {
 
 impl TitleAgent {
     pub fn new(state: State, db: Db) -> Self {
-        let token_usage_hook = TokenUsageHook::new(state.cwd, db.clone());
+        let token_usage_hook = TokenUsageHook::new(state.cwd(), db.clone());
 
-        let builder = AgentBuilder::new(state.model)
+        let builder = AgentBuilder::new(state.model())
             .name("title")
             .description("根据会话内容生成简短、清晰的标题。")
             .preamble(
@@ -25,7 +25,7 @@ impl TitleAgent {
                  仅输出一行标题，不要添加引号、前缀、Markdown 格式或解释。",
             )
             .add_hook(token_usage_hook)
-            .reasoning(state.effort)
+            .reasoning(state.effort())
             .default_max_turns(1);
 
         let inner = builder.build();

@@ -17,7 +17,7 @@ mod set_session_mode;
 mod set_session_title;
 
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use aries_communicate::{AgentEvent, Notifier};
@@ -92,15 +92,15 @@ pub struct Session {
 
 impl Session {
     pub fn id(&self) -> String {
-        self.state.session_id.clone()
+        self.state.session_id()
     }
 
-    pub fn mode(&self) -> &str {
-        &self.state.agent.frontmatter.name
+    pub fn mode(&self) -> String {
+        self.state.agent().frontmatter.name
     }
 
     pub fn thought_level(&self) -> Effort {
-        self.state.effort
+        self.state.effort()
     }
 
     pub fn setting(&self) -> &Setting {
@@ -131,16 +131,16 @@ impl Session {
         self.cancel_token.lock().cancel()
     }
 
-    pub fn session_dir(&self) -> &Path {
-        &self.state.session_dir
+    pub fn session_dir(&self) -> PathBuf {
+        self.state.session_dir()
     }
 
-    pub fn current_dir(&self) -> &Path {
-        &self.state.cwd
+    pub fn current_dir(&self) -> PathBuf {
+        self.state.cwd()
     }
 
-    pub fn transcript_dir(&self) -> &Path {
-        &self.state.transcript_dir
+    pub fn transcript_dir(&self) -> PathBuf {
+        self.state.transcript_dir()
     }
 
     pub fn list_available_commands(&self) -> Vec<aries_extension::AvailableCommand> {
@@ -224,7 +224,8 @@ impl Session {
             Notifier::clone(&notifier),
         );
 
-        let input = SessionStartHookInput::new(&id, &state.cwd, source, state.model.name());
+        let model = state.model();
+        let input = SessionStartHookInput::new(&id, state.cwd(), source, model.name());
         if let HookDecision::Continue { contexts } = hooks_executor.fire_session_start(input).await
         {
             chat_context.append(&system_reminders(contexts)).await;

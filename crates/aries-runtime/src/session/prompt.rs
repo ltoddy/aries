@@ -21,7 +21,7 @@ use crate::session::{
 };
 
 impl Session {
-    #[tracing::instrument(name = "prompt", skip_all, fields(session_id = %self.state.session_id))]
+    #[tracing::instrument(name = "prompt", skip_all, fields(session_id = %self.state.session_id()))]
     pub async fn prompt<F, Fut>(
         &mut self,
         prompt: impl Into<Message>,
@@ -117,9 +117,8 @@ impl Session {
     }
 
     async fn summarize_title(&mut self, prompt: impl Into<Message>) {
-        let Ok(Some(session)) =
-            self.session_repo.find_last_by_session_id(&self.state.session_id).await
-        else {
+        let session_id = self.state.session_id();
+        let Ok(Some(session)) = self.session_repo.find_last_by_session_id(&session_id).await else {
             return;
         };
         if session.has_title() {
@@ -128,7 +127,6 @@ impl Session {
 
         let prompt = prompt.into();
         let mut session_repo = self.session_repo.clone();
-        let session_id = self.state.session_id.clone();
         let agent = TitleAgent::new(self.state.clone(), self.db.clone());
         let notifier = self.notifier.clone();
 
@@ -146,8 +144,9 @@ impl Session {
         &self,
         prompt: impl Into<String>,
     ) -> crate::agent::AriesResult<VecDeque<String>> {
-        let input = UserPromptSubmitHookInput::new(&self.state.session_id, &self.state.cwd, prompt)
-            .transcript_dir(&self.state.transcript_dir);
+        let input =
+            UserPromptSubmitHookInput::new(self.state.session_id(), self.state.cwd(), prompt)
+                .transcript_dir(self.state.transcript_dir());
         match self.hooks_executor.fire_user_prompt_submit(input).await {
             HookDecision::Terminate { reason } => {
                 Err(crate::agent::AriesError::hook_terminated(reason))
@@ -158,8 +157,8 @@ impl Session {
 
     async fn fire_stop_failure(&self, error: impl Into<String>) {
         let error = error.into();
-        let input = StopFailureHookInput::new(&self.state.session_id, &self.state.cwd, &error)
-            .transcript_dir(&self.state.transcript_dir)
+        let input = StopFailureHookInput::new(self.state.session_id(), self.state.cwd(), &error)
+            .transcript_dir(self.state.transcript_dir())
             .error_details(&error);
 
         let input = match &self.last_assistant_message {
@@ -171,7 +170,7 @@ impl Session {
     }
 
     async fn fire_stop(&self, assistant_output: impl Into<String>) {
-        let input = StopHookInput::new(&self.state.session_id, &self.state.cwd, false)
+        let input = StopHookInput::new(self.state.session_id(), self.state.cwd(), false)
             .last_assistant_message(assistant_output);
         if let HookDecision::Continue { contexts } = self.hooks_executor.fire_stop(input).await {
             self.chat_context.append(&system_reminders(contexts)).await;
@@ -192,7 +191,7 @@ impl Session {
     async fn recall_context(&self, query: impl AsRef<str>) -> Option<String> {
         let query = query.as_ref();
         let memories = self.memory_store.scan().await;
-        let retriever = MemoryRetriever::new(self.state.model.clone());
+        let retriever = MemoryRetriever::new(self.state.model());
         let retrieved = retriever.retrieve(query, &memories).await;
 
         let mut blocks = Vec::<String>::with_capacity(retrieved.len());
