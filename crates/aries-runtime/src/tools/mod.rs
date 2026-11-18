@@ -113,7 +113,7 @@ pub fn create_tools<'a>(
                 ));
             },
             bash::NAME => {
-                tool_set.add_tool(bash::BashTool::new(ctx.clone()));
+                tool_set.add_tool(bash::BashTool::new(ctx.clone(), state.clone(), gctx.clone()));
             },
             batch::NAME => {
                 tool_set.add_tool(batch::BatchTool::new(
@@ -211,7 +211,7 @@ pub fn create_agent_tools<'a>(
     for &tool_name in tool_names {
         match tool_name {
             bash::NAME => {
-                tool_set.add_tool(bash::BashTool::new(ctx.clone()));
+                tool_set.add_tool(bash::BashTool::new(ctx.clone(), state.clone(), gctx.clone()));
             },
             batch::NAME => {
                 tool_set.add_tool(batch::BatchTool::new(

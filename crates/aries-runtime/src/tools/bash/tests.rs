@@ -3,27 +3,45 @@
 use rig::tool::{Tool, ToolContext};
 use tempfile::TempDir;
 
-use super::*;
+use crate::state::State;
+use crate::tools::bash::{BashArgs, BashTool};
 
 fn bash_args(command: &str) -> BashArgs {
     BashArgs { command: command.to_owned(), description: None, background: false }
 }
 
-fn tool(cwd: impl Into<std::path::PathBuf>) -> BashTool {
-    BashTool::new(crate::tools::context::ToolContext::new(
+fn state(cwd: impl Into<std::path::PathBuf>) -> State {
+    let config = aries_init::ModelConfig::openai("test", "test", "test", "http://localhost");
+    let model = crate::create_model(&config).expect("test model should initialize");
+    let frontmatter = serde_json::from_value(serde_json::json!({
+        "name": "test",
+        "description": "test agent"
+    }))
+    .expect("test frontmatter should initialize");
+    let cwd = cwd.into();
+    let agent = aries_extension::agent::AgentDefinition::new(&cwd, frontmatter, "");
+    let session_dir = cwd.join(".aries-test-session");
+    State::new(model, agent, &cwd, &session_dir, "test", &session_dir)
+}
+
+async fn tool(cwd: impl Into<std::path::PathBuf>) -> BashTool {
+    let ctx = crate::tools::context::ToolContext::new(
         "test",
         {
             let (notifier, _) = aries_communicate::Notifier::channel();
             notifier
         },
         cwd,
-    ))
+    );
+    let state = state(ctx.cwd());
+    let gctx = aries_init::GlobalContext::new().await;
+    BashTool::new(ctx, state, gctx)
 }
 
 #[tokio::test]
 async fn test_bash_echo() {
     let mut context = ToolContext::new();
-    let tool = tool(std::env::temp_dir());
+    let tool = tool(std::env::temp_dir()).await;
     let result = tool
         .call(&mut context, bash_args("echo hello"))
         .await
@@ -36,7 +54,7 @@ async fn test_bash_echo() {
 #[tokio::test]
 async fn test_bash_failed_command() {
     let mut context = ToolContext::new();
-    let tool = tool(std::env::temp_dir());
+    let tool = tool(std::env::temp_dir()).await;
     let result =
         tool.call(&mut context, bash_args("exit 1")).await.expect("test operation should succeed");
 
@@ -46,7 +64,7 @@ async fn test_bash_failed_command() {
 #[tokio::test]
 async fn test_bash_nonexistent_command() {
     let mut context = ToolContext::new();
-    let tool = tool(std::env::temp_dir());
+    let tool = tool(std::env::temp_dir()).await;
     let result = tool
         .call(&mut context, bash_args("nonexistent_cmd_12345"))
         .await
@@ -60,7 +78,7 @@ async fn test_bash_nonexistent_command() {
 async fn test_bash_runs_in_cwd() {
     let dir = TempDir::new().expect("test operation should succeed");
     let mut context = ToolContext::new();
-    let tool = tool(dir.path());
+    let tool = tool(dir.path()).await;
     let result =
         tool.call(&mut context, bash_args("pwd")).await.expect("test operation should succeed");
 
@@ -82,7 +100,8 @@ async fn test_bash_background() {
         },
         std::env::temp_dir(),
     );
-    let tool = BashTool::new(ctx.clone());
+    let gctx = aries_init::GlobalContext::new().await;
+    let tool = BashTool::new(ctx.clone(), state(ctx.cwd()), gctx);
     let mut args = bash_args("printf hello");
     args.background = true;
     let result = tool.call(&mut context, args).await.expect("test operation should succeed");
@@ -100,7 +119,7 @@ async fn test_bash_background() {
 #[tokio::test]
 async fn test_bash_output_truncation() {
     let mut context = ToolContext::new();
-    let tool = tool(std::env::temp_dir());
+    let tool = tool(std::env::temp_dir()).await;
     // 打印约 40000 个字符，超过 30000 上限。
     let result = tool
         .call(&mut context, bash_args("printf 'a%.0s' $(seq 1 40000)"))
@@ -120,19 +139,19 @@ async fn test_bash_args_title() {
     assert_eq!(empty_args.title(), "Run a shell command");
 }
 
-#[test]
-fn test_description_excludes_git_section_outside_repo() {
+#[tokio::test]
+async fn test_description_excludes_git_section_outside_repo() {
     let dir = TempDir::new().expect("test operation should succeed");
-    let tool = tool(dir.path());
+    let tool = tool(dir.path()).await;
 
     assert!(!tool.description().contains("# 使用 git 提交改动"));
 }
 
-#[test]
-fn test_description_includes_git_section_inside_repo() {
+#[tokio::test]
+async fn test_description_includes_git_section_inside_repo() {
     let dir = TempDir::new().expect("test operation should succeed");
     git2::Repository::init(dir.path()).expect("test operation should succeed");
-    let tool = tool(dir.path());
+    let tool = tool(dir.path()).await;
 
     assert!(tool.description().contains("# 使用 git 提交改动"));
 }

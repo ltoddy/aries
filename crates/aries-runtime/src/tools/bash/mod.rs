@@ -4,27 +4,32 @@ mod output;
 #[cfg(test)]
 mod tests;
 
+#[cfg(target_os = "macos")]
+use std::ffi::OsString;
 use std::process::Stdio;
-
-use rig::tool::{Tool, ToolContext};
-use serde_json::Value;
-use tokio::process::Command;
 
 pub use self::args::BashArgs;
 pub use self::error::BashError;
 pub use self::output::BashOutput;
+use crate::state::State;
 use crate::tools::context::ToolContext as AriesToolContext;
 use crate::tools::task::TaskKind;
+use aries_init::GlobalContext;
+use rig::tool::{Tool, ToolContext};
+use serde_json::Value;
+use tokio::process::Command;
 
 pub const NAME: &str = "Bash";
 
 pub struct BashTool {
     ctx: AriesToolContext,
+    state: State,
+    gctx: GlobalContext,
 }
 
 impl BashTool {
-    pub fn new(ctx: AriesToolContext) -> Self {
-        Self { ctx }
+    pub fn new(ctx: AriesToolContext, state: State, gctx: GlobalContext) -> Self {
+        Self { ctx, state, gctx }
     }
 }
 
@@ -80,6 +85,28 @@ impl Tool for BashTool {
         }
 
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "bash".to_owned());
+        #[cfg(target_os = "macos")]
+        let mut command = {
+            let temp_dir = std::env::temp_dir();
+            let mut command = Command::new("/usr/bin/sandbox-exec");
+            command.arg("-p").arg(self.state.sandbox_mode.seatbelt_profile());
+
+            let params = [
+                ("HOME", self.gctx.home_dir()),
+                ("WORKSPACE", &cwd),
+                ("SANDBOX_TMP", temp_dir.as_path()),
+            ];
+            for (name, path) in params {
+                let mut parameter = OsString::from(name);
+                parameter.push("=");
+                parameter.push(path);
+                command.arg("-D").arg(parameter);
+            }
+            command.env("TMPDIR", &temp_dir).arg(&shell);
+            command
+        };
+
+        #[cfg(not(target_os = "macos"))]
         let mut command = Command::new(&shell);
         command
             .arg("-c")
