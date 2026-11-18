@@ -46,7 +46,7 @@ impl ContextCompactor {
         notifier: Notifier,
     ) -> Self {
         let breaker = AutoCompactBreaker::new();
-        let agent = CompactAgent::new(state.model.clone(), &state.transcript_dir);
+        let agent = CompactAgent::new(state.model(), state.transcript_dir());
 
         Self { state, agent, breaker, chat_context, hooks_executor, notifier }
     }
@@ -153,12 +153,12 @@ impl ContextCompactor {
         }
 
         let input = PreCompactHookInput::new(
-            &self.state.session_id,
-            &self.state.cwd,
+            self.state.session_id(),
+            self.state.cwd(),
             PostCompactTrigger::Auto,
             PreCompactCustomInstructions::Auto,
         )
-        .transcript_dir(&self.state.transcript_dir);
+        .transcript_dir(self.state.transcript_dir());
         if let HookDecision::Terminate { reason: _ } =
             self.hooks_executor.fire_pre_compact(input).await
         {
@@ -176,12 +176,12 @@ impl ContextCompactor {
                 self.breaker.on_success();
 
                 let input = PostCompactHookInput::new(
-                    &self.state.session_id,
-                    &self.state.cwd,
+                    self.state.session_id(),
+                    self.state.cwd(),
                     PostCompactTrigger::Auto,
                     &summary,
                 )
-                .transcript_dir(&self.state.transcript_dir);
+                .transcript_dir(self.state.transcript_dir());
                 self.hooks_executor.fire_post_compact(input).await;
                 Ok(Some(summary))
             },

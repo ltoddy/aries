@@ -65,7 +65,7 @@ impl Tool for MonitorTool {
             .map_or_else(|| self.ctx.cwd(), |worktree| worktree.path().to_owned());
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "bash".to_owned());
         let command =
-            self.state.sandbox_mode.command(&shell, self.gctx.home_dir(), &cwd).await.map_err(
+            self.state.sandbox_mode().command(&shell, self.gctx.home_dir(), &cwd).await.map_err(
                 |source| {
                     SpawnTaskError::new(TaskKind::Monitor, &shell, &cwd, &args.command, source)
                 },

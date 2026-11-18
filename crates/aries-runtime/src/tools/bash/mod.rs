@@ -80,7 +80,7 @@ impl Tool for BashTool {
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "bash".to_owned());
         let mut command = self
             .state
-            .sandbox_mode
+            .sandbox_mode()
             .command(&shell, self.gctx.home_dir(), &cwd)
             .await
             .map_err(|err| BashError::io(&shell, &cwd, &arg, err))?;

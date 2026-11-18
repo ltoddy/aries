@@ -43,16 +43,13 @@ pub async fn resume_session(
         SessionUpdate::AvailableCommandsUpdate(AvailableCommandsUpdate::new(available_commands)),
     ));
 
-    let modes = match modes(session.mode(), session.agents()) {
+    let mode = session.mode();
+    let modes = match modes(&mode, session.agents()) {
         Ok(modes) => modes,
         Err(err) => return responder.respond_with_internal_error(err.to_string()),
     };
-    let config_options = config_options(
-        session.setting(),
-        session.mode(),
-        session.agents(),
-        session.thought_level(),
-    );
+    let config_options =
+        config_options(session.setting(), mode, session.agents(), session.thought_level());
     let resp = ResumeSessionResponse::new().modes(modes).config_options(config_options);
     responder.respond(resp)
 }

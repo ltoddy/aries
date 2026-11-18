@@ -5,7 +5,7 @@ impl Session {
         let title = title.as_ref();
 
         self.session_repo
-            .update_title_by_session_id(&self.state.session_id, title)
+            .update_title_by_session_id(self.state.session_id(), title)
             .await
             .map_err(SessionError::db)
     }

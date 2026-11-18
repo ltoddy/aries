@@ -112,10 +112,9 @@ impl Tool for AgentTool {
         let task_id = nanoid::nanoid!();
         let tool_names = mode.frontmatter.filter_tool_names(crate::tools::ALL_TOOL_NAMES);
         let cwd = self.ctx.cwd();
-        let mut state = self.state.clone();
-        state.cwd(&cwd);
         let tools = crate::tools::create_agent_tools(
-            state,
+            self.state.clone(),
+            &cwd,
             self.gctx.clone(),
             &tool_names,
             self.extensions.clone(),
@@ -128,12 +127,12 @@ impl Tool for AgentTool {
 
         let token_usage_hook = TokenUsageHook::new(self.gctx.current_dir(), self.db.clone());
         let tool_call_hook = ToolCallHook::new(self.gctx.current_dir(), self.db.clone());
-        let dir = self.state.session_dir.join("subagent").join(&task_id);
+        let dir = self.state.session_dir().join("subagent").join(&task_id);
         let transcript_hook = TranscriptHook::new(&dir)
             .await
             .map_err(|source| AgentError::context_persistence(&dir, source))?;
 
-        let agent = AgentBuilder::new(self.state.model.clone())
+        let agent = AgentBuilder::new(self.state.model())
             .name(&mode.frontmatter.name)
             .preamble(&mode.body)
             .append_preamble(&preamble::env::section(&cwd))
@@ -143,8 +142,8 @@ impl Tool for AgentTool {
             .add_hook(token_usage_hook)
             .add_hook(tool_call_hook)
             .add_hook(transcript_hook)
-            .reasoning(self.state.effort)
-            .default_max_turns(self.state.turns.as_usize())
+            .reasoning(self.state.effort())
+            .default_max_turns(self.state.turns().as_usize())
             .build();
 
         let session_id = format!("agent-{}", nanoid::nanoid!());
@@ -157,7 +156,7 @@ impl Tool for AgentTool {
 
         self.notifier.send_session_message(
             &message_id,
-            &self.state.session_id,
+            self.state.session_id(),
             &session_id,
             &message_id,
             &message_id,

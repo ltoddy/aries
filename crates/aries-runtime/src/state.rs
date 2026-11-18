@@ -1,6 +1,8 @@
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use aries_extension::agent::AgentDefinition;
+use parking_lot::RwLock;
 use rig::Model;
 use rig::completion::Effort;
 use rig::providers::openai::wire::OpenAiWire;
@@ -9,19 +11,24 @@ use crate::sandbox::SandboxMode;
 
 #[derive(Clone, Debug)]
 pub struct State {
-    pub agent: AgentDefinition,
-    pub effort: Effort,
-    pub turns: MaxTurn,
-    pub model: Model<OpenAiWire>,
-    pub cwd: PathBuf,
-    pub session_dir: PathBuf,
-    pub session_id: String,
-    pub transcript_dir: PathBuf,
-    pub sandbox_mode: SandboxMode,
+    inner: Arc<RwLock<Inner>>,
 }
 
-impl State {
-    pub fn new(
+#[derive(Debug)]
+struct Inner {
+    agent: AgentDefinition,
+    effort: Effort,
+    turns: MaxTurn,
+    model: Model<OpenAiWire>,
+    cwd: PathBuf,
+    session_dir: PathBuf,
+    session_id: String,
+    transcript_dir: PathBuf,
+    sandbox_mode: SandboxMode,
+}
+
+impl Inner {
+    fn new(
         model: Model<OpenAiWire>,
         agent: AgentDefinition,
         cwd: impl Into<PathBuf>,
@@ -37,7 +44,7 @@ impl State {
 
         Self {
             effort: Effort::High,
-            turns: MaxTurn::Turns400,
+            turns: MaxTurn::default(),
             model,
             agent,
             cwd,
@@ -46,6 +53,56 @@ impl State {
             transcript_dir,
             sandbox_mode,
         }
+    }
+}
+
+impl State {
+    pub fn new(
+        model: Model<OpenAiWire>,
+        agent: AgentDefinition,
+        cwd: impl Into<PathBuf>,
+        session_dir: impl Into<PathBuf>,
+        session_id: impl Into<String>,
+        transcript_dir: impl Into<PathBuf>,
+    ) -> Self {
+        let inner = Inner::new(model, agent, cwd, session_dir, session_id, transcript_dir);
+        Self { inner: Arc::new(RwLock::new(inner)) }
+    }
+
+    pub fn agent(&self) -> AgentDefinition {
+        self.inner.read().agent.clone()
+    }
+
+    pub fn effort(&self) -> Effort {
+        self.inner.read().effort
+    }
+
+    pub fn turns(&self) -> MaxTurn {
+        self.inner.read().turns
+    }
+
+    pub fn model(&self) -> Model<OpenAiWire> {
+        self.inner.read().model.clone()
+    }
+
+    pub fn cwd(&self) -> PathBuf {
+        self.inner.read().cwd.clone()
+    }
+
+    pub fn session_dir(&self) -> PathBuf {
+        self.inner.read().session_dir.clone()
+    }
+
+    pub fn session_id(&self) -> String {
+        self.inner.read().session_id.clone()
+    }
+
+    pub fn transcript_dir(&self) -> PathBuf {
+        self.inner.read().transcript_dir.clone()
+    }
+
+    pub fn sandbox_mode(&self) -> SandboxMode {
+        self.inner.read().sandbox_mode
     }
 }
 
@@ -70,28 +127,28 @@ impl MaxTurn {
 }
 
 impl State {
-    pub fn agent(&mut self, agent: AgentDefinition) {
-        self.agent = agent;
+    pub fn set_agent(&self, agent: AgentDefinition) {
+        self.inner.write().agent = agent;
     }
 
-    pub fn effort(&mut self, effort: Effort) {
-        self.effort = effort;
+    pub fn set_effort(&self, effort: Effort) {
+        self.inner.write().effort = effort;
     }
 
-    pub fn turns(&mut self, turns: MaxTurn) {
-        self.turns = turns;
+    pub fn set_turns(&self, turns: MaxTurn) {
+        self.inner.write().turns = turns;
     }
 
-    pub fn model(&mut self, model: Model<OpenAiWire>) {
-        self.model = model;
+    pub fn set_model(&self, model: Model<OpenAiWire>) {
+        self.inner.write().model = model;
     }
 
-    pub fn cwd(&mut self, cwd: impl Into<PathBuf>) {
+    pub fn set_cwd(&self, cwd: impl Into<PathBuf>) {
         let cwd = cwd.into();
-        self.cwd = cwd;
+        self.inner.write().cwd = cwd;
     }
 
-    pub fn sandbox_mode(&mut self, sandbox_mode: SandboxMode) {
-        self.sandbox_mode = sandbox_mode;
+    pub fn set_sandbox_mode(&self, sandbox_mode: SandboxMode) {
+        self.inner.write().sandbox_mode = sandbox_mode;
     }
 }
