@@ -1,7 +1,6 @@
-use crate::terminal::session::*;
-
 use crate::terminal::session::error::WorkerError;
 use crate::terminal::session::runtime::{Command, Listener};
+use crate::terminal::session::*;
 
 #[cfg_attr(not(unix), allow(dead_code))]
 pub struct Worker {

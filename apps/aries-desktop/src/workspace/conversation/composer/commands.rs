@@ -1,5 +1,4 @@
 use crate::workspace::conversation::composer::*;
-
 use crate::workspace::settings::palette::Palette;
 
 impl Composer {
