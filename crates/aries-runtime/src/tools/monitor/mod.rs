@@ -2,24 +2,28 @@ mod args;
 mod error;
 mod output;
 
+use aries_init::GlobalContext;
 use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
 
 pub use self::args::MonitorArgs;
 pub use self::error::MonitorError;
 pub use self::output::MonitorOutput;
+use crate::state::State;
 use crate::tools::context::ToolContext as AriesToolContext;
-use crate::tools::task::TaskKind;
+use crate::tools::task::{SpawnTaskError, TaskKind};
 
 pub const NAME: &str = "Monitor";
 
 pub struct MonitorTool {
     ctx: AriesToolContext,
+    state: State,
+    gctx: GlobalContext,
 }
 
 impl MonitorTool {
-    pub fn new(ctx: AriesToolContext) -> Self {
-        Self { ctx }
+    pub fn new(ctx: AriesToolContext, state: State, gctx: GlobalContext) -> Self {
+        Self { ctx, state, gctx }
     }
 }
 
@@ -59,8 +63,18 @@ impl Tool for MonitorTool {
             .ctx
             .worktree()
             .map_or_else(|| self.ctx.cwd(), |worktree| worktree.path().to_owned());
-        let task =
-            self.ctx.task.spawn(TaskKind::Monitor, cwd, args.command, args.description).await?;
+        let shell = std::env::var("SHELL").unwrap_or_else(|_| "bash".to_owned());
+        let command =
+            self.state.sandbox_mode.command(&shell, self.gctx.home_dir(), &cwd).await.map_err(
+                |source| {
+                    SpawnTaskError::new(TaskKind::Monitor, &shell, &cwd, &args.command, source)
+                },
+            )?;
+        let task = self
+            .ctx
+            .task
+            .spawn(TaskKind::Monitor, cwd, args.command, args.description, command)
+            .await?;
 
         let task_id = task.task_id;
         let message = "Monitor started. Use TaskOutput to read output and TaskStop to stop it.";

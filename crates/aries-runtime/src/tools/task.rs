@@ -201,11 +201,12 @@ impl TaskRegistry {
         cwd: impl AsRef<Path>,
         command: impl Into<String>,
         description: Option<String>,
+        mut process: Command,
     ) -> Result<TaskSnapshot, SpawnTaskError> {
         let cwd = cwd.as_ref();
         let command: String = command.into();
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "bash".to_owned());
-        let mut child = Command::new(&shell)
+        let mut child = process
             .arg("-c")
             .arg(&command)
             .current_dir(cwd)
@@ -606,8 +607,14 @@ mod tests {
     async fn stop_terminates_running_task() {
         let (notifier, _receiver) = Notifier::channel();
         let registry = TaskRegistry::new(notifier);
+        let shell = std::env::var("SHELL").unwrap_or_else(|_| "bash".to_owned());
+        let gctx = aries_init::GlobalContext::new().await;
+        let command = crate::sandbox::SandboxMode::default()
+            .command(&shell, gctx.home_dir(), ".")
+            .await
+            .expect("test command should initialize");
         let task = registry
-            .spawn(TaskKind::Shell, ".", "sleep 30", None)
+            .spawn(TaskKind::Shell, ".", "sleep 30", None, command)
             .await
             .expect("test operation should succeed");
 

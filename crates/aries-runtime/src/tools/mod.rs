@@ -157,7 +157,11 @@ pub fn create_tools<'a>(
                 tool_set.add_tool(grep::GrepTool::new(ctx.clone()));
             },
             monitor::NAME => {
-                tool_set.add_tool(monitor::MonitorTool::new(ctx.clone()));
+                tool_set.add_tool(monitor::MonitorTool::new(
+                    ctx.clone(),
+                    state.clone(),
+                    gctx.clone(),
+                ));
             },
             multiedit::NAME => {
                 tool_set.add_tool(multiedit::MultiEditTool::new(ctx.clone()));
@@ -236,7 +240,11 @@ pub fn create_agent_tools<'a>(
                 tool_set.add_tool(grep::GrepTool::new(ctx.clone()));
             },
             monitor::NAME => {
-                tool_set.add_tool(monitor::MonitorTool::new(ctx.clone()));
+                tool_set.add_tool(monitor::MonitorTool::new(
+                    ctx.clone(),
+                    state.clone(),
+                    gctx.clone(),
+                ));
             },
             multiedit::NAME => {
                 tool_set.add_tool(multiedit::MultiEditTool::new(ctx.clone()));
