@@ -21,8 +21,8 @@ use self::prompt::prompt;
 use self::provider::{disable_provider, list_providers, set_provider};
 use self::session::{
     archive_session, close_session, delete_session, fork_session, list_session, load_session,
-    new_session, resume_session, session_status, set_session_config_option, set_session_mode,
-    set_session_title, unarchive_session,
+    new_session, resume_session, session_options, session_status, set_session_config_option,
+    set_session_mode, set_session_title, unarchive_session,
 };
 
 pub async fn run(
@@ -115,6 +115,13 @@ pub async fn run(
             {
                 let registry = registry.clone();
                 async move |req, responder, cx| session_status(req, responder, cx, &registry).await
+            },
+            on_receive_request!(),
+        )
+        .on_receive_request(
+            {
+                let registry = registry.clone();
+                async move |req, responder, cx| session_options(req, responder, cx, &registry).await
             },
             on_receive_request!(),
         )
