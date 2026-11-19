@@ -30,7 +30,7 @@ use crate::workspace::usage::{ReturnToSessions, UsageView};
 use crate::workspace::{SessionRenderMode, SessionView};
 use crate::{
     CloseTab, NewSession, NextTab, NextUserMessage, OpenSettings, PreviousTab, PreviousUserMessage,
-    SwitchSidebar, ToggleSidebar, ToggleTerminal,
+    ShowFilesSidebar, ShowSessionsSidebar, ToggleSidebar, ToggleTerminal,
 };
 
 mod file_operations;

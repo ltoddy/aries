@@ -64,13 +64,13 @@ impl CopyRelativePath {
 }
 
 impl PreviousFocus {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self
     }
 }
 
 impl ConfirmEntry {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self
     }
 }
