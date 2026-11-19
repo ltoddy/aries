@@ -1,5 +1,4 @@
 pub mod document;
-pub mod lock;
 #[cfg(test)]
 mod tests;
 pub mod walk;

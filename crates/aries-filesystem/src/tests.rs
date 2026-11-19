@@ -25,31 +25,6 @@ async fn reads_frontmatter_document() {
     assert_eq!(document.body, "body");
 }
 
-#[tokio::test]
-async fn lock_creates_file_without_truncating_existing_content() {
-    let dir = tempfile::tempdir().unwrap();
-    let file_path = dir.path().join("lock-file");
-    tokio::fs::write(&file_path, "keep me").await.unwrap();
-
-    let file = crate::lock::lock(&file_path).await.unwrap();
-    drop(file);
-
-    let content = tokio::fs::read_to_string(&file_path).await.unwrap();
-    assert_eq!(content, "keep me");
-}
-
-#[tokio::test]
-async fn try_lock_fails_when_file_is_already_locked() {
-    let dir = tempfile::tempdir().unwrap();
-    let file_path = dir.path().join("lock-file");
-    let file = crate::lock::lock(&file_path).await.unwrap();
-
-    let result = crate::lock::try_lock(&file_path).await;
-
-    assert!(result.is_err());
-    drop(file);
-}
-
 #[test]
 fn walk_dir_returns_direct_children_when_not_recursive() {
     let dir = tempfile::tempdir().unwrap();
