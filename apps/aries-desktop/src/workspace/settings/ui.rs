@@ -5,6 +5,7 @@ use gpui_kit::prelude::*;
 use gpui_kit::*;
 
 use crate::OpenSettings;
+use crate::keymap::groups;
 use crate::workspace::WorkspaceView;
 use crate::workspace::settings::SendKey;
 use crate::workspace::settings::palette::Palette;
@@ -51,40 +52,8 @@ impl RenderOnce for SettingsButton {
 }
 
 pub fn render_shortcuts(send_key: SendKey, cx: &App) -> impl IntoElement {
-    let modifier = if cfg!(target_os = "macos") { "⌘" } else { "Ctrl" };
-    let mut sessions = vec![
-        ("关闭当前标签", format!("{modifier} + W")),
-        ("下一个标签", "Ctrl + Tab".into()),
-        ("上一个标签", "Ctrl + Shift + Tab".into()),
-        ("下一个标签（替代）", format!("{modifier} + Shift + ]")),
-        ("上一个标签（替代）", format!("{modifier} + Shift + [")),
-        ("退出应用", format!("{modifier} + Q")),
-    ];
-    if cfg!(target_os = "macos") {
-        sessions.insert(0, ("新建会话", "⌘ + N".into()));
-        sessions.insert(1, ("显示/隐藏终端", "⌘ + F".into()));
-        sessions.push(("打开设置", "⌘ + ,".into()));
-    }
-    let groups = [
-        ("会话与标签", sessions),
-        (
-            "消息导航",
-            vec![
-                ("上一条用户消息", format!("{modifier} + Alt + ↑")),
-                ("下一条用户消息", format!("{modifier} + Alt + ↓")),
-            ],
-        ),
-        (
-            "输入与弹框",
-            vec![
-                ("发送消息", send_key.send_label().into()),
-                ("输入框换行", send_key.newline_label().into()),
-                ("关闭弹框", "Esc".into()),
-            ],
-        ),
-    ];
     div().flex().flex_col().gap_6().text_color(cx.theme().foreground).children(
-        groups.into_iter().map(|(title, rows)| {
+        groups(send_key).into_iter().map(|(title, rows)| {
             div()
                 .flex()
                 .flex_col()

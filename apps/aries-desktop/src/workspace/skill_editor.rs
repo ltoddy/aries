@@ -23,17 +23,9 @@ const AUTOSAVE_DELAY: Duration = Duration::from_millis(700);
 pub struct SaveSkill;
 
 impl SaveSkill {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self
     }
-}
-
-pub fn init(cx: &mut App) {
-    cx.bind_keys([KeyBinding::new(
-        if cfg!(target_os = "macos") { "cmd-s" } else { "ctrl-s" },
-        SaveSkill::new(),
-        Some("SkillEditor"),
-    )]);
 }
 
 pub enum SkillEditorEvent {

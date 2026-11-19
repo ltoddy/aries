@@ -19,14 +19,6 @@ use gpui_kit::{
 
 gpui_kit::actions!(terminal, [ClearTerminal, CopyTerminal, PasteTerminal]);
 
-pub fn init(cx: &mut App) {
-    cx.bind_keys([
-        gpui_kit::KeyBinding::new("cmd-k", ClearTerminal, Some("Terminal")),
-        gpui_kit::KeyBinding::new("cmd-c", CopyTerminal, Some("Terminal")),
-        gpui_kit::KeyBinding::new("cmd-v", PasteTerminal, Some("Terminal")),
-    ]);
-}
-
 pub use self::session::Status;
 use self::session::{Dimensions, Session, StartError, WriteError};
 use crate::workspace::settings::typography;

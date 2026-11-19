@@ -58,28 +58,6 @@ impl PreviousMatch {
     }
 }
 
-pub fn init(cx: &mut App) {
-    let (find, copy, next, previous) = if cfg!(target_os = "macos") {
-        ("cmd-f", "cmd-shift-c", "cmd-g", "cmd-shift-g")
-    } else {
-        ("ctrl-f", "ctrl-shift-c", "ctrl-g", "ctrl-shift-g")
-    };
-    cx.bind_keys([
-        KeyBinding::new(find, FindFile::new(), Some(FILE_VIEW_CONTEXT)),
-        KeyBinding::new(copy, CopyFile::new(), Some(FILE_VIEW_CONTEXT)),
-        KeyBinding::new(
-            if cfg!(target_os = "macos") { "cmd-s" } else { "ctrl-s" },
-            SaveFile::new(),
-            Some(FILE_VIEW_CONTEXT),
-        ),
-        KeyBinding::new(next, NextMatch::new(), Some(FILE_VIEW_CONTEXT)),
-        KeyBinding::new(previous, PreviousMatch::new(), Some(FILE_VIEW_CONTEXT)),
-        KeyBinding::new("f3", NextMatch::new(), Some(FILE_VIEW_CONTEXT)),
-        KeyBinding::new("shift-f3", PreviousMatch::new(), Some(FILE_VIEW_CONTEXT)),
-        KeyBinding::new("escape", Escape, Some(FILE_VIEW_CONTEXT)),
-    ]);
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OpenFile {
     directory: PathBuf,
@@ -230,12 +208,6 @@ pub struct FileView {
     _save_task: Option<Task<()>>,
     auto_save_task: Option<Task<()>>,
     auto_save_paused: bool,
-}
-
-impl FileView {
-    pub fn init(cx: &mut App) {
-        self::init(cx);
-    }
 }
 
 impl EventEmitter<CloseFile> for FileView {}
