@@ -1,5 +1,7 @@
 mod acp;
 mod error;
+#[cfg(target_os = "macos")]
+mod pet;
 mod terminal;
 mod workspace;
 
@@ -18,6 +20,7 @@ gpui_kit::actions!(
         Quit,
         Hide,
         OpenSettings,
+        ShowPet,
         NewSession,
         CloseTab,
         PreviousTab,
@@ -29,6 +32,13 @@ gpui_kit::actions!(
         SwitchSidebar,
     ]
 );
+
+#[cfg(target_os = "macos")]
+impl ShowPet {
+    fn new() -> Self {
+        Self
+    }
+}
 
 impl SwitchSidebar {
     fn new() -> Self {
@@ -123,6 +133,7 @@ fn run() -> Result<(), StartupError> {
         #[cfg(target_os = "macos")]
         cx.set_menus([Menu::new("Aries Desktop").items([
             MenuItem::action("设置…", OpenSettings),
+            MenuItem::action("显示桌宠", ShowPet::new()),
             MenuItem::action("切换会话 / 文件", SwitchSidebar::new()),
             MenuItem::separator(),
             MenuItem::action("隐藏 Aries Desktop", Hide),
@@ -151,6 +162,8 @@ fn run() -> Result<(), StartupError> {
             cx.new(|cx| WorkspaceView::new(cwd, Preferences::path(), aries_config(), window, cx))
         }) {
             Ok((handle, workspace)) => {
+                #[cfg(target_os = "macos")]
+                crate::pet::init(handle, &workspace, cx);
                 let quit_workspace = workspace.downgrade();
                 cx.on_action(move |_: &Quit, cx| {
                     cx.stop_propagation();

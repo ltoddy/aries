@@ -36,6 +36,16 @@ pub enum SessionRenderMode {
 pub mod management;
 use self::management::SessionManagement;
 
+pub struct SessionFinished;
+
+impl SessionFinished {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl EventEmitter<SessionFinished> for SessionView {}
+
 pub struct SessionView {
     execution: Execution,
     management: SessionManagement,

@@ -1,6 +1,25 @@
 use crate::workspace::workspace_view::*;
 
 impl WorkspaceView {
+    pub fn session_views(&self) -> Vec<Entity<SessionView>> {
+        self.tabs.iter().filter_map(WorkspaceTab::session).cloned().collect()
+    }
+
+    pub fn focus_session_view(
+        &mut self,
+        id: EntityId,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(index) = self
+            .tabs
+            .iter()
+            .position(|tab| tab.session().is_some_and(|view| view.entity_id() == id))
+        {
+            self.select_tab(index, window, cx);
+        }
+    }
+
     pub fn selected_session_view(&self) -> Option<&Entity<SessionView>> {
         self.tabs.get(self.active).and_then(WorkspaceTab::session)
     }
