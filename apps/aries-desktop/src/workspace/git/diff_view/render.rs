@@ -209,6 +209,7 @@ impl Render for GitDiffView {
             .unwrap_or_else(|| path.clone());
         let toolbar_snapshot = self.tool_snapshot();
         let mode = self.state.read(cx).mode();
+        let added_file = self.is_added_file(cx);
         let has_diff = self.error.is_none() && !self.state.read(cx).files().is_empty();
         let body = if let Some(error) = &self.error {
             div()
@@ -409,7 +410,12 @@ impl Render for GitDiffView {
                             .compact()
                             .icon(IconName::Columns2)
                             .accessibility_label("左右对照")
-                            .tooltip("左右对照")
+                            .tooltip(if added_file {
+                                "新增文件仅支持单栏"
+                            } else {
+                                "左右对照"
+                            })
+                            .disabled(added_file)
                             .selected(mode == DiffMode::Split)
                             .when(mode == DiffMode::Split, |button| {
                                 button
