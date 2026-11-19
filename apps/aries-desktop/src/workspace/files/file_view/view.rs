@@ -8,6 +8,7 @@ use gpui_kit::*;
 use crate::workspace::files::file_view::document::{read_text_file, save_document};
 use crate::workspace::files::file_view::status::{EditorStatus, editor_tab_size, file_language};
 use crate::workspace::files::file_view::{AUTO_SAVE_DELAY, FileLoadState, FileView, OpenFile};
+use crate::workspace::settings::typography;
 
 impl FileView {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
@@ -18,6 +19,7 @@ impl FileView {
                 .line_number(true)
                 .tab_size(tab)
                 .replaceable(true)
+                .scroll_beyond_last_line(Some(0))
         });
         let status = EditorStatus::new(editor.read(cx));
         let change_subscription =
@@ -374,7 +376,7 @@ impl FileView {
                 .appearance(false)
                 .bordered(false)
                 .font_family(cx.theme().mono_font_family.clone())
-                .text_size(cx.theme().mono_font_size)
+                .text_size(typography::code_size())
                 .aria_label("文件内容，编辑后自动保存")
                 .h_full()
                 .w_full()
