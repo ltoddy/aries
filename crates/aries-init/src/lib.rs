@@ -4,8 +4,6 @@ pub mod setting;
 
 use std::path::Path;
 
-use tracing::warn;
-
 pub use crate::global::GlobalContext;
 pub use crate::setting::{ModelConfig, Provider, Setting, SettingError, SettingLoader};
 
@@ -32,29 +30,4 @@ pub async fn init(root_dir: impl AsRef<Path>) {
     f1.expect("Unable to write build.md");
     f2.expect("Unable to write explore.md");
     f3.expect("Unable to write general.md");
-}
-
-pub async fn gc(root_dir: impl AsRef<Path>) {
-    let root_dir = root_dir.as_ref();
-
-    let mut db = match aries_persistence::connect(root_dir).await {
-        Ok(db) => db,
-        Err(err) => {
-            warn!(path = %root_dir.display(), error = %err, "failed to connect database for garbage collection");
-            return;
-        },
-    };
-    if let Err(err) = aries_persistence::migrate(&mut db).await {
-        warn!(path = %root_dir.display(), error = %err, "failed to migrate database for garbage collection");
-        return;
-    }
-
-    let lock_file_path = root_dir.join("aries-db.lock");
-    match aries_filesystem::lock::lock(lock_file_path).await {
-        Ok(file) => {
-            let _lock = file;
-            aries_persistence::gc(db).await;
-        },
-        Err(err) => warn!(err = %err, "failed to lock file"),
-    }
 }

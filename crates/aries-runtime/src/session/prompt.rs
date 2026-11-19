@@ -191,7 +191,7 @@ impl Session {
     async fn recall_context(&self, query: impl AsRef<str>) -> Option<String> {
         let query = query.as_ref();
         let memories = self.memory_store.scan().await;
-        let retriever = MemoryRetriever::new(self.state.model());
+        let retriever = MemoryRetriever::new(self.state.model(), self.state.cwd(), self.db.clone());
         let retrieved = retriever.retrieve(query, &memories).await;
 
         let mut blocks = Vec::<String>::with_capacity(retrieved.len());

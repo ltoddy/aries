@@ -71,20 +71,15 @@ impl SandboxMode {
         {
             let home = tokio::fs::canonicalize(home).await?;
             let cwd = tokio::fs::canonicalize(cwd).await?;
-            let temp_dir = tokio::fs::canonicalize(std::env::temp_dir()).await?;
             let mut command = Command::new("/usr/bin/sandbox-exec");
             command.arg("-p").arg(self.seatbelt_profile());
-            for (name, path) in [
-                ("HOME", home.as_path()),
-                ("WORKSPACE", cwd.as_path()),
-                ("SANDBOX_TMP", temp_dir.as_path()),
-            ] {
+            for (name, path) in [("HOME", home.as_path()), ("WORKSPACE", cwd.as_path())] {
                 let mut parameter = OsString::from(name);
                 parameter.push("=");
                 parameter.push(path);
                 command.arg("-D").arg(parameter);
             }
-            command.env("TMPDIR", &temp_dir).arg(shell);
+            command.env("TMPDIR", "/private/tmp").arg(shell);
             Ok(command)
         }
 

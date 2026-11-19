@@ -5,10 +5,14 @@
 (allow signal (target same-sandbox))
 (allow sysctl-read)
 
+(allow file-read-metadata)
+
 (allow file-read*
   (literal "/")
   (literal "/private/var/select/sh")
+  (literal "/private/var/select/developer_dir")
   (subpath "/System")
+  (subpath "/Applications/Xcode.app")
   (subpath "/usr/bin")
   (subpath "/usr/lib")
   (subpath "/usr/share")
@@ -18,14 +22,14 @@
   (subpath "/sbin")
   (subpath "/Library/Developer")
   (subpath "/private/etc")
+  (subpath "/private/tmp")
   (subpath "/dev")
   (subpath (param "HOME"))
-  (subpath (param "WORKSPACE"))
-  (subpath (param "SANDBOX_TMP")))
+  (subpath (param "WORKSPACE")))
 
 (allow file-write*
   (literal "/dev/null")
-  (subpath (param "SANDBOX_TMP")))
+  (subpath "/private/tmp"))
 
 (allow file-write*
   (subpath (param "WORKSPACE")))

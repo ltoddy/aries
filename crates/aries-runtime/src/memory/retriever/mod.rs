@@ -1,11 +1,15 @@
+use std::path::PathBuf;
+
 use itertools::Itertools;
 use rig::Model;
 use rig::extractor::{Extractor, ExtractorBuilder};
 use rig::providers::openai::wire::OpenAiWire;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use toasty::Db;
 use tracing::info;
 
+use crate::hooks::TokenUsageHook;
 use crate::memory::Memory;
 
 const PREAMBLE: &str = include_str!("preamble.md");
@@ -22,9 +26,13 @@ pub struct MemoryRetriever {
 }
 
 impl MemoryRetriever {
-    pub fn new(model: Model<OpenAiWire>) -> Self {
-        let inner =
-            ExtractorBuilder::<RetrievedMemories>::new(model).append_preamble(PREAMBLE).build();
+    pub fn new(model: Model<OpenAiWire>, cwd: impl Into<PathBuf>, db: Db) -> Self {
+        let token_usage_hook = TokenUsageHook::new(cwd, db);
+
+        let inner = ExtractorBuilder::<RetrievedMemories>::new(model)
+            .append_preamble(PREAMBLE)
+            .add_hook(token_usage_hook)
+            .build();
 
         Self { inner }
     }
