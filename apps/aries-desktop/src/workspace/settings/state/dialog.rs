@@ -9,9 +9,10 @@ impl SettingsState {
                 .title(div().text_sm().font_weight(FontWeight::SEMIBOLD).child("设置"))
                 .centered()
                 .width(cx.theme().font_size * 44.)
+                .h(rems(28.))
                 .bg(cx.theme().background)
                 .rounded(cx.theme().radius_tokens().xl)
-                .content(move |content, window, cx| {
+                .content(move |content, _, cx| {
                     let Some(owner) = view.upgrade() else {
                         return content;
                     };
@@ -33,8 +34,6 @@ impl SettingsState {
                     let font_smaller = view.clone();
                     let font_larger = view.clone();
                     let font_reset = view.clone();
-                    let content_height = (window.viewport_size().height - window.rem_size() * 7.)
-                        .clamp(window.rem_size() * 0., window.rem_size() * 31.);
                     let navigation = div().flex().flex_col().gap_1().children(
                         [
                             SettingsPage::Appearance,
@@ -300,8 +299,9 @@ impl SettingsState {
                             content.child(render_shortcuts(send_key, cx))
                         });
                     content
-                        .h(content_height)
+                        .flex_1()
                         .min_h_0()
+                        .overflow_hidden()
                         .gap_3()
                         .child(
                             div()
@@ -337,7 +337,8 @@ impl SettingsState {
                         .child(
                             div()
                                 .id("settings-save-status")
-                                .max_h(content_height * 0.4)
+                                .h_auto()
+                                .max_h(rems(8.))
                                 .flex_shrink_0()
                                 .overflow_y_scrollbar()
                                 .child(
