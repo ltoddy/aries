@@ -64,6 +64,7 @@ pub struct GitDiffView {
     target: Option<DiffTarget>,
     targets: Vec<DiffTarget>,
     state: Entity<DiffState>,
+    preferred_mode: DiffMode,
     patch: Arc<String>,
     error: Option<String>,
     model: Option<Arc<DiffPatch>>,
@@ -109,6 +110,7 @@ impl GitDiffView {
             target: None,
             targets: Vec::new(),
             state,
+            preferred_mode: DiffMode::default(),
             patch: Arc::new(String::new()),
             error: None,
             model: None,
@@ -241,7 +243,18 @@ impl GitDiffView {
                 match result {
                     Ok(result) => {
                         if let Some((patch, files, model)) = result {
-                            this.state.update(cx, |state, cx| state.set_files(files, cx));
+                            let mode = if files
+                                .first()
+                                .is_some_and(|file| file.status() == DiffFileStatus::Added)
+                            {
+                                DiffMode::Unified
+                            } else {
+                                this.preferred_mode
+                            };
+                            this.state.update(cx, |state, cx| {
+                                state.set_files(files, cx);
+                                state.set_mode(mode, cx);
+                            });
                             this.patch = patch;
                             match model {
                                 Ok(model) => {
@@ -449,7 +462,19 @@ impl GitDiffView {
         .detach();
     }
 
+    pub fn is_added_file(&self, cx: &App) -> bool {
+        self.state
+            .read(cx)
+            .files()
+            .first()
+            .is_some_and(|file| file.status() == DiffFileStatus::Added)
+    }
+
     pub fn set_mode(&mut self, mode: DiffMode, cx: &mut Context<Self>) {
+        if self.is_added_file(cx) {
+            return;
+        }
+        self.preferred_mode = mode;
         self.state.update(cx, |state, cx| state.set_mode(mode, cx));
     }
 }
