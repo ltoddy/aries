@@ -1,5 +1,6 @@
 mod acp;
 mod error;
+mod keymap;
 mod terminal;
 mod workspace;
 
@@ -70,56 +71,9 @@ fn run() -> Result<(), StartupError> {
     let cwd = directory.canonicalize().map_err(|source| StartupError::access(directory, source))?;
     gpui_kit::application().with_assets(AllAssets).run(move |cx| {
         gpui_kit::init(cx);
-        crate::terminal::init(cx);
-        crate::workspace::skill_editor::init(cx);
-        crate::workspace::files::FileView::init(cx);
-        cx.bind_keys([
-            KeyBinding::new(
-                if cfg!(target_os = "macos") { "cmd-f" } else { "ctrl-f" },
-                gpui_kit::component::input::Search,
-                Some("GitDiff"),
-            ),
-            KeyBinding::new("escape", gpui_kit::component::input::Escape, Some("GitDiff")),
-            KeyBinding::new(
-                "escape",
-                gpui_kit::component::dialog::Cancel,
-                Some("Dialog || Dialog > (Input || TextView)"),
-            ),
-        ]);
-        cx.bind_keys([KeyBinding::new("cmd-q", Quit, None), KeyBinding::new("ctrl-q", Quit, None)]);
-        #[cfg(target_os = "macos")]
-        cx.bind_keys([
-            KeyBinding::new("cmd-,", OpenSettings, None),
-            KeyBinding::new("cmd-n", NewSession, None),
-            KeyBinding::new("cmd-j", ToggleTerminal, None),
-            KeyBinding::new("cmd-b", ToggleSidebar, None),
-            KeyBinding::new("cmd-shift-e", SwitchSidebar::new(), None),
-            KeyBinding::new("cmd-h", Hide, None),
-        ]);
+        crate::keymap::init(cx);
         #[cfg(target_os = "macos")]
         cx.on_action(|_: &Hide, cx| cx.hide());
-        #[cfg(target_os = "macos")]
-        cx.bind_keys([
-            KeyBinding::new("cmd-w", CloseTab, None),
-            KeyBinding::new("cmd-shift-[", PreviousTab, None),
-            KeyBinding::new("cmd-shift-]", NextTab, None),
-            KeyBinding::new("cmd-alt-up", PreviousUserMessage, None),
-            KeyBinding::new("cmd-alt-down", NextUserMessage, None),
-        ]);
-        #[cfg(not(target_os = "macos"))]
-        cx.bind_keys([
-            KeyBinding::new("ctrl-w", CloseTab, None),
-            KeyBinding::new("ctrl-b", ToggleSidebar, None),
-            KeyBinding::new("ctrl-shift-e", SwitchSidebar::new(), None),
-            KeyBinding::new("ctrl-shift-[", PreviousTab, None),
-            KeyBinding::new("ctrl-shift-]", NextTab, None),
-            KeyBinding::new("ctrl-alt-up", PreviousUserMessage, None),
-            KeyBinding::new("ctrl-alt-down", NextUserMessage, None),
-        ]);
-        cx.bind_keys([
-            KeyBinding::new("ctrl-tab", NextTab, None),
-            KeyBinding::new("ctrl-shift-tab", PreviousTab, None),
-        ]);
         #[cfg(target_os = "macos")]
         cx.set_menus([Menu::new("Aries Desktop").items([
             MenuItem::action("设置…", OpenSettings),

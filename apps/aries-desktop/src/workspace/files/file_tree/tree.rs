@@ -56,27 +56,6 @@ impl FileTree {
                 });
             });
         });
-        cx.bind_keys([
-            KeyBinding::new("enter", ConfirmEntry::new(), Some("FileTreeContent")),
-            KeyBinding::new("shift-tab", PreviousFocus::new(), Some("FileTree")),
-            KeyBinding::new(
-                if cfg!(target_os = "macos") { "cmd-f" } else { "ctrl-f" },
-                FindEntry::new(),
-                Some("FileTree"),
-            ),
-            KeyBinding::new("escape", Escape, Some("FileTree")),
-            KeyBinding::new("f2", RenameEntry::new(), Some("FileTreeContent")),
-            KeyBinding::new(
-                if cfg!(target_os = "macos") { "cmd-backspace" } else { "ctrl-backspace" },
-                DeleteEntry::new(),
-                Some("FileTreeContent"),
-            ),
-            KeyBinding::new(
-                if cfg!(target_os = "macos") { "cmd-shift-c" } else { "ctrl-shift-c" },
-                CopyRelativePath::new(),
-                Some("FileTreeContent"),
-            ),
-        ]);
         let view = cx.weak_entity();
         cx.defer(move |cx| {
             let _ = view.update(cx, |this, cx| {
