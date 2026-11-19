@@ -8,15 +8,6 @@ impl WorkspaceView {
         }
     }
 
-    pub fn switch_sidebar(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let page = if self.sidebar_page == SidebarPage::sessions() {
-            SidebarPage::files()
-        } else {
-            SidebarPage::sessions()
-        };
-        self.select_sidebar_page(page, window, cx);
-    }
-
     pub fn select_sidebar_page(
         &mut self,
         page: SidebarPage,
@@ -130,7 +121,7 @@ impl WorkspaceView {
                             .label("会话")
                             .icon(IconName::MessagesSquare)
                             .track_focus(&self.sidebar_sessions_focus_handle)
-                            .tooltip_with_action("切换会话 / 文件", &SwitchSidebar::new(), None)
+                            .tooltip_with_action("显示会话列表", &ShowSessionsSidebar::new(), None)
                             .selected(!files_selected)
                             .on_click(cx.listener(|this, _, window, cx| {
                                 this.select_sidebar_page(SidebarPage::sessions(), window, cx);
@@ -143,7 +134,7 @@ impl WorkspaceView {
                                 .ghost()
                                 .label("文件")
                                 .icon(IconName::FolderTree)
-                                .tooltip_with_action("切换会话 / 文件", &SwitchSidebar::new(), None)
+                                .tooltip_with_action("显示文件树", &ShowFilesSidebar::new(), None)
                                 .selected(self.sidebar_page == SidebarPage::files())
                                 .on_click(cx.listener(|this, _, window, cx| {
                                     this.select_sidebar_page(SidebarPage::files(), window, cx);

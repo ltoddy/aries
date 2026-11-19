@@ -121,8 +121,11 @@ impl Render for WorkspaceView {
             .on_action(cx.listener(|this, _: &ToggleSidebar, window, cx| {
                 this.toggle_sidebar(window, cx);
             }))
-            .on_action(cx.listener(|this, _: &SwitchSidebar, window, cx| {
-                this.switch_sidebar(window, cx);
+            .on_action(cx.listener(|this, _: &ShowSessionsSidebar, window, cx| {
+                this.select_sidebar_page(SidebarPage::sessions(), window, cx);
+            }))
+            .on_action(cx.listener(|this, _: &ShowFilesSidebar, window, cx| {
+                this.select_sidebar_page(SidebarPage::files(), window, cx);
             }))
             .on_action(cx.listener(|this, _: &CloseTab, window, cx| {
                 if this.is_sessions_visible()

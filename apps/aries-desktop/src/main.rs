@@ -27,12 +27,19 @@ gpui_kit::actions!(
         NextUserMessage,
         ToggleTerminal,
         ToggleSidebar,
-        SwitchSidebar,
+        ShowSessionsSidebar,
+        ShowFilesSidebar,
     ]
 );
 
-impl SwitchSidebar {
-    fn new() -> Self {
+impl ShowSessionsSidebar {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl ShowFilesSidebar {
+    pub fn new() -> Self {
         Self
     }
 }
@@ -77,7 +84,8 @@ fn run() -> Result<(), StartupError> {
         #[cfg(target_os = "macos")]
         cx.set_menus([Menu::new("Aries Desktop").items([
             MenuItem::action("设置…", OpenSettings),
-            MenuItem::action("切换会话 / 文件", SwitchSidebar::new()),
+            MenuItem::action("显示会话列表", ShowSessionsSidebar::new()),
+            MenuItem::action("显示文件树", ShowFilesSidebar::new()),
             MenuItem::separator(),
             MenuItem::action("隐藏 Aries Desktop", Hide),
             MenuItem::separator(),
