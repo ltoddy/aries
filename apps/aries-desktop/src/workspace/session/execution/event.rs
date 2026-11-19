@@ -122,6 +122,9 @@ impl Execution {
                 } else {
                     self.with_prompt_queue(PromptQueue::pause);
                 }
+                if automatic && !self.conversation.is_busy() {
+                    cx.emit(crate::workspace::session::session_view::SessionFinished::new());
+                }
                 if ui.render_mode != crate::workspace::SessionRenderMode::Main {
                     self.refresh_sessions(ui, cx);
                 }

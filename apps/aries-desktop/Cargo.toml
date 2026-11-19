@@ -54,5 +54,10 @@ tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["fmt"] }
 url.workspace = true
 
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSAccessibility", "NSApplication", "NSCell", "NSEvent", "NSMenu", "NSMenuItem", "NSView", "NSWindow", "NSResponder", "NSWorkspace"] }
+raw-window-handle = "0.6"
+
 [target.'cfg(any(target_os = "macos", target_os = "linux"))'.dependencies]
 rustix = { version = "1.1", features = ["fs"] }
