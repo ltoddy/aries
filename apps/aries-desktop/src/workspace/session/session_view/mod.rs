@@ -273,7 +273,7 @@ impl SessionView {
     ) {
         self.sidebar.list_mut().expand_project(&session.cwd);
         if !self.sidebar.list().show_archived() {
-            self.sidebar.motion_mut().add_created(session, cx.background_executor().now());
+            self.sidebar.motion_mut().add_created(session);
         }
         self.refresh_sessions(cx);
         cx.notify();

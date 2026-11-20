@@ -94,7 +94,6 @@ impl SessionView {
 
 impl Render for SessionView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        self.sidebar.cleanup(cx);
         let p = Palette::new(cx.theme().mode);
         match self.render_mode {
             SessionRenderMode::Full => self.render_layout(window, cx).into_any_element(),

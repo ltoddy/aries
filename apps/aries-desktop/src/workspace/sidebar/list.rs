@@ -19,7 +19,7 @@ impl<'a> SessionListView<'a> {
     pub fn render_sessions(
         &self,
         p: Palette,
-        window: &mut Window,
+        _window: &mut Window,
         cx: &mut Context<SessionView>,
     ) -> impl IntoElement {
         let list = &self.sidebar.list();
@@ -52,7 +52,7 @@ impl<'a> SessionListView<'a> {
                     .pb_2()
                     .children(groups.into_iter().map(|(cwd, sessions)| {
                         ProjectView::new(self.sidebar, self.owner)
-                            .render_project(cwd, &sessions, p, window, cx)
+                            .render_project(cwd, &sessions, p, cx)
                     }))
                     .when(list.is_loading(), |list| {
                         list.child(

@@ -57,9 +57,7 @@ impl Execution {
                     )
                     .title(self.conversation.title());
                     if !ui.sidebar.list().show_archived() {
-                        ui.sidebar
-                            .motion_mut()
-                            .add_created(session.clone(), cx.background_executor().now());
+                        ui.sidebar.motion_mut().add_created(session.clone());
                     }
                     ui.sidebar.set_created_session(session);
                 }
