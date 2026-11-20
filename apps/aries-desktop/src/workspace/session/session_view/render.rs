@@ -1,9 +1,6 @@
 use crate::workspace::session::session_view::*;
 
 impl SessionView {
-    pub fn render_session_actions(&self, p: Palette) -> impl IntoElement {
-        crate::workspace::session::deletion::render_session_actions(self, p)
-    }
     pub fn render_session_delete_popup(
         &self,
         anchor: impl AsRef<str>,
