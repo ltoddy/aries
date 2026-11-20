@@ -35,7 +35,6 @@ impl<'a> SessionListView<'a> {
                     SessionToolbar::new(self.sidebar, self.owner).render_session_toolbar(p, cx),
                 ),
             )
-            .child(div().px_2().child(self.owner.render_session_actions(p)))
             .when(self.owner.management().is_pending(), |list| {
                 list.child(
                     div().px_4().py_1().text_xs().text_color(p.muted()).child("正在更新会话…"),

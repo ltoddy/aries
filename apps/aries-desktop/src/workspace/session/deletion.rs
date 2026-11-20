@@ -6,13 +6,6 @@ use gpui_kit::*;
 use crate::workspace::SessionView;
 use crate::workspace::settings::palette::Palette;
 
-pub fn render_session_actions(owner: &SessionView, p: Palette) -> impl IntoElement {
-    let actions = &owner.deletion();
-    div().flex_shrink_0().when(actions.is_deleting(), |panel| {
-        panel.child(div().p_2().text_xs().text_color(p.muted()).child("正在删除会话…"))
-    })
-}
-
 pub fn render_session_delete_popup(
     owner: &SessionView,
     anchor: impl AsRef<str>,
