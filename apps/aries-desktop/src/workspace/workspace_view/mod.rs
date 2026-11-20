@@ -27,6 +27,7 @@ use crate::workspace::settings::palette::Palette;
 use crate::workspace::settings::{Preferences, SettingsState};
 use crate::workspace::sidebar::Sidebar;
 use crate::workspace::usage::{ReturnToSessions, UsageView};
+use crate::workspace::workspace_view::fps_counter::FpsCounter;
 use crate::workspace::{SessionRenderMode, SessionView};
 use crate::{
     CloseTab, NewSession, NextTab, NextUserMessage, OpenSettings, PreviousTab, PreviousUserMessage,
@@ -35,6 +36,7 @@ use crate::{
 
 mod file_operations;
 mod file_tabs;
+mod fps_counter;
 mod layout;
 mod pages;
 mod render;
@@ -343,6 +345,7 @@ pub struct WorkspaceView {
     active: usize,
     next_id: usize,
     tab_scroll: ScrollHandle,
+    fps_counter: Entity<FpsCounter>,
     focus_handle: FocusHandle,
     terminal: Option<Entity<TerminalView>>,
     terminal_visible: bool,
@@ -431,6 +434,7 @@ impl WorkspaceView {
             active: 0,
             next_id: 0,
             tab_scroll: ScrollHandle::new(),
+            fps_counter: cx.new(|cx| FpsCounter::new(window, cx)),
             focus_handle,
             terminal: None,
             terminal_visible: false,

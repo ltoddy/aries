@@ -19,7 +19,8 @@ aries-persistence = { path = "../../crates/aries-persistence" }
 base64.workspace = true
 dirs = "7.0"
 git2 = { workspace = true, default-features = false }
-gpui-kit = { version = "0.9", features = [
+gpui-kit = { version = "0.10", features = [
+    "profiler",
     "tree-sitter",
     "tree-sitter-bash",
     "tree-sitter-c",

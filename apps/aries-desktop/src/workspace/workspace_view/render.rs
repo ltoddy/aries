@@ -185,6 +185,13 @@ impl Render for WorkspaceView {
                             )
                         })
                         .child(self.render_tab_bar(p, sidebar_available, cx))
+                        .child(
+                            div()
+                                .w_20()
+                                .h_full()
+                                .flex_shrink_0()
+                                .child(self.fps_counter.clone().cached(panel_style.clone())),
+                        )
                         .child(div().w_3().h_full().flex_shrink_0()),
                 ),
             )
