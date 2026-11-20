@@ -9,7 +9,7 @@ use gpui_kit::*;
 
 use crate::workspace::SessionView;
 use crate::workspace::settings::palette::Palette;
-use crate::workspace::sidebar::motion::{SidebarRow, project_body};
+use crate::workspace::sidebar::motion::SidebarRow;
 use crate::workspace::sidebar::session::SessionRowView;
 use crate::workspace::sidebar::{SESSION_LIMIT, Sidebar};
 
@@ -27,7 +27,6 @@ impl<'a> ProjectView<'a> {
         cwd: impl AsRef<Path>,
         sessions: &[&SidebarRow],
         p: Palette,
-        window: &mut Window,
         cx: &mut Context<SessionView>,
     ) -> AnyElement {
         let cwd = cwd.as_ref();
@@ -42,7 +41,7 @@ impl<'a> ProjectView<'a> {
         let delete_path = path.clone();
         let more_path = path.clone();
         let delete_anchor = format!("project:{}", delete_path.display());
-        let has_sessions = sessions.iter().any(|row| !row.is_exiting());
+        let has_sessions = !sessions.is_empty();
         let delete_enabled = self.owner.can_manage_sessions()
             && self.owner.supports_session_deletion()
             && has_sessions;
@@ -185,12 +184,8 @@ impl<'a> ProjectView<'a> {
                         )
                     }),
             )
-            .child(project_body(
-                SharedString::from(format!("project:{}", cwd.display())).into(),
-                expanded,
-                window,
-                cx,
-                |cx| {
+            .when(expanded, |project| {
+                project.child(
                     div()
                         .children(sessions.iter().take(visible_count).map(|row| {
                             SessionRowView::new(self.sidebar, self.owner)
@@ -234,10 +229,9 @@ impl<'a> ProjectView<'a> {
                                     },
                                 )),
                             )
-                        })
-                        .into_any_element()
-                },
-            ))
+                        }),
+                )
+            })
             .into_any_element()
     }
 }

@@ -109,7 +109,7 @@ impl Execution {
     ) {
         let (deleted, failed) = result.into_parts();
         let deleted: HashSet<_> = deleted.into_iter().collect();
-        ui.sidebar.begin_sidebar_exit(
+        ui.sidebar.remove_sidebar_sessions(
             &deleted,
             self.session_id.as_ref(),
             &self.cwd,

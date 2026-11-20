@@ -29,7 +29,7 @@ impl<'a> SessionRowView<'a> {
         cx: &mut Context<SessionView>,
     ) -> AnyElement {
         let session = row.session();
-        let enabled = expanded && !row.is_exiting();
+        let enabled = expanded;
         let id = session.session_id.to_string();
         let execution = self.owner.execution();
         let current = execution.session_id() == Some(&session.session_id);

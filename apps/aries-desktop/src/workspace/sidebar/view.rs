@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
 use agent_client_protocol::v1::schema::{SessionId, SessionInfo};
 use gpui_kit::assets::IconName;
@@ -40,7 +39,7 @@ impl Sidebar {
         let anchor = ScrollAnchor::for_handle(scroll.clone());
         Self {
             list: SessionList::default(),
-            motion: SidebarMotion::default(),
+            motion: SidebarMotion::new(),
             scroll,
             anchor,
             loading_session: None,
@@ -94,9 +93,6 @@ impl Sidebar {
     pub fn collapse_all(&mut self) {
         self.list.collapse_all();
         self.expanded_sessions.clear();
-    }
-    pub fn cleanup(&mut self, cx: &App) {
-        self.motion.cleanup(cx.background_executor().now(), cx.reduce_motion());
     }
 
     pub fn render(
@@ -238,10 +234,10 @@ impl Sidebar {
         current: Option<&SessionId>,
         cwd: impl AsRef<Path>,
         title: String,
-        cx: &mut Context<SessionView>,
+        _cx: &mut Context<SessionView>,
     ) {
         let sessions = self.sidebar_sessions(current, cwd, title);
-        self.motion.reconcile(sessions, cx.background_executor().now());
+        self.motion.reconcile(sessions);
     }
 
     pub fn receive_sidebar_rows(
@@ -249,12 +245,12 @@ impl Sidebar {
         current: Option<&SessionId>,
         cwd: impl AsRef<Path>,
         title: String,
-        cx: &mut Context<SessionView>,
+        _cx: &mut Context<SessionView>,
     ) {
         let confirmed: HashSet<_> =
             self.list.entries().iter().map(|session| session.session_id.clone()).collect();
         let sessions = self.sidebar_sessions(current, cwd, title);
-        self.motion.receive(sessions, &confirmed, cx.background_executor().now());
+        self.motion.receive(sessions, &confirmed);
     }
 
     fn sidebar_sessions(
@@ -275,7 +271,7 @@ impl Sidebar {
         sessions
     }
 
-    pub fn begin_sidebar_exit(
+    pub fn remove_sidebar_sessions(
         &mut self,
         ids: &HashSet<SessionId>,
         current: Option<&SessionId>,
@@ -284,22 +280,7 @@ impl Sidebar {
         cx: &mut Context<SessionView>,
     ) {
         self.sync_sidebar_rows(current, cwd, title, cx);
-        let duration = if cx.reduce_motion() {
-            Duration::ZERO
-        } else {
-            cx.theme().motion_tokens().duration_fast
-        };
-        self.motion.delete(ids, cx.background_executor().now(), duration);
-        if !duration.is_zero() && !ids.is_empty() {
-            cx.spawn(async move |view, cx| {
-                cx.background_executor().timer(duration).await;
-                let _ = view.update(cx, |this, cx| {
-                    this.with_sidebar(|sidebar| sidebar.cleanup(cx));
-                    cx.notify();
-                });
-            })
-            .detach();
-        }
+        self.motion.delete(ids);
     }
     pub fn locate_current_session(
         &mut self,
