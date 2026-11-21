@@ -24,7 +24,7 @@ pub async fn session_status(
     };
     drop(registry);
 
-    let status = match session.session_status() {
+    let status = match session.session_status().await {
         session::SessionStatus::Open => SessionStatus::Open,
         session::SessionStatus::Saved => SessionStatus::Saved,
     };

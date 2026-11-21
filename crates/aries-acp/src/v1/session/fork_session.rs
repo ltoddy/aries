@@ -16,7 +16,7 @@ pub async fn fork_session(
 ) -> Result<(), Error> {
     info!("Received fork session request {req:?}");
     let session_id = req.session_id.to_string();
-    let mcp_servers = McpServers(req.mcp_servers);
+    let mcp_servers = McpServers::new(req.mcp_servers);
 
     let mut registry = registry.lock().await;
     let session = registry
@@ -25,14 +25,15 @@ pub async fn fork_session(
         .map_err(|e| Error::internal_error().data(e.to_string()))?;
     drop(registry);
 
-    let modes = modes(DEFAULT_AGENT_NAME, session.agents())
+    let snapshot = session.snapshot().await;
+    let modes = modes(DEFAULT_AGENT_NAME, snapshot.agents())
         .map_err(|e| Error::internal_error().data(e.to_string()))?;
     let config_options = config_options(
-        session.setting(),
-        session.sandbox_mode(),
-        session.mode(),
-        session.agents(),
-        session.thought_level(),
+        snapshot.setting(),
+        snapshot.sandbox_mode(),
+        snapshot.mode(),
+        snapshot.agents(),
+        snapshot.thought_level(),
     );
     let resp = ForkSessionResponse::new(session.id()).modes(modes).config_options(config_options);
     responder.respond(resp)

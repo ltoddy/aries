@@ -15,7 +15,6 @@ use crate::{Result, commands, input, welcome};
 pub async fn execute(gctx: GlobalContext) -> Result<()> {
     let loader = SettingLoader::new(gctx.root_dir());
     let setting = loader.load().await.map_err(Error::setting)?;
-    let model_config = setting.active_model().map_err(Error::setting)?;
 
     let mut registry =
         SessionRegistry::new(gctx.clone(), setting).await.map_err(Error::registry)?;
@@ -24,12 +23,14 @@ pub async fn execute(gctx: GlobalContext) -> Result<()> {
 
     let current_dir = gctx.current_dir();
 
-    let mut session =
+    let session =
         registry.new_session(current_dir, McpDefinition::empty()).await.map_err(Error::registry)?;
     let session_id = session.id();
     let _session_span = info_span!("session", session_id = %session_id).entered();
 
     let mut reader = input::InputReader::new(gctx.root_dir()).map_err(Error::readline)?;
+    let snapshot = session.snapshot().await;
+    let model_config = snapshot.setting().active_model().map_err(Error::setting)?;
     welcome::welcome(
         model_config.provider().as_str(),
         model_config.model(),

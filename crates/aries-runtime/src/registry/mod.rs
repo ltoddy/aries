@@ -9,10 +9,9 @@ use aries_init::{GlobalContext, Setting};
 use aries_persistence::SessionRepository;
 use toasty::Db;
 use tokio::sync::Mutex;
-use tracing::{Instrument, info_span};
 
 pub use self::error::RegistryError;
-use crate::session::Session;
+use crate::session::SessionHandle;
 
 pub type SharedRegistry = Arc<Mutex<SessionRegistry>>;
 
@@ -21,14 +20,14 @@ pub struct SessionRegistry {
     setting: Setting,
 
     db: Db,
-    sessions: HashMap<String, Session>,
+    sessions: HashMap<String, SessionHandle>,
     session_repo: SessionRepository,
 }
 
 impl SessionRegistry {
     pub async fn new(gctx: GlobalContext, setting: Setting) -> Result<Self, RegistryError> {
         let root_dir = gctx.root_dir();
-        let db = aries_persistence::connect(root_dir).await?;
+        let db = aries_persistence::connect(root_dir).await.map_err(RegistryError::db)?;
         let session_repo = SessionRepository::new(db.clone());
 
         Ok(Self { gctx, setting, db, sessions: Default::default(), session_repo })
@@ -38,11 +37,11 @@ impl SessionRegistry {
         &mut self,
         cwd: impl Into<PathBuf>,
         external_mcp_config: McpDefinition,
-    ) -> Result<Session, RegistryError> {
+    ) -> Result<SessionHandle, RegistryError> {
         let cwd: PathBuf = cwd.into();
-        let model_config = self.setting.active_model()?;
+        let model_config = self.setting.active_model().map_err(RegistryError::setting)?;
 
-        let session = Session::new_session(
+        let session = SessionHandle::new_session(
             self.gctx.clone(),
             cwd,
             model_config,
@@ -50,7 +49,8 @@ impl SessionRegistry {
             self.db.clone(),
             external_mcp_config,
         )
-        .await?;
+        .await
+        .map_err(RegistryError::session)?;
         self.sessions.insert(session.id(), session.clone());
 
         Ok(session)
@@ -60,18 +60,23 @@ impl SessionRegistry {
         &mut self,
         session_id: impl AsRef<str>,
         external_mcp_config: McpDefinition,
-    ) -> Result<Session, RegistryError> {
-        let model_config = self.setting.active_model()?;
+    ) -> Result<SessionHandle, RegistryError> {
+        let session_id = session_id.as_ref();
+        if self.sessions.contains_key(session_id) {
+            return Err(RegistryError::session_already_active(session_id));
+        }
+        let model_config = self.setting.active_model().map_err(RegistryError::setting)?;
 
-        let session = Session::load_session(
-            session_id.as_ref(),
+        let session = SessionHandle::load_session(
+            session_id,
             self.gctx.clone(),
             model_config,
             self.setting.clone(),
             self.db.clone(),
             external_mcp_config,
         )
-        .await?;
+        .await
+        .map_err(RegistryError::session)?;
 
         self.sessions.insert(session.id(), session.clone());
 
@@ -82,18 +87,23 @@ impl SessionRegistry {
         &mut self,
         session_id: impl AsRef<str>,
         external_mcp_config: McpDefinition,
-    ) -> Result<Session, RegistryError> {
-        let model_config = self.setting.active_model()?;
+    ) -> Result<SessionHandle, RegistryError> {
+        let session_id = session_id.as_ref();
+        if self.sessions.contains_key(session_id) {
+            return Err(RegistryError::session_already_active(session_id));
+        }
+        let model_config = self.setting.active_model().map_err(RegistryError::setting)?;
 
-        let session = Session::resume_session(
-            session_id.as_ref(),
+        let session = SessionHandle::resume_session(
+            session_id,
             self.gctx.clone(),
             model_config,
             self.setting.clone(),
             self.db.clone(),
             external_mcp_config,
         )
-        .await?;
+        .await
+        .map_err(RegistryError::session)?;
 
         self.sessions.insert(session.id(), session.clone());
 
@@ -105,18 +115,18 @@ impl SessionRegistry {
         parent_session_id: impl AsRef<str>,
         cwd: impl Into<PathBuf>,
         external_mcp_config: McpDefinition,
-    ) -> Result<Session, RegistryError> {
+    ) -> Result<SessionHandle, RegistryError> {
         let parent_session_id = parent_session_id.as_ref();
         let cwd: PathBuf = cwd.into();
-        let session_id = nanoid::nanoid!();
 
         let parent_session = self
             .sessions
             .get(parent_session_id)
             .ok_or_else(|| RegistryError::session_not_active(parent_session_id))?;
 
-        let model_config = self.setting.active_model()?;
-        let session = Session::new_session(
+        let parent_context = parent_session.context().await.map_err(RegistryError::session)?;
+        let model_config = self.setting.active_model().map_err(RegistryError::setting)?;
+        let session = SessionHandle::new_session(
             self.gctx.clone(),
             cwd,
             model_config,
@@ -124,20 +134,10 @@ impl SessionRegistry {
             self.db.clone(),
             external_mcp_config,
         )
-        .instrument(info_span!("session_init", session_id = %session_id))
-        .await?;
+        .await
+        .map_err(RegistryError::session)?;
 
-        let parent_context = parent_session.context().await;
         session.overwrite_context(parent_context).await;
-
-        self.session_repo
-            .create(
-                session.id(),
-                session.current_dir().display().to_string(),
-                session.session_dir().display().to_string(),
-                session.transcript_dir().display().to_string(),
-            )
-            .await?;
         self.sessions.insert(session.id(), session.clone());
 
         Ok(session)
@@ -147,7 +147,7 @@ impl SessionRegistry {
         &mut self,
         cwd: impl Into<PathBuf>,
         session_id: impl AsRef<str>,
-    ) -> Result<Session, RegistryError> {
+    ) -> Result<SessionHandle, RegistryError> {
         let cwd: PathBuf = cwd.into();
         let session_id = session_id.as_ref();
         if let Some(session) = self.sessions.get(session_id) {
@@ -155,13 +155,18 @@ impl SessionRegistry {
         }
 
         let mcp_config = McpDefinition::empty();
-        match self.session_repo.find_last_by_session_id(session_id).await? {
+        match self
+            .session_repo
+            .find_last_by_session_id(session_id)
+            .await
+            .map_err(RegistryError::db)?
+        {
             Some(_) => self.load_session(session_id, mcp_config).await,
             None => self.new_session(cwd, mcp_config).await,
         }
     }
 
-    pub fn session(&self, session_id: impl AsRef<str>) -> Option<Session> {
+    pub fn session(&self, session_id: impl AsRef<str>) -> Option<SessionHandle> {
         let session = self.sessions.get(session_id.as_ref())?;
 
         Some(session.to_owned())
@@ -174,7 +179,8 @@ impl SessionRegistry {
         let sessions = match &cwd {
             Some(cwd) => self.session_repo.find_by_cwd(cwd.display().to_string()).await,
             None => self.session_repo.find().await,
-        }?;
+        }
+        .map_err(RegistryError::db)?;
 
         let sessions = sessions
             .into_iter()
@@ -184,20 +190,19 @@ impl SessionRegistry {
         Ok(sessions)
     }
 
-    pub fn putback_session(&mut self, session: Session) {
-        if let Some(active_session) = self.sessions.get_mut(&session.id()) {
-            *active_session = session;
-        }
-    }
-
     pub async fn delete_session(
         &mut self,
         session_id: impl AsRef<str>,
     ) -> Result<(), RegistryError> {
-        let model_config = self.setting.active_model()?;
         let session_id = session_id.as_ref();
+        if let Some(session) = self.session(session_id) {
+            session.delete_session().await.map_err(RegistryError::session)?;
+            self.sessions.remove(session_id);
+            return Ok(());
+        }
+        let model_config = self.setting.active_model().map_err(RegistryError::setting)?;
 
-        let mut session = Session::resume_session(
+        let session = SessionHandle::resume_session(
             session_id,
             self.gctx.clone(),
             model_config,
@@ -205,7 +210,8 @@ impl SessionRegistry {
             self.db.clone(),
             McpDefinition::empty(),
         )
-        .await?;
+        .await
+        .map_err(RegistryError::session)?;
         session.delete_session().await.map_err(RegistryError::session)?;
         self.sessions.remove(session_id);
 

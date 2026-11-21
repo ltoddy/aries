@@ -24,14 +24,13 @@ pub async fn execute(args: ResumeSessionsArgs, gctx: GlobalContext) -> Result<()
     let session_id = args.session_id;
     let loader = SettingLoader::new(gctx.root_dir());
     let setting = loader.load().await.map_err(Error::setting)?;
-    let model_config = setting.active_model().map_err(Error::setting)?;
 
     let mut registry =
         SessionRegistry::new(gctx.clone(), setting).await.map_err(Error::registry)?;
 
     aries_logger::init(gctx.root_dir().join("logs"));
 
-    let mut session = registry
+    let session = registry
         .load_session(&session_id, McpDefinition::empty())
         .await
         .map_err(Error::registry)?;
@@ -39,6 +38,8 @@ pub async fn execute(args: ResumeSessionsArgs, gctx: GlobalContext) -> Result<()
     let _span = info_span!("session", session_id = %session_id).entered();
 
     let mut reader = input::InputReader::new(gctx.root_dir()).map_err(Error::readline)?;
+    let snapshot = session.snapshot().await;
+    let model_config = snapshot.setting().active_model().map_err(Error::setting)?;
     welcome::welcome(
         model_config.provider().as_str(),
         model_config.model(),

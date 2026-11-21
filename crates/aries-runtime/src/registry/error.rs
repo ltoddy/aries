@@ -4,6 +4,9 @@ use crate::session::SessionError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum RegistryError {
+    #[error("session {0} is already active")]
+    SessionAlreadyActive(String),
+
     #[error("{0}")]
     Db(#[from] toasty::Error),
 
@@ -21,6 +24,10 @@ pub enum RegistryError {
 }
 
 impl RegistryError {
+    pub fn session_already_active(session_id: impl Into<String>) -> Self {
+        Self::SessionAlreadyActive(session_id.into())
+    }
+
     pub fn db(source: toasty::Error) -> Self {
         Self::Db(source)
     }
