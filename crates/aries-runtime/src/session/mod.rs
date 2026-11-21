@@ -5,6 +5,7 @@ mod commands;
 mod config;
 mod delete_session;
 mod error;
+mod handle;
 mod hook;
 mod load_session;
 mod new_session;
@@ -33,13 +34,12 @@ use rig::message::UserContent;
 use rig::tool::rmcp::McpConnection;
 use rig::tool::server::{ToolServer, ToolServerHandle};
 use toasty::Db;
-use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedReceiver;
-use tokio_util::sync::CancellationToken;
 
 pub use self::commands::BUILTIN_COMMANDS;
 pub use self::config::{ParseSessionConfigError, SessionConfig};
 pub use self::error::SessionError;
+pub use self::handle::{SessionHandle, SessionSnapshot};
 use self::hook::SessionPromptHook;
 pub use self::session_status::SessionStatus;
 use crate::agent::AriesAgent;
@@ -56,8 +56,7 @@ pub enum PromptOutcome {
 
 pub const DEFAULT_AGENT_NAME: &str = "build";
 
-#[derive(Clone)]
-pub struct Session {
+struct Session {
     gctx: GlobalContext,
     setting: Setting,
     config: ModelConfig,
@@ -71,8 +70,7 @@ pub struct Session {
     session_repo: SessionRepository,
 
     tool_server_handle: ToolServerHandle,
-    cancel_token: Arc<parking_lot::Mutex<CancellationToken>>,
-    receiver: Arc<Mutex<UnboundedReceiver<AgentEvent>>>,
+    receiver: UnboundedReceiver<AgentEvent>,
     notifier: Notifier,
     db: Db,
 
@@ -81,19 +79,14 @@ pub struct Session {
     memory_store: MemoryStore,
     hook: SessionPromptHook,
 
-    // 为了避免连接因为 drop 而释放
     #[allow(dead_code)]
-    mcp_clients: Arc<Vec<McpConnection>>,
+    mcp_clients: Vec<McpConnection>,
     extensions: AgentExtensions,
 
     last_assistant_message: Option<String>,
 }
 
 impl Session {
-    pub fn id(&self) -> String {
-        self.state.session_id()
-    }
-
     pub fn sandbox_mode(&self) -> SandboxMode {
         self.state.sandbox_mode()
     }
@@ -124,22 +117,6 @@ impl Session {
 
     pub async fn overwrite_context(&self, messages: impl IntoIterator<Item = Message>) {
         self.chat_context.overwrite(messages).await;
-    }
-
-    pub fn cancel(&self) {
-        self.cancel_token.lock().cancel()
-    }
-
-    pub fn session_dir(&self) -> PathBuf {
-        self.state.session_dir()
-    }
-
-    pub fn current_dir(&self) -> PathBuf {
-        self.state.cwd()
-    }
-
-    pub fn transcript_dir(&self) -> PathBuf {
-        self.state.transcript_dir()
     }
 
     pub fn list_available_commands(&self) -> Vec<aries_extension::AvailableCommand> {
@@ -238,13 +215,12 @@ impl Session {
             chat_context,
             session_repo,
             tool_server_handle,
-            cancel_token: Arc::new(parking_lot::Mutex::new(CancellationToken::new())),
             notifier,
-            receiver: Arc::new(Mutex::new(receiver)),
+            receiver,
             hooks_executor,
             memory_store,
             hook,
-            mcp_clients: Arc::new(mcp_clients),
+            mcp_clients,
             extensions,
             last_assistant_message: None,
             compactor,

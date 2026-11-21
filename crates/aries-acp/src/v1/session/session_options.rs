@@ -26,16 +26,17 @@ pub async fn session_options(
                 session
             };
 
-            let modes = match modes(DEFAULT_AGENT_NAME, session.agents()) {
+            let snapshot = session.snapshot().await;
+            let modes = match modes(DEFAULT_AGENT_NAME, snapshot.agents()) {
                 Ok(modes) => modes,
                 Err(err) => return responder.respond_with_internal_error(err.to_string()),
             };
             let config_options = config_options(
-                session.setting(),
-                session.sandbox_mode(),
-                session.mode(),
-                session.agents(),
-                session.thought_level(),
+                snapshot.setting(),
+                snapshot.sandbox_mode(),
+                snapshot.mode(),
+                snapshot.agents(),
+                snapshot.thought_level(),
             );
 
             let resp = SessionOptionsResponse::new().modes(modes).config_options(config_options);

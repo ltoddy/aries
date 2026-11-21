@@ -23,7 +23,7 @@ pub async fn set_session_config_option(
 
     let session_id = req.session_id.to_string();
     let guard = registry.lock().await;
-    let Some(mut session) = guard.session(&session_id) else {
+    let Some(session) = guard.session(&session_id) else {
         return responder
             .respond_with_error(schema::Error::resource_not_found(Some(session_id)).into());
     };
@@ -41,13 +41,13 @@ pub async fn set_session_config_option(
         return responder.respond_with_internal_error(err.to_string());
     }
 
+    let snapshot = session.snapshot().await;
     let resp = SetSessionConfigOptionResponse::new(config_options(
-        session.setting(),
-        session.sandbox_mode(),
-        session.mode(),
-        session.agents(),
-        session.thought_level(),
+        snapshot.setting(),
+        snapshot.sandbox_mode(),
+        snapshot.mode(),
+        snapshot.agents(),
+        snapshot.thought_level(),
     ));
-    registry.lock().await.putback_session(session);
     responder.respond(resp)
 }

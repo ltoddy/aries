@@ -3,6 +3,9 @@ use rig::completion::PromptError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AriesError {
+    #[error("session {0} is busy")]
+    SessionBusy(String),
+
     #[error("{0}")]
     Streaming(#[source] Box<PromptError>),
 
@@ -11,6 +14,10 @@ pub enum AriesError {
 }
 
 impl AriesError {
+    pub fn session_busy(session_id: impl Into<String>) -> Self {
+        Self::SessionBusy(session_id.into())
+    }
+
     pub fn streaming(err: PromptError) -> Self {
         Self::Streaming(Box::new(err))
     }

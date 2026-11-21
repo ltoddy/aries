@@ -20,8 +20,11 @@ impl Session {
         let id = id.into();
 
         let mut session_repo = SessionRepository::new(db.clone());
-        let session =
-            session_repo.find_last_by_session_id(&id).await.map_err(SessionError::db)?.unwrap();
+        let session = session_repo
+            .find_last_by_session_id(&id)
+            .await
+            .map_err(SessionError::db)?
+            .ok_or_else(|| SessionError::not_found(&id))?;
         let cwd = PathBuf::from(&session.cwd);
 
         Self::build(

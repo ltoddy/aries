@@ -26,6 +26,7 @@ impl Session {
         &mut self,
         prompt: impl Into<Message>,
         mut callback: F,
+        cancel_token: CancellationToken,
     ) -> crate::agent::AriesResult<PromptOutcome>
     where
         F: FnMut(AgentEvent) -> Fut,
@@ -34,11 +35,6 @@ impl Session {
         let mut prompt: Message = prompt.into();
         self.summarize_title(prompt.clone()).await;
 
-        let cancel_token = {
-            let mut guard = self.cancel_token.lock();
-            *guard = CancellationToken::new();
-            guard.clone()
-        };
         self.last_assistant_message = None;
         let message_id = format!("user-{}", nanoid::nanoid!());
 
@@ -65,7 +61,6 @@ impl Session {
             let future = self.agent.prompt(prompt, history);
             pin!(future);
 
-            let mut guard = self.receiver.lock().await;
             let mut final_res = Ok(PromptResponse::new("", Default::default()));
             let mut cancelled = false;
             loop {
@@ -75,7 +70,7 @@ impl Session {
                         cancelled = true;
                         break;
                     }
-                    event = guard.recv() => {
+                    event = self.receiver.recv() => {
                         if let Some(event) = event {
                             callback(event).await;
                         }
@@ -86,10 +81,9 @@ impl Session {
                     }
                 }
             }
-            while let Ok(event) = guard.try_recv() {
+            while let Ok(event) = self.receiver.try_recv() {
                 callback(event).await;
             }
-            drop(guard);
 
             if cancelled {
                 return Ok(PromptOutcome::Cancelled(message_id));

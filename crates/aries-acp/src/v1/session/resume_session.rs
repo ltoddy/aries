@@ -31,6 +31,7 @@ pub async fn resume_session(
 
     let available_commands = session
         .list_available_commands()
+        .await
         .into_iter()
         .map(|c| {
             AvailableCommand::new(c.name, c.description).input(c.argument_hint.map(|hint| {
@@ -43,17 +44,18 @@ pub async fn resume_session(
         SessionUpdate::AvailableCommandsUpdate(AvailableCommandsUpdate::new(available_commands)),
     ));
 
-    let mode = session.mode();
-    let modes = match modes(&mode, session.agents()) {
+    let snapshot = session.snapshot().await;
+    let mode = snapshot.mode();
+    let modes = match modes(&mode, snapshot.agents()) {
         Ok(modes) => modes,
         Err(err) => return responder.respond_with_internal_error(err.to_string()),
     };
     let config_options = config_options(
-        session.setting(),
-        session.sandbox_mode(),
+        snapshot.setting(),
+        snapshot.sandbox_mode(),
         mode,
-        session.agents(),
-        session.thought_level(),
+        snapshot.agents(),
+        snapshot.thought_level(),
     );
     let resp = ResumeSessionResponse::new().modes(modes).config_options(config_options);
     responder.respond(resp)
