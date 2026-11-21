@@ -128,10 +128,6 @@ impl Session {
         self.chat_context.overwrite(messages).await;
     }
 
-    pub async fn clear_context(&mut self) {
-        self.chat_context.overwrite([]).await;
-    }
-
     pub fn cancel(&self) {
         self.cancel_token.lock().cancel()
     }
@@ -219,7 +215,7 @@ impl Session {
             Notifier::clone(&notifier),
             db.clone(),
         )
-        .build(hook.clone())
+        .build(chat_history.clone(), chat_context.clone(), hook.clone())
         .await;
 
         let compactor = ContextCompactor::new(

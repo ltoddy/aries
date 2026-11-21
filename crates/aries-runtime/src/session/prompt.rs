@@ -106,8 +106,6 @@ impl Session {
 
         let output = final_res.output();
         self.last_assistant_message = Some(output.clone());
-        let messages = final_res.messages();
-        self.append_messages(messages).await;
         self.fire_stop(&output).await;
         if let Some(completion) = final_res.completion_calls.last() {
             self.compactor.post_compact(completion.usage).await;
@@ -208,15 +206,5 @@ impl Session {
             "以下是与当前对话相关的历史记忆（自动召回，用户不可见）：\n\n{}",
             blocks.join("\n\n")
         ))
-    }
-
-    async fn append_messages(&self, messages: impl AsRef<[Message]>) {
-        let messages = messages.as_ref();
-        if messages.is_empty() {
-            return;
-        }
-
-        self.chat_history.append(messages).await;
-        self.chat_context.append(messages).await;
     }
 }
