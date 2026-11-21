@@ -279,18 +279,33 @@ impl SkillEditor {
 impl Render for SkillEditor {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let loaded = self.original.is_some();
+        let path: SharedString = self.location.display().to_string().into();
         let source = div()
             .size_full()
             .min_w_0()
             .min_h_0()
             .flex()
             .flex_col()
-            .gap_3()
-            .when(self.mode == MarkdownModeKind::Split, |view| view.pr_3())
-            .child(div().flex_shrink_0().text_sm().child("源文件（frontmatter 与正文）"))
+            .when(self.mode == MarkdownModeKind::Split, |view| {
+                view.child(
+                    div()
+                        .flex_shrink_0()
+                        .px_3()
+                        .py_1()
+                        .border_b_1()
+                        .border_color(cx.theme().border)
+                        .text_sm()
+                        .text_color(cx.theme().muted_foreground)
+                        .child("源文件（frontmatter 与正文）"),
+                )
+            })
             .child(
                 div().flex_1().min_h_0().min_w_0().child(
                     Editor::new(&self.input)
+                        .appearance(false)
+                        .bordered(false)
+                        .font_family(cx.theme().mono_font_family.clone())
+                        .text_size(typography::code_size())
                         .h_full()
                         .w_full()
                         .disabled(self.closing || !loaded)
@@ -303,12 +318,24 @@ impl Render for SkillEditor {
             .min_h_0()
             .flex()
             .flex_col()
-            .gap_3()
-            .when(self.mode == MarkdownModeKind::Split, |view| view.pl_3())
-            .child(div().flex_shrink_0().text_sm().child("Markdown 预览"))
+            .when(self.mode == MarkdownModeKind::Split, |view| {
+                view.child(
+                    div()
+                        .flex_shrink_0()
+                        .px_3()
+                        .py_1()
+                        .border_b_1()
+                        .border_color(cx.theme().border)
+                        .text_sm()
+                        .text_color(cx.theme().muted_foreground)
+                        .child("Markdown 预览"),
+                )
+            })
             .child(
                 div().flex_1().min_h_0().min_w_0().child(
                     TextView::markdown("skill-preview", self.preview.clone())
+                        .size_full()
+                        .p_3()
                         .map(typography::style_markdown)
                         .selectable(true)
                         .scrollable(true),
@@ -340,8 +367,6 @@ impl Render for SkillEditor {
             .min_h_0()
             .flex()
             .flex_col()
-            .gap_3()
-            .p_6()
             .bg(cx.theme().background)
             .text_color(cx.theme().foreground)
             .on_action(cx.listener(|this, _: &SaveSkill, _, cx| this.save(cx)))
@@ -349,7 +374,12 @@ impl Render for SkillEditor {
                 div()
                     .flex()
                     .items_center()
-                    .gap_3()
+                    .flex_shrink_0()
+                    .gap_2()
+                    .px_3()
+                    .py_1()
+                    .border_b_1()
+                    .border_color(cx.theme().border)
                     .child(
                         Button::new("skill-editor-back")
                             .small()
@@ -362,10 +392,17 @@ impl Render for SkillEditor {
                     )
                     .child(
                         div()
+                            .id("skill-editor-path")
                             .flex_1()
-                            .text_lg()
-                            .font_weight(FontWeight::MEDIUM)
-                            .child("编辑 Skill"),
+                            .min_w_0()
+                            .truncate()
+                            .text_sm()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(path.clone())
+                            .tooltip(move |window, cx| {
+                                gpui_kit::component::tooltip::Tooltip::new(path.clone())
+                                    .build(window, cx)
+                            }),
                     )
                     .child(
                         div().flex().items_center().gap_1().children(
@@ -413,46 +450,65 @@ impl Render for SkillEditor {
                         ),
                     ),
             )
+            .child(div().flex_1().min_h_0().min_w_0().child(content))
+            .when_some(self.error.clone(), |view, error| {
+                view.child(
+                    div()
+                        .flex_shrink_0()
+                        .px_3()
+                        .py_1()
+                        .border_t_1()
+                        .border_color(cx.theme().border)
+                        .text_sm()
+                        .text_color(cx.theme().danger)
+                        .child(error),
+                )
+            })
             .child(
                 div()
+                    .flex()
+                    .flex_shrink_0()
+                    .items_center()
+                    .flex_wrap()
+                    .gap_3()
+                    .px_3()
+                    .py_1()
+                    .border_t_1()
+                    .border_color(cx.theme().border)
                     .text_xs()
                     .text_color(cx.theme().muted_foreground)
-                    .child(self.location.display().to_string()),
+                    .when(loaded, |view| {
+                        view.child(if self.pending {
+                            "正在自动保存…"
+                        } else if self.error.is_some() {
+                            "自动保存失败，修改仍保留在编辑器中"
+                        } else if self.dirty {
+                            "等待自动保存…"
+                        } else {
+                            "已保存"
+                        })
+                    })
+                    .when(self.pending && !loaded, |view| view.child("正在读取 Skill…"))
+                    .when(loaded && self.dirty && self.error.is_some() && !self.pending, |view| {
+                        view.child(
+                            Button::new("retry-skill-autosave")
+                                .small()
+                                .ghost()
+                                .icon(IconName::RefreshCw)
+                                .accessibility_label("重试自动保存")
+                                .tooltip("重试自动保存 · Cmd/Ctrl+S")
+                                .on_click(cx.listener(|this, _, _, cx| this.save(cx))),
+                        )
+                    })
+                    .when(!loaded && !self.pending, |view| {
+                        view.child(
+                            Button::new("retry-skill-read")
+                                .small()
+                                .label("重新读取")
+                                .on_click(cx.listener(|this, _, window, cx| this.load(window, cx))),
+                        )
+                    }),
             )
-            .when(loaded && (self.pending || self.dirty || self.error.is_some()), |view| {
-                view.child(div().text_xs().text_color(cx.theme().muted_foreground).child(
-                    if self.pending {
-                        "正在自动保存…"
-                    } else if self.error.is_some() {
-                        "自动保存失败，修改仍保留在编辑器中"
-                    } else {
-                        "等待自动保存…"
-                    },
-                ))
-            })
-            .when(self.pending && !loaded, |view| view.child("正在读取 Skill…"))
-            .when_some(self.error.clone(), |view, error| {
-                view.child(div().text_sm().text_color(cx.theme().danger).child(error))
-            })
-            .when(loaded && self.dirty && self.error.is_some() && !self.pending, |view| {
-                view.child(
-                    Button::new("retry-skill-autosave")
-                        .small()
-                        .ghost()
-                        .icon(IconName::RefreshCw)
-                        .accessibility_label("重试自动保存")
-                        .tooltip("重试自动保存 · Cmd/Ctrl+S")
-                        .on_click(cx.listener(|this, _, _, cx| this.save(cx))),
-                )
-            })
-            .when(!loaded && !self.pending, |view| {
-                view.child(
-                    Button::new("retry-skill-read")
-                        .label("重新读取")
-                        .on_click(cx.listener(|this, _, window, cx| this.load(window, cx))),
-                )
-            })
-            .child(div().flex_1().min_h_0().min_w_0().child(content))
     }
 }
 
