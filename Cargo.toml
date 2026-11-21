@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "apps/aries-cli",
+    "apps/aries-daemon",
     "apps/aries-desktop",
     "crates/aries-acp",
     "crates/aries-communicate",
@@ -27,6 +28,7 @@ repository = "https://github.com/ltoddy/aries"
 [workspace.dependencies]
 agent-client-protocol = "5.4"
 base64 = "0.23"
+clap = "4.6"
 colored = "3.1"
 futures = "0.3"
 http = "1.4"

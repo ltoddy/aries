@@ -1,0 +1,15 @@
+[Unit]
+Description=Aries daemon
+
+[Service]
+Type=exec
+ExecStart=":{binary}"
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=10
+UMask=0077
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

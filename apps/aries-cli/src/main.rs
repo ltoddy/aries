@@ -12,6 +12,7 @@ use mimalloc::MiMalloc;
 
 use crate::cli::agent::{self, AgentCommand};
 use crate::cli::command::{self, CommandCommand};
+use crate::cli::daemon::{self, DaemonCommand};
 use crate::cli::hook::{self, HookCommand};
 use crate::cli::mcp::{self, McpCommand};
 use crate::cli::model::{self, ModelCommand};
@@ -39,6 +40,10 @@ async fn main() -> Result<()> {
         Some(cli::Subcommands::Command { command }) => match command {
             CommandCommand::List(args) => command::list::execute(args, gctx).await,
         },
+        Some(cli::Subcommands::Daemon { command }) => match command {
+            DaemonCommand::Install(args) => daemon::install::execute(args, gctx).await,
+            DaemonCommand::Status(args) => daemon::status::execute(args, gctx).await,
+        },
         Some(cli::Subcommands::Gc) => cli::gc::execute(gctx).await,
         Some(cli::Subcommands::Hook { command }) => match command {
             HookCommand::List(args) => hook::list::execute(args, gctx).await,
@@ -59,12 +64,12 @@ async fn main() -> Result<()> {
             SessionCommand::Resume(args) => session::resume::execute(args, gctx).await,
         },
         Some(cli::Subcommands::Setup) => cli::setup::execute(gctx).await,
+        Some(cli::Subcommands::Skill { command }) => match command {
+            SkillCommand::List(args) => skill::list::execute(args, gctx).await,
+        },
         Some(cli::Subcommands::Stats { command }) => match command {
             StatsCommand::Bash(args) => cli::stats::bash::execute(gctx, args).await,
             StatsCommand::Tool(args) => cli::stats::tool::execute(gctx, args).await,
-        },
-        Some(cli::Subcommands::Skill { command }) => match command {
-            SkillCommand::List(args) => skill::list::execute(args, gctx).await,
         },
         _ => session::run::execute(gctx).await,
     }

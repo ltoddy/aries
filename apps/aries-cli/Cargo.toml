@@ -23,7 +23,7 @@ aries-init = { version = "0.1.0", path = "../../crates/aries-init" }
 aries-logger = { version = "0.1.0", path = "../../crates/aries-logger" }
 aries-persistence = { version = "0.1.0", path = "../../crates/aries-persistence" }
 aries-runtime = { version = "0.1.0", path = "../../crates/aries-runtime" }
-clap = { version = "4.6", features = ["derive"] }
+clap = { workspace = true, features = ["derive"] }
 colored.workspace = true
 dialoguer = "0.12"
 ferris-says = "0.3"
