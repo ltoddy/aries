@@ -27,7 +27,7 @@ impl Session {
             Notifier::clone(&self.notifier),
             self.db.clone(),
         )
-        .build(self.hook.clone())
+        .build(self.chat_history.clone(), self.chat_context.clone(), self.hook.clone())
         .await;
 
         Ok(())

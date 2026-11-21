@@ -7,7 +7,8 @@ use rig::tool::server::ToolServerHandle;
 use toasty::Db;
 
 use crate::agent::AriesAgent;
-use crate::hooks::{TokenUsageHook, ToolCallHook};
+use crate::context::{ChatContext, ChatHistory};
+use crate::hooks::{TokenUsageHook, ToolCallHook, TranscriptHook};
 use crate::preamble;
 use crate::state::State;
 
@@ -33,7 +34,12 @@ impl Builder {
         Self { state, extensions, gctx, tool_server_handle, db, notifier }
     }
 
-    pub async fn build<P>(self, hook: P) -> AriesAgent
+    pub async fn build<P>(
+        self,
+        chat_history: ChatHistory,
+        chat_context: ChatContext,
+        hook: P,
+    ) -> AriesAgent
     where
         P: AgentHook + 'static,
     {
@@ -49,8 +55,11 @@ impl Builder {
 
         let cwd = self.state.cwd();
         let agent = self.state.agent();
+
         let token_usage_hook = TokenUsageHook::new(&cwd, self.db.clone());
         let tool_call_hook = ToolCallHook::new(&cwd, self.db.clone());
+        let transcript_hook = TranscriptHook::new(chat_history, chat_context);
+
         let builder = AgentBuilder::new(self.state.model())
             .name(&agent.frontmatter.name)
             .description(&agent.frontmatter.description)
@@ -62,6 +71,7 @@ impl Builder {
             ))
             .append_preamble(&preamble::agentsmd::section(&cwd))
             .tool_server_handle(self.tool_server_handle)
+            .add_hook(transcript_hook)
             .add_hook(token_usage_hook)
             .add_hook(tool_call_hook)
             .add_hook(hook)

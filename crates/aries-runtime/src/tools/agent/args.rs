@@ -10,7 +10,11 @@ pub struct AgentArgs {
 
 impl AgentArgs {
     pub fn title(&self) -> String {
-        format!("Launch {} subagent: {}", self.name, self.description)
+        let mut title = format!("Launch {} subagent: {}", self.name, self.description);
+        if let Some(agent_id) = &self.agent_id {
+            title.push_str(&format!(" (agent id: {})", agent_id));
+        }
+        title
     }
 }
 

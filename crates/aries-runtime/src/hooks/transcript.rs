@@ -1,8 +1,8 @@
-use std::io;
-use std::path::Path;
-
-use rig::agent::{AgentHook, CompletionCallAction, CompletionCallEvent, HookContext, RunSettled};
-use rig::message::Message;
+use rig::agent::{
+    AgentHook, CompletionCallAction, CompletionCallEvent, HookContext, ModelTurnAction,
+    ModelTurnFinished, OutcomeAction, OutcomeEvent, RunSettled,
+};
+use rig::message::{AssistantMessage, Message};
 
 use crate::context::{ChatContext, ChatHistory};
 
@@ -11,30 +11,64 @@ pub struct TranscriptHook {
     chat_context: ChatContext,
 }
 
-impl TranscriptHook {
-    pub async fn new(dir: impl AsRef<Path>) -> io::Result<Self> {
-        let dir = dir.as_ref();
-        let chat_history = ChatHistory::new(dir).await?;
-        let chat_context = ChatContext::new(dir).await?;
+#[derive(Clone)]
+struct TranscriptProgress {
+    history_len: usize,
+    written: usize,
+    recorded: Option<Message>,
+}
 
-        Ok(Self { chat_history, chat_context })
+impl TranscriptProgress {
+    fn new(history_len: usize) -> Self {
+        Self { history_len, written: 0, recorded: None }
+    }
+}
+
+impl TranscriptHook {
+    pub fn new(chat_history: ChatHistory, chat_context: ChatContext) -> Self {
+        Self { chat_history, chat_context }
+    }
+
+    async fn append_messages(
+        &self,
+        ctx: &HookContext,
+        messages: &[Message],
+        mut progress: TranscriptProgress,
+    ) {
+        let history = messages
+            .iter()
+            .filter(|message| {
+                if progress.recorded.as_ref() == Some(*message) {
+                    progress.recorded.take();
+                    false
+                } else {
+                    true
+                }
+            })
+            .collect::<Vec<_>>();
+        if !messages.is_empty() {
+            self.chat_history.append(history).await;
+            self.chat_context.append(messages).await;
+            progress.written += messages.len();
+        }
+        progress.recorded = None;
+        ctx.scratchpad().insert(progress);
     }
 }
 
 impl AgentHook for TranscriptHook {
     async fn on_run_settled(&self, ctx: &HookContext, event: RunSettled<'_>) {
         if let Some(messages) = event.messages {
-            let (history_len, written) = ctx.scratchpad().get::<(usize, usize)>().unwrap_or((0, 0));
+            let progress = ctx
+                .scratchpad()
+                .get::<TranscriptProgress>()
+                .unwrap_or_else(|| TranscriptProgress::new(0));
             let messages = messages
                 .iter()
-                .skip(written)
+                .skip(progress.written)
                 .map(|message| message.as_ref().clone())
                 .collect::<Vec<Message>>();
-            if !messages.is_empty() {
-                self.chat_history.append(&messages).await;
-                self.chat_context.append(&messages).await;
-                ctx.scratchpad().insert((history_len, written + messages.len()));
-            }
+            self.append_messages(ctx, &messages, progress).await;
         }
     }
 
@@ -43,23 +77,48 @@ impl AgentHook for TranscriptHook {
         ctx: &HookContext,
         event: CompletionCallEvent<'_>,
     ) -> CompletionCallAction {
-        let (history_len, written) =
-            ctx.scratchpad().get::<(usize, usize)>().unwrap_or((event.history.len(), 0));
-        ctx.scratchpad().insert((history_len, written));
+        let progress = ctx
+            .scratchpad()
+            .get::<TranscriptProgress>()
+            .unwrap_or_else(|| TranscriptProgress::new(event.history.len()));
 
         let messages = event
             .history
             .iter()
-            .skip(history_len)
+            .skip(progress.history_len)
             .map(|message| message.as_ref().clone())
             .chain(std::iter::once(event.prompt.clone()))
-            .skip(written)
+            .skip(progress.written)
             .collect::<Vec<Message>>();
-        if !messages.is_empty() {
-            self.chat_history.append(&messages).await;
-            self.chat_context.append(&messages).await;
-            ctx.scratchpad().insert((history_len, written + messages.len()));
-        }
+        self.append_messages(ctx, &messages, progress).await;
         CompletionCallAction::continue_run()
+    }
+
+    async fn on_model_turn_finished(
+        &self,
+        ctx: &HookContext,
+        event: ModelTurnFinished<'_>,
+    ) -> ModelTurnAction {
+        if let Some(head) = ctx.scratchpad().get::<AssistantMessage>() {
+            let assistant = head.with_content(event.content.clone());
+            if !assistant.is_empty_turn() {
+                let message = Message::from(assistant);
+                self.chat_history.append(std::iter::once(&message)).await;
+                let mut progress = ctx
+                    .scratchpad()
+                    .get::<TranscriptProgress>()
+                    .unwrap_or_else(|| TranscriptProgress::new(0));
+                progress.recorded = Some(message);
+                ctx.scratchpad().insert(progress);
+            }
+        }
+        ModelTurnAction::continue_run()
+    }
+
+    async fn on_outcome(&self, ctx: &HookContext, event: OutcomeEvent<'_>) -> OutcomeAction {
+        if let Some(response) = event.completion() {
+            ctx.scratchpad().insert(response.head());
+        }
+        OutcomeAction::proceed()
     }
 }

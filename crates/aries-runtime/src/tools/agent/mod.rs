@@ -16,7 +16,7 @@ use toasty::Db;
 pub use self::args::AgentArgs;
 pub use self::error::AgentError;
 pub use self::output::AgentOutput;
-use crate::context::ChatContext;
+use crate::context::{ChatContext, ChatHistory};
 use crate::hooks::{TokenUsageHook, ToolCallHook, TranscriptHook};
 use crate::preamble;
 use crate::state::State;
@@ -145,15 +145,14 @@ impl Tool for AgentTool {
         let token_usage_hook = TokenUsageHook::new(self.gctx.current_dir(), self.db.clone());
         let tool_call_hook = ToolCallHook::new(self.gctx.current_dir(), self.db.clone());
         let dir = self.state.session_dir().join("subagent").join(&agent_id);
-        let transcript_hook = TranscriptHook::new(&dir)
+        let chat_history = ChatHistory::new(&dir)
             .await
             .map_err(|source| AgentError::context_persistence(&dir, source))?;
-
-        let history = ChatContext::new(&dir)
+        let chat_context = ChatContext::new(&dir)
             .await
-            .map_err(|source| AgentError::context_persistence(&dir, source))?
-            .history()
-            .await;
+            .map_err(|source| AgentError::context_persistence(&dir, source))?;
+        let history = chat_context.history().await;
+        let transcript_hook = TranscriptHook::new(chat_history, chat_context);
 
         let agent = AgentBuilder::new(self.state.model())
             .name(&mode.frontmatter.name)
@@ -162,9 +161,9 @@ impl Tool for AgentTool {
             .append_preamble(&preamble::skill::section(&self.extensions.skills))
             .append_preamble(&preamble::agentsmd::section(&cwd))
             .tool_server_handle(tool_server_handle)
+            .add_hook(transcript_hook)
             .add_hook(token_usage_hook)
             .add_hook(tool_call_hook)
-            .add_hook(transcript_hook)
             .reasoning(self.state.effort())
             .default_max_turns(self.state.turns().as_usize())
             .build();
