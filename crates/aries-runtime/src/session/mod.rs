@@ -6,7 +6,6 @@ mod config;
 mod delete_session;
 mod error;
 mod hook;
-mod instruction;
 mod load_session;
 mod new_session;
 mod prompt;
@@ -42,7 +41,6 @@ pub use self::commands::BUILTIN_COMMANDS;
 pub use self::config::{ParseSessionConfigError, SessionConfig};
 pub use self::error::SessionError;
 use self::hook::SessionPromptHook;
-use self::instruction::InstructionContext;
 pub use self::session_status::SessionStatus;
 use crate::agent::AriesAgent;
 use crate::context::compaction::ContextCompactor;
@@ -185,7 +183,6 @@ impl Session {
         let chat_context = ChatContext::new(&session_dir).await.map_err(SessionError::io)?;
 
         let hooks_executor = Arc::new(HooksExecutor::new(extensions.hooks.clone()));
-        let instruction_ctx = InstructionContext::new(&cwd);
         let session_repo = SessionRepository::new(db.clone());
 
         let hook = SessionPromptHook::new(
@@ -194,7 +191,6 @@ impl Session {
             &cwd,
             &transcript_dir,
             DEFAULT_AGENT_NAME,
-            instruction_ctx.clone(),
             Notifier::clone(&notifier),
         );
 
