@@ -80,32 +80,5 @@ pub fn micro_compact(messages: &mut [Message], keep_recent: usize) -> bool {
         }
     }
 
-    // 清理思考过程
-
-    let mut reasoning_to_clear = messages
-        .iter()
-        .filter_map(|m| match m {
-            Message::Assistant(m) => Some(&m.content),
-            _ => None,
-        })
-        .flatten()
-        .filter(|item| matches!(item, AssistantContent::Reasoning(_)))
-        .count()
-        .saturating_sub(keep_recent);
-
-    for message in messages.iter_mut() {
-        if let Message::Assistant(message) = message {
-            message.content.retain(|item| {
-                if reasoning_to_clear > 0 && matches!(item, AssistantContent::Reasoning(_)) {
-                    reasoning_to_clear -= 1;
-                    compacted = true;
-                    false
-                } else {
-                    true
-                }
-            });
-        }
-    }
-
     compacted
 }

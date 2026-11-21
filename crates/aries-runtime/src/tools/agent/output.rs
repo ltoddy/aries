@@ -4,22 +4,22 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AgentOutput {
-    pub task_id: String,
+    pub agent_id: String,
     pub result: String,
     pub transcript_dir: PathBuf,
 }
 
 impl AgentOutput {
     pub fn new(
-        task_id: impl Into<String>,
+        agent_id: impl Into<String>,
         result: impl Into<String>,
         transcript_dir: impl Into<PathBuf>,
     ) -> Self {
-        let task_id = task_id.into();
+        let agent_id = agent_id.into();
         let result = result.into();
         let transcript_dir = transcript_dir.into();
 
-        Self { task_id, result, transcript_dir }
+        Self { agent_id, result, transcript_dir }
     }
 
     pub fn render_output(raw: serde_json::Value) -> Result<String, serde_json::Error> {

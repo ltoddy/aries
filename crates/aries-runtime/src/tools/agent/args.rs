@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AgentArgs {
+    pub agent_id: Option<String>,
     pub name: String,
     pub description: String,
     pub prompt: String,

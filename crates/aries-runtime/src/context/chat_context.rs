@@ -3,69 +3,59 @@ use std::path::Path;
 use std::sync::Arc;
 
 use rig::completion::Message;
-use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use tokio::sync::RwLock;
 use tracing::error;
 
-use crate::jsonl::{self, JsonlAppender};
+use crate::jsonl::JsonlAppender;
 
 #[derive(Debug, Clone)]
 pub struct ChatContext {
-    inner: Arc<Inner>,
-}
-
-#[derive(Debug)]
-struct Inner {
-    history: RwLock<Vec<Message>>,
+    history: Arc<RwLock<Vec<Message>>>,
     file: JsonlAppender,
 }
 
 impl ChatContext {
     const FILENAME: &'static str = "chat-context.jsonl";
 
-    pub async fn new(root_dir: impl AsRef<Path>) -> std::io::Result<Self> {
+    pub async fn new(root_dir: impl AsRef<Path>) -> io::Result<Self> {
         let root_dir = root_dir.as_ref();
         let file_path = root_dir.join(Self::FILENAME);
-        _ = tokio::fs::create_dir_all(root_dir).await;
+        if !root_dir.exists() {
+            tokio::fs::create_dir_all(root_dir).await?;
+        }
 
-        let history = Self::load(&file_path).await.unwrap_or_default();
         let file = JsonlAppender::open(file_path).await?;
+        let history = Arc::new(RwLock::new(file.read().await?));
 
-        let inner = Inner { history: RwLock::new(history), file };
-        Ok(Self { inner: Arc::new(inner) })
+        Ok(Self { history, file })
     }
 
     pub async fn append<'a>(&self, messages: impl IntoIterator<Item = &'a Message>) {
         let messages = messages.into_iter().collect::<Vec<_>>();
+        let mut history = self.history.write().await;
+        history.extend(messages.iter().copied().cloned());
 
-        self.inner.history.write().await.extend(messages.iter().copied().cloned());
-
-        if let Err(err) = self.inner.file.append(&messages).await {
-            error!(path = %self.inner.file.file_path().display(), err = %err, "failed to persist chat context");
+        if let Err(err) = self.file.append(messages).await {
+            error!(path = %self.file.file_path().display(), err = %err, "failed to persist chat context");
         }
-        let _ = self.inner.file.flush().await;
+        if let Err(err) = self.file.flush().await {
+            error!(path = %self.file.file_path().display(), err = %err, "failed to flush chat context");
+        }
     }
 
     pub async fn overwrite(&self, messages: impl IntoIterator<Item = Message>) {
-        let messages = messages.into_iter().collect::<Vec<_>>();
+        let mut history = self.history.write().await;
+        *history = messages.into_iter().collect();
 
-        *self.inner.history.write().await = messages.clone();
-
-        if let Err(err) = self.inner.file.overwrite(&messages).await {
-            error!(path = %self.inner.file.file_path().display(), err = %err, "failed to persist chat context");
+        if let Err(err) = self.file.overwrite(&*history).await {
+            error!(path = %self.file.file_path().display(), err = %err, "failed to persist chat context");
         }
-        let _ = self.inner.file.flush().await;
+        if let Err(err) = self.file.flush().await {
+            error!(path = %self.file.file_path().display(), err = %err, "failed to flush chat context");
+        }
     }
 
-    pub async fn history(&self) -> RwLockReadGuard<'_, Vec<Message>> {
-        self.inner.history.read().await
-    }
-
-    pub async fn history_mut(&self) -> RwLockWriteGuard<'_, Vec<Message>> {
-        self.inner.history.write().await
-    }
-
-    #[inline]
-    async fn load(file_path: impl AsRef<Path>) -> io::Result<Vec<Message>> {
-        jsonl::read(file_path).await
+    pub async fn history(&self) -> Vec<Message> {
+        self.history.read().await.clone()
     }
 }

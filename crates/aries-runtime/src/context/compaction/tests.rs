@@ -97,7 +97,7 @@ async fn overwritten_chat_context_reloads_micro_compacted_placeholders() {
     let messages = tool_result_messages(3);
     context.append(&messages).await;
 
-    let mut compacted = context.history().await.clone();
+    let mut compacted = context.history().await;
     assert!(micro_compact(&mut compacted, 1));
     context.overwrite(compacted).await;
 
