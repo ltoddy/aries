@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use rig::message::{
-    AssistantContent, Document, DocumentData, DocumentSourceKind, Message, ToolResultContent,
-    UserContent,
+    AssistantContent, DocumentContent, DocumentData, DocumentSourceKind, Message,
+    ToolResultContent, UserContent,
 };
 
 pub trait TokenEstimator {
@@ -114,7 +114,7 @@ impl TokenEstimator for UserContent {
     }
 }
 
-impl TokenEstimator for Document {
+impl TokenEstimator for DocumentContent {
     fn estimate_tokens(&self) -> u64 {
         self.data.estimate_tokens()
     }

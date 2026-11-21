@@ -66,7 +66,7 @@ impl Session {
             pin!(future);
 
             let mut guard = self.receiver.lock().await;
-            let mut final_res = Ok(PromptResponse::empty());
+            let mut final_res = Ok(PromptResponse::new("", Default::default()));
             let mut cancelled = false;
             loop {
                 tokio::select! {

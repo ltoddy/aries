@@ -36,7 +36,7 @@ impl AriesAgent {
         let stream = self.inner.prompt(prompt).history(history).stream();
         tokio::pin!(stream);
 
-        let mut final_res = PromptResponse::empty();
+        let mut final_res = PromptResponse::new("", Default::default());
         while let Some(chunk) = stream.next().await {
             match chunk {
                 Ok(item) => {

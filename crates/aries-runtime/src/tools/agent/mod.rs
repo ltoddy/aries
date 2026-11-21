@@ -184,7 +184,7 @@ impl Tool for AgentTool {
             &message_id,
             &message_id,
         );
-        let mut final_res = PromptResponse::empty();
+        let mut final_res = PromptResponse::new("", Default::default());
         while let Some(chunk) = stream.next().await {
             let chunk = chunk.map_err(AgentError::execution)?;
             self.notifier.send_session_message_chunk(&message_id, chunk.clone());
