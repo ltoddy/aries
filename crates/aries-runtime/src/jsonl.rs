@@ -6,7 +6,7 @@ use std::sync::Arc;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Deserializer;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tokio::sync::Mutex;
 use tracing::warn;
 
@@ -79,6 +79,31 @@ impl JsonlAppender {
             .await?;
 
         Ok(Self { file_path, file: Arc::new(Mutex::new(file)) })
+    }
+
+    pub async fn read<D>(&self) -> io::Result<Vec<D>>
+    where
+        D: DeserializeOwned,
+    {
+        let mut guard = self.file.lock().await;
+
+        let mut content = String::with_capacity(4 * 1024);
+        guard.rewind().await?;
+        guard.read_to_string(&mut content).await?;
+
+        let elements: Vec<D> = Deserializer::from_str(&content)
+            .into_iter::<D>()
+            .enumerate()
+            .filter_map(|(i, result)| match result {
+                Ok(msg) => Some(msg),
+                Err(e) => {
+                    warn!(path = %self.file_path.display(), index = i, line = e.line(), column = e.column(), error = %e, "failed to deserialize JSONL record");
+                    None
+                },
+            })
+            .collect::<Vec<_>>();
+
+        Ok(elements)
     }
 
     pub async fn append<'a, S: Serialize + ?Sized + 'a>(

@@ -56,7 +56,7 @@ impl ContextCompactor {
     }
 
     pub async fn pre_compact(&mut self, prompt: &Message) {
-        let mut history = self.chat_context.history().await.clone();
+        let mut history = self.chat_context.history().await;
         if micro_compact(&mut history, KEEP_RECENT) {
             self.chat_context.overwrite(history).await;
 
@@ -166,7 +166,7 @@ impl ContextCompactor {
         }
 
         let outcome = {
-            let read = self.chat_context.history().await.clone();
+            let read = self.chat_context.history().await;
             self.agent.compact(&read).await
         };
 

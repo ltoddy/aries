@@ -4,16 +4,20 @@ use std::path::Path;
 use rig::agent::{AgentHook, CompletionCallAction, CompletionCallEvent, HookContext, RunSettled};
 use rig::message::Message;
 
-use crate::context::ChatHistory;
+use crate::context::{ChatContext, ChatHistory};
 
 pub struct TranscriptHook {
     chat_history: ChatHistory,
+    chat_context: ChatContext,
 }
 
 impl TranscriptHook {
     pub async fn new(dir: impl AsRef<Path>) -> io::Result<Self> {
+        let dir = dir.as_ref();
         let chat_history = ChatHistory::new(dir).await?;
-        Ok(Self { chat_history })
+        let chat_context = ChatContext::new(dir).await?;
+
+        Ok(Self { chat_history, chat_context })
     }
 }
 
@@ -28,6 +32,7 @@ impl AgentHook for TranscriptHook {
                 .collect::<Vec<Message>>();
             if !messages.is_empty() {
                 self.chat_history.append(&messages).await;
+                self.chat_context.append(&messages).await;
                 ctx.scratchpad().insert((history_len, written + messages.len()));
             }
         }
@@ -52,6 +57,7 @@ impl AgentHook for TranscriptHook {
             .collect::<Vec<Message>>();
         if !messages.is_empty() {
             self.chat_history.append(&messages).await;
+            self.chat_context.append(&messages).await;
             ctx.scratchpad().insert((history_len, written + messages.len()));
         }
         CompletionCallAction::continue_run()

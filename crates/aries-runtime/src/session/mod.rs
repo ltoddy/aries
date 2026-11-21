@@ -117,7 +117,7 @@ impl Session {
     }
 
     pub async fn context(&self) -> Vec<Message> {
-        self.chat_context.history().await.to_vec()
+        self.chat_context.history().await
     }
 
     pub async fn history(&self) -> io::Result<Vec<Message>> {

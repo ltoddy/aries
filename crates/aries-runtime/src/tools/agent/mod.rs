@@ -16,6 +16,7 @@ use toasty::Db;
 pub use self::args::AgentArgs;
 pub use self::error::AgentError;
 pub use self::output::AgentOutput;
+use crate::context::ChatContext;
 use crate::hooks::{TokenUsageHook, ToolCallHook, TranscriptHook};
 use crate::preamble;
 use crate::state::State;
@@ -32,6 +33,8 @@ pub struct AgentTool {
     notifier: Notifier,
     extensions: AgentExtensions,
     db: Db,
+
+    agent_id_re: regex_lite::Regex,
 }
 
 impl AgentTool {
@@ -43,7 +46,10 @@ impl AgentTool {
         extensions: AgentExtensions,
         db: Db,
     ) -> Self {
-        Self { state, gctx, ctx, notifier, extensions, db }
+        let agent_id_re = regex_lite::Regex::new(r"\A[A-Za-z0-9_-]{21}\z")
+            .expect("the hard-coded agent ID regex must be valid");
+
+        Self { state, gctx, ctx, notifier, extensions, db, agent_id_re }
     }
 }
 
@@ -78,17 +84,21 @@ impl Tool for AgentTool {
         serde_json::json!({
             "type": "object",
             "properties": {
+                "agent_id": {
+                    "type": "string",
+                    "description": "Optional agent ID returned by a previous Agent call in the current parent session. Provide it to reuse that agent's context and continue the task; omit it to create a new agent. Do not call the same agent ID concurrently."
+                },
                 "description": {
                     "type": "string",
                     "description": "Short user-facing title summarizing the delegated task."
                 },
                 "prompt": {
                     "type": "string",
-                    "description": "Self-contained task brief: goal, relevant context and paths, constraints, whether edits are allowed, expected deliverable and validation."
+                    "description": "For a new agent, provide a self-contained task brief: goal, relevant context and paths, constraints, whether edits are allowed, expected deliverable and validation. When reusing agent_id, provide follow-up instructions and any new information."
                 },
                 "name": {
                     "type": "string",
-                    "description": "Built-in build/general allow shell commands and file edits; explore is read-only research; plan is read-only analysis and planning. Also accepts listed custom names, matched case-insensitively before built-ins. Unknown values fall back to general."
+                    "description": "Name of an available agent configuration, matched case-insensitively. Determines instructions and available tools; unknown names return an error. Required even when reusing agent_id; use the same name to preserve the configuration."
                 }
             },
             "required": ["description", "prompt", "name"]
@@ -100,6 +110,12 @@ impl Tool for AgentTool {
         _context: &mut ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
+        if let Some(ref agent_id) = args.agent_id
+            && !self.agent_id_re.is_match(agent_id)
+        {
+            return Err(AgentError::invalid_agent_id(agent_id));
+        }
+
         let Some(mode) = self
             .extensions
             .agents
@@ -109,7 +125,8 @@ impl Tool for AgentTool {
             return Err(AgentError::agent_not_found(args.name));
         };
 
-        let task_id = nanoid::nanoid!();
+        let title = args.title();
+        let agent_id = args.agent_id.unwrap_or(nanoid::nanoid!());
         let tool_names = mode.frontmatter.filter_tool_names(crate::tools::ALL_TOOL_NAMES);
         let cwd = self.ctx.cwd();
         let tools = crate::tools::create_agent_tools(
@@ -127,10 +144,16 @@ impl Tool for AgentTool {
 
         let token_usage_hook = TokenUsageHook::new(self.gctx.current_dir(), self.db.clone());
         let tool_call_hook = ToolCallHook::new(self.gctx.current_dir(), self.db.clone());
-        let dir = self.state.session_dir().join("subagent").join(&task_id);
+        let dir = self.state.session_dir().join("subagent").join(&agent_id);
         let transcript_hook = TranscriptHook::new(&dir)
             .await
             .map_err(|source| AgentError::context_persistence(&dir, source))?;
+
+        let history = ChatContext::new(&dir)
+            .await
+            .map_err(|source| AgentError::context_persistence(&dir, source))?
+            .history()
+            .await;
 
         let agent = AgentBuilder::new(self.state.model())
             .name(&mode.frontmatter.name)
@@ -148,11 +171,11 @@ impl Tool for AgentTool {
 
         let session_id = format!("agent-{}", nanoid::nanoid!());
         let subagent_update =
-            SubagentUpdate::new(&session_id).title(args.title()).description(args.description);
+            SubagentUpdate::new(&session_id).title(title).description(args.description);
         self.notifier.send_subagent_update(subagent_update);
 
         let message_id = format!("agent-message-{}", nanoid::nanoid!());
-        let mut stream = agent.prompt(args.prompt).stream();
+        let mut stream = agent.prompt(args.prompt).history(history).stream();
 
         self.notifier.send_session_message(
             &message_id,
@@ -171,6 +194,6 @@ impl Tool for AgentTool {
             }
         }
 
-        Ok(AgentOutput::new(task_id, final_res.output(), dir))
+        Ok(AgentOutput::new(agent_id, final_res.output(), dir))
     }
 }

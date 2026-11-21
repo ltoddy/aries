@@ -56,7 +56,7 @@ impl Session {
         self.compactor.pre_compact(&prompt).await;
 
         let context = self.recall_context(&user_input).await;
-        let mut history = self.chat_context.history().await.to_vec();
+        let mut history = self.chat_context.history().await;
         history.extend(system_reminders(hook_context));
         if let Some(reminder) = context {
             history.push(system_reminder(reminder));
