@@ -447,6 +447,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "aries-daemon"
+version = "0.1.0"
+dependencies = [
+ "aries-init",
+ "aries-ipc",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "aries-desktop"
 version = "0.1.0"
 dependencies = [
