@@ -39,7 +39,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2.9.3
 
-      - run: cargo clippy --workspace --exclude aries-cli --exclude aries-desktop --all-targets -- -D warnings
+      - run: cargo clippy --workspace --exclude aries-cli --exclude aries-daemon --exclude aries-desktop --all-targets -- -D warnings
 
   test-crates:
     name: test (crates)
@@ -51,7 +51,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2.9.3
 
-      - run: cargo test --workspace --exclude aries-cli --exclude aries-desktop
+      - run: cargo test --workspace --exclude aries-cli --exclude aries-daemon --exclude aries-desktop
 
   lint-cli:
     name: lint (aries-cli)
@@ -78,6 +78,40 @@ jobs:
       - uses: Swatinem/rust-cache@v2.9.3
 
       - run: cargo test -p aries-cli --bins --tests
+
+  lint-daemon:
+    name: lint (aries-daemon, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-15]
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2.9.3
+
+      - run: $HOME/.cargo/bin/cargo clippy -p aries-daemon --all-targets -- -D warnings
+
+  test-daemon:
+    name: test (aries-daemon, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-15]
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2.9.3
+
+      - run: $HOME/.cargo/bin/cargo test -p aries-daemon --bins --tests
 
   lint-orbit:
     name: lint (aries-desktop)
