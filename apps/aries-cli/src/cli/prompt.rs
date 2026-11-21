@@ -31,8 +31,7 @@ pub async fn execute(args: PromptArgs, gctx: GlobalContext) -> Result<()> {
 
     let current_dir = gctx.current_dir();
 
-    let mut session =
-        registry.try_session(current_dir, &session_id).await.map_err(Error::registry)?;
+    let session = registry.try_session(current_dir, &session_id).await.map_err(Error::registry)?;
     let session_id = session.id();
     let _session_span = info_span!("session", session_id = %session_id).entered();
 

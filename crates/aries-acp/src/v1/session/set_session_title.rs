@@ -17,7 +17,7 @@ pub async fn set_session_title(
 
     let session_id = req.session_id.to_string();
     let registry = registry.lock().await;
-    let Some(mut session) = registry.session(&session_id) else {
+    let Some(session) = registry.session(&session_id) else {
         return responder
             .respond_with_error(schema::Error::resource_not_found(Some(session_id)).into());
     };

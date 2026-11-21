@@ -33,7 +33,7 @@ pub async fn prompt(
         });
     };
 
-    let mut session = {
+    let session = {
         let registry = registry.lock().await;
         match registry.session(&session_id) {
             Some(session) => session,
@@ -46,10 +46,6 @@ pub async fn prompt(
     };
 
     let result = session.prompt(prompt, callback).await;
-    {
-        let mut registry = registry.lock().await;
-        registry.putback_session(session);
-    }
     let stop_reason = match result {
         Ok(PromptOutcome::Completed(_)) => StopReason::EndTurn,
         Ok(PromptOutcome::Cancelled(_)) => StopReason::Cancelled,

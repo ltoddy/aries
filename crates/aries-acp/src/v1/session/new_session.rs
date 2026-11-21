@@ -21,7 +21,7 @@ pub async fn new_session(
 ) -> Result<(), Error> {
     info!("Received new session request {req:?}");
 
-    let mcp_servers = McpServers(req.mcp_servers);
+    let mcp_servers = McpServers::new(req.mcp_servers);
     let mcp_config = mcp_servers.into();
     let mut registry = registry.lock().await;
     let session = match registry.new_session(req.cwd, mcp_config).await {
@@ -34,6 +34,7 @@ pub async fn new_session(
 
     let available_commands = session
         .list_available_commands()
+        .await
         .into_iter()
         .map(|c| {
             AvailableCommand::new(c.name, c.description).input(c.argument_hint.map(|hint| {
@@ -51,16 +52,17 @@ pub async fn new_session(
         SessionUpdate::SessionInfoUpdate(SessionInfoUpdate::new()),
     ));
 
-    let modes = match modes(DEFAULT_AGENT_NAME, session.agents()) {
+    let snapshot = session.snapshot().await;
+    let modes = match modes(DEFAULT_AGENT_NAME, snapshot.agents()) {
         Ok(modes) => modes,
         Err(err) => return responder.respond_with_internal_error(err.to_string()),
     };
     let config_options = config_options(
-        session.setting(),
-        session.sandbox_mode(),
-        session.mode(),
-        session.agents(),
-        session.thought_level(),
+        snapshot.setting(),
+        snapshot.sandbox_mode(),
+        snapshot.mode(),
+        snapshot.agents(),
+        snapshot.thought_level(),
     );
     let resp = NewSessionResponse::new(session.id()).modes(modes).config_options(config_options);
     responder.respond(resp)

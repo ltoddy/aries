@@ -8,6 +8,12 @@ use crate::session::ParseSessionConfigError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum SessionError {
+    #[error("session {0} is busy")]
+    Busy(String),
+
+    #[error("session {0} not found")]
+    NotFound(String),
+
     #[error("{0}")]
     ParseConfig(#[from] ParseSessionConfigError),
 
@@ -41,6 +47,14 @@ pub enum SessionError {
 }
 
 impl SessionError {
+    pub fn busy(session_id: impl Into<String>) -> Self {
+        Self::Busy(session_id.into())
+    }
+
+    pub fn not_found(session_id: impl Into<String>) -> Self {
+        Self::NotFound(session_id.into())
+    }
+
     pub fn parse_config(error: ParseSessionConfigError) -> Self {
         Self::ParseConfig(error)
     }
