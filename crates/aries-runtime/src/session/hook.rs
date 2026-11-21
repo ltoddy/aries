@@ -24,10 +24,7 @@ use tokio::sync::Mutex;
 use tracing::warn;
 
 use crate::context::compaction::{ContextWindow, TokenEstimator, micro_compact};
-use crate::session::instruction::InstructionContext;
-use crate::session::{system_reminder, system_reminders};
 use crate::tools::agent::AgentArgs;
-use crate::tools::read::ReadArgs;
 
 const MICRO_COMPACT_KEEP_MESSAGES_AT_80_PERCENT: usize = 10;
 const MICRO_COMPACT_KEEP_MESSAGES_AT_75_PERCENT: usize = 15;
@@ -43,7 +40,6 @@ pub struct SessionPromptHook {
     transcript_dir: PathBuf,
     agent_id: String,
     tool_call_started_at: Arc<Mutex<HashMap<CallId, time::Instant>>>,
-    instruction_ctx: InstructionContext,
     window: ContextWindow,
     notifier: Notifier,
 }
@@ -55,7 +51,6 @@ impl SessionPromptHook {
         cwd: impl Into<PathBuf>,
         transcript_dir: impl Into<PathBuf>,
         agent_id: impl Into<String>,
-        instruction_ctx: InstructionContext,
         notifier: Notifier,
     ) -> Self {
         let session_id = session_id.into();
@@ -72,7 +67,6 @@ impl SessionPromptHook {
             transcript_dir,
             agent_id,
             tool_call_started_at: Arc::new(Mutex::new(HashMap::new())),
-            instruction_ctx,
             window,
             notifier,
         }
@@ -103,11 +97,7 @@ impl SessionPromptHook {
             None => input,
         };
 
-        if let HookDecision::Continue { contexts } =
-            self.executor.fire_post_tool_use_failure(input).await
-        {
-            self.instruction_ctx.push_hook_contexts(contexts).await;
-        }
+        let _ = self.executor.fire_post_tool_use_failure(input).await;
     }
 }
 
@@ -135,12 +125,9 @@ impl AgentHook for SessionPromptHook {
         _ctx: &HookContext,
         event: CompletionCallEvent<'_>,
     ) -> CompletionCallAction {
-        let instructions = self.instruction_ctx.drain().await;
-        let hook_contexts = self.instruction_ctx.drain_hook_contexts().await;
-
         let estimate_tokens = event.history.estimate_tokens() + event.prompt.estimate_tokens();
         let stuffed = estimate_tokens > self.window.sixty_percent_threshold();
-        if instructions.is_empty() && hook_contexts.is_empty() && !stuffed {
+        if !stuffed {
             return CompletionCallAction::continue_run();
         }
 
@@ -159,11 +146,6 @@ impl AgentHook for SessionPromptHook {
             micro_compact(&mut patched, MICRO_COMPACT_KEEP_MESSAGES_AT_60_PERCENT);
         }
 
-        for instruction in instructions {
-            let reminder = system_reminder(instruction.render());
-            patched.push(reminder);
-        }
-        patched.extend(system_reminders(hook_contexts));
         CompletionCallAction::patch(RequestPatch::new().history(patched))
     }
 
@@ -222,44 +204,32 @@ impl AgentHook for SessionPromptHook {
             serde_json::from_str(args).unwrap_or_else(|_| Value::String(args.clone()));
         let mut patched_tool_input = false;
 
-        match name.as_str() {
-            crate::tools::agent::NAME => {
-                let input =
-                    SubagentStartHookInput::new(&self.session_id, &self.cwd, &self.agent_id)
-                        .transcript_dir(&self.transcript_dir);
+        if name == crate::tools::agent::NAME {
+            let input = SubagentStartHookInput::new(&self.session_id, &self.cwd, &self.agent_id)
+                .transcript_dir(&self.transcript_dir);
 
-                match self.executor.fire_subagent_start(input).await {
-                    HookDecision::Continue { contexts } => {
-                        let contexts: Vec<_> = contexts.into_iter().collect();
-                        if !contexts.is_empty() {
-                            let Ok(mut args) = AgentArgs::deserialize(&tool_input) else {
-                                warn!("failed to parse Agent args for SubagentStart context");
-                                return DispatchAction::proceed();
-                            };
+            match self.executor.fire_subagent_start(input).await {
+                HookDecision::Continue { contexts } => {
+                    let contexts: Vec<_> = contexts.into_iter().collect();
+                    if !contexts.is_empty() {
+                        let Ok(mut args) = AgentArgs::deserialize(&tool_input) else {
+                            warn!("failed to parse Agent args for SubagentStart context");
+                            return DispatchAction::proceed();
+                        };
 
-                            args.prompt.push_str("\n\n");
-                            args.prompt.push_str(&render_contexts(contexts));
-                            match serde_json::to_value(args) {
-                                Ok(patched) => tool_input = patched,
-                                Err(err) => {
-                                    warn!(%err, "failed to serialize Agent args for SubagentStart context");
-                                },
-                            }
-                            patched_tool_input = true;
+                        args.prompt.push_str("\n\n");
+                        args.prompt.push_str(&render_contexts(contexts));
+                        match serde_json::to_value(args) {
+                            Ok(patched) => tool_input = patched,
+                            Err(err) => {
+                                warn!(%err, "failed to serialize Agent args for SubagentStart context");
+                            },
                         }
-                    },
-                    HookDecision::Terminate { reason } => return DispatchAction::stop(reason),
-                }
-            },
-            crate::tools::read::NAME => {
-                if let Ok(args) = ReadArgs::deserialize(&tool_input) {
-                    let file_path = args.file_path;
-                    if let Some(parent) = file_path.parent() {
-                        self.instruction_ctx.visit(parent).await;
+                        patched_tool_input = true;
                     }
-                }
-            },
-            _ => {},
+                },
+                HookDecision::Terminate { reason } => return DispatchAction::stop(reason),
+            }
         }
 
         let input = PreToolUseHookInput::new(
@@ -273,8 +243,7 @@ impl AgentHook for SessionPromptHook {
         .agent_id(&self.agent_id);
 
         match self.executor.fire_pre_tool_use(input).await {
-            HookDecision::Continue { contexts } => {
-                self.instruction_ctx.push_hook_contexts(contexts).await;
+            HookDecision::Continue { .. } => {
                 if patched_tool_input {
                     DispatchAction::rewrite_tool_args(event.kind, tool_input)
                 } else {
@@ -328,11 +297,7 @@ impl AgentHook for SessionPromptHook {
                         Some(text) => input.last_assistant_message(text),
                         None => input,
                     };
-                    if let HookDecision::Continue { contexts } =
-                        self.executor.fire_subagent_stop(input).await
-                    {
-                        self.instruction_ctx.push_hook_contexts(contexts).await;
-                    }
+                    let _ = self.executor.fire_subagent_stop(input).await;
                 }
 
                 let input = PostToolUseHookInput::new(
@@ -350,11 +315,7 @@ impl AgentHook for SessionPromptHook {
                     None => input,
                 };
 
-                if let HookDecision::Continue { contexts } =
-                    self.executor.fire_post_tool_use(input).await
-                {
-                    self.instruction_ctx.push_hook_contexts(contexts).await;
-                }
+                let _ = self.executor.fire_post_tool_use(input).await;
 
                 OutcomeAction::proceed()
             },
