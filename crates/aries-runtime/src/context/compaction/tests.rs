@@ -1,6 +1,6 @@
 use rig::message::{
-    AssistantContent, CallId, Document, DocumentData, Message, ProviderCallId, Reasoning, ToolName,
-    ToolResultContent, UserContent,
+    AssistantContent, CallId, DocumentContent, DocumentData, Message, ProviderCallId, Reasoning,
+    ToolName, ToolResultContent, UserContent,
 };
 
 use crate::context::ChatContext;
@@ -53,7 +53,7 @@ fn tool_result_json_estimates_from_serialized_value() {
 
 #[test]
 fn string_document_estimates_from_actual_content() {
-    let content = UserContent::Document(Document {
+    let content = UserContent::Document(DocumentContent {
         data: DocumentData::Text("opened file metadata".to_owned()),
         media_type: None,
         additional_params: None,

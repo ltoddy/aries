@@ -16,8 +16,8 @@ use base64::engine::general_purpose::STANDARD;
 use rig::agent::{CompletionCall, MultiTurnStreamItem, PromptResponse};
 use rig::completion::Message;
 use rig::message::{
-    AssistantContent, Audio, Document, DocumentData, DocumentSourceKind, Image, MimeType, ToolCall,
-    ToolFunction, ToolResult, UserContent, Video,
+    AssistantContent, Audio, DocumentContent, DocumentData, DocumentSourceKind, Image, MimeType,
+    ToolCall, ToolFunction, ToolResult, UserContent, Video,
 };
 use rig::streaming::{Item, StreamEvent};
 
@@ -233,7 +233,7 @@ impl SessionUpdates {
         ContentBlock::from("[video]")
     }
 
-    fn from_document(document: Document) -> ContentBlock {
+    fn from_document(document: DocumentContent) -> ContentBlock {
         let mime_type = document.media_type.as_ref().map(MimeType::to_mime_type);
         let source = match document.data {
             DocumentData::Text(text) => {
