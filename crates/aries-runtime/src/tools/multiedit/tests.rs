@@ -20,7 +20,6 @@ async fn test_multiedit_basic() {
     let dir = TempDir::new().expect("test operation should succeed");
     let file_path = dir.path().join("test.txt");
     let ctx = ToolContext::new(
-        "test",
         {
             let (notifier, _) = aries_communicate::Notifier::channel();
             notifier
@@ -66,7 +65,6 @@ async fn test_multiedit_creates_file() {
 
     let mut context = rig::tool::ToolContext::new();
     let tool = MultiEditTool::new(ToolContext::new(
-        "test",
         {
             let (notifier, _) = aries_communicate::Notifier::channel();
             notifier
@@ -101,7 +99,6 @@ async fn test_multiedit_identical_text_error() {
     let dir = TempDir::new().expect("test operation should succeed");
     let file_path = dir.path().join("test.txt");
     let ctx = ToolContext::new(
-        "test",
         {
             let (notifier, _) = aries_communicate::Notifier::channel();
             notifier
@@ -138,7 +135,6 @@ async fn test_multiedit_rejects_unread_file() {
 
     let mut context = rig::tool::ToolContext::new();
     let tool = MultiEditTool::new(ToolContext::new(
-        "test",
         {
             let (notifier, _) = aries_communicate::Notifier::channel();
             notifier
@@ -181,7 +177,6 @@ async fn test_multiedit_rejects_empty_old_text_on_non_empty_file() {
     let dir = TempDir::new().expect("test operation should succeed");
     let file_path = dir.path().join("test.txt");
     let ctx = ToolContext::new(
-        "test",
         {
             let (notifier, _) = aries_communicate::Notifier::channel();
             notifier
@@ -218,7 +213,6 @@ async fn test_multiedit_allows_empty_old_text_on_empty_file() {
     let dir = TempDir::new().expect("test operation should succeed");
     let file_path = dir.path().join("test.txt");
     let ctx = ToolContext::new(
-        "test",
         {
             let (notifier, _) = aries_communicate::Notifier::channel();
             notifier

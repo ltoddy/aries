@@ -39,7 +39,7 @@ impl Tool for WriteTool {
             "properties": {
                 "file_path": {
                     "type": "string",
-                    "description": "Destination file path, absolute or relative to the current working directory (the active worktree, if any)."
+                    "description": "Destination file path, absolute or relative to the current working directory."
                 },
                 "content": {
                     "type": "string",
@@ -55,10 +55,7 @@ impl Tool for WriteTool {
         _context: &mut ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
-        let cwd = self
-            .ctx
-            .worktree()
-            .map_or_else(|| self.ctx.cwd(), |worktree| worktree.path().to_owned());
+        let cwd = self.ctx.cwd();
         let file_path =
             if args.file_path.is_relative() { cwd.join(&args.file_path) } else { args.file_path };
 

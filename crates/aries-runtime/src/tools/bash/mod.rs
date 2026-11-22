@@ -72,10 +72,7 @@ impl Tool for BashTool {
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
         let arg = args.command;
-        let cwd = self
-            .ctx
-            .worktree()
-            .map_or_else(|| self.ctx.cwd(), |worktree| worktree.path().to_owned());
+        let cwd = self.ctx.cwd();
 
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "bash".to_owned());
         let mut command = self
