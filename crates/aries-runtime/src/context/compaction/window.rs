@@ -3,10 +3,8 @@ pub struct ContextWindow {
     pub total: u64,
 }
 
-// rig 没有提供方法来获取模型对应的上下文窗口大小
-// 目前是 2026 年了, 模型拥有 1M 上下文窗口或者大于这个窗口是很常见的了,所以这里目前先 hardcode 1M.
-
-const CONTEXT_WINDOW: u64 = 1_000_000;
+const KIB: u64 = 1024;
+const CONTEXT_WINDOW: u64 = 500 * KIB;
 
 impl Default for ContextWindow {
     fn default() -> Self {

@@ -1,11 +1,7 @@
 ## TODO
 
-- [ ] 从错误中恢复
-    - 输出被截断
-    - [x] 上下文超长 (agent loop 内发送端过滤, 详见 docs/error-recovery.md)
 - [ ] agent (参考 https://github.com/vercel/eve 对 agent 的目录结构设计来支持)
 - [ ] token 使用优化
-- [ ] 支持设置模型 effort
 - [ ] 支持 cron
 - [ ] 支持自我进化 (想要达到的目标, 从单体进化逐步走向群体进化,单体进化: 一个 Agent 变聪明了, 另一个 Agent 不知道,
   希望逐步走向进化成果可以像基因一样跨个体共享, 群体遗传!)
@@ -16,7 +12,6 @@
         2. RL 训练, 使用更强大模型，批量生成高质量的 Agent 执行轨迹, 清洗压缩成训练数据，然后使用 GRPO 算法训练小模型.
     - GEP 架构 参考项目: https://github.com/EvoMap/evolver
 - [ ] 遥测与 tracing (记录每个工具调用预估耗费的 token, 用于统计，针对工具做优化)
-- [ ] 长程任务
 - [ ] 对环境进行感知
 - [ ] 实现 MoA (Mixture of Agent)
 - [ ] 支持 handoff

@@ -57,6 +57,10 @@ impl TranscriptHook {
 }
 
 impl AgentHook for TranscriptHook {
+    fn name(&self) -> Option<String> {
+        Some(String::from("TranscriptHook"))
+    }
+
     async fn on_run_settled(&self, ctx: &HookContext, event: RunSettled<'_>) {
         if let Some(messages) = event.messages {
             let progress = ctx

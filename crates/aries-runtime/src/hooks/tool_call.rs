@@ -29,6 +29,10 @@ impl ToolCallHook {
 }
 
 impl AgentHook for ToolCallHook {
+    fn name(&self) -> Option<String> {
+        Some(String::from("ToolCallHook"))
+    }
+
     async fn on_dispatch(&self, _ctx: &HookContext, event: DispatchEvent<'_>) -> DispatchAction {
         if matches!(event.kind, EffectKind::ToolCall { .. })
             && let Some(call_id) = event.call_id

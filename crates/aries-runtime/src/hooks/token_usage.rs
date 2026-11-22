@@ -20,6 +20,10 @@ impl TokenUsageHook {
 }
 
 impl AgentHook for TokenUsageHook {
+    fn name(&self) -> Option<String> {
+        Some(String::from("TokenUsageHook"))
+    }
+
     async fn on_model_turn_finished(
         &self,
         _ctx: &HookContext,
