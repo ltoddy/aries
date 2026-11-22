@@ -26,7 +26,6 @@ fn state(cwd: impl Into<std::path::PathBuf>) -> State {
 
 async fn tool(cwd: impl Into<std::path::PathBuf>) -> BashTool {
     let ctx = crate::tools::context::ToolContext::new(
-        "test",
         {
             let (notifier, _) = aries_communicate::Notifier::channel();
             notifier

@@ -47,7 +47,7 @@ impl Tool for GlobTool {
                 },
                 "base_dir": {
                     "type": "string",
-                    "description": "Directory to search recursively. Defaults to the current working directory (the active worktree, if any); relative directories resolve from there."
+                    "description": "Directory to search recursively. Defaults to the current working directory; relative directories resolve from there."
                 },
                 "hidden": {
                     "type": "boolean",
@@ -71,10 +71,7 @@ impl Tool for GlobTool {
         _context: &mut ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
-        let current_dir = self
-            .ctx
-            .worktree()
-            .map_or_else(|| self.ctx.cwd(), |worktree| worktree.path().to_owned());
+        let current_dir = self.ctx.cwd();
         let base_dir = match args.base_dir {
             Some(base_dir) if base_dir.is_absolute() => base_dir,
             Some(base_dir) => current_dir.join(base_dir),

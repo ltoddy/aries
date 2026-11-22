@@ -1,5 +1,4 @@
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 
 use aries_communicate::Notifier;
@@ -7,13 +6,10 @@ use tokio::fs;
 
 use crate::tools::read_state::SharedReadState;
 use crate::tools::task::TaskRegistry;
-use crate::tools::worktree::Worktree;
 
 #[derive(Clone)]
 pub struct ToolContext {
-    session_id: String,
-    cwd: Arc<parking_lot::Mutex<PathBuf>>,
-    worktree: Arc<parking_lot::Mutex<Option<Worktree>>>,
+    cwd: PathBuf,
     pub task: TaskRegistry,
     read_state: SharedReadState,
 }
@@ -67,34 +63,16 @@ impl GuardWriteError {
 }
 
 impl ToolContext {
-    pub fn new(session_id: impl Into<String>, notifier: Notifier, cwd: impl Into<PathBuf>) -> Self {
-        let session_id = session_id.into();
+    pub fn new(notifier: Notifier, cwd: impl Into<PathBuf>) -> Self {
         let task = TaskRegistry::new(notifier);
         let read_state = SharedReadState::new();
-        let cwd = std::sync::Arc::new(parking_lot::Mutex::new(cwd.into()));
-        let worktree_session = std::sync::Arc::new(parking_lot::Mutex::new(None));
+        let cwd = cwd.into();
 
-        Self { session_id, cwd, worktree: worktree_session, task, read_state }
-    }
-
-    pub fn session_id(&self) -> &str {
-        &self.session_id
+        Self { cwd, task, read_state }
     }
 
     pub fn cwd(&self) -> PathBuf {
-        self.cwd.lock().clone()
-    }
-
-    pub fn set_cwd(&self, cwd: impl Into<PathBuf>) {
-        *self.cwd.lock() = cwd.into();
-    }
-
-    pub fn worktree(&self) -> Option<Worktree> {
-        self.worktree.lock().clone()
-    }
-
-    pub fn set_worktree(&self, worktree: Option<Worktree>) {
-        *self.worktree.lock() = worktree;
+        self.cwd.clone()
     }
 
     pub async fn on_file_read(&self, file_path: impl AsRef<Path>) {

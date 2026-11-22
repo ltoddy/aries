@@ -59,10 +59,7 @@ impl Tool for MonitorTool {
         _context: &mut ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
-        let cwd = self
-            .ctx
-            .worktree()
-            .map_or_else(|| self.ctx.cwd(), |worktree| worktree.path().to_owned());
+        let cwd = self.ctx.cwd();
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "bash".to_owned());
         let command =
             self.state.sandbox_mode().command(&shell, self.gctx.home_dir(), &cwd).await.map_err(

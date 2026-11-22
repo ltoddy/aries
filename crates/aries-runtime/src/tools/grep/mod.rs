@@ -87,10 +87,7 @@ impl Tool for GrepTool {
         _context: &mut ToolContext,
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
-        let cwd = self
-            .ctx
-            .worktree()
-            .map_or_else(|| self.ctx.cwd(), |worktree| worktree.path().to_owned());
+        let cwd = self.ctx.cwd();
         tokio::task::spawn_blocking(move || driver::run(&cwd, &args))
             .await
             .map_err(GrepError::task)?

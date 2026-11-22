@@ -5,8 +5,6 @@ pub mod codesearch;
 pub mod context;
 mod diff;
 pub mod edit;
-pub mod enter_worktree;
-pub mod exit_worktree;
 pub mod glob;
 pub mod grep;
 pub mod monitor;
@@ -21,7 +19,6 @@ pub mod task_stop;
 pub mod update_plan;
 pub mod webfetch;
 pub mod websearch;
-pub mod worktree;
 pub mod write;
 
 use std::path::Path;
@@ -29,7 +26,6 @@ use std::path::Path;
 use aries_communicate::Notifier;
 use aries_extension::AgentExtensions;
 use aries_init::GlobalContext;
-use git2::Repository;
 use itertools::Itertools;
 use rig::tool::ToolSet;
 use toasty::Db;
@@ -44,8 +40,6 @@ pub fn format_tool_output(tool_name: impl AsRef<str>, raw_json: serde_json::Valu
         batch::NAME => batch::BatchOutput::render_output(raw_json),
         codesearch::NAME => codesearch::CodeSearchOutput::render_output(raw_json),
         edit::NAME => edit::EditOutput::render_output(raw_json),
-        enter_worktree::NAME => enter_worktree::EnterGitWorktreeOutput::render_output(raw_json),
-        exit_worktree::NAME => exit_worktree::ExitGitWorktreeOutput::render_output(raw_json),
         glob::NAME => glob::GlobOutput::render_output(raw_json),
         grep::NAME => grep::GrepOutput::render_output(raw_json),
         monitor::NAME => monitor::MonitorOutput::render_output(raw_json),
@@ -70,8 +64,6 @@ pub const ALL_TOOL_NAMES: &[&str] = &[
     batch::NAME,
     codesearch::NAME,
     edit::NAME,
-    enter_worktree::NAME,
-    exit_worktree::NAME,
     glob::NAME,
     grep::NAME,
     monitor::NAME,
@@ -100,7 +92,7 @@ pub fn create_tools<'a>(
 ) -> ToolSet {
     let tool_names = tool_names.as_ref().iter().unique().collect_vec();
     let mut tool_set = ToolSet::default();
-    let ctx = ToolContext::new(state.session_id(), notifier.clone(), state.cwd());
+    let ctx = ToolContext::new(notifier.clone(), state.cwd());
 
     for &tool_name in tool_names {
         match tool_name {
@@ -132,25 +124,6 @@ pub fn create_tools<'a>(
             },
             edit::NAME => {
                 tool_set.add_tool(edit::EditTool::new(ctx.clone()));
-            },
-            enter_worktree::NAME => {
-                if let Some(repository) =
-                    Repository::discover(state.cwd()).ok().filter(|repo| repo.workdir().is_some())
-                {
-                    tool_set.add_tool(enter_worktree::EnterGitWorktreeTool::new(
-                        ctx.clone(),
-                        repository,
-                        gctx.worktree_dir(),
-                    ));
-                }
-            },
-            exit_worktree::NAME => {
-                if let Some(repository) =
-                    Repository::discover(state.cwd()).ok().filter(|repo| repo.workdir().is_some())
-                {
-                    tool_set
-                        .add_tool(exit_worktree::ExitGitWorktreeTool::new(ctx.clone(), repository));
-                }
             },
             glob::NAME => {
                 tool_set.add_tool(glob::GlobTool::new(ctx.clone()));
@@ -213,7 +186,7 @@ pub fn create_agent_tools<'a>(
 ) -> ToolSet {
     let tool_names = tool_names.as_ref().iter().unique().collect_vec();
     let mut tool_set = ToolSet::default();
-    let ctx = ToolContext::new(state.session_id(), notifier.clone(), cwd);
+    let ctx = ToolContext::new(notifier.clone(), cwd);
 
     for &tool_name in tool_names {
         match tool_name {

@@ -1,6 +1,6 @@
 在当前工作目录执行 shell 命令，用于构建、测试、运行程序、Git 操作及专用工具无法完成的系统任务。文件查找、内容搜索、读取、编辑和创建优先使用 `Glob`、`Grep`、`Read`、`Edit` / `MultiEdit`、`Write`；持续监视可用 `Monitor`。
 
-- 通过 `$SHELL -c` 执行，未设置时使用 `bash`。每次启动新的 shell，`cd`、变量、函数等状态不跨调用保留；已进入 worktree 时在该目录启动。
+- 通过 `$SHELL -c` 执行，未设置时使用 `bash`。每次启动新的 shell，`cd`、变量、函数等状态不跨调用保留。
 - 默认等待命令结束，返回 `stdout`、`stderr`、`exit_code`。非零退出码表示异常退出，不应仅凭工具调用成功判断命令成功。
 - 前台 stdout / stderr 各保留前 30000 个字符，超出会附截断提示；需要完整日志时由命令保存到文件，再用 `Read` 分段读取。
 - `background=true` 立即返回 `task_id`，仅表示已启动；空输出和占位 `exit_code=0` 不代表执行成功。用 `TaskOutput` 查看状态和保留的输出，用 `TaskStop` 停止。
