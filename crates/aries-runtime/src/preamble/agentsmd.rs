@@ -31,7 +31,7 @@ impl AgentsmdReader {
 
         let content = std::fs::read_to_string(&file_path)?;
 
-        Ok(Agentsmd::new(file_path, content, true))
+        Ok(Agentsmd::new(file_path, content))
     }
 }
 
@@ -40,26 +40,17 @@ pub struct Agentsmd {
     pub file_path: PathBuf,
     pub content: String,
     // 文件是否来来源于当前路径的 AGENTS.md 文件
-    pub is_root: bool,
 }
 
 impl Agentsmd {
-    pub fn new(file_path: impl Into<PathBuf>, content: impl Into<String>, is_root: bool) -> Self {
+    pub fn new(file_path: impl Into<PathBuf>, content: impl Into<String>) -> Self {
         let file_path = file_path.into();
         let content = content.into();
 
-        Self { file_path, content, is_root }
+        Self { file_path, content }
     }
 
     pub fn render(&self) -> String {
-        if self.is_root {
-            format!("以下内容来自 {} (项目指令):\n\n{}", self.file_path.display(), self.content)
-        } else {
-            format!(
-                "以下内容来自 {} (子目录项目指令, 因读取了该目录下的文件而加载:\n\n{})",
-                self.file_path.display(),
-                self.content
-            )
-        }
+        format!("以下内容来自 {} (项目指令):\n\n{}", self.file_path.display(), self.content)
     }
 }

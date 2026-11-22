@@ -11,10 +11,8 @@ use aries_extension::hook::input::{
 use aries_extension::hook::{HookDecision, HooksExecutor};
 use rig::agent::{
     AgentHook, CompletionCall, CompletionCallAction, CompletionCallEvent, DispatchAction,
-    DispatchEvent, HookContext, InvalidToolCallAction, InvalidToolCallContext, ModelSelection,
-    ModelSelectionAction, ModelTurnAction, ModelTurnFinished, MultiTurnStreamItem,
-    ObservationAction, OutcomeAction, OutcomeEvent, ReasoningDelta, RequestPatch, RunSettled,
-    RunStart, RunStartAction, StepEventKind, TextDelta, ToolCallDelta,
+    DispatchEvent, HookContext, ModelTurnAction, ModelTurnFinished, MultiTurnStreamItem,
+    OutcomeAction, OutcomeEvent, RequestPatch,
 };
 use rig::effect::{Answered, EffectKind};
 use rig::message::CallId;
@@ -106,20 +104,6 @@ impl AgentHook for SessionPromptHook {
         Some(String::from("AgentHook"))
     }
 
-    async fn on_run_start(&self, _ctx: &HookContext, _event: RunStart<'_>) -> RunStartAction {
-        RunStartAction::continue_run()
-    }
-
-    async fn on_run_settled(&self, _ctx: &HookContext, _event: RunSettled<'_>) {}
-
-    fn on_model_select(
-        &self,
-        _ctx: &HookContext,
-        _event: ModelSelection<'_>,
-    ) -> ModelSelectionAction {
-        ModelSelectionAction::continue_run()
-    }
-
     async fn on_completion_call(
         &self,
         _ctx: &HookContext,
@@ -160,34 +144,6 @@ impl AgentHook for SessionPromptHook {
             event.raw.clone(),
         )));
         ModelTurnAction::continue_run()
-    }
-
-    async fn on_invalid_tool_call(
-        &self,
-        _ctx: &HookContext,
-        _event: &InvalidToolCallContext,
-    ) -> Option<InvalidToolCallAction> {
-        None
-    }
-
-    async fn on_text_delta(&self, _ctx: &HookContext, _event: TextDelta<'_>) -> ObservationAction {
-        ObservationAction::continue_run()
-    }
-
-    async fn on_reasoning_delta(
-        &self,
-        _ctx: &HookContext,
-        _event: ReasoningDelta<'_>,
-    ) -> ObservationAction {
-        ObservationAction::continue_run()
-    }
-
-    async fn on_tool_call_delta(
-        &self,
-        _ctx: &HookContext,
-        _event: ToolCallDelta<'_>,
-    ) -> ObservationAction {
-        ObservationAction::continue_run()
     }
 
     async fn on_dispatch(&self, _ctx: &HookContext, event: DispatchEvent<'_>) -> DispatchAction {
@@ -339,10 +295,6 @@ impl AgentHook for SessionPromptHook {
             },
             (_, _, _) => OutcomeAction::proceed(),
         }
-    }
-
-    fn observes(&self, _kind: StepEventKind) -> bool {
-        true
     }
 }
 
