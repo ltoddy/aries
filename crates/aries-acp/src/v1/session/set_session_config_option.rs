@@ -22,12 +22,14 @@ pub async fn set_session_config_option(
     info!("Received set session config option request {req:?}");
 
     let session_id = req.session_id.to_string();
-    let guard = registry.lock().await;
-    let Some(session) = guard.session(&session_id) else {
-        return responder
-            .respond_with_error(schema::Error::resource_not_found(Some(session_id)).into());
+    let session = {
+        let registry = registry.lock().await;
+        let Some(session) = registry.session(&session_id) else {
+            return responder
+                .respond_with_error(schema::Error::resource_not_found(Some(session_id)).into());
+        };
+        session
     };
-    drop(guard);
 
     let config_id = req.config_id.to_string();
     let Some(value) = req.value.as_value_id() else {

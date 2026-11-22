@@ -23,14 +23,14 @@ pub async fn cancel(
     info!("Received cancel notification {args:?}");
 
     let session_id = args.session_id.to_string();
-
     let session = {
         let registry = registry.lock().await;
-        match registry.session(&session_id) {
-            Some(session) => session,
-            None => return Err(schema::Error::resource_not_found(Some(session_id)).into()),
-        }
+        let Some(session) = registry.session(&session_id) else {
+            return Err(schema::Error::resource_not_found(Some(session_id)).into());
+        };
+        session
     };
+
     session.cancel();
 
     Ok(())

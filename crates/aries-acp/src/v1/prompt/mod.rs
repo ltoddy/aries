@@ -35,14 +35,11 @@ pub async fn prompt(
 
     let session = {
         let registry = registry.lock().await;
-        match registry.session(&session_id) {
-            Some(session) => session,
-            None => {
-                return responder.respond_with_error(
-                    schema::Error::resource_not_found(Some(session_id)).into(),
-                );
-            },
-        }
+        let Some(session) = registry.session(&session_id) else {
+            return responder
+                .respond_with_error(schema::Error::resource_not_found(Some(session_id)).into());
+        };
+        session
     };
 
     let result = session.prompt(prompt, callback).await;

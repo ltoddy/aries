@@ -16,12 +16,14 @@ pub async fn set_session_title(
     info!("Received set session title request {req:?}");
 
     let session_id = req.session_id.to_string();
-    let registry = registry.lock().await;
-    let Some(session) = registry.session(&session_id) else {
-        return responder
-            .respond_with_error(schema::Error::resource_not_found(Some(session_id)).into());
+    let session = {
+        let registry = registry.lock().await;
+        let Some(session) = registry.session(&session_id) else {
+            return responder
+                .respond_with_error(schema::Error::resource_not_found(Some(session_id)).into());
+        };
+        session
     };
-    drop(registry);
 
     let _ = match session.set_session_title(&req.title).await {
         Ok(_) => cx.send_notification(SessionNotification::new(

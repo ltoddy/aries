@@ -13,12 +13,14 @@ pub async fn set_session_mode(
     registry: &SharedRegistry,
 ) -> Result<(), Error> {
     let session_id = req.session_id.to_string();
-    let registry = registry.lock().await;
-    let Some(session) = registry.session(&session_id) else {
-        return responder
-            .respond_with_error(schema::Error::resource_not_found(Some(session_id)).into());
+    let session = {
+        let registry = registry.lock().await;
+        let Some(session) = registry.session(&session_id) else {
+            return responder
+                .respond_with_error(schema::Error::resource_not_found(Some(session_id)).into());
+        };
+        session
     };
-    drop(registry);
 
     let mode = req.mode_id.to_string();
     let _ = match session.set_session_mode(&mode).await {

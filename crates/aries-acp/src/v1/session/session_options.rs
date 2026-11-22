@@ -15,7 +15,6 @@ pub async fn session_options(
     match req.session_id {
         Some(session_id) => {
             let session_id = session_id.to_string();
-
             let session = {
                 let registry = registry.lock().await;
                 let Some(session) = registry.session(&session_id) else {
