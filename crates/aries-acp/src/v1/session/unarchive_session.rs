@@ -16,12 +16,14 @@ pub async fn unarchive_session(
     info!("Received unarchive session request {req:?}");
 
     let session_id = req.session_id.to_string();
-    let registry = registry.lock().await;
-    let Some(session) = registry.session(&session_id) else {
-        return responder
-            .respond_with_error(schema::Error::resource_not_found(Some(session_id)).into());
+    let session = {
+        let registry = registry.lock().await;
+        let Some(session) = registry.session(&session_id) else {
+            return responder
+                .respond_with_error(schema::Error::resource_not_found(Some(session_id)).into());
+        };
+        session
     };
-    drop(registry);
 
     let _ = match session.unarchive_session().await {
         Ok(_) => cx.send_notification(SessionNotification::new(

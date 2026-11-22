@@ -16,13 +16,14 @@ pub async fn session_status(
     info!("Received session status request {req:?}");
 
     let session_id = req.session_id.to_string();
-
-    let registry = registry.lock().await;
-    let Some(session) = registry.session(&session_id) else {
-        return responder
-            .respond_with_error(schema::Error::resource_not_found(Some(session_id)).into());
+    let session = {
+        let registry = registry.lock().await;
+        let Some(session) = registry.session(&session_id) else {
+            return responder
+                .respond_with_error(schema::Error::resource_not_found(Some(session_id)).into());
+        };
+        session
     };
-    drop(registry);
 
     let status = match session.session_status().await {
         session::SessionStatus::Open => SessionStatus::Open,
