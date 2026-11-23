@@ -22,6 +22,12 @@ pub struct TokenUsage {
     pub total_tokens: u64,
     pub cached_input_tokens: u64,
     pub reasoning_tokens: u64,
+
+    pub input_cost: f64,
+    pub output_cost: f64,
+    pub cache_read_cost: f64,
+    pub cache_write_cost: f64,
+    pub total_cost: f64,
 }
 
 #[derive(Clone)]
@@ -34,6 +40,7 @@ impl TokenUsageRepository {
         Self { db }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn create(
         &mut self,
         cwd: impl IntoExpr<String>,
@@ -42,6 +49,11 @@ impl TokenUsageRepository {
         total_tokens: u64,
         cached_input_tokens: u64,
         reasoning_tokens: u64,
+        input_cost: f64,
+        output_cost: f64,
+        cache_read_cost: f64,
+        cache_write_cost: f64,
+        total_cost: f64,
     ) -> toasty::Result<TokenUsage> {
         TokenUsage::create()
             .cwd(cwd)
@@ -50,6 +62,11 @@ impl TokenUsageRepository {
             .total_tokens(total_tokens)
             .cached_input_tokens(cached_input_tokens)
             .reasoning_tokens(reasoning_tokens)
+            .input_cost(input_cost)
+            .output_cost(output_cost)
+            .cache_read_cost(cache_read_cost)
+            .cache_write_cost(cache_write_cost)
+            .total_cost(total_cost)
             .exec(&mut self.db)
             .await
     }
