@@ -5,122 +5,35 @@ impl GitPanel {
         &self,
         view: &Entity<SessionView>,
         window: &mut Window,
-        cx: &mut App,
-    ) -> Option<AnyElement> {
-        let conversation = self;
-        if conversation.info.is_none()
-            && conversation.read_error.is_none()
-            && conversation.watch_error.is_none()
-        {
-            return None;
-        }
-        let summary = conversation
-            .read_error
-            .as_ref()
-            .map(|error| format!("无法读取 Git：{error}"))
-            .unwrap_or_else(|| {
-                conversation.info.as_ref().map(GitInfo::summary).unwrap_or_default()
-            });
+        cx: &mut Context<SessionView>,
+    ) -> AnyElement {
         let now = cx.background_executor().now();
-        let expanded = !conversation.info_collapsed;
-        let progress = conversation.motion.panel().sample(now);
-        if conversation.motion.panel().active(now)
-            || conversation.motion.summary().active(now)
-            || conversation.motion.all_rows().iter().any(|row| {
+        if self.motion.summary().active(now)
+            || self.motion.all_rows().iter().any(|row| {
                 row.visibility().active(now) || row.status().active(now) || row.lines().active(now)
             })
         {
             window.request_animation_frame();
         }
-        let id: SharedString =
-            format!("project-git-{:?}-{}", view.entity_id(), conversation.cwd.display()).into();
-        let ball = if progress < 1. || !expanded {
-            let view = view.clone();
-            Some(
-                div()
-                    .id((ElementId::from(id.clone()), "ball"))
-                    .absolute()
-                    .top_3()
-                    .right_3()
-                    .rounded(cx.theme().radius_full())
-                    .shadow_sm()
-                    .opacity(1. - progress)
-                    .when(!expanded, |ball| ball.occlude())
-                    .child(if expanded {
-                        div()
-                            .h_8()
-                            .w_10()
-                            .rounded(cx.theme().radius_full())
-                            .bg(cx.theme().popover)
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .child(Icon::new(IconName::GitBranch).size_4())
-                            .into_any_element()
-                    } else {
-                        Button::new("expand-git-info")
-                            .ghost()
-                            .small()
-                            .h_8()
-                            .w_10()
-                            .rounded(cx.theme().radius_full())
-                            .bg(cx.theme().popover)
-                            .text_color(cx.theme().muted_foreground)
-                            .icon(IconName::GitBranch)
-                            .track_focus(&conversation.trigger_focus)
-                            .disabled(expanded)
-                            .accessibility_label("展开 Git 变更")
-                            .tooltip(format!("展开 Git 变更 · {summary}"))
-                            .on_click(move |_, window, cx| {
-                                view.update(cx, |this, cx| {
-                                    this.with_git_panel(|panel| {
-                                        panel.set_collapsed(false, window, cx)
-                                    })
-                                });
-                            })
-                            .into_any_element()
-                    })
-                    .into_any_element(),
-            )
-        } else {
-            None
-        };
-        if progress == 0. && !expanded {
-            return ball;
-        }
+        let summary = self
+            .read_error
+            .as_ref()
+            .map(|error| format!("无法读取 Git：{error}"))
+            .unwrap_or_else(|| self.info.as_ref().map(GitInfo::summary).unwrap_or_default());
+        let summary_opacity = self.motion.summary().sample(now);
         let mut panel = div()
-            .id(id)
-            .absolute()
-            .top_3()
-            .right_3()
-            .w(rems(20.))
-            .max_w(relative(0.9))
-            .p_2()
-            .rounded(cx.theme().radius_tokens().lg)
-            .bg(cx.theme().popover)
-            .text_color(cx.theme().popover_foreground)
-            .shadow_sm()
-            .opacity(progress)
-            .when(expanded, |panel| panel.occlude())
-            .mt(cx.theme().motion_tokens().distance_short * (1. - progress))
+            .id("sidebar-git-changes")
+            .size_full()
+            .min_w_0()
+            .min_h_0()
             .flex()
             .flex_col()
             .gap_2()
-            .min_w_0()
-            .aria_label("Git 变更文件")
-            .when(expanded, |panel| {
-                let view = view.clone();
-                panel.on_key_down(move |event, window, cx| {
-                    if event.keystroke.key == "escape" {
-                        view.update(cx, |this, cx| {
-                            this.with_git_panel(|panel| panel.set_collapsed(true, window, cx))
-                        });
-                        cx.stop_propagation();
-                    }
-                })
-            })
+            .px_2()
+            .py_1()
             .child(
                 div()
+                    .flex_shrink_0()
                     .flex()
                     .items_center()
                     .justify_between()
@@ -131,120 +44,91 @@ impl GitPanel {
                             .flex()
                             .items_center()
                             .gap_1()
-                            .when(expanded, |actions| {
-                                let view = view.clone();
-                                actions.child(
-                                    Button::new("refresh-git-info")
-                                        .ghost()
-                                        .small()
-                                        .icon(IconName::RefreshCw)
-                                        .loading(conversation.refreshing)
-                                        .disabled(conversation.index_busy)
-                                        .accessibility_label("刷新 Git 变更")
-                                        .tooltip("刷新 Git 变更")
-                                        .on_click(move |_, _, cx| {
-                                            view.update(cx, |this, cx| {
-                                                this.with_git_panel(|panel| panel.watch_info(cx));
-                                            });
-                                        }),
-                                )
-                            })
-                            .when(expanded, |actions| {
-                                let view = view.clone();
-                                actions.child(
-                                    Button::new("recover-git-discard")
-                                        .ghost()
-                                        .small()
-                                        .icon(IconName::Undo)
-                                        .disabled(conversation.index_busy)
-                                        .accessibility_label("恢复丢弃的变更")
-                                        .tooltip("恢复丢弃的变更…")
-                                        .on_click(move |_, window, cx| {
-                                            view.update(cx, |this, cx| {
-                                                this.with_git_panel(|panel| {
-                                                    panel.open_discard_backups(window, cx)
-                                                });
-                                            });
-                                        }),
-                                )
-                            })
-                            .child(if !expanded {
-                                div()
-                                    .size_6()
-                                    .flex()
-                                    .items_center()
-                                    .justify_center()
-                                    .child(Icon::new(IconName::ChevronUp).size_4())
-                                    .into_any_element()
-                            } else {
-                                let view = view.clone();
-                                let label = "缩小为悬浮球";
-                                Button::new("toggle-git-info")
-                                    .track_focus(&conversation.panel_focus)
-                                    .disabled(!expanded)
+                            .child(
+                                Button::new("refresh-git-info")
                                     .ghost()
                                     .small()
-                                    .icon(IconName::ChevronUp)
-                                    .accessibility_label(label)
-                                    .tooltip(label)
-                                    .on_click(move |_, window, cx| {
-                                        view.update(cx, |this, cx| {
-                                            this.with_git_panel(|panel| {
-                                                panel.set_collapsed(true, window, cx)
-                                            })
+                                    .icon(IconName::RefreshCw)
+                                    .loading(self.refreshing)
+                                    .disabled(self.index_busy)
+                                    .accessibility_label("刷新 Git 变更")
+                                    .tooltip("刷新 Git 变更")
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.with_git_panel(|panel| panel.watch_info(cx));
+                                    })),
+                            )
+                            .child(
+                                Button::new("recover-git-discard")
+                                    .ghost()
+                                    .small()
+                                    .icon(IconName::Undo)
+                                    .disabled(self.index_busy)
+                                    .accessibility_label("恢复丢弃的变更")
+                                    .tooltip("恢复丢弃的变更…")
+                                    .on_click(cx.listener(|this, _, window, cx| {
+                                        this.with_git_panel(|panel| {
+                                            panel.open_discard_backups(window, cx)
                                         });
-                                    })
-                                    .into_any_element()
-                            }),
+                                    })),
+                            ),
                     ),
+            )
+            .child(
+                div()
+                    .flex_shrink_0()
+                    .relative()
+                    .text_xs()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(div().whitespace_normal().opacity(summary_opacity).child(summary))
+                    .when_some(self.motion.previous_summary(), |summary, previous| {
+                        summary.child(
+                            div()
+                                .absolute()
+                                .top_0()
+                                .left_0()
+                                .w_full()
+                                .whitespace_normal()
+                                .opacity(1. - summary_opacity)
+                                .child(previous),
+                        )
+                    }),
             );
-        let summary_opacity = conversation.motion.summary().sample(now);
-        panel = panel.child(
-            div()
-                .relative()
-                .text_xs()
-                .text_color(cx.theme().muted_foreground)
-                .child(div().whitespace_normal().opacity(summary_opacity).child(summary))
-                .when_some(conversation.motion.previous_summary(), |summary, previous| {
-                    summary.child(
-                        div()
-                            .absolute()
-                            .top_0()
-                            .left_0()
-                            .w_full()
-                            .whitespace_normal()
-                            .opacity(1. - summary_opacity)
-                            .child(previous),
-                    )
-                }),
-        );
-        if let Some(error) = &conversation.watch_error {
+        if let Some(error) = &self.watch_error {
             panel = panel.child(
                 div()
+                    .flex_shrink_0()
                     .text_xs()
                     .text_color(cx.theme().warning)
                     .whitespace_normal()
                     .child(format!("自动刷新不可用：{error}。请手动刷新重试。")),
             );
         }
-        if !conversation.motion.all_rows().is_empty() {
-            panel = panel
+        if self.info.is_none() && self.read_error.is_none() {
+            return panel
                 .child(
-                    GitChangeList::new(self, view, ChangeGroup::Staged, window.rem_size() * 2.)
-                        .render(cx),
+                    div()
+                        .text_xs()
+                        .text_color(cx.theme().muted_foreground)
+                        .whitespace_normal()
+                        .child("当前目录不在 Git 仓库中"),
                 )
-                .child(
-                    GitChangeList::new(self, view, ChangeGroup::Unstaged, window.rem_size() * 2.)
-                        .render(cx),
-                );
+                .into_any_element();
         }
-        Some(
-            div()
-                .absolute()
-                .inset_0()
-                .children([Some(panel.into_any_element()), ball].into_iter().flatten())
-                .into_any_element(),
-        )
+        if self.motion.all_rows().is_empty() {
+            return panel
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(cx.theme().muted_foreground)
+                        .whitespace_normal()
+                        .child("没有未提交的变更"),
+                )
+                .into_any_element();
+        }
+        panel
+            .child(GitChangeList::new(self, view, ChangeGroup::Staged).render(cx))
+            .child(GitChangeList::new(self, view, ChangeGroup::Unstaged).render(cx))
+            .into_any_element()
     }
 
     pub fn open_discard_backups(&self, window: &mut Window, cx: &mut Context<SessionView>) {

@@ -71,6 +71,7 @@ impl WorkspaceView {
             match &tab.kind {
                 WorkspaceTabKind::Session(tab) => tab.view.update(cx, |_, cx| cx.notify()),
                 WorkspaceTabKind::File(tab) => tab.view.update(cx, |_, cx| cx.notify()),
+                WorkspaceTabKind::Diff(tab) => tab.view.update(cx, |_, cx| cx.notify()),
             }
         }
     }

@@ -2,11 +2,20 @@ use crate::workspace::workspace_view::*;
 
 impl WorkspaceView {
     pub fn selected_session_view(&self) -> Option<&Entity<SessionView>> {
-        self.tabs.get(self.active).and_then(WorkspaceTab::session)
+        let tab = self.tabs.get(self.active)?;
+        tab.session().or_else(|| tab.diff_session())
     }
 
     pub fn selected_file_view(&self) -> Option<&Entity<FileView>> {
         self.tabs.get(self.active).and_then(WorkspaceTab::file)
+    }
+
+    pub fn selected_diff_view(&self) -> Option<&Entity<GitDiffView>> {
+        self.tabs.get(self.active).and_then(WorkspaceTab::diff)
+    }
+
+    pub fn active_diff_view(&self) -> Option<&Entity<GitDiffView>> {
+        self.is_sessions_visible().then(|| self.selected_diff_view()).flatten()
     }
 
     pub fn active_view(&self) -> Option<&Entity<SessionView>> {
@@ -228,6 +237,8 @@ impl WorkspaceView {
                 index += 1;
             }
         }
+        self.tabs
+            .retain(|tab| tab.diff_session().is_none_or(|view| !view.read(cx).matches_session(id)));
         self.active = active_id
             .and_then(|id| self.tabs.iter().position(|tab| tab.id == id))
             .unwrap_or_else(|| self.active.min(self.tabs.len().saturating_sub(1)));

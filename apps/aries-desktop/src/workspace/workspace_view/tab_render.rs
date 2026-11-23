@@ -406,6 +406,29 @@ impl WorkspaceView {
                 };
                 (title, tooltip, status, indicator)
             },
+            WorkspaceTabKind::Diff(tab) => {
+                let view = tab.view.read(cx);
+                let target = view.target();
+                let title = target
+                    .and_then(|target| target.path().file_name())
+                    .map(|name| name.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| "变更".into());
+                let tooltip = target
+                    .map(|target| {
+                        format!("{} · {}", target.group().title(), target.path().display())
+                    })
+                    .unwrap_or_else(|| title.clone());
+                let indicator = div()
+                    .size_4()
+                    .flex_shrink_0()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(Icon::new(IconName::FileDiff).size_3().text_color(p.muted()))
+                    .into_any_element();
+                let status = target.map(|target| target.group().title()).unwrap_or("变更");
+                (title, tooltip, status, indicator)
+            },
         };
         let tab_label = format!("切换到标签 {title} · {status}");
         let drag_title = title.clone().into();

@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use gpui_kit::assets::IconName;
-use gpui_kit::component::button::{Button, ButtonGroup, ButtonVariants};
+use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::clipboard::Clipboard;
 use gpui_kit::component::diff::{
     Diff, DiffDecoration, DiffFile, DiffFileStatus, DiffLinePosition, DiffLineRange, DiffMode,
@@ -35,6 +35,14 @@ pub struct DiffTarget {
 impl DiffTarget {
     fn new(path: PathBuf, group: ChangeGroup) -> Self {
         Self { path, group }
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn group(&self) -> ChangeGroup {
+        self.group
     }
 }
 
@@ -142,6 +150,19 @@ impl GitDiffView {
 
     pub fn is_open(&self) -> bool {
         self.target.is_some()
+    }
+
+    pub fn target(&self) -> Option<&DiffTarget> {
+        self.target.as_ref()
+    }
+
+    pub fn focus(&self, window: &mut Window, cx: &mut App) {
+        let handle = self.state.read(cx).focus_handle(cx);
+        handle.focus(window, cx);
+    }
+
+    pub fn is_focused(&self, window: &Window, cx: &App) -> bool {
+        self.state.read(cx).focus_handle(cx).is_focused(window)
     }
 
     pub fn is_selected(&self, path: &Path, group: ChangeGroup) -> bool {
@@ -353,23 +374,6 @@ impl GitDiffView {
             None => return None,
         };
         self.group_targets(target.group).nth(ix)
-    }
-
-    pub fn set_group(&mut self, group: ChangeGroup, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(current) = self.target.as_ref() else {
-            return;
-        };
-        if current.group == group {
-            return;
-        }
-        let target = self
-            .group_targets(group)
-            .find(|target| target.path == current.path)
-            .or_else(|| self.group_targets(group).next())
-            .cloned();
-        if let Some(target) = target {
-            self.switch_file(target, window, cx);
-        }
     }
 
     pub fn switch_file(&mut self, target: DiffTarget, window: &mut Window, cx: &mut Context<Self>) {

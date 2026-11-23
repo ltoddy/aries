@@ -89,7 +89,6 @@ pub struct GitMotion {
     summary: Fade,
     previous_summary: Option<GitSummary>,
     scroll: [UniformListScrollHandle; 2],
-    panel: Fade,
     cwd: Option<PathBuf>,
     snapshot: Option<GitInfo>,
     initialized: bool,
@@ -102,7 +101,6 @@ impl Default for GitMotion {
             summary: Fade::default(),
             previous_summary: None,
             scroll: std::array::from_fn(|_| UniformListScrollHandle::new()),
-            panel: Fade::settled(0.0),
             cwd: None,
             snapshot: None,
             initialized: false,
@@ -126,13 +124,6 @@ impl GitMotion {
             ChangeGroup::Unstaged => 1,
         }]
     }
-    pub fn panel(&self) -> &Fade {
-        &self.panel
-    }
-    pub fn panel_mut(&mut self) -> &mut Fade {
-        &mut self.panel
-    }
-
     pub fn reset(&mut self, cwd: impl AsRef<Path>) -> bool {
         let cwd = cwd.as_ref();
         if self.cwd.as_deref() == Some(cwd) {
@@ -281,13 +272,11 @@ impl GitMotion {
         let before = self.rows.len();
         self.rows.retain(|row| !row.exiting || (!reduced && row.visibility.active(now)));
         let mut changed = before != self.rows.len();
-        for fade in
-            std::iter::once(&mut self.summary).chain(std::iter::once(&mut self.panel)).chain(
-                self.rows
-                    .iter_mut()
-                    .flat_map(|row| [&mut row.visibility, &mut row.status, &mut row.lines]),
-            )
-        {
+        for fade in std::iter::once(&mut self.summary).chain(
+            self.rows
+                .iter_mut()
+                .flat_map(|row| [&mut row.visibility, &mut row.status, &mut row.lines]),
+        ) {
             if reduced || !fade.active(now) {
                 changed |= !fade.duration.is_zero();
                 fade.settle();

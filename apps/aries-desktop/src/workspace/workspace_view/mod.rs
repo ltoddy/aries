@@ -23,6 +23,7 @@ use crate::acp::Event;
 use crate::terminal::TerminalView;
 use crate::workspace::extensions::ExtensionsView;
 use crate::workspace::files::{CloseFile, FileActionEvent, FileTree, FileView, OpenFile, SaveFile};
+use crate::workspace::git::diff_view::{DiffTargetChanged, GitDiffView};
 use crate::workspace::settings::palette::Palette;
 use crate::workspace::settings::{Preferences, SettingsState};
 use crate::workspace::sidebar::Sidebar;
@@ -31,7 +32,7 @@ use crate::workspace::workspace_view::fps_counter::FpsCounter;
 use crate::workspace::{SessionRenderMode, SessionView};
 use crate::{
     CloseTab, NewSession, NextTab, NextUserMessage, OpenSettings, PreviousTab, PreviousUserMessage,
-    ShowFilesSidebar, ShowSessionsSidebar, ToggleSidebar, ToggleTerminal,
+    ShowFilesSidebar, ShowGitSidebar, ShowSessionsSidebar, ToggleSidebar, ToggleTerminal,
 };
 
 mod file_operations;
@@ -82,9 +83,26 @@ impl FileTab {
     }
 }
 
+pub struct DiffTab {
+    view: Entity<GitDiffView>,
+    session: Entity<SessionView>,
+    _subscription: Subscription,
+}
+
+impl DiffTab {
+    fn new(
+        view: Entity<GitDiffView>,
+        session: Entity<SessionView>,
+        subscription: Subscription,
+    ) -> Self {
+        Self { view, session, _subscription: subscription }
+    }
+}
+
 pub enum WorkspaceTabKind {
     Session(SessionTab),
     File(FileTab),
+    Diff(DiffTab),
 }
 
 impl WorkspaceTabKind {
@@ -94,6 +112,10 @@ impl WorkspaceTabKind {
 
     fn file(tab: FileTab) -> Self {
         Self::File(tab)
+    }
+
+    fn diff(tab: DiffTab) -> Self {
+        Self::Diff(tab)
     }
 }
 
@@ -111,6 +133,7 @@ impl WorkspaceTab {
         match &self.kind {
             WorkspaceTabKind::Session(tab) => Some(&tab.view),
             WorkspaceTabKind::File(_) => None,
+            WorkspaceTabKind::Diff(_) => None,
         }
     }
 
@@ -118,6 +141,23 @@ impl WorkspaceTab {
         match &self.kind {
             WorkspaceTabKind::Session(_) => None,
             WorkspaceTabKind::File(tab) => Some(&tab.view),
+            WorkspaceTabKind::Diff(_) => None,
+        }
+    }
+
+    fn diff(&self) -> Option<&Entity<GitDiffView>> {
+        match &self.kind {
+            WorkspaceTabKind::Session(_) => None,
+            WorkspaceTabKind::File(_) => None,
+            WorkspaceTabKind::Diff(tab) => Some(&tab.view),
+        }
+    }
+
+    fn diff_session(&self) -> Option<&Entity<SessionView>> {
+        match &self.kind {
+            WorkspaceTabKind::Session(_) => None,
+            WorkspaceTabKind::File(_) => None,
+            WorkspaceTabKind::Diff(tab) => Some(&tab.session),
         }
     }
 
@@ -260,6 +300,7 @@ impl WorkspacePage {
 pub enum SidebarPage {
     Sessions,
     Files,
+    Git,
 }
 
 impl SidebarPage {
@@ -269,6 +310,10 @@ impl SidebarPage {
 
     fn files() -> Self {
         Self::Files
+    }
+
+    fn git() -> Self {
+        Self::Git
     }
 }
 
@@ -333,7 +378,6 @@ pub struct WorkspaceView {
     sidebar_toggle_focus_handle: FocusHandle,
     sidebar_sessions_focus_handle: FocusHandle,
     layout: Entity<ResizableState>,
-    diff_layout: Entity<ResizableState>,
     _sidebar_subscription: Subscription,
     tabs: Vec<WorkspaceTab>,
     pending_file_operations: VecDeque<PendingFileOperation>,
@@ -422,7 +466,6 @@ impl WorkspaceView {
             sidebar_toggle_focus_handle: cx.focus_handle().tab_stop(true),
             sidebar_sessions_focus_handle: cx.focus_handle().tab_stop(true),
             layout: cx.new(|_| ResizableState::default()),
-            diff_layout: cx.new(|_| ResizableState::default()),
             _sidebar_subscription: sidebar_subscription,
             tabs: Vec::new(),
             pending_file_operations: VecDeque::new(),

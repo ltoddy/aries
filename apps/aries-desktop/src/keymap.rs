@@ -11,7 +11,7 @@ use crate::workspace::settings::SendKey;
 use crate::workspace::skill_editor::SaveSkill;
 use crate::{
     CloseTab, NextTab, NextUserMessage, PreviousTab, PreviousUserMessage, Quit, ShowFilesSidebar,
-    ShowSessionsSidebar, ToggleSidebar,
+    ShowGitSidebar, ShowSessionsSidebar, ToggleSidebar,
 };
 #[cfg(target_os = "macos")]
 use crate::{Hide, NewSession, OpenSettings, ToggleTerminal};
@@ -36,6 +36,7 @@ const TOGGLE_TERMINAL: &str = "cmd-j";
 const TOGGLE_SIDEBAR: &str = if MACOS { "cmd-b" } else { "ctrl-b" };
 const SHOW_SESSIONS_SIDEBAR: &str = if MACOS { "cmd-1" } else { "ctrl-1" };
 const SHOW_FILES_SIDEBAR: &str = if MACOS { "cmd-2" } else { "ctrl-2" };
+const SHOW_GIT_SIDEBAR: &str = if MACOS { "cmd-3" } else { "ctrl-3" };
 const CLOSE_TAB: &str = if MACOS { "cmd-w" } else { "ctrl-w" };
 const PREVIOUS_TAB: &str = if MACOS { "cmd-shift-[" } else { "ctrl-shift-[" };
 const NEXT_TAB: &str = if MACOS { "cmd-shift-]" } else { "ctrl-shift-]" };
@@ -67,6 +68,7 @@ pub fn init(cx: &mut App) {
         KeyBinding::new(TOGGLE_SIDEBAR, ToggleSidebar, None),
         KeyBinding::new(SHOW_SESSIONS_SIDEBAR, ShowSessionsSidebar::new(), None),
         KeyBinding::new(SHOW_FILES_SIDEBAR, ShowFilesSidebar::new(), None),
+        KeyBinding::new(SHOW_GIT_SIDEBAR, ShowGitSidebar::new(), None),
         KeyBinding::new(CLOSE_TAB, CloseTab, None),
         KeyBinding::new(PREVIOUS_TAB, PreviousTab, None),
         KeyBinding::new(NEXT_TAB, NextTab, None),
@@ -122,6 +124,7 @@ pub fn groups(send_key: SendKey) -> Vec<(&'static str, Vec<(&'static str, String
         shortcut("显示 / 隐藏侧栏", &[TOGGLE_SIDEBAR]),
         shortcut("显示会话列表", &[SHOW_SESSIONS_SIDEBAR]),
         shortcut("显示文件树", &[SHOW_FILES_SIDEBAR]),
+        shortcut("显示 Git 变更", &[SHOW_GIT_SIDEBAR]),
     ];
     if MACOS {
         panels.insert(0, shortcut("显示 / 隐藏终端", &[TOGGLE_TERMINAL]));

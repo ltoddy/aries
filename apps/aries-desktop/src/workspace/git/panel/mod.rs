@@ -4,7 +4,7 @@ use std::time::Duration;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::notification::Notification;
-use gpui_kit::component::{ActiveTheme, Disableable, Icon, Sizable, WindowExt};
+use gpui_kit::component::{ActiveTheme, Disableable, Sizable, WindowExt};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -35,12 +35,9 @@ pub struct GitPanel {
     watch_error: Option<String>,
     index_busy: bool,
     revision: u64,
-    info_collapsed: bool,
     motion: GitMotion,
     pending_index: Option<(PathBuf, IndexAction)>,
     read_error: Option<String>,
-    trigger_focus: FocusHandle,
-    panel_focus: FocusHandle,
     diff: Entity<GitDiffView>,
     _diff_subscription: Subscription,
 }
@@ -61,12 +58,9 @@ impl GitPanel {
             watch_error: None,
             index_busy: false,
             revision: 0,
-            info_collapsed: true,
             motion: GitMotion::default(),
             pending_index: None,
             read_error: None,
-            trigger_focus: cx.focus_handle().tab_stop(true),
-            panel_focus: cx.focus_handle().tab_stop(true),
             diff,
             _diff_subscription: diff_subscription,
         }
@@ -84,7 +78,6 @@ impl GitPanel {
         window: &mut Window,
         cx: &mut Context<SessionView>,
     ) {
-        self.set_collapsed(true, window, cx);
         self.diff.update(cx, |diff, cx| {
             diff.set_targets(self.info.as_ref(), cx);
             diff.open(path, group, window, cx);
@@ -92,11 +85,7 @@ impl GitPanel {
         let owner = cx.weak_entity();
         window.defer(cx, move |window, cx| {
             if let Some(host) = owner.upgrade().and_then(|owner| owner.read(cx).tab_host()) {
-                let _ = host.update(cx, |host, cx| {
-                    if host.is_active_session(&owner) {
-                        host.show_diff(window, cx);
-                    }
-                });
+                let _ = host.update(cx, |host, cx| host.show_diff(&owner, window, cx));
             }
         });
     }
@@ -105,9 +94,6 @@ impl GitPanel {
     }
     pub fn motion(&self) -> &GitMotion {
         &self.motion
-    }
-    pub fn is_collapsed(&self) -> bool {
-        self.info_collapsed
     }
     pub fn is_index_busy(&self) -> bool {
         self.index_busy
@@ -127,7 +113,6 @@ impl GitPanel {
         if self.motion.reset(&self.cwd) {
             self.info = None;
             self.read_error = None;
-            self.info_collapsed = true;
         }
         self.revision += 1;
         self.refresh_task = None;

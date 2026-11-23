@@ -1,35 +1,6 @@
 use crate::workspace::git::diff_view::*;
 
 impl GitDiffView {
-    pub fn render_groups(&self, cx: &mut Context<Self>) -> AnyElement {
-        let busy = self.controls_busy(cx);
-        div()
-            .flex()
-            .items_center()
-            .flex_shrink_0()
-            .px_3()
-            .py_1()
-            .border_b_1()
-            .border_color(cx.theme().border.opacity(0.5))
-            .child(ButtonGroup::new("diff-groups").small().outline().children(
-                [ChangeGroup::Unstaged, ChangeGroup::Staged].map(|group| {
-                    let count = self.group_targets(group).count();
-                    let id = match group {
-                        ChangeGroup::Unstaged => "unstaged-diff",
-                        ChangeGroup::Staged => "staged-diff",
-                    };
-                    Button::new(id)
-                        .label(format!("{} {count}", group.title()))
-                        .selected(self.target.as_ref().is_some_and(|target| target.group == group))
-                        .disabled(busy || count == 0)
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            this.set_group(group, window, cx);
-                        }))
-                }),
-            ))
-            .into_any_element()
-    }
-
     pub fn render_file_selector(&self, path: &str, cx: &mut Context<Self>) -> AnyElement {
         let view = cx.weak_entity();
         let directory = self.directory.clone();
@@ -303,7 +274,6 @@ impl Render for GitDiffView {
                     cx.stop_propagation();
                 },
             ))
-            .child(self.render_groups(cx))
             .child(
                 div()
                     .flex()
