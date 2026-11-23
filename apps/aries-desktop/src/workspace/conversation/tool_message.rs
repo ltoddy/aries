@@ -1,13 +1,13 @@
-use agent_client_protocol::v1::schema::{SessionId, ToolCallStatus, ToolKind};
+use agent_client_protocol::v1::schema::{SessionId, ToolCallId, ToolCallStatus, ToolKind};
 use gpui_kit::assets::IconName;
-use gpui_kit::base::SelectableText;
 use gpui_kit::base::motion::{self, Transition};
+use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::spinner::Spinner;
-use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme, Icon, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
+use crate::workspace::conversation::ClickHandler;
 use crate::workspace::conversation::model::tool_call::ToolCallState;
 use crate::workspace::settings::palette::Palette;
 
@@ -26,11 +26,31 @@ fn tool_icon(kind: ToolKind) -> IconName {
     }
 }
 
+fn motion_id(
+    prefix: &'static str,
+    entity_id: EntityId,
+    session_id: Option<&SessionId>,
+    tool_call_id: &ToolCallId,
+) -> ElementId {
+    ElementId::NamedChild(
+        ElementId::NamedChild(
+            ElementId::from((prefix, entity_id)).into(),
+            match session_id {
+                Some(id) => format!("session:{id}").into(),
+                None => "no-session".into(),
+            },
+        )
+        .into(),
+        tool_call_id.to_string().into(),
+    )
+}
+
 #[derive(IntoElement)]
 pub struct ToolMessage {
     index: usize,
     header: ToolHeader,
     content: AnyElement,
+    on_toggle: ClickHandler,
     palette: Palette,
 }
 
@@ -42,6 +62,7 @@ impl ToolMessage {
         entity_id: EntityId,
         session_id: Option<&SessionId>,
         content: AnyElement,
+        on_toggle: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
     ) -> Self {
         let failed = tool.call().status == ToolCallStatus::Failed;
         let (status, status_icon) = if tool.is_interrupted() {
@@ -57,19 +78,9 @@ impl ToolMessage {
         };
         let color = if failed { p.danger() } else { p.muted() };
         let title = crate::workspace::conversation::single_line(tool.title());
-        let details = SharedString::from(format!("{} · {status}", tool.title()));
+        let tool_call_id = &tool.call().tool_call_id;
         let status_icon = MessageStatusIcon {
-            id: ElementId::NamedChild(
-                ElementId::NamedChild(
-                    ElementId::from(("tool-status-motion", entity_id)).into(),
-                    match session_id {
-                        Some(id) => format!("session:{id}").into(),
-                        None => "no-session".into(),
-                    },
-                )
-                .into(),
-                tool.call().tool_call_id.to_string().into(),
-            ),
+            id: motion_id("tool-status-motion", entity_id, session_id, tool_call_id),
             running: tool.call().status == ToolCallStatus::InProgress && !tool.is_interrupted(),
             completed: tool.call().status == ToolCallStatus::Completed && !tool.is_interrupted(),
             icon: status_icon,
@@ -80,37 +91,36 @@ impl ToolMessage {
             ToolHeader::new(
                 format!("工具调用：{} · {status}", tool.title()),
                 title,
-                details,
                 tool_icon(tool.call().kind),
                 ToolStatus::new(status, failed || tool.is_interrupted(), status_icon),
             ),
             content,
+            on_toggle,
             p,
         )
     }
 
-    fn new(index: usize, header: ToolHeader, content: AnyElement, palette: Palette) -> Self {
-        Self { index, header, content, palette }
+    fn new(
+        index: usize,
+        header: ToolHeader,
+        content: AnyElement,
+        on_toggle: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+        palette: Palette,
+    ) -> Self {
+        Self { index, header, content, on_toggle: Box::new(on_toggle), palette }
     }
 }
 
 struct ToolHeader {
     label: String,
     title: String,
-    details: SharedString,
     icon: IconName,
     status: ToolStatus,
 }
 
 impl ToolHeader {
-    fn new(
-        label: String,
-        title: String,
-        details: SharedString,
-        icon: IconName,
-        status: ToolStatus,
-    ) -> Self {
-        Self { label, title, details, icon, status }
+    fn new(label: String, title: String, icon: IconName, status: ToolStatus) -> Self {
+        Self { label, title, icon, status }
     }
 }
 
@@ -128,8 +138,8 @@ impl ToolStatus {
 
 impl RenderOnce for ToolMessage {
     fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
-        let Self { index, header, content, palette: p } = self;
-        let ToolHeader { label, title, details, icon, status } = header;
+        let Self { index, header, content, on_toggle, palette: p } = self;
+        let ToolHeader { label, title, icon, status } = header;
         let ToolStatus { label: status, visible: show_status, icon: status_icon } = status;
         let color = status_icon.color;
         div()
@@ -141,28 +151,24 @@ impl RenderOnce for ToolMessage {
             .flex_col()
             .gap_1()
             .child(
-                div()
-                    .id(("tool-header", index))
+                Button::new(("tool-details", index))
+                    .ghost()
+                    .xsmall()
                     .w_full()
-                    .min_w_0()
-                    .tooltip(move |window, cx| {
-                        let details = details.clone();
-                        Tooltip::element(move |_, _| {
-                            div().max_w(rems(30.)).whitespace_normal().child(details.clone())
-                        })
-                        .build(window, cx)
-                    })
+                    .h_6()
+                    .px_0()
+                    .text_color(p.muted())
+                    .accessibility_label("查看原始输入与输出")
+                    .on_click(on_toggle)
                     .child(
                         div()
                             .w_full()
                             .min_w_0()
-                            .h_6()
                             .flex()
                             .items_center()
-                            .justify_start()
                             .gap_2()
                             .text_xs()
-                            .text_color(p.muted())
+                            .text_left()
                             .child(
                                 div()
                                     .flex_shrink_0()
@@ -174,15 +180,11 @@ impl RenderOnce for ToolMessage {
                                     .when(show_status, |status_row| status_row.child(status)),
                             )
                             .child(Icon::new(icon).size(rems(0.875)).flex_shrink_0())
+                            .child(div().flex_1().min_w_0().truncate().child(title))
                             .child(
-                                div().flex_1().min_w_0().child(
-                                    div()
-                                        .w_full()
-                                        .min_w_0()
-                                        .text_left()
-                                        .truncate()
-                                        .child(SelectableText::new(("tool-title", index), title)),
-                                ),
+                                div()
+                                    .flex_shrink_0()
+                                    .child(Icon::new(IconName::Braces).size(rems(0.875))),
                             ),
                     ),
             )

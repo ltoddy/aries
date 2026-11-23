@@ -10,6 +10,7 @@ mod text;
 mod thought_message;
 pub mod timeline;
 mod tool_content;
+mod tool_details;
 pub mod tool_message;
 mod user_message;
 use gpui_kit::{App, ClickEvent, Window};
