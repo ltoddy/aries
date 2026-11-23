@@ -22,9 +22,13 @@ use crate::workspace::files::OpenFile;
 use crate::workspace::git::diff_operations::DiscardBackupEntry;
 use crate::workspace::git::diff_patch::{DiffPatch, PatchScope};
 use crate::workspace::git::error::DiffLoadError;
-use crate::workspace::git::repository::{ChangeGroup, GitInfo, read_file_diff};
+use crate::workspace::git::repository::{
+    ChangeGroup, GitInfo, PATCH_CONTEXT_LINES, read_file_diff,
+};
 
 mod tools;
+
+const DISPLAY_CONTEXT_LINES: u32 = 1_000_000;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DiffTarget {
@@ -74,6 +78,7 @@ pub struct GitDiffView {
     state: Entity<DiffState>,
     preferred_mode: DiffMode,
     patch: Arc<String>,
+    display_patch: Arc<String>,
     error: Option<String>,
     model: Option<Arc<DiffPatch>>,
     tool_error: Option<String>,
@@ -118,8 +123,9 @@ impl GitDiffView {
             target: None,
             targets: Vec::new(),
             state,
-            preferred_mode: DiffMode::default(),
+            preferred_mode: DiffMode::Split,
             patch: Arc::new(String::new()),
+            display_patch: Arc::new(String::new()),
             error: None,
             model: None,
             tool_error: None,
@@ -211,6 +217,7 @@ impl GitDiffView {
         self.loading = false;
         self.pending = false;
         self.patch = Arc::new(String::new());
+        self.display_patch = Arc::new(String::new());
         self.error = None;
         self.reset_tools();
         self.state.update(cx, |state, cx| state.set_files(Vec::new(), cx));
@@ -238,22 +245,34 @@ impl GitDiffView {
         self.pending = false;
         let directory = self.directory.clone();
         let previous_patch = self.patch.clone();
+        let previous_display_patch = self.display_patch.clone();
         let revision = self.revision;
         self.task = Some(cx.spawn(async move |view, cx| {
             let result = cx
                 .background_spawn(async move {
-                    let patch = read_file_diff(&directory, &target.path, target.group)?;
-                    if patch == *previous_patch {
+                    let patch = read_file_diff(
+                        &directory,
+                        &target.path,
+                        target.group,
+                        PATCH_CONTEXT_LINES,
+                    )?;
+                    let display_patch = read_file_diff(
+                        &directory,
+                        &target.path,
+                        target.group,
+                        DISPLAY_CONTEXT_LINES,
+                    )?;
+                    if patch == *previous_patch && display_patch == *previous_display_patch {
                         return Ok::<_, DiffLoadError>(None);
                     }
-                    let files = DiffFile::parse(&patch)
+                    let files = DiffFile::parse(&display_patch)
                         .map_err(|error| DiffLoadError::display_patch(&target.path, error))?;
                     let model = if patch.is_empty() {
                         Ok(None)
                     } else {
                         DiffPatch::parse(&patch).map(|model| Some(Arc::new(model)))
                     };
-                    Ok(Some((Arc::new(patch), files, model)))
+                    Ok(Some((Arc::new(patch), Arc::new(display_patch), files, model)))
                 })
                 .await;
             let _ = view.update(cx, |this, cx| {
@@ -263,7 +282,7 @@ impl GitDiffView {
                 this.loading = false;
                 match result {
                     Ok(result) => {
-                        if let Some((patch, files, model)) = result {
+                        if let Some((patch, display_patch, files, model)) = result {
                             let mode = if files
                                 .first()
                                 .is_some_and(|file| file.status() == DiffFileStatus::Added)
@@ -277,6 +296,7 @@ impl GitDiffView {
                                 state.set_mode(mode, cx);
                             });
                             this.patch = patch;
+                            this.display_patch = display_patch;
                             match model {
                                 Ok(model) => {
                                     this.current_hunk = model

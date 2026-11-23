@@ -19,7 +19,9 @@ use gpui_kit::prelude::*;
 use gpui_kit::*;
 
 use crate::workspace::git::diff_operations::{DiffAction, DiffRequest, DiscardBackup};
-use crate::workspace::git::diff_patch::{LineEndpoint, LineSelection, PatchScope, SourceSide};
+use crate::workspace::git::diff_patch::{
+    DiffPatch, LineEndpoint, LineSelection, PatchScope, SourceSide,
+};
 use crate::workspace::git::diff_view::GitDiffView;
 use crate::workspace::git::repository::ChangeGroup;
 
@@ -212,6 +214,84 @@ fn endpoint(side: DiffSide, line: usize) -> Result<LineEndpoint> {
         },
         u32::try_from(line).map_err(|source| ToolError::line_number(line, source))?,
     )?)
+}
+
+#[derive(Clone, Copy)]
+pub struct ChangeBlock {
+    index: usize,
+    original: Option<u32>,
+    modified: Option<u32>,
+}
+
+impl ChangeBlock {
+    pub fn new(index: usize, original: Option<u32>, modified: Option<u32>) -> Self {
+        Self { index, original, modified }
+    }
+
+    pub fn index(&self) -> usize {
+        self.index
+    }
+
+    pub fn modified(&self) -> Option<u32> {
+        self.modified
+    }
+
+    pub fn apply(&self) -> Option<(DiffSide, u32)> {
+        match (self.modified, self.original) {
+            (Some(line), _) => Some((DiffSide::Modified, line)),
+            (None, Some(line)) => Some((DiffSide::Original, line)),
+            (None, None) => None,
+        }
+    }
+
+    pub fn discard(&self) -> Option<(DiffSide, u32)> {
+        self.modified?;
+        self.original.map(|line| (DiffSide::Original, line))
+    }
+}
+
+pub fn change_blocks(model: &DiffPatch) -> Vec<ChangeBlock> {
+    let mut blocks: Vec<ChangeBlock> = Vec::new();
+    for line in model.source_lines().iter().filter(|line| line.is_changed()) {
+        let index = line.hunk_index();
+        if blocks.last().is_none_or(|block| block.index() != index) {
+            blocks.push(ChangeBlock::new(index, None, None));
+        }
+        if let Some(block) = blocks.last_mut() {
+            block.original = block.original.or(line.original_line());
+            block.modified = block.modified.or(line.modified_line());
+        }
+    }
+    blocks
+}
+
+pub fn change_action(
+    model: &DiffPatch,
+    group: ChangeGroup,
+    position: &DiffLinePosition,
+) -> Option<(usize, DiffAction)> {
+    change_blocks(model)
+        .into_iter()
+        .find_map(|block| Some((block.index(), block_action(&block, group, position)?)))
+}
+
+fn block_action(
+    block: &ChangeBlock,
+    group: ChangeGroup,
+    position: &DiffLinePosition,
+) -> Option<DiffAction> {
+    let line = u32::try_from(position.line()).ok()?;
+    let apply = match group {
+        ChangeGroup::Staged => DiffAction::unstage(),
+        ChangeGroup::Unstaged => DiffAction::stage(),
+    };
+    match position.side() {
+        DiffSide::Modified => (block.apply() == Some((DiffSide::Modified, line))).then_some(apply),
+        DiffSide::Original if group == ChangeGroup::Unstaged && block.modified().is_some() => {
+            (block.discard() == Some((DiffSide::Original, line))).then_some(DiffAction::discard())
+        },
+        DiffSide::Original => (block.apply() == Some((DiffSide::Original, line))).then_some(apply),
+    }
 }
 
 fn dispatch_change(

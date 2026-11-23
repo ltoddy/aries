@@ -44,9 +44,16 @@ pub enum LineChanges {
     Unavailable,
 }
 
-fn read_diff(repository: &Repository, group: ChangeGroup) -> Result<Diff<'_>, git2::Error> {
+pub const PATCH_CONTEXT_LINES: u32 = 3;
+
+fn read_diff(
+    repository: &Repository,
+    group: ChangeGroup,
+    context_lines: u32,
+) -> Result<Diff<'_>, git2::Error> {
     let mut options = DiffOptions::new();
     options
+        .context_lines(context_lines)
         .update_index(false)
         .include_untracked(true)
         .recurse_untracked_dirs(true)
@@ -72,10 +79,11 @@ pub fn read_file_diff(
     cwd: &Path,
     path: &Path,
     group: ChangeGroup,
+    context_lines: u32,
 ) -> Result<String, RepositoryError> {
     let repository = Repository::discover(cwd)
         .map_err(|source| RepositoryError::git("discovering Git repository", cwd, source))?;
-    let diff = read_diff(&repository, group)
+    let diff = read_diff(&repository, group, context_lines)
         .map_err(|source| RepositoryError::git("reading Git diff", cwd, source))?;
     let mut output = Vec::new();
     for (ix, delta) in diff.deltas().enumerate() {
@@ -97,7 +105,7 @@ fn read_line_changes(
     repository: &Repository,
     group: ChangeGroup,
 ) -> Result<BTreeMap<PathBuf, LineChanges>, git2::Error> {
-    let diff = read_diff(repository, group)?;
+    let diff = read_diff(repository, group, PATCH_CONTEXT_LINES)?;
     let mut changes = BTreeMap::new();
     for ix in 0..diff.deltas().len() {
         let lines = match Patch::from_diff(&diff, ix) {

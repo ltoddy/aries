@@ -1,4 +1,9 @@
+use crate::workspace::git::diff_operations::DiffAction;
+use crate::workspace::git::diff_view::tools::change_blocks;
 use crate::workspace::git::diff_view::*;
+use gpui_kit::component::diff::{
+    DiffChangeIndicator, DiffGutterMarker, DiffHoverHighlight, DiffHunkSeparator,
+};
 
 impl GitDiffView {
     pub fn render_file_selector(&self, path: &str, cx: &mut Context<Self>) -> AnyElement {
@@ -160,6 +165,42 @@ impl GitDiffView {
             .children(status)
             .into_any_element()
     }
+
+    fn change_markers(&self, cx: &App) -> Vec<DiffGutterMarker> {
+        let Some(target) = self.target.as_ref() else {
+            return Vec::new();
+        };
+        let Some(model) = self.model.as_ref() else {
+            return Vec::new();
+        };
+        let Some(file) = self.state.read(cx).files().first() else {
+            return Vec::new();
+        };
+        let path = file.path().clone();
+        let discardable = target.group == ChangeGroup::Unstaged && model.is_discardable();
+        let apply_label = match target.group {
+            ChangeGroup::Unstaged => "暂存这个变更块",
+            ChangeGroup::Staged => "取消暂存这个变更块",
+        };
+        let mut markers = Vec::new();
+        for block in change_blocks(model) {
+            if let Some((side, line)) = block.apply() {
+                let position = DiffLinePosition::new(path.clone(), side, line as usize);
+                markers.push(
+                    DiffGutterMarker::new(("diff-apply", block.index()), position)
+                        .with_label(apply_label),
+                );
+            }
+            if discardable && let Some((side, line)) = block.discard() {
+                let position = DiffLinePosition::new(path.clone(), side, line as usize);
+                markers.push(
+                    DiffGutterMarker::new(("diff-discard", block.index()), position)
+                        .with_label("丢弃这个变更块"),
+                );
+            }
+        }
+        markers
+    }
 }
 
 impl Render for GitDiffView {
@@ -207,23 +248,65 @@ impl Render for GitDiffView {
         } else {
             let view = cx.weak_entity();
             let menu_view = view.clone();
+            let click_view = view.clone();
+            let markers = self.change_markers(cx);
+            let marked = !markers.is_empty();
+            let mut diff = Diff::new(&self.state)
+                .header_visible(false)
+                .hunk_separator(DiffHunkSeparator::LineInfo)
+                .change_indicator(DiffChangeIndicator::Bars)
+                .hover_highlight(DiffHoverHighlight::Line)
+                .gutter_markers(markers)
+                .decorations(self.decorations.clone())
+                .on_line_click(move |position, _, _, cx| {
+                    let _ = view.update(cx, |this, cx| {
+                        this.set_location(position.clone(), cx);
+                    });
+                });
+            if marked {
+                diff = diff.render_gutter_marker(move |marker, _, cx| {
+                    let Some(view) = click_view.upgrade() else {
+                        return div().into_any_element();
+                    };
+                    let position = marker.position().clone();
+                    let icon = match position.side() {
+                        DiffSide::Original => IconName::ChevronsRight,
+                        DiffSide::Modified => IconName::ChevronsLeft,
+                    };
+                    let (label, busy) = {
+                        let this = view.read(cx);
+                        let label = match this.marker_action(&position) {
+                            Some(action) if action == DiffAction::discard() => "丢弃这个变更块",
+                            Some(action) if action == DiffAction::unstage() => "取消暂存这个变更块",
+                            Some(_) => "暂存这个变更块",
+                            None => "这个变更块",
+                        };
+                        (label, this.writes_busy(cx))
+                    };
+                    let view = click_view.clone();
+                    Button::new(marker.id().clone())
+                        .xsmall()
+                        .ghost()
+                        .compact()
+                        .icon(icon)
+                        .accessibility_label(label)
+                        .tooltip(label)
+                        .disabled(busy)
+                        .on_click(move |_, window, cx| {
+                            let position = position.clone();
+                            let _ = view.update(cx, |this, cx| {
+                                this.change_at(position, window, cx);
+                            });
+                        })
+                        .into_any_element()
+                });
+            }
             div()
                 .id("git-diff-selection-menu")
                 .size_full()
                 .min_w_0()
                 .min_h_0()
-                .child(
-                    Diff::new(&self.state)
-                        .soft_wrap(true)
-                        .header_visible(false)
-                        .decorations(self.decorations.clone())
-                        .on_line_click(move |position, _, _, cx| {
-                            let _ = view.update(cx, |this, cx| {
-                                this.set_location(position.clone(), cx);
-                            });
-                        })
-                        .size_full(),
-                )
+                .child(diff.size_full())
                 .context_menu(move |menu, _, cx| {
                     if let Some(view) = menu_view.upgrade() {
                         view.update(cx, |this, cx| this.selection_menu(menu, cx))
