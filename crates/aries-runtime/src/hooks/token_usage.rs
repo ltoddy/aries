@@ -38,6 +38,19 @@ impl AgentHook for TokenUsageHook {
         let cached_input_tokens = event.usage.cached_input_tokens.unwrap_or(0);
         let reasoning_tokens = event.usage.reasoning_tokens.unwrap_or(0);
 
+        let mut input_cost = 0.0_f64;
+        let mut output_cost = 0.0_f64;
+        let mut cache_read_cost = 0.0_f64;
+        let mut cache_write_cost = 0.0_f64;
+        let mut total_cost = 0.0_f64;
+        if let Some(cost) = event.usage.cost {
+            input_cost = cost.input.unwrap_or(0.0_f64);
+            output_cost = cost.output.unwrap_or(0.0_f64);
+            cache_read_cost = cost.cache_read.unwrap_or(0.0_f64);
+            cache_write_cost = cost.cache_write.unwrap_or(0.0_f64);
+            total_cost = cost.total;
+        }
+
         tokio::task::spawn(async move {
             let _ = repo
                 .create(
@@ -47,6 +60,11 @@ impl AgentHook for TokenUsageHook {
                     total_tokens,
                     cached_input_tokens,
                     reasoning_tokens,
+                    input_cost,
+                    output_cost,
+                    cache_read_cost,
+                    cache_write_cost,
+                    total_cost,
                 )
                 .await;
         });

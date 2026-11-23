@@ -292,11 +292,13 @@ impl SessionUpdates {
         let kind = tool_kind(name.as_str());
 
         let tc = AcpToolCall::new(ToolCallId::new(tool_call.id.to_string()), title)
+            .name(name.as_str().to_owned())
             .kind(kind)
             .status(ToolCallStatus::InProgress)
             .content(content)
             .locations(locations)
-            .raw_input(arguments);
+            .raw_input(arguments)
+            .raw_output(None);
 
         SessionUpdate::ToolCall(tc)
     }
