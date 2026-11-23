@@ -111,6 +111,10 @@ impl Sidebar {
                     host.read(cx).active_view().map(|view| view.read(cx).can_start_new_chat())
                 })
                 .unwrap_or_else(|| owner.can_start_new_chat());
+        let settings_selected = tab_host
+            .as_ref()
+            .and_then(|host| host.upgrade())
+            .is_some_and(|host| host.read(cx).is_settings_visible());
         let usage_selected = tab_host
             .as_ref()
             .and_then(|host| host.upgrade())
@@ -153,6 +157,7 @@ impl Sidebar {
                 sidebar.child(Self::render_footer(
                     tab_host,
                     p,
+                    settings_selected,
                     usage_selected,
                     extensions_selected,
                     cx,
@@ -163,6 +168,7 @@ impl Sidebar {
     pub fn render_footer(
         tab_host: Option<WeakEntity<WorkspaceView>>,
         p: Palette,
+        settings_selected: bool,
         usage_selected: bool,
         extensions_selected: bool,
         cx: &mut App,
@@ -176,7 +182,7 @@ impl Sidebar {
             .flex()
             .items_center()
             .gap_2()
-            .child(SettingsButton::new(tab_host, p))
+            .child(SettingsButton::new(tab_host, p, settings_selected))
             .child(
                 Button::new("open-extensions")
                     .ghost()

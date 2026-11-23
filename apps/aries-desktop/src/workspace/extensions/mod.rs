@@ -11,7 +11,6 @@ use gpui_kit::*;
 use thiserror::Error;
 
 use crate::workspace::skill_editor::{SkillEditor, SkillEditorEvent};
-use crate::workspace::usage::ReturnToSessions;
 
 const ENTRY_HEIGHT: f32 = 6.5;
 const CATEGORIES: [&str; 4] = ["Skills", "Commands", "Hooks", "Agents"];
@@ -302,15 +301,12 @@ pub struct ExtensionsView {
     category: usize,
     loading: bool,
     error: Option<String>,
-    back_focus: FocusHandle,
     list_focus: FocusHandle,
     scroll: [UniformListScrollHandle; 4],
     _task: Option<Task<()>>,
     editor: Option<Entity<SkillEditor>>,
     _editor_subscription: Option<Subscription>,
 }
-
-impl EventEmitter<ReturnToSessions> for ExtensionsView {}
 
 impl ExtensionsView {
     pub fn new(cx: &mut Context<Self>) -> Self {
@@ -320,7 +316,6 @@ impl ExtensionsView {
             category: 0,
             loading: false,
             error: None,
-            back_focus: cx.focus_handle().tab_stop(true),
             list_focus: cx.focus_handle().tab_stop(true),
             scroll: std::array::from_fn(|_| UniformListScrollHandle::new()),
             _task: None,
@@ -333,7 +328,7 @@ impl ExtensionsView {
         if let Some(editor) = &self.editor {
             editor.update(cx, |editor, cx| editor.focus(window, cx));
         } else {
-            self.back_focus.focus(window, cx);
+            self.list_focus.focus(window, cx);
         }
         if self.directory.as_ref() != Some(&directory) {
             self.directory = Some(directory);
@@ -379,7 +374,7 @@ impl ExtensionsView {
                         this.editor = None;
                         this._editor_subscription = None;
                         if restore_focus {
-                            this.back_focus.focus(window, cx);
+                            this.list_focus.focus(window, cx);
                         }
                     },
                 }

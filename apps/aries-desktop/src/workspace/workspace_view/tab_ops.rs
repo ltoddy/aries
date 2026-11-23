@@ -119,10 +119,13 @@ impl WorkspaceView {
     }
 
     pub fn focus_active_tab(&self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.is_sessions_visible() || window.has_active_dialog(cx) {
+        if window.has_active_dialog(cx) {
             return;
         }
         self.focus_handle.focus(window, cx);
+        if !self.is_sessions_visible() {
+            return;
+        }
         let id = self.tabs.get(self.active).map(|tab| tab.id);
         let revision = self.file_navigation_revision;
         let owner = cx.weak_entity();
@@ -158,9 +161,6 @@ impl WorkspaceView {
         if !self.file_tree.update(cx, |tree, cx| tree.cancel_actions(window, cx)) {
             return;
         }
-        if !self.is_sessions_visible() {
-            self.show_sessions(window, cx);
-        }
         self.file_navigation_revision = self.file_navigation_revision.wrapping_add(1);
         self.active = index;
         self.tab_scroll.scroll_to_item(index);
@@ -170,10 +170,6 @@ impl WorkspaceView {
     }
 
     pub fn switch_tab(&mut self, next: bool, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.is_sessions_visible() {
-            self.show_sessions(window, cx);
-            return;
-        }
         let Some(index) = adjacent_tab(self.active, self.tabs.len(), next) else {
             return;
         };

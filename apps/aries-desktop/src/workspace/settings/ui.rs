@@ -1,6 +1,6 @@
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
-use gpui_kit::component::{ActiveTheme, Disableable, Icon, Sizable};
+use gpui_kit::component::{ActiveTheme, Disableable, Icon, Selectable, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -14,11 +14,12 @@ use crate::workspace::settings::palette::Palette;
 pub struct SettingsButton {
     host: Option<WeakEntity<WorkspaceView>>,
     palette: Palette,
+    selected: bool,
 }
 
 impl SettingsButton {
-    pub fn new(host: Option<WeakEntity<WorkspaceView>>, palette: Palette) -> Self {
-        Self { host, palette }
+    pub fn new(host: Option<WeakEntity<WorkspaceView>>, palette: Palette, selected: bool) -> Self {
+        Self { host, palette, selected }
     }
 }
 
@@ -26,6 +27,7 @@ impl RenderOnce for SettingsButton {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let p = self.palette;
         let host = self.host;
+        let selected = self.selected;
         let error = host
             .as_ref()
             .and_then(|host| host.upgrade())
@@ -35,8 +37,16 @@ impl RenderOnce for SettingsButton {
             .small()
             .icon(Icon::new(IconName::Settings).small())
             .size_7()
+            .selected(selected)
+            .bg(if selected { cx.theme().sidebar_accent } else { cx.theme().transparent })
             .disabled(host.is_none())
-            .text_color(if error.is_some() { p.danger() } else { p.muted() })
+            .text_color(if error.is_some() {
+                p.danger()
+            } else if selected {
+                p.foreground()
+            } else {
+                p.muted()
+            })
             .tooltip_with_action(
                 error.map(|error| format!("设置\n{error}")).unwrap_or_else(|| "设置".into()),
                 &OpenSettings,

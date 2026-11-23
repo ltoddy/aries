@@ -56,9 +56,6 @@ impl WorkspaceView {
             return;
         }
         self.file_navigation_revision = self.file_navigation_revision.wrapping_add(1);
-        if !self.is_sessions_visible() {
-            self.show_sessions(window, cx);
-        }
         let id = self.next_id;
         self.next_id += 1;
         let view =
@@ -69,7 +66,6 @@ impl WorkspaceView {
             WorkspaceTabKind::session(SessionTab::new(id, view.clone(), subscription)),
         ));
         self.file_tree.update(cx, |tree, cx| tree.set_directory(directory.clone(), cx));
-        self.page = WorkspacePage::sessions();
         self.active = self.tabs.len() - 1;
         self.tab_scroll.scroll_to_item(self.active);
         self.sync_sidebar_active_session(cx);
@@ -98,9 +94,6 @@ impl WorkspaceView {
         }
         if !self.file_tree.update(cx, |tree, cx| tree.cancel_actions(window, cx)) {
             return;
-        }
-        if !self.is_sessions_visible() {
-            self.show_sessions(window, cx);
         }
         self.file_navigation_revision = self.file_navigation_revision.wrapping_add(1);
         let session_id = session.session_id.clone();
@@ -138,7 +131,6 @@ impl WorkspaceView {
             id,
             WorkspaceTabKind::session(SessionTab::new(id, view, subscription)),
         ));
-        self.page = WorkspacePage::sessions();
         self.active = self.tabs.len() - 1;
         self.tab_scroll.scroll_to_item(self.active);
         self.set_sidebar_session(session_id, cx);
