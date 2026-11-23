@@ -227,4 +227,31 @@ impl GitDiffView {
         let next = if backwards { (current + count - 1) % count } else { (current + 1) % count };
         self.choose_hunk(next, cx);
     }
+
+    pub fn marker_action(&self, position: &DiffLinePosition) -> Option<DiffAction> {
+        let target = self.target.as_ref()?;
+        let model = self.model.as_ref()?;
+        change_action(model, target.group, position).map(|(_, action)| action)
+    }
+
+    pub fn change_at(
+        &mut self,
+        position: DiffLinePosition,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(target) = self.target.as_ref() else {
+            return;
+        };
+        let group = target.group;
+        let Some(model) = self.model.as_ref() else {
+            return;
+        };
+        let Some((index, action)) = change_action(model, group, &position) else {
+            return;
+        };
+        self.current_hunk = Some(index);
+        self.location = Some(position);
+        self.request_change(action, ToolScope::hunk(), window, cx);
+    }
 }
