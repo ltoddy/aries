@@ -16,14 +16,6 @@ use thiserror::Error;
 
 use crate::workspace::number;
 
-pub struct ReturnToSessions;
-
-impl ReturnToSessions {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
 struct UsageData {
     days: BTreeMap<Date, u64>,
 }
@@ -79,8 +71,6 @@ pub struct UsageView {
     scroll: ScrollHandle,
     _task: Option<Task<()>>,
 }
-
-impl EventEmitter<ReturnToSessions> for UsageView {}
 
 impl UsageView {
     pub fn new(_: &mut Window, cx: &mut Context<Self>) -> Self {
@@ -408,15 +398,11 @@ impl Render for UsageView {
             .bg(cx.theme().background).text_color(cx.theme().foreground)
             .child(div().w_full().max_w(rems(72.)).mx_auto().min_w_0().p_6().flex().flex_col().gap_6()
                 .child(div().flex().items_center().gap_3()
-                    .child(Button::new("return-to-sessions").ghost().small().label("返回会话")
-                        .icon(Icon::new(IconName::ArrowLeft))
-                        .on_click(cx.listener(|_, _, _, cx| cx.emit(ReturnToSessions::new()))))
-                    .child(div().flex_1().text_lg().font_weight(FontWeight::MEDIUM).child("统计"))
+                    .child(div().flex_1().min_w_0().text_sm().text_color(cx.theme().muted_foreground)
+                        .child(format!("过去一年 · {first} 至 {last}")))
                     .child(Button::new("refresh-usage").ghost().small().label(if loading { "加载中…" } else { "刷新" })
                         .icon(Icon::new(IconName::RefreshCw)).disabled(loading)
                         .on_click(cx.listener(|this, _, window, cx| this.refresh(window, cx)))))
-                .child(div().text_sm().text_color(cx.theme().muted_foreground)
-                    .child(format!("过去一年 · {first} 至 {last}")))
                 .child(self.render_summary(cx))
                 .when(loading, |view| view.child(div().text_color(cx.theme().muted_foreground).child("正在读取本地用量记录…")))
                 .when_some(match &self.state { LoadState::Failed(error) => Some(error.clone()), _ => None }, |view, error| {

@@ -11,16 +11,6 @@ impl ExtensionsView {
             .gap_3()
             .px_3()
             .py_2()
-            .child(
-                Button::new("extensions-back")
-                    .ghost()
-                    .small()
-                    .track_focus(&self.back_focus)
-                    .icon(IconName::ArrowLeft)
-                    .accessibility_label("返回会话")
-                    .tooltip("返回会话")
-                    .on_click(cx.listener(|_, _, _, cx| cx.emit(ReturnToSessions::new()))),
-            )
             .child(div().font_weight(FontWeight::SEMIBOLD).child("Agent 扩展"))
             .child(
                 div()

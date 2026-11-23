@@ -32,17 +32,20 @@ impl Render for WorkspaceView {
             Pixels::ZERO
         };
         let panel_style = div().size_full().style().clone();
+        let page = self.active_page().map(|page| match page {
+            WorkspacePage::Settings => {
+                self.settings.clone().cached(panel_style.clone()).into_any_element()
+            },
+            WorkspacePage::Extensions => {
+                self.extensions.clone().cached(panel_style.clone()).into_any_element()
+            },
+            WorkspacePage::Usage => {
+                self.usage.clone().cached(panel_style.clone()).into_any_element()
+            },
+        });
         let chat =
-            div().relative().size_full().min_w_0().min_h_0().child(if self.is_usage_visible() {
-                div()
-                    .size_full()
-                    .child(self.usage.clone().cached(panel_style.clone()))
-                    .into_any_element()
-            } else if self.is_extensions_visible() {
-                div()
-                    .size_full()
-                    .child(self.extensions.clone().cached(panel_style.clone()))
-                    .into_any_element()
+            div().relative().size_full().min_w_0().min_h_0().child(if let Some(page) = page {
+                div().size_full().child(page).into_any_element()
             } else {
                 if let Some(file) = file {
                     div().size_full().child(file.cached(panel_style.clone())).into_any_element()
@@ -108,9 +111,7 @@ impl Render for WorkspaceView {
                 this.select_sidebar_page(SidebarPage::git(), window, cx);
             }))
             .on_action(cx.listener(|this, _: &CloseTab, window, cx| {
-                if this.is_sessions_visible()
-                    && let Some(tab) = this.tabs.get(this.active)
-                {
+                if let Some(tab) = this.tabs.get(this.active) {
                     let id = tab.id;
                     this.execute_tab_command(TabCommand::close(id), window, cx);
                 }

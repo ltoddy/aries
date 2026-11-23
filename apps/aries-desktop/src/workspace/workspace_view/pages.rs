@@ -9,57 +9,63 @@ impl WorkspaceView {
         &self.settings
     }
 
+    pub fn active_page(&self) -> Option<WorkspacePage> {
+        self.tabs.get(self.active).and_then(WorkspaceTab::page)
+    }
+
     pub fn is_sessions_visible(&self) -> bool {
-        self.page == WorkspacePage::sessions()
+        self.active_page().is_none()
+    }
+
+    pub fn is_settings_visible(&self) -> bool {
+        self.active_page() == Some(WorkspacePage::settings())
     }
 
     pub fn is_usage_visible(&self) -> bool {
-        self.page == WorkspacePage::usage()
+        self.active_page() == Some(WorkspacePage::usage())
     }
 
     pub fn is_extensions_visible(&self) -> bool {
-        self.page == WorkspacePage::extensions()
+        self.active_page() == Some(WorkspacePage::extensions())
+    }
+
+    pub fn open_page(&mut self, page: WorkspacePage, window: &mut Window, cx: &mut Context<Self>) {
+        match page {
+            WorkspacePage::Usage => self.usage.update(cx, |view, cx| view.open(window, cx)),
+            WorkspacePage::Extensions => {
+                let directory = self.current_directory(cx);
+                self.extensions.update(cx, |view, cx| view.open(directory, window, cx));
+            },
+            WorkspacePage::Settings => {},
+        }
+        let index = match self.tabs.iter().position(|tab| tab.page() == Some(page)) {
+            Some(index) => index,
+            None => {
+                let id = self.next_id;
+                self.next_id += 1;
+                self.tabs.push(WorkspaceTab::new(id, WorkspaceTabKind::page(page)));
+                self.tabs.len() - 1
+            },
+        };
+        self.select_tab(index, window, cx);
     }
 
     pub fn open_usage(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.page = WorkspacePage::usage();
-        self.invalidate_file_navigation(cx);
-        self.sync_sidebar_active_session(cx);
-        self.usage.update(cx, |view, cx| view.open(window, cx));
-        self.sidebar.update(cx, |_, cx| cx.notify());
-        cx.notify();
+        self.open_page(WorkspacePage::usage(), window, cx);
     }
 
     pub fn open_extensions(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let directory = self.current_directory(cx);
-        self.page = WorkspacePage::extensions();
-        self.invalidate_file_navigation(cx);
-        self.sync_sidebar_active_session(cx);
-        self.extensions.update(cx, |view, cx| view.open(directory, window, cx));
-        self.sidebar.update(cx, |_, cx| cx.notify());
-        cx.notify();
+        self.open_page(WorkspacePage::extensions(), window, cx);
     }
 
-    pub fn show_sessions(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.is_sessions_visible() {
-            return;
-        }
-        self.page = WorkspacePage::sessions();
-        self.invalidate_file_navigation(cx);
-        self.sync_sidebar_active_session(cx);
-        self.focus_active_tab(window, cx);
-        self.sidebar.update(cx, |_, cx| cx.notify());
-        cx.notify();
-    }
-
-    pub fn open_settings(&self, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn open_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.file_confirmation.is_some()
             || !self.pending_file_operations.is_empty()
             || window.has_active_dialog(cx)
         {
             return;
         }
-        self.settings.update(cx, |settings, cx| settings.open_settings(window, cx));
+        self.open_page(WorkspacePage::settings(), window, cx);
     }
 
     pub fn notify_settings_sidebar(&self, cx: &mut Context<Self>) {
@@ -72,6 +78,7 @@ impl WorkspaceView {
                 WorkspaceTabKind::Session(tab) => tab.view.update(cx, |_, cx| cx.notify()),
                 WorkspaceTabKind::File(tab) => tab.view.update(cx, |_, cx| cx.notify()),
                 WorkspaceTabKind::Diff(tab) => tab.view.update(cx, |_, cx| cx.notify()),
+                WorkspaceTabKind::Page(_) => {},
             }
         }
     }

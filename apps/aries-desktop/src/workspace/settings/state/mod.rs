@@ -6,7 +6,7 @@ use gpui_kit::component::radio::{Radio, RadioGroup};
 use gpui_kit::component::scroll::ScrollableElement;
 use gpui_kit::component::searchable_list::{SearchableListItem, SearchableVec};
 use gpui_kit::component::select::{Select, SelectEvent, SelectState};
-use gpui_kit::component::{ActiveTheme, Disableable, Selectable, Sizable, Theme, WindowExt};
+use gpui_kit::component::{ActiveTheme, Disableable, Selectable, Sizable, Theme};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
@@ -261,4 +261,4 @@ impl SettingsState {
     }
 }
 
-mod dialog;
+mod page;

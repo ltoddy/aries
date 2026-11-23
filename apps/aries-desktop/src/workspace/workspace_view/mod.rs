@@ -27,7 +27,7 @@ use crate::workspace::git::diff_view::{DiffTargetChanged, GitDiffView};
 use crate::workspace::settings::palette::Palette;
 use crate::workspace::settings::{Preferences, SettingsState};
 use crate::workspace::sidebar::Sidebar;
-use crate::workspace::usage::{ReturnToSessions, UsageView};
+use crate::workspace::usage::UsageView;
 use crate::workspace::workspace_view::fps_counter::FpsCounter;
 use crate::workspace::{SessionRenderMode, SessionView};
 use crate::{
@@ -103,6 +103,7 @@ pub enum WorkspaceTabKind {
     Session(SessionTab),
     File(FileTab),
     Diff(DiffTab),
+    Page(WorkspacePage),
 }
 
 impl WorkspaceTabKind {
@@ -116,6 +117,10 @@ impl WorkspaceTabKind {
 
     fn diff(tab: DiffTab) -> Self {
         Self::Diff(tab)
+    }
+
+    fn page(page: WorkspacePage) -> Self {
+        Self::Page(page)
     }
 }
 
@@ -134,6 +139,7 @@ impl WorkspaceTab {
             WorkspaceTabKind::Session(tab) => Some(&tab.view),
             WorkspaceTabKind::File(_) => None,
             WorkspaceTabKind::Diff(_) => None,
+            WorkspaceTabKind::Page(_) => None,
         }
     }
 
@@ -142,6 +148,7 @@ impl WorkspaceTab {
             WorkspaceTabKind::Session(_) => None,
             WorkspaceTabKind::File(tab) => Some(&tab.view),
             WorkspaceTabKind::Diff(_) => None,
+            WorkspaceTabKind::Page(_) => None,
         }
     }
 
@@ -150,6 +157,7 @@ impl WorkspaceTab {
             WorkspaceTabKind::Session(_) => None,
             WorkspaceTabKind::File(_) => None,
             WorkspaceTabKind::Diff(tab) => Some(&tab.view),
+            WorkspaceTabKind::Page(_) => None,
         }
     }
 
@@ -158,6 +166,16 @@ impl WorkspaceTab {
             WorkspaceTabKind::Session(_) => None,
             WorkspaceTabKind::File(_) => None,
             WorkspaceTabKind::Diff(tab) => Some(&tab.session),
+            WorkspaceTabKind::Page(_) => None,
+        }
+    }
+
+    fn page(&self) -> Option<WorkspacePage> {
+        match &self.kind {
+            WorkspaceTabKind::Session(_) => None,
+            WorkspaceTabKind::File(_) => None,
+            WorkspaceTabKind::Diff(_) => None,
+            WorkspaceTabKind::Page(page) => Some(*page),
         }
     }
 
@@ -277,22 +295,46 @@ impl TabCommand {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum WorkspacePage {
-    Sessions,
-    Usage,
+    Settings,
     Extensions,
+    Usage,
 }
 
 impl WorkspacePage {
-    fn sessions() -> Self {
-        Self::Sessions
+    fn settings() -> Self {
+        Self::Settings
+    }
+
+    fn extensions() -> Self {
+        Self::Extensions
     }
 
     fn usage() -> Self {
         Self::Usage
     }
 
-    fn extensions() -> Self {
-        Self::Extensions
+    fn title(self) -> &'static str {
+        match self {
+            Self::Settings => "设置",
+            Self::Extensions => "Agent 扩展",
+            Self::Usage => "统计",
+        }
+    }
+
+    fn icon(self) -> IconName {
+        match self {
+            Self::Settings => IconName::Settings,
+            Self::Extensions => IconName::Bot,
+            Self::Usage => IconName::ChartNoAxesColumn,
+        }
+    }
+
+    fn status(self) -> &'static str {
+        match self {
+            Self::Settings => "偏好设置",
+            Self::Extensions => "本地扩展",
+            Self::Usage => "用量统计",
+        }
     }
 }
 
@@ -398,9 +440,6 @@ pub struct WorkspaceView {
     terminal_previous_focus: Option<FocusHandle>,
     usage: Entity<UsageView>,
     extensions: Entity<ExtensionsView>,
-    _extensions_subscription: Subscription,
-    page: WorkspacePage,
-    _usage_subscription: Subscription,
 }
 
 impl fmt::Debug for WorkspaceView {
@@ -439,15 +478,7 @@ impl WorkspaceView {
                 });
             });
         let usage = cx.new(|cx| UsageView::new(window, cx));
-        let usage_subscription =
-            cx.subscribe_in(&usage, window, |this, _, _: &ReturnToSessions, window, cx| {
-                this.show_sessions(window, cx);
-            });
         let extensions = cx.new(ExtensionsView::new);
-        let extensions_subscription =
-            cx.subscribe_in(&extensions, window, |this, _, _: &ReturnToSessions, window, cx| {
-                this.show_sessions(window, cx);
-            });
         let focus_handle = cx.focus_handle();
         focus_handle.focus(window, cx);
         Self {
@@ -486,9 +517,6 @@ impl WorkspaceView {
             terminal_previous_focus: None,
             usage,
             extensions,
-            _extensions_subscription: extensions_subscription,
-            page: WorkspacePage::sessions(),
-            _usage_subscription: usage_subscription,
         }
     }
 }

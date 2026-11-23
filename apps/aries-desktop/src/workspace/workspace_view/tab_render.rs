@@ -7,15 +7,12 @@ impl WorkspaceView {
         sidebar_available: Option<Pixels>,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let tabs: Vec<_> = if !self.is_sessions_visible() {
-            Vec::new()
-        } else {
-            self.tabs
-                .iter()
-                .enumerate()
-                .map(|(index, tab)| self.render_tab(index, tab, p, cx))
-                .collect()
-        };
+        let tabs: Vec<_> = self
+            .tabs
+            .iter()
+            .enumerate()
+            .map(|(index, tab)| self.render_tab(index, tab, p, cx))
+            .collect();
         let sidebar_visible = self.sidebar_visible && sidebar_available.is_some();
         let label = if sidebar_visible { "收起侧栏" } else { "展开侧栏" };
         let icon = if sidebar_visible { IconName::PanelLeftClose } else { IconName::PanelLeftOpen };
@@ -359,7 +356,7 @@ impl WorkspaceView {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let id = tab.id;
-        let active = index == self.active && self.is_sessions_visible();
+        let active = index == self.active;
         let pending = tab.is_pending(cx);
         let (title, tooltip, status, indicator) = match &tab.kind {
             WorkspaceTabKind::Session(tab) => {
@@ -428,6 +425,19 @@ impl WorkspaceView {
                     .into_any_element();
                 let status = target.map(|target| target.group().title()).unwrap_or("变更");
                 (title, tooltip, status, indicator)
+            },
+            WorkspaceTabKind::Page(page) => {
+                let title = page.title().to_owned();
+                let tooltip = title.clone();
+                let indicator = div()
+                    .size_4()
+                    .flex_shrink_0()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(Icon::new(page.icon()).size_3().text_color(p.muted()))
+                    .into_any_element();
+                (title, tooltip, page.status(), indicator)
             },
         };
         let tab_label = format!("切换到标签 {title} · {status}");

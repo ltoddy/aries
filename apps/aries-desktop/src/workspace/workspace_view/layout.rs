@@ -14,9 +14,6 @@ impl WorkspaceView {
         if !diff.read(cx).is_open() {
             return;
         }
-        if !self.is_sessions_visible() {
-            self.show_sessions(window, cx);
-        }
         let existing = self
             .tabs
             .iter()
@@ -280,6 +277,7 @@ impl WorkspaceView {
             .child(Sidebar::render_footer(
                 Some(cx.weak_entity()),
                 Palette::new(cx.theme().mode),
+                self.is_settings_visible(),
                 self.is_usage_visible(),
                 self.is_extensions_visible(),
                 cx,
