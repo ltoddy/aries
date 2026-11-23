@@ -1,32 +1,6 @@
 use crate::workspace::git::panel::*;
 
 impl GitPanel {
-    pub fn set_collapsed(
-        &mut self,
-        collapsed: bool,
-        window: &mut Window,
-        cx: &mut Context<SessionView>,
-    ) {
-        if self.info_collapsed == collapsed {
-            return;
-        }
-        self.info_collapsed = collapsed;
-        let tokens = cx.theme().motion_tokens();
-        let duration = if cx.reduce_motion() { Duration::ZERO } else { tokens.duration_fast };
-        self.motion.panel_mut().retarget(
-            if collapsed { 0. } else { 1. },
-            cx.background_executor().now(),
-            duration,
-            if collapsed { tokens.easing_exit.clone() } else { tokens.easing_enter.clone() },
-        );
-        if collapsed {
-            self.trigger_focus.focus(window, cx);
-        } else {
-            self.panel_focus.focus(window, cx);
-        }
-        cx.notify();
-    }
-
     pub fn sync_info(
         &mut self,
         result: Result<Option<GitInfo>, RepositoryError>,
@@ -36,7 +10,6 @@ impl GitPanel {
         if self.motion.reset(&self.cwd) {
             self.info = None;
             self.read_error = None;
-            self.info_collapsed = true;
         }
         let (info, error) = match result {
             Ok(None) if self.info.is_some() || self.read_error.is_some() => {
@@ -97,10 +70,6 @@ impl GitPanel {
         cx: &mut Context<SessionView>,
     ) {
         let path = path.into();
-        let group = match action {
-            IndexAction::Stage => ChangeGroup::Unstaged,
-            IndexAction::Unstage => ChangeGroup::Staged,
-        };
         if !self.is_index_action_available(&path, action) {
             return;
         }
@@ -110,7 +79,6 @@ impl GitPanel {
         self.revision += 1;
         let revision = self.revision;
         let directory = self.cwd.clone();
-        let action_focus = window.focused(cx);
         cx.spawn_in(window, async move |view, cx| {
             let (result, info, path, directory) = cx
                 .background_executor()
@@ -123,43 +91,28 @@ impl GitPanel {
                     (result, info, path, directory)
                 })
                 .await;
-            let focus_panel = view
-                .update(cx, |this, cx| {
-                    this.with_git_panel(|panel| {
-                        panel.index_busy = false;
-                        panel.pending_index = None;
-                        panel.diff.update(cx, |_, cx| cx.notify());
-                        let current =
-                            accept_result(&panel.cwd, panel.revision, &directory, revision);
-                        if current {
-                            panel.sync_info(info, result.is_ok(), cx);
-                        }
-                        let focus_panel = current
-                            && !panel.info_collapsed
-                            && !panel
-                                .motion
-                                .rows(group)
-                                .any(|row| row.file().path() == path && !row.is_exiting());
-                        panel.revision += 1;
-                        if panel.refresh_pending || !current {
-                            panel.refresh_info(cx);
-                        }
-                        cx.notify();
-                        focus_panel
-                    })
+            let _ = view.update(cx, |this, cx| {
+                this.with_git_panel(|panel| {
+                    panel.index_busy = false;
+                    panel.pending_index = None;
+                    panel.diff.update(cx, |_, cx| cx.notify());
+                    let current = accept_result(&panel.cwd, panel.revision, &directory, revision);
+                    if current {
+                        panel.sync_info(info, result.is_ok(), cx);
+                    }
+                    panel.revision += 1;
+                    if panel.refresh_pending || !current {
+                        panel.refresh_info(cx);
+                    }
+                    cx.notify();
                 })
-                .unwrap_or(false);
+            });
             let label = match action {
                 IndexAction::Stage => "无法暂存",
                 IndexAction::Unstage => "无法取消暂存",
             };
             let title = format!("{label} {}", path.display());
-            let delivered = view.update_in(cx, |this, window, cx| {
-                this.with_git_panel(|panel| {
-                    if focus_panel && window.focused(cx) == action_focus {
-                        panel.panel_focus.focus(window, cx);
-                    }
-                });
+            let delivered = view.update_in(cx, |_, window, cx| {
                 if let Err(error) = &result {
                     report(title.clone(), error, window, cx);
                 }

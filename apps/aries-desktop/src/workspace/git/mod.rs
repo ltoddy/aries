@@ -1,6 +1,6 @@
 mod diff_operations;
 mod diff_patch;
-mod diff_view;
+pub mod diff_view;
 mod error;
 pub mod index;
 mod list;

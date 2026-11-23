@@ -5,15 +5,10 @@ impl Render for WorkspaceView {
         let p = Palette::new(cx.theme().mode);
         let active = self.active_view().cloned();
         let file = self.active_file_view().cloned();
-        let git_info = active.as_ref().and_then(|view| {
-            view.update(cx, |session, cx| session.git_panel().render(view, window, cx))
-        });
-        let diff = active.as_ref().map(|view| view.read(cx).git_panel().diff().clone());
-        let diff = diff.filter(|diff| diff.read(cx).is_open());
-        let diff_open = diff.is_some();
+        let diff = self.active_diff_view().cloned().filter(|view| view.read(cx).is_open());
         let font_size = cx.theme().font_size;
         let width = window.viewport_size().width;
-        let content_minimum = font_size * if diff_open { 28. } else { 26. };
+        let content_minimum = font_size * 26.;
         let sidebar_minimum = font_size * 13.75;
         let sidebar_maximum = (width - content_minimum - font_size).min(font_size * 30.);
         let sidebar_available = (sidebar_maximum >= sidebar_minimum).then_some(sidebar_maximum);
@@ -36,14 +31,9 @@ impl Render for WorkspaceView {
         } else {
             Pixels::ZERO
         };
-        let content_width = width - sidebar_width - font_size;
         let panel_style = div().size_full().style().clone();
-        let chat = div()
-            .relative()
-            .size_full()
-            .min_w_0()
-            .min_h_0()
-            .child(if self.is_usage_visible() {
+        let chat =
+            div().relative().size_full().min_w_0().min_h_0().child(if self.is_usage_visible() {
                 div()
                     .size_full()
                     .child(self.usage.clone().cached(panel_style.clone()))
@@ -61,22 +51,9 @@ impl Render for WorkspaceView {
                 } else {
                     self.render_empty_main(p, cx)
                 }
-            })
-            .children(git_info);
+            });
         let content = if let Some(diff) = diff {
-            let detail = diff.cached(panel_style.clone()).into_any_element();
-            let diff_width =
-                (content_width * 0.6).clamp(font_size * 16., content_width - font_size * 12.);
-            h_resizable("chat-diff-layout")
-                .with_state(&self.diff_layout)
-                .child(resizable_panel().size_range(font_size * 12. ..Pixels::MAX).child(chat))
-                .child(
-                    resizable_panel()
-                        .size(diff_width)
-                        .size_range(font_size * 16. ..Pixels::MAX)
-                        .child(detail),
-                )
-                .into_any_element()
+            diff.cached(panel_style.clone()).into_any_element()
         } else {
             chat.into_any_element()
         };
@@ -126,6 +103,9 @@ impl Render for WorkspaceView {
             }))
             .on_action(cx.listener(|this, _: &ShowFilesSidebar, window, cx| {
                 this.select_sidebar_page(SidebarPage::files(), window, cx);
+            }))
+            .on_action(cx.listener(|this, _: &ShowGitSidebar, window, cx| {
+                this.select_sidebar_page(SidebarPage::git(), window, cx);
             }))
             .on_action(cx.listener(|this, _: &CloseTab, window, cx| {
                 if this.is_sessions_visible()
@@ -206,7 +186,7 @@ impl Render for WorkspaceView {
                                 div()
                                     .size_full()
                                     .track_focus(&self.sidebar_focus_handle)
-                                    .child(self.render_sidebar(panel_style, cx)),
+                                    .child(self.render_sidebar(panel_style, window, cx)),
                             ),
                     )
                     .child(resizable_panel().child(main))

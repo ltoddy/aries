@@ -29,6 +29,7 @@ gpui_kit::actions!(
         ToggleSidebar,
         ShowSessionsSidebar,
         ShowFilesSidebar,
+        ShowGitSidebar,
     ]
 );
 
@@ -39,6 +40,12 @@ impl ShowSessionsSidebar {
 }
 
 impl ShowFilesSidebar {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl ShowGitSidebar {
     pub fn new() -> Self {
         Self
     }
@@ -86,6 +93,7 @@ fn run() -> Result<(), StartupError> {
             MenuItem::action("设置…", OpenSettings),
             MenuItem::action("显示会话列表", ShowSessionsSidebar::new()),
             MenuItem::action("显示文件树", ShowFilesSidebar::new()),
+            MenuItem::action("显示 Git 变更", ShowGitSidebar::new()),
             MenuItem::separator(),
             MenuItem::action("隐藏 Aries Desktop", Hide),
             MenuItem::separator(),

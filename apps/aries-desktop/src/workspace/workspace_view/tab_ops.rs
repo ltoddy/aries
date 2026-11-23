@@ -22,7 +22,12 @@ impl WorkspaceView {
             return;
         }
         let active_id = self.tabs.get(self.active).map(|tab| tab.id);
+        let session = self.tabs[index].session().map(|view| view.entity_id());
         self.tabs.remove(index);
+        if let Some(session) = session {
+            self.tabs
+                .retain(|tab| tab.diff_session().is_none_or(|view| view.entity_id() != session));
+        }
         self.active = active_id
             .and_then(|id| self.tabs.iter().position(|tab| tab.id == id))
             .unwrap_or_else(|| index.min(self.tabs.len().saturating_sub(1)));
@@ -95,9 +100,12 @@ impl WorkspaceView {
                 let _ = owner.update(cx, |this, cx| {
                     let already_focused = this.active_file_view().is_some_and(|view| {
                         view.read(cx).focus_handle(cx).contains_focused(window, cx)
-                    }) || this.active_view().is_some_and(|view| {
-                        view.read(cx).input().focus_handle(cx).contains_focused(window, cx)
-                    });
+                    }) || this
+                        .active_diff_view()
+                        .is_some_and(|view| view.read(cx).is_focused(window, cx))
+                        || this.active_view().is_some_and(|view| {
+                            view.read(cx).input().focus_handle(cx).contains_focused(window, cx)
+                        });
                     if this.file_navigation_revision == revision
                         && this.tabs.get(this.active).map(|tab| tab.id) == id
                         && !window.has_active_dialog(cx)
@@ -127,7 +135,9 @@ impl WorkspaceView {
                 {
                     return;
                 }
-                if let Some(view) = this.active_file_view() {
+                if let Some(view) = this.active_diff_view() {
+                    view.update(cx, |view, cx| view.focus(window, cx));
+                } else if let Some(view) = this.active_file_view() {
                     view.update(cx, |view, cx| view.focus(window, cx));
                 } else if let Some(view) = this.active_view() {
                     let input = view.read(cx).input().clone();

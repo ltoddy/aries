@@ -1,11 +1,71 @@
 use crate::workspace::workspace_view::*;
 
 impl WorkspaceView {
-    pub fn show_diff(&mut self, _: &mut Window, cx: &mut Context<Self>) {
-        if self.active_view().is_some() {
-            self.invalidate_file_navigation(cx);
-            cx.notify();
+    pub fn show_diff(
+        &mut self,
+        session: &WeakEntity<SessionView>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(session) = session.upgrade() else {
+            return;
+        };
+        let diff = session.read(cx).git_panel().diff().clone();
+        if !diff.read(cx).is_open() {
+            return;
         }
+        if !self.is_sessions_visible() {
+            self.show_sessions(window, cx);
+        }
+        let existing = self
+            .tabs
+            .iter()
+            .position(|tab| tab.diff().is_some_and(|view| view.entity_id() == diff.entity_id()));
+        let index = if let Some(index) = existing {
+            index
+        } else {
+            let id = self.next_id;
+            self.next_id += 1;
+            let subscription = Self::observe_diff(id, &diff, window, cx);
+            let insert = self
+                .tabs
+                .iter()
+                .position(|tab| {
+                    tab.session().is_some_and(|view| view.entity_id() == session.entity_id())
+                })
+                .map(|index| index + 1)
+                .unwrap_or(self.tabs.len());
+            self.tabs.insert(
+                insert,
+                WorkspaceTab::new(
+                    id,
+                    WorkspaceTabKind::diff(DiffTab::new(diff, session, subscription)),
+                ),
+            );
+            insert
+        };
+        self.invalidate_file_navigation(cx);
+        self.select_tab(index, window, cx);
+        cx.notify();
+    }
+
+    pub fn observe_diff(
+        id: usize,
+        view: &Entity<GitDiffView>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Subscription {
+        cx.subscribe_in(view, window, move |_, view, _: &DiffTargetChanged, window, cx| {
+            if view.read(cx).is_open() {
+                cx.notify();
+                return;
+            }
+            cx.defer_in(window, move |this, _, cx| {
+                if this.tabs.iter().any(|tab| tab.id == id && !tab.is_pending(cx)) {
+                    this.close_tab(id, cx);
+                }
+            });
+        })
     }
 
     pub fn select_sidebar_page(
@@ -14,11 +74,12 @@ impl WorkspaceView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let page = if page == SidebarPage::files() && self.selected_file_directory(cx).is_none() {
-            SidebarPage::sessions()
-        } else {
-            page
+        let available = match page {
+            SidebarPage::Sessions => true,
+            SidebarPage::Files => self.selected_file_directory(cx).is_some(),
+            SidebarPage::Git => self.active_view().is_some(),
         };
+        let page = if available { page } else { SidebarPage::sessions() };
         self.sidebar_page = page;
         self.sidebar_visible = true;
         if page == SidebarPage::files() {
@@ -36,14 +97,13 @@ impl WorkspaceView {
                 {
                     return;
                 }
-                let detail_open = this
-                    .active_view()
-                    .is_some_and(|view| view.read(cx).git_panel().diff().read(cx).is_open());
-                let minimum = cx.theme().font_size * if detail_open { 42.75 } else { 40.75 };
+                let minimum = cx.theme().font_size * 40.75;
                 if window.viewport_size().width < minimum {
                     this.sidebar_toggle_focus_handle.focus(window, cx);
                 } else if page == SidebarPage::files() {
                     this.file_tree.update(cx, |tree, cx| tree.focus(window, cx));
+                } else if page == SidebarPage::git() {
+                    this.sidebar_focus_handle.focus(window, cx);
                 } else {
                     this.sidebar_sessions_focus_handle.focus(window, cx);
                 }
@@ -95,10 +155,23 @@ impl WorkspaceView {
     pub fn render_sidebar(
         &self,
         panel_style: StyleRefinement,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let files_available = self.selected_file_directory(cx).is_some();
         let files_selected = files_available && self.sidebar_page == SidebarPage::files();
+        let git_view = self.active_view().cloned();
+        let git_available = git_view.is_some();
+        let git_selected = git_available && self.sidebar_page == SidebarPage::git();
+        let sessions_selected = !files_selected && !git_selected;
+        let git_content = if git_selected {
+            git_view.map(|view| {
+                let owner = view.clone();
+                view.update(cx, move |session, cx| session.git_panel().render(&owner, window, cx))
+            })
+        } else {
+            None
+        };
         let saving =
             self.tabs.iter().filter_map(WorkspaceTab::file).any(|view| view.read(cx).is_saving());
         div()
@@ -122,7 +195,7 @@ impl WorkspaceView {
                             .icon(IconName::MessagesSquare)
                             .track_focus(&self.sidebar_sessions_focus_handle)
                             .tooltip_with_action("显示会话列表", &ShowSessionsSidebar::new(), None)
-                            .selected(!files_selected)
+                            .selected(sessions_selected)
                             .on_click(cx.listener(|this, _, window, cx| {
                                 this.select_sidebar_page(SidebarPage::sessions(), window, cx);
                             })),
@@ -135,9 +208,23 @@ impl WorkspaceView {
                                 .label("文件")
                                 .icon(IconName::FolderTree)
                                 .tooltip_with_action("显示文件树", &ShowFilesSidebar::new(), None)
-                                .selected(self.sidebar_page == SidebarPage::files())
+                                .selected(files_selected)
                                 .on_click(cx.listener(|this, _, window, cx| {
                                     this.select_sidebar_page(SidebarPage::files(), window, cx);
+                                })),
+                        )
+                    })
+                    .when(git_available, |tabs| {
+                        tabs.child(
+                            Button::new("sidebar-git")
+                                .small()
+                                .ghost()
+                                .label("变更")
+                                .icon(IconName::GitBranch)
+                                .tooltip_with_action("显示 Git 变更", &ShowGitSidebar::new(), None)
+                                .selected(git_selected)
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    this.select_sidebar_page(SidebarPage::git(), window, cx);
                                 })),
                         )
                     }),
@@ -185,6 +272,8 @@ impl WorkspaceView {
                         )
                     })
                     .into_any_element()
+            } else if let Some(content) = git_content {
+                div().size_full().min_h_0().min_w_0().child(content).into_any_element()
             } else {
                 self.sidebar.clone().cached(panel_style).into_any_element()
             }))
