@@ -39,7 +39,7 @@ rustyline-derive = "0.13"
 serde_json.workspace = true
 thiserror.workspace = true
 toasty.workspace = true
-tokio = { workspace = true, features = ["rt-multi-thread", "macros", "fs", "process"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "fs"] }
 tracing.workspace = true
 tree-sitter = "0.26"
 tree-sitter-bash = "0.25"

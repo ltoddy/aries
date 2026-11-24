@@ -1,9 +1,6 @@
 install-cli:
     @cargo install --path apps/aries-cli --force --locked
 
-install-daemon:
-    @cargo install --path apps/aries-daemon --force --locked
-
 install-desktop:
     @cargo install --path apps/aries-desktop --force --locked
 

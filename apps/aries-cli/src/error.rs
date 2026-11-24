@@ -5,13 +5,8 @@ use aries_runtime::agent::AriesError;
 use aries_runtime::registry::RegistryError;
 use rustyline::error::ReadlineError;
 
-use crate::cli::daemon::error::DaemonError;
-
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error(transparent)]
-    Daemon(DaemonError),
-
     #[error(transparent)]
     Setting(SettingError),
 
@@ -47,10 +42,6 @@ pub enum Error {
 }
 
 impl Error {
-    pub fn daemon(source: DaemonError) -> Self {
-        Self::Daemon(source)
-    }
-
     pub fn setting(source: SettingError) -> Self {
         Self::Setting(source)
     }
