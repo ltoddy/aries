@@ -1,7 +1,6 @@
 pub mod acp;
 pub mod agent;
 pub mod command;
-pub mod daemon;
 pub mod gc;
 pub mod hook;
 pub mod mcp;
@@ -17,7 +16,6 @@ use clap::{Parser, Subcommand};
 use crate::cli::acp::AcpArgs;
 use crate::cli::agent::AgentCommand;
 use crate::cli::command::CommandCommand;
-use crate::cli::daemon::DaemonCommand;
 use crate::cli::hook::HookCommand;
 use crate::cli::mcp::McpCommand;
 use crate::cli::model::ModelCommand;
@@ -46,11 +44,6 @@ pub enum Subcommands {
     Command {
         #[command(subcommand)]
         command: CommandCommand,
-    },
-    #[command(about = "Manage the Aries background daemon")]
-    Daemon {
-        #[command(subcommand)]
-        command: DaemonCommand,
     },
     #[command(about = "Garbage collect stale database records")]
     Gc,
