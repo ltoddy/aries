@@ -189,22 +189,10 @@ impl GitMotion {
                     if ChangedFile::status_kind(row.file.status())
                         != ChangedFile::status_kind(file.status())
                     {
-                        row.status = Fade::new(
-                            if row.status.active(now) { row.status.sample(now) } else { 0. },
-                            1.0,
-                            now,
-                            short,
-                            easing.clone(),
-                        );
+                        row.status.retarget(1.0, now, short, easing.clone());
                     }
                     if row.file.lines() != file.lines() {
-                        row.lines = Fade::new(
-                            if row.lines.active(now) { row.lines.sample(now) } else { 0. },
-                            1.0,
-                            now,
-                            short,
-                            easing.clone(),
-                        );
+                        row.lines.retarget(1.0, now, short, easing.clone());
                     }
                 }
                 row.file = file.clone();

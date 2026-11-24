@@ -99,6 +99,7 @@ pub struct GitDiffView {
     backups: Vec<DiscardBackupEntry>,
     backup_task: Option<Task<()>>,
     loading: bool,
+    spinner: bool,
     pending: bool,
     revision: u64,
     task: Option<Task<()>>,
@@ -146,6 +147,7 @@ impl GitDiffView {
             backups: Vec::new(),
             backup_task: None,
             loading: false,
+            spinner: false,
             pending: false,
             revision: 0,
             task: None,
@@ -215,6 +217,7 @@ impl GitDiffView {
         self.revision += 1;
         self.task = None;
         self.loading = false;
+        self.spinner = false;
         self.pending = false;
         self.patch = Arc::new(String::new());
         self.display_patch = Arc::new(String::new());
@@ -234,14 +237,24 @@ impl GitDiffView {
     }
 
     pub fn refresh(&mut self, cx: &mut Context<Self>) {
+        self.reload(true, cx);
+    }
+
+    pub fn refresh_silent(&mut self, cx: &mut Context<Self>) {
+        self.reload(false, cx);
+    }
+
+    fn reload(&mut self, show_loading: bool, cx: &mut Context<Self>) {
         let Some(target) = self.target.clone() else {
             return;
         };
         if self.loading {
             self.pending = true;
+            self.spinner |= show_loading;
             return;
         }
         self.loading = true;
+        self.spinner = show_loading;
         self.pending = false;
         let directory = self.directory.clone();
         let previous_patch = self.patch.clone();
@@ -280,6 +293,7 @@ impl GitDiffView {
                     return;
                 }
                 this.loading = false;
+                let spinner = std::mem::take(&mut this.spinner);
                 match result {
                     Ok(result) => {
                         if let Some((patch, display_patch, files, model)) = result {
@@ -324,13 +338,15 @@ impl GitDiffView {
                     },
                     Err(error) => this.error = Some(details(&error)),
                 }
-                if this.pending {
-                    this.refresh(cx);
+                if std::mem::take(&mut this.pending) {
+                    this.reload(spinner, cx);
                 }
                 cx.notify();
             });
         }));
-        cx.notify();
+        if show_loading {
+            cx.notify();
+        }
     }
 
     pub fn set_targets(&mut self, info: Option<&GitInfo>, cx: &mut Context<Self>) {

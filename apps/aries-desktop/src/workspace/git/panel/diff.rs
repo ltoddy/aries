@@ -94,7 +94,7 @@ impl GitPanel {
                     });
                     panel.revision += 1;
                     if panel.refresh_pending || !current {
-                        panel.refresh_info(cx);
+                        panel.refresh_info(false, cx);
                     }
                     cx.notify();
                 });

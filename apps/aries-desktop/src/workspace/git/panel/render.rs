@@ -49,7 +49,7 @@ impl GitPanel {
                                     .ghost()
                                     .small()
                                     .icon(IconName::RefreshCw)
-                                    .loading(self.refreshing)
+                                    .loading(self.loading)
                                     .disabled(self.index_busy)
                                     .accessibility_label("刷新 Git 变更")
                                     .tooltip("刷新 Git 变更")
