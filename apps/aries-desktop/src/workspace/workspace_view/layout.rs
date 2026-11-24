@@ -32,13 +32,8 @@ impl WorkspaceView {
                 })
                 .map(|index| index + 1)
                 .unwrap_or(self.tabs.len());
-            self.tabs.insert(
-                insert,
-                WorkspaceTab::new(
-                    id,
-                    WorkspaceTabKind::diff(DiffTab::new(diff, session, subscription)),
-                ),
-            );
+            let tab = Tab::new(id, diff, subscription);
+            self.tabs.insert(insert, WorkspaceTab::new_diff(DiffTab::new(tab, session)));
             insert
         };
         self.invalidate_file_navigation(cx);
@@ -58,7 +53,7 @@ impl WorkspaceView {
                 return;
             }
             cx.defer_in(window, move |this, _, cx| {
-                if this.tabs.iter().any(|tab| tab.id == id && !tab.is_pending(cx)) {
+                if this.tabs.iter().any(|tab| tab.id() == id && !tab.is_pending(cx)) {
                     this.close_tab(id, cx);
                 }
             });
@@ -84,13 +79,13 @@ impl WorkspaceView {
         }
         let view = cx.weak_entity();
         let revision = self.file_navigation_revision;
-        let active_id = self.tabs.get(self.active).map(|tab| tab.id);
+        let active_id = self.active_id();
         window.on_next_frame(move |window, cx| {
             let _ = view.update(cx, |this, cx| {
                 if this.sidebar_page != page
                     || !this.sidebar_visible
                     || this.file_navigation_revision != revision
-                    || this.tabs.get(this.active).map(|tab| tab.id) != active_id
+                    || this.active_id() != active_id
                 {
                     return;
                 }
@@ -169,8 +164,7 @@ impl WorkspaceView {
         } else {
             None
         };
-        let saving =
-            self.tabs.iter().filter_map(WorkspaceTab::file).any(|view| view.read(cx).is_saving());
+        let saving = self.has_saving_file(cx);
         div()
             .size_full()
             .min_h_0()
@@ -231,12 +225,7 @@ impl WorkspaceView {
                     .size_full()
                     .relative()
                     .capture_any_mouse_down(cx.listener(|this, _, window, cx| {
-                        if this
-                            .tabs
-                            .iter()
-                            .filter_map(WorkspaceTab::file)
-                            .any(|view| view.read(cx).is_saving())
-                        {
+                        if this.has_saving_file(cx) {
                             window.prevent_default();
                             cx.stop_propagation();
                         }
@@ -248,12 +237,7 @@ impl WorkspaceView {
                         {
                             return;
                         }
-                        if this
-                            .tabs
-                            .iter()
-                            .filter_map(WorkspaceTab::file)
-                            .any(|view| view.read(cx).is_saving())
-                        {
+                        if this.has_saving_file(cx) {
                             window.prevent_default();
                             cx.stop_propagation();
                         }

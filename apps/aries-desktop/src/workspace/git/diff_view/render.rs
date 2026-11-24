@@ -1,9 +1,10 @@
-use crate::workspace::git::diff_operations::DiffAction;
-use crate::workspace::git::diff_view::tools::change_blocks;
-use crate::workspace::git::diff_view::*;
 use gpui_kit::component::diff::{
     DiffChangeIndicator, DiffGutterMarker, DiffHoverHighlight, DiffHunkSeparator,
 };
+
+use crate::workspace::git::diff_operations::DiffAction;
+use crate::workspace::git::diff_view::tools::change_blocks;
+use crate::workspace::git::diff_view::*;
 
 impl GitDiffView {
     pub fn render_file_selector(&self, path: &str, cx: &mut Context<Self>) -> AnyElement {

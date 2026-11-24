@@ -18,10 +18,7 @@ impl WorkspaceView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if !self.pending_file_operations.is_empty()
-            || self.file_confirmation.is_some()
-            || window.has_active_dialog(cx)
-        {
+        if !self.pending_file_operations.is_empty() || !self.can_navigate(window, cx) {
             return;
         }
         self.file_operation_focus = window.focused(cx);
@@ -40,7 +37,7 @@ impl WorkspaceView {
                 || self
                     .pending_file_operations
                     .iter()
-                    .any(|operation| operation.tab_id() == Some(tab.id)))
+                    .any(|operation| operation.tab_id() == Some(tab.id())))
                 && let Some(view) = tab.file()
             {
                 view.update(cx, |view, _| view.pause_auto_save());
@@ -61,7 +58,7 @@ impl WorkspaceView {
         while let Some(operation) = self.pending_file_operations.front().copied() {
             if matches!(operation, PendingFileOperation::Quit)
                 && self.tabs.iter().all(|tab| {
-                    self.quit_discarded.contains(&tab.id)
+                    self.quit_discarded.contains(&tab.id())
                         || tab.file().is_none_or(|view| {
                             !view.read(cx).is_dirty() && !view.read(cx).is_saving()
                         })
@@ -116,14 +113,14 @@ impl WorkspaceView {
                 self.apply_file_operation(operation, window, cx);
             } else {
                 let dirty = self.tabs.iter().find(|tab| {
-                    !self.quit_discarded.contains(&tab.id)
+                    !self.quit_discarded.contains(&tab.id())
                         && tab.file().is_some_and(|view| {
                             view.read(cx).is_dirty() || view.read(cx).is_saving()
                         })
                 });
                 if let Some(tab) = dirty {
                     self.pending_file_operations
-                        .push_front(PendingFileOperation::quit_file(tab.id));
+                        .push_front(PendingFileOperation::quit_file(tab.id()));
                 }
             }
         }
