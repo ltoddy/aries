@@ -9,6 +9,7 @@ use aries_extension::hook::input::{
     SubagentStopHookInput,
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
+use aries_init::ModelConfig;
 use rig::agent::{
     AgentHook, CompletionCall, CompletionCallAction, CompletionCallEvent, DispatchAction,
     DispatchEvent, HookContext, ModelTurnAction, ModelTurnFinished, MultiTurnStreamItem,
@@ -44,6 +45,7 @@ pub struct SessionPromptHook {
 
 impl SessionPromptHook {
     pub fn new(
+        config: &ModelConfig,
         executor: Arc<HooksExecutor>,
         session_id: impl Into<String>,
         cwd: impl Into<PathBuf>,
@@ -56,7 +58,7 @@ impl SessionPromptHook {
         let transcript_dir = transcript_dir.into();
         let agent_id = agent_id.into();
 
-        let window = ContextWindow::new();
+        let window = ContextWindow::new(config);
 
         Self {
             executor,

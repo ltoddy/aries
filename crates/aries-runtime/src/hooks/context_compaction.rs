@@ -1,3 +1,4 @@
+use aries_init::ModelConfig;
 use rig::agent::{AgentHook, CompletionCallAction, CompletionCallEvent, HookContext, RequestPatch};
 
 use crate::context::compaction::{ContextWindow, TokenEstimator, micro_compact};
@@ -13,15 +14,9 @@ pub struct ContextCompactionHook {
     window: ContextWindow,
 }
 
-impl Default for ContextCompactionHook {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl ContextCompactionHook {
-    pub fn new() -> Self {
-        Self { window: ContextWindow::new() }
+    pub fn new(config: &ModelConfig) -> Self {
+        Self { window: ContextWindow::new(config) }
     }
 }
 

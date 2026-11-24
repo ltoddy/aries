@@ -14,6 +14,7 @@ use aries_extension::hook::input::{
     PostCompactHookInput, PostCompactTrigger, PreCompactCustomInstructions, PreCompactHookInput,
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
+use aries_init::ModelConfig;
 use nanoid::nanoid;
 use rig::Model;
 use rig::completion::{Message, Usage};
@@ -36,19 +37,22 @@ pub struct ContextCompactor {
     chat_context: ChatContext,
     hooks_executor: Arc<HooksExecutor>,
     notifier: Notifier,
+    window: ContextWindow,
 }
 
 impl ContextCompactor {
     pub fn new(
+        config: &ModelConfig,
         state: State,
         chat_context: ChatContext,
         hooks_executor: Arc<HooksExecutor>,
         notifier: Notifier,
     ) -> Self {
+        let window = ContextWindow::new(config);
         let breaker = AutoCompactBreaker::new();
         let agent = CompactAgent::new(state.model(), state.transcript_dir());
 
-        Self { state, agent, breaker, chat_context, hooks_executor, notifier }
+        Self { state, agent, breaker, chat_context, hooks_executor, notifier, window }
     }
 
     pub fn set_model(&mut self, model: Model<OpenAiWire>) {
@@ -64,8 +68,7 @@ impl ContextCompactor {
             self.notifier.send_compaction(id, CompactionStatus::Completed, "上下文微压缩已完成");
         }
 
-        let window = ContextWindow::new();
-        let compact_threshold = window.auto_compact_threshold();
+        let compact_threshold = self.window.auto_compact_threshold();
 
         let estimated_tokens = {
             let read = self.chat_context.history().await;
@@ -76,7 +79,7 @@ impl ContextCompactor {
             let compaction_id = format!("abstract-compression-{}", nanoid!());
             let text = format!(
                 "预估 tokens {estimated_tokens} 已达到摘要压缩阈值 {compact_threshold}（上下文窗口 {}），开始自动摘要压缩。",
-                window.total
+                self.window.context_window
             );
             self.notifier.send_compaction(&compaction_id, CompactionStatus::InProgress, text);
             match self.compact().await {
@@ -106,8 +109,7 @@ impl ContextCompactor {
     }
 
     pub async fn post_compact(&mut self, usage: Usage) {
-        let window = ContextWindow::new();
-        let compact_threshold = window.auto_compact_threshold();
+        let compact_threshold = self.window.auto_compact_threshold();
 
         if let Some(total_tokens) = usage.total_tokens
             && total_tokens > compact_threshold
