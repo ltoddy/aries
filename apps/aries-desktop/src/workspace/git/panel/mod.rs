@@ -30,13 +30,15 @@ pub struct GitPanel {
     info: Option<GitInfo>,
     info_task: Option<Task<()>>,
     refresh_task: Option<Task<()>>,
-    refreshing: bool,
+    reading: bool,
+    loading: bool,
     refresh_pending: bool,
     watch_error: Option<String>,
     index_busy: bool,
     revision: u64,
     motion: GitMotion,
     pending_index: Option<(PathBuf, IndexAction)>,
+    touched: Vec<PathBuf>,
     read_error: Option<String>,
     diff: Entity<GitDiffView>,
     _diff_subscription: Subscription,
@@ -53,13 +55,15 @@ impl GitPanel {
             info: None,
             info_task: None,
             refresh_task: None,
-            refreshing: false,
+            reading: false,
+            loading: false,
             refresh_pending: false,
             watch_error: None,
             index_busy: false,
             revision: 0,
             motion: GitMotion::default(),
             pending_index: None,
+            touched: Vec::new(),
             read_error: None,
             diff,
             _diff_subscription: diff_subscription,
@@ -116,7 +120,8 @@ impl GitPanel {
         }
         self.revision += 1;
         self.refresh_task = None;
-        self.refreshing = false;
+        self.reading = false;
+        self.loading = false;
         self.refresh_pending = false;
         self.watch_error = None;
         let directory = self.cwd.clone();
@@ -133,14 +138,14 @@ impl GitPanel {
                         this.with_git_panel(|panel| {
                             log("Git 自动刷新不可用", &error);
                             panel.watch_error = Some(details(&error));
-                            panel.refresh_info(cx);
+                            panel.refresh_info(true, cx);
                         });
                     });
                     return;
                 },
             };
             if view
-                .update(cx, |this, cx| this.with_git_panel(|panel| panel.refresh_info(cx)))
+                .update(cx, |this, cx| this.with_git_panel(|panel| panel.refresh_info(true, cx)))
                 .is_err()
             {
                 return;
@@ -152,9 +157,11 @@ impl GitPanel {
                     Ok(error) => (error, false),
                     Err(error) => (Some(error), true),
                 };
+                let touched = watcher.take_paths();
                 if view
                     .update(cx, |this, cx| {
                         this.with_git_panel(|panel| {
+                            panel.touched.extend(touched);
                             if let Some(error) = error {
                                 let message = details(&error);
                                 if panel.watch_error.as_ref() != Some(&message) {
@@ -162,7 +169,7 @@ impl GitPanel {
                                     panel.watch_error = Some(message);
                                 }
                             }
-                            panel.refresh_info(cx);
+                            panel.refresh_info(false, cx);
                         });
                     })
                     .is_err()
@@ -178,12 +185,15 @@ impl GitPanel {
         cx.notify();
     }
 
-    pub fn refresh_info(&mut self, cx: &mut Context<SessionView>) {
-        if self.refreshing || self.index_busy {
+    pub fn refresh_info(&mut self, show_loading: bool, cx: &mut Context<SessionView>) {
+        if show_loading {
+            self.loading = true;
+        }
+        if self.reading || self.index_busy {
             self.refresh_pending = true;
             return;
         }
-        self.refreshing = true;
+        self.reading = true;
         self.refresh_pending = false;
         self.refresh_task = Some(cx.spawn(async move |view, cx| {
             loop {
@@ -206,7 +216,8 @@ impl GitPanel {
                         if again {
                             panel.refresh_pending = false;
                         } else {
-                            panel.refreshing = false;
+                            panel.reading = false;
+                            panel.loading = false;
                         }
                         cx.notify();
                         again
@@ -217,6 +228,8 @@ impl GitPanel {
                 }
             }
         }));
-        cx.notify();
+        if show_loading {
+            cx.notify();
+        }
     }
 }

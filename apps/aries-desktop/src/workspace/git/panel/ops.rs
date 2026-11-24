@@ -1,4 +1,14 @@
+use crate::workspace::git::diff_view::DiffTarget;
 use crate::workspace::git::panel::*;
+use crate::workspace::git::repository::FileChange;
+
+fn target_change<'a>(info: Option<&'a GitInfo>, target: &DiffTarget) -> Option<&'a FileChange> {
+    info?
+        .changed_files()?
+        .iter()
+        .filter_map(|file| file.change(target.group()))
+        .find(|change| change.path() == target.path())
+}
 
 impl GitPanel {
     pub fn sync_info(
@@ -19,6 +29,13 @@ impl GitPanel {
             Err(error) => (None, Some(details(&error))),
         };
         let changed = self.info != info || self.read_error != error;
+        let touched = std::mem::take(&mut self.touched);
+        let target = self.diff.read(cx).target().cloned();
+        let reload_diff = target.as_ref().is_none_or(|target| {
+            touched.is_empty()
+                || touched.iter().any(|path| path.ends_with(target.path()))
+                || target_change(self.info.as_ref(), target) != target_change(info.as_ref(), target)
+        });
         let tokens = cx.theme().motion_tokens();
         let duration = if cx.reduce_motion() { Duration::ZERO } else { tokens.duration_fast };
         self.motion.sync(
@@ -30,10 +47,16 @@ impl GitPanel {
         );
         self.info = info;
         self.read_error = error;
-        self.diff.update(cx, |diff, cx| {
-            diff.set_targets(self.info.as_ref(), cx);
-            diff.refresh(cx);
-        });
+        if changed || reload_diff {
+            self.diff.update(cx, |diff, cx| {
+                if changed {
+                    diff.set_targets(self.info.as_ref(), cx);
+                }
+                if reload_diff {
+                    diff.refresh_silent(cx);
+                }
+            });
+        }
         if changed {
             if !duration.is_zero() {
                 cx.spawn(async move |view, cx| {
@@ -102,7 +125,7 @@ impl GitPanel {
                     }
                     panel.revision += 1;
                     if panel.refresh_pending || !current {
-                        panel.refresh_info(cx);
+                        panel.refresh_info(false, cx);
                     }
                     cx.notify();
                 })

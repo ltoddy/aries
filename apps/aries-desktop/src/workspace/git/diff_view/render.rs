@@ -140,7 +140,7 @@ impl GitDiffView {
 
     pub fn render_file_summary(&self, cx: &mut Context<Self>) -> AnyElement {
         let state = self.state.read(cx);
-        let Some(file) = state.files().first().filter(|_| !self.loading && self.error.is_none())
+        let Some(file) = state.files().first().filter(|_| !self.spinner && self.error.is_none())
         else {
             return div().into_any_element();
         };
@@ -240,7 +240,7 @@ impl Render for GitDiffView {
                 .justify_center()
                 .text_sm()
                 .text_color(cx.theme().muted_foreground)
-                .child(if self.loading {
+                .child(if self.spinner {
                     "正在读取 diff"
                 } else {
                     "当前比较范围内无变更"
@@ -400,7 +400,7 @@ impl Render for GitDiffView {
                                 cx.listener(|this, _, window, cx| this.open_source(window, cx)),
                             ),
                     )
-                    .when(self.loading, |toolbar| toolbar.child(Spinner::new().small()))
+                    .when(self.spinner, |toolbar| toolbar.child(Spinner::new().small()))
                     .child(
                         Button::new("refresh-diff")
                             .small()

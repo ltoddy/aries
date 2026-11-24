@@ -13,6 +13,7 @@ pub struct GitWatch {
     watcher: Option<RecommendedWatcher>,
     executor: BackgroundExecutor,
     error: Arc<Mutex<Option<notify::Error>>>,
+    paths: Arc<Mutex<Vec<PathBuf>>>,
 }
 
 impl GitWatch {
@@ -24,6 +25,8 @@ impl GitWatch {
         let (paths, repository_path) = watch_paths(cwd.as_ref())?;
         let error = Arc::new(Mutex::new(None));
         let watch_error = error.clone();
+        let touched = Arc::new(Mutex::new(Vec::new()));
+        let changed_paths = touched.clone();
         let mut watcher =
             notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
                 match event {
@@ -32,6 +35,9 @@ impl GitWatch {
                             || !should_refresh(&event, repository_path.as_deref())
                         {
                             return;
+                        }
+                        if let Ok(mut paths) = changed_paths.lock() {
+                            paths.extend(event.paths);
                         }
                     },
                     Err(error) => {
@@ -48,12 +54,16 @@ impl GitWatch {
                 .watch(&path, RecursiveMode::Recursive)
                 .map_err(|source| WatchError::watch(&path, source))?;
         }
-        Ok(Self { watcher: Some(watcher), executor, error })
+        Ok(Self { watcher: Some(watcher), executor, error, paths: touched })
     }
 
     pub fn take_error(&self) -> Result<Option<WatchError>, WatchError> {
         let mut error = self.error.lock().map_err(|_| WatchError::lock_poisoned())?;
         Ok(error.take().map(WatchError::runtime))
+    }
+
+    pub fn take_paths(&self) -> Vec<PathBuf> {
+        self.paths.lock().map(|mut paths| std::mem::take(&mut *paths)).unwrap_or_default()
     }
 }
 
