@@ -163,6 +163,7 @@ impl Session {
         let session_repo = SessionRepository::new(db.clone());
 
         let hook = SessionPromptHook::new(
+            &config,
             hooks_executor.clone(),
             &id,
             &cwd,
@@ -192,6 +193,7 @@ impl Session {
         .await;
 
         let compactor = ContextCompactor::new(
+            &config,
             state.clone(),
             chat_context.clone(),
             hooks_executor.clone(),

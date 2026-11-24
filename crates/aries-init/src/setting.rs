@@ -262,20 +262,16 @@ pub enum Provider {
 impl Provider {
     pub const fn as_str(&self) -> &str {
         match self {
-            Provider::Azure => "Azure",
-            Provider::DeepSeek => "Deepseek",
-            Provider::OpenAI => "OpenAI",
+            Provider::Azure => "azure",
+            Provider::DeepSeek => "deepseek",
+            Provider::OpenAI => "openai",
         }
     }
 }
 
 impl Display for Provider {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Provider::Azure => write!(f, "Azure"),
-            Provider::DeepSeek => write!(f, "Deepseek"),
-            Provider::OpenAI => write!(f, "OpenAI"),
-        }
+        write!(f, "{}", self.as_str())
     }
 }
 
