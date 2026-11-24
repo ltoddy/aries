@@ -110,7 +110,7 @@ impl WorkspaceView {
         owner: WeakEntity<Self>,
         cx: &App,
     ) -> PopupMenu {
-        let Some(tab) = self.tabs.iter().find(|tab| tab.id == id) else {
+        let Some(tab) = self.tabs.iter().find(|tab| tab.id() == id) else {
             return menu;
         };
         if let Some(view) = tab.file() {
@@ -149,7 +149,7 @@ impl WorkspaceView {
             }
             menu = menu.separator();
         }
-        let has_others = self.tabs.iter().any(|tab| tab.id != id && !tab.is_pending(cx));
+        let has_others = self.tabs.iter().any(|tab| tab.id() != id && !tab.is_pending(cx));
         let has_closable = self.tabs.iter().any(|tab| !tab.is_pending(cx));
         for (label, command, disabled) in [
             ("关闭", TabCommand::close(id), tab.is_pending(cx)),
@@ -180,7 +180,7 @@ impl WorkspaceView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(index) = self.tabs.iter().position(|tab| tab.id == id) else {
+        let Some(index) = self.tab_index(id) else {
             return;
         };
         let Some(view) = self.tabs[index].file().cloned() else {
@@ -195,7 +195,7 @@ impl WorkspaceView {
                     return;
                 }
                 self.select_tab(index, window, cx);
-                if self.tabs.get(self.active).is_none_or(|tab| tab.id != id) {
+                if self.active_id() != Some(id) {
                     return;
                 }
                 let revision = self.file_navigation_revision;
@@ -204,11 +204,11 @@ impl WorkspaceView {
                     let _ = owner.update(cx, |this, cx| {
                         if this.is_sessions_visible()
                             && this.file_navigation_revision == revision
-                            && this.tabs.get(this.active).is_some_and(|tab| tab.id == id)
+                            && this.active_id() == Some(id)
                             && let Some(view) = this
                                 .tabs
                                 .iter()
-                                .find(|tab| tab.id == id)
+                                .find(|tab| tab.id() == id)
                                 .and_then(WorkspaceTab::file)
                             && (this.focus_handle.is_focused(window)
                                 || view.read(cx).focus_handle(cx).contains_focused(window, cx))
@@ -243,7 +243,7 @@ impl WorkspaceView {
             },
             FileTabCommand::Locate => {
                 self.select_tab(index, window, cx);
-                if self.tabs.get(self.active).is_none_or(|tab| tab.id != id) {
+                if self.active_id() != Some(id) {
                     return;
                 }
                 self.file_tree.update(cx, |tree, cx| tree.reveal(target.path(), cx));
@@ -255,7 +255,7 @@ impl WorkspaceView {
     pub fn file_tab_title(&self, id: usize, target: &OpenFile, cx: &App) -> String {
         let name = target.path().file_name().unwrap_or(target.path().as_os_str());
         let duplicate = self.tabs.iter().any(|tab| {
-            tab.id != id
+            tab.id() != id
                 && tab
                     .file()
                     .and_then(|view| view.read(cx).target())
@@ -268,7 +268,7 @@ impl WorkspaceView {
             let relative = parent.strip_prefix(&directory).unwrap_or(&parent);
             let relative = relative.to_owned();
             let same_parent = self.tabs.iter().any(|tab| {
-                tab.id != id
+                tab.id() != id
                     && tab.file().and_then(|view| view.read(cx).target()).is_some_and(|other| {
                         other.path().file_name() == Some(name)
                             && other.path().parent().is_some_and(|parent| {
@@ -355,93 +355,14 @@ impl WorkspaceView {
         p: Palette,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let id = tab.id;
+        let id = tab.id();
         let active = index == self.active;
         let pending = tab.is_pending(cx);
-        let (title, tooltip, status, indicator) = match &tab.kind {
-            WorkspaceTabKind::Session(tab) => {
-                let view = tab.view.read(cx);
-                let title = view.tab_title();
-                let state = view.execution_state();
-                (title.clone(), title, state.label(), state.render_tab_indicator(p))
-            },
-            WorkspaceTabKind::File(tab) => {
-                let view = tab.view.read(cx);
-                let title = view
-                    .target()
-                    .map(|target| self.file_tab_title(id, target, cx))
-                    .unwrap_or_else(|| "文件".into());
-                let tooltip = view
-                    .target()
-                    .map(|target| target.path().display().to_string())
-                    .unwrap_or_else(|| title.clone());
-                let loading = view.is_loading();
-                let failed = view.has_error() || view.save_error().is_some();
-                let indicator = div()
-                    .size_4()
-                    .flex_shrink_0()
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .child(if loading {
-                        Spinner::new().xsmall().into_any_element()
-                    } else {
-                        Icon::new(if failed { IconName::Info } else { IconName::FileCode })
-                            .size_3()
-                            .text_color(if failed { cx.theme().danger } else { p.muted() })
-                            .into_any_element()
-                    })
-                    .into_any_element();
-                let status = if loading {
-                    "读取中"
-                } else if view.save_error().is_some() {
-                    "自动保存失败"
-                } else if failed {
-                    "读取失败"
-                } else {
-                    "文件"
-                };
-                (title, tooltip, status, indicator)
-            },
-            WorkspaceTabKind::Diff(tab) => {
-                let view = tab.view.read(cx);
-                let target = view.target();
-                let title = target
-                    .and_then(|target| target.path().file_name())
-                    .map(|name| name.to_string_lossy().into_owned())
-                    .unwrap_or_else(|| "变更".into());
-                let tooltip = target
-                    .map(|target| {
-                        format!("{} · {}", target.group().title(), target.path().display())
-                    })
-                    .unwrap_or_else(|| title.clone());
-                let indicator = div()
-                    .size_4()
-                    .flex_shrink_0()
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .child(Icon::new(IconName::FileDiff).size_3().text_color(p.muted()))
-                    .into_any_element();
-                let status = target.map(|target| target.group().title()).unwrap_or("变更");
-                (title, tooltip, status, indicator)
-            },
-            WorkspaceTabKind::Page(page) => {
-                let title = page.title().to_owned();
-                let tooltip = title.clone();
-                let indicator = div()
-                    .size_4()
-                    .flex_shrink_0()
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .child(Icon::new(page.icon()).size_3().text_color(p.muted()))
-                    .into_any_element();
-                (title, tooltip, page.status(), indicator)
-            },
-        };
+        let TabMeta { title, tooltip, status, indicator, notice } = tab.meta(self, p, cx);
+        let notice = notice
+            .map(|notice| div().text_xs().text_color(p.muted()).child(notice).into_any_element());
         let tab_label = format!("切换到标签 {title} · {status}");
-        let drag_title = title.clone().into();
+        let drag_title = title.clone();
         let tab = div()
             .id(("tab", id))
             .h_7()
@@ -468,7 +389,7 @@ impl WorkspaceView {
                     .tooltip(format!("{tooltip} · {status}"))
                     .child(indicator)
                     .on_click(cx.listener(move |this, _, window, cx| {
-                        if let Some(index) = this.tabs.iter().position(|tab| tab.id == id) {
+                        if let Some(index) = this.tab_index(id) {
                             this.select_tab(index, window, cx);
                         }
                     }))
@@ -483,10 +404,7 @@ impl WorkspaceView {
                             .text_color(if active { p.foreground() } else { p.muted() })
                             .child(title),
                     )
-                    .when(
-                        tab.file().is_some_and(|view| view.read(cx).save_error().is_some()),
-                        |button| button.child(div().text_xs().text_color(p.muted()).child(status)),
-                    ),
+                    .children(notice),
             )
             .child(
                 Button::new(("close-tab", id))

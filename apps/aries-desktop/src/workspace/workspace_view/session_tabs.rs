@@ -10,14 +10,6 @@ impl WorkspaceView {
         self.tabs.get(self.active).and_then(WorkspaceTab::file)
     }
 
-    pub fn selected_diff_view(&self) -> Option<&Entity<GitDiffView>> {
-        self.tabs.get(self.active).and_then(WorkspaceTab::diff)
-    }
-
-    pub fn active_diff_view(&self) -> Option<&Entity<GitDiffView>> {
-        self.is_sessions_visible().then(|| self.selected_diff_view()).flatten()
-    }
-
     pub fn active_view(&self) -> Option<&Entity<SessionView>> {
         self.is_sessions_visible().then(|| self.selected_session_view()).flatten()
     }
@@ -28,6 +20,13 @@ impl WorkspaceView {
 
     pub fn current_directory(&self, cx: &App) -> PathBuf {
         self.selected_file_directory(cx).unwrap_or_else(|| self.cwd.clone())
+    }
+
+    pub fn session_views(&self) -> impl Iterator<Item = &Entity<SessionView>> {
+        self.tabs
+            .iter()
+            .filter_map(WorkspaceTab::session)
+            .chain(self.archived_tabs.iter().map(Tab::view))
     }
 
     pub fn new_session(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -61,15 +60,9 @@ impl WorkspaceView {
         let view =
             Self::create_chat_view(&directory, &self.agent, SessionRenderMode::Main, window, cx);
         let subscription = Self::observe_tab(&view, window, cx);
-        self.tabs.push(WorkspaceTab::new(
-            id,
-            WorkspaceTabKind::session(SessionTab::new(id, view.clone(), subscription)),
-        ));
+        self.tabs.push(WorkspaceTab::new_session(id, view.clone(), subscription));
         self.file_tree.update(cx, |tree, cx| tree.set_directory(directory.clone(), cx));
-        self.active = self.tabs.len() - 1;
-        self.tab_scroll.scroll_to_item(self.active);
-        self.sync_sidebar_active_session(cx);
-        self.focus_active_tab(window, cx);
+        self.activate_tab(self.tabs.len() - 1, window, cx);
         let view = view.downgrade();
         cx.spawn_in(window, async move |_, cx| {
             let _ = cx.update(|window, cx| {
@@ -97,12 +90,14 @@ impl WorkspaceView {
         }
         self.file_navigation_revision = self.file_navigation_revision.wrapping_add(1);
         let session_id = session.session_id.clone();
-        if let Some(index) =
-            self.archived_tabs.iter().position(|tab| tab.view.read(cx).matches_session(&session_id))
+        if let Some(index) = self
+            .archived_tabs
+            .iter()
+            .position(|tab| tab.view().read(cx).matches_session(&session_id))
         {
             let tab = self.archived_tabs.remove(index);
-            tab.view.update(cx, |view, cx| view.reload_archived_session(session, window, cx));
-            self.tabs.push(WorkspaceTab::new(tab.id, WorkspaceTabKind::session(tab)));
+            tab.view().update(cx, |view, cx| view.reload_archived_session(session, window, cx));
+            self.tabs.push(WorkspaceTab::resumed_session(tab));
             self.select_tab(self.tabs.len() - 1, window, cx);
             return;
         }
@@ -127,10 +122,7 @@ impl WorkspaceView {
             Self::create_chat_view(&session.cwd, &self.agent, SessionRenderMode::Main, window, cx);
         let subscription = Self::observe_tab(&view, window, cx);
         view.update(cx, |view, cx| view.queue_session_load(session, cx));
-        self.tabs.push(WorkspaceTab::new(
-            id,
-            WorkspaceTabKind::session(SessionTab::new(id, view, subscription)),
-        ));
+        self.tabs.push(WorkspaceTab::new_session(id, view, subscription));
         self.active = self.tabs.len() - 1;
         self.tab_scroll.scroll_to_item(self.active);
         self.set_sidebar_session(session_id, cx);
@@ -149,11 +141,7 @@ impl WorkspaceView {
         id: &SessionId,
         cx: &App,
     ) -> Option<&Entity<SessionView>> {
-        self.tabs
-            .iter()
-            .filter_map(WorkspaceTab::session)
-            .chain(self.archived_tabs.iter().map(|tab| &tab.view))
-            .find(|view| view.read(cx).matches_session(id))
+        self.session_views().find(|view| view.read(cx).matches_session(id))
     }
 
     pub fn forward_session_management_event(
@@ -177,15 +165,10 @@ impl WorkspaceView {
     }
 
     pub fn session_management_available(&self, id: &SessionId, cx: &App) -> bool {
-        self.tabs
-            .iter()
-            .filter_map(WorkspaceTab::session)
-            .chain(self.archived_tabs.iter().map(|tab| &tab.view))
-            .filter(|view| view.read(cx).matches_session(id))
-            .all(|view| {
-                let view = view.read(cx);
-                view.is_session_idle() && !view.execution().is_disconnected()
-            })
+        self.session_views().filter(|view| view.read(cx).matches_session(id)).all(|view| {
+            let view = view.read(cx);
+            view.is_session_idle() && !view.execution().is_disconnected()
+        })
     }
     pub fn lock_session_management(
         &mut self,
@@ -193,36 +176,26 @@ impl WorkspaceView {
         locked: bool,
         cx: &mut Context<Self>,
     ) {
-        for view in self
-            .tabs
-            .iter()
-            .filter_map(WorkspaceTab::session)
-            .chain(self.archived_tabs.iter().map(|tab| &tab.view))
-        {
+        for view in self.session_views() {
             if view.read(cx).matches_session(id) {
                 view.update(cx, |view, cx| view.set_management_lock(locked, cx));
             }
         }
     }
     pub fn sync_session_title(&mut self, id: &SessionId, title: String, cx: &mut Context<Self>) {
-        for view in self
-            .tabs
-            .iter()
-            .filter_map(WorkspaceTab::session)
-            .chain(self.archived_tabs.iter().map(|tab| &tab.view))
-        {
+        for view in self.session_views() {
             view.update(cx, |view, cx| view.sync_session_title(id, title.clone(), cx));
         }
         self.sync_sidebar_active_session(cx);
         cx.notify();
     }
     pub fn close_archived_session(&mut self, id: &SessionId, cx: &mut Context<Self>) {
-        let active_id = self.tabs.get(self.active).map(|tab| tab.id);
+        let active_id = self.active_id();
         let mut index = 0;
         while index < self.tabs.len() {
             if self.tabs[index].session().is_some_and(|view| view.read(cx).matches_session(id)) {
                 let tab = self.tabs.remove(index);
-                if let WorkspaceTabKind::Session(tab) = tab.kind {
+                if let WorkspaceTab::Session(tab) = tab {
                     self.archived_tabs.push(tab);
                 }
             } else {
@@ -232,9 +205,9 @@ impl WorkspaceView {
         self.tabs
             .retain(|tab| tab.diff_session().is_none_or(|view| !view.read(cx).matches_session(id)));
         self.active = active_id
-            .and_then(|id| self.tabs.iter().position(|tab| tab.id == id))
+            .and_then(|id| self.tab_index(id))
             .unwrap_or_else(|| self.active.min(self.tabs.len().saturating_sub(1)));
-        let changed_active = active_id != self.tabs.get(self.active).map(|tab| tab.id);
+        let changed_active = active_id != self.active_id();
         if changed_active {
             self.invalidate_file_navigation(cx);
         }
@@ -247,7 +220,7 @@ impl WorkspaceView {
     }
     pub fn close_deleted_sessions(&mut self, deleted: &HashSet<SessionId>, cx: &mut Context<Self>) {
         self.archived_tabs
-            .retain(|tab| !deleted.iter().any(|id| tab.view.read(cx).matches_session(id)));
+            .retain(|tab| !deleted.iter().any(|id| tab.view().read(cx).matches_session(id)));
         let ids: Vec<_> = self
             .tabs
             .iter()
@@ -255,7 +228,7 @@ impl WorkspaceView {
                 tab.session()
                     .is_some_and(|view| deleted.iter().any(|id| view.read(cx).matches_session(id)))
             })
-            .map(|tab| tab.id)
+            .map(WorkspaceTab::id)
             .collect();
         for id in ids {
             self.close_tab(id, cx);

@@ -43,7 +43,7 @@ impl WorkspaceView {
             None => {
                 let id = self.next_id;
                 self.next_id += 1;
-                self.tabs.push(WorkspaceTab::new(id, WorkspaceTabKind::page(page)));
+                self.tabs.push(WorkspaceTab::new_page(id, page));
                 self.tabs.len() - 1
             },
         };
@@ -59,10 +59,7 @@ impl WorkspaceView {
     }
 
     pub fn open_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.file_confirmation.is_some()
-            || !self.pending_file_operations.is_empty()
-            || window.has_active_dialog(cx)
-        {
+        if !self.can_navigate(window, cx) {
             return;
         }
         self.open_page(WorkspacePage::settings(), window, cx);
@@ -74,12 +71,7 @@ impl WorkspaceView {
 
     pub fn notify_settings_tabs(&self, cx: &mut Context<Self>) {
         for tab in &self.tabs {
-            match &tab.kind {
-                WorkspaceTabKind::Session(tab) => tab.view.update(cx, |_, cx| cx.notify()),
-                WorkspaceTabKind::File(tab) => tab.view.update(cx, |_, cx| cx.notify()),
-                WorkspaceTabKind::Diff(tab) => tab.view.update(cx, |_, cx| cx.notify()),
-                WorkspaceTabKind::Page(_) => {},
-            }
+            tab.notify(cx);
         }
     }
 

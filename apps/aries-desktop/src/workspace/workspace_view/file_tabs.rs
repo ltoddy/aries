@@ -2,21 +2,15 @@ use crate::workspace::workspace_view::*;
 
 impl WorkspaceView {
     pub fn open_file(&mut self, target: OpenFile, window: &mut Window, cx: &mut Context<Self>) {
-        if self.file_confirmation.is_some()
-            || !self.pending_file_operations.is_empty()
-            || window.has_active_dialog(cx)
-        {
-            return;
-        }
-        if !self.file_tree.update(cx, |tree, cx| tree.cancel_actions(window, cx)) {
+        if !self.begin_navigation(window, cx) {
             return;
         }
         let path = self.normalize_file_path(target.path(), cx);
         let existing = self.tabs.iter().position(|tab| {
-            let WorkspaceTabKind::File(file) = &tab.kind else {
+            let WorkspaceTab::File(file) = tab else {
                 return false;
             };
-            file.view
+            file.view()
                 .read(cx)
                 .target()
                 .is_some_and(|current| self.normalize_file_path(current.path(), cx) == path)
@@ -42,16 +36,14 @@ impl WorkspaceView {
                     });
                 });
             view.update(cx, |view, cx| view.open(target.clone(), window, cx));
-            self.tabs.push(WorkspaceTab::new(
-                id,
-                WorkspaceTabKind::file(FileTab::new(view, subscription, close_subscription)),
-            ));
+            let tab = Tab::new(id, view, subscription);
+            self.tabs.push(WorkspaceTab::new_file(FileTab::new(tab, close_subscription)));
             self.resolve_file_identity(id, window, cx);
             self.tabs.len() - 1
         };
-        let id = self.tabs[index].id;
+        let id = self.tabs[index].id();
         self.select_tab(index, window, cx);
-        if self.tabs.get(self.active).is_none_or(|tab| tab.id != id) {
+        if self.active_id() != Some(id) {
             return;
         }
         if let Some(view) = self.active_file_view().cloned() {
@@ -83,9 +75,9 @@ impl WorkspaceView {
             let _ = owner.update(cx, |this, cx| {
                 if this.is_sessions_visible()
                     && this.file_navigation_revision == revision
-                    && this.tabs.get(this.active).is_some_and(|tab| tab.id == id)
+                    && this.active_id() == Some(id)
                     && let Some(view) =
-                        this.tabs.iter().find(|tab| tab.id == id).and_then(WorkspaceTab::file)
+                        this.tabs.iter().find(|tab| tab.id() == id).and_then(WorkspaceTab::file)
                     && (this.focus_handle.is_focused(window)
                         || view.read(cx).focus_handle(cx).contains_focused(window, cx))
                 {
@@ -105,45 +97,41 @@ impl WorkspaceView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(tab) = self.tabs.iter_mut().find(|tab| tab.id == id) else {
+        let Some(tab) = self.tabs.iter_mut().find(|tab| tab.id() == id) else {
             return;
         };
-        let WorkspaceTabKind::File(file) = &mut tab.kind else {
+        let WorkspaceTab::File(file) = tab else {
             return;
         };
-        file.identity_task = None;
-        file.canonical_path = None;
-        let Some(target) = file.view.read(cx).target() else {
+        file.reset_identity();
+        let Some(target) = file.view().read(cx).target() else {
             return;
         };
         let path = target.path().to_owned();
-        file.identity_task = Some(cx.spawn_in(window, async move |this, cx| {
+        let task = cx.spawn_in(window, async move |this, cx| {
             let request = path.clone();
             let canonical =
                 cx.background_spawn(async move { std::fs::canonicalize(request).ok() }).await;
             let _ = this.update_in(cx, |this, window, cx| {
-                let Some(tab) = this.tabs.iter_mut().find(|tab| tab.id == id) else {
+                let Some(tab) = this.tabs.iter_mut().find(|tab| tab.id() == id) else {
                     return;
                 };
-                let WorkspaceTabKind::File(file) = &mut tab.kind else {
+                let WorkspaceTab::File(file) = tab else {
                     return;
                 };
-                if file.view.read(cx).target().is_none_or(|target| target.path() != path) {
+                if file.view().read(cx).target().is_none_or(|target| target.path() != path) {
                     return;
                 }
-                file.identity_task = None;
-                file.canonical_path = canonical.clone();
+                file.settle_identity(canonical.clone());
                 let Some(canonical) = canonical else {
                     return;
                 };
                 let mut duplicates: Vec<_> = this
                     .tabs
                     .iter()
-                    .filter_map(|tab| match &tab.kind {
-                        WorkspaceTabKind::File(file)
-                            if file.canonical_path.as_ref() == Some(&canonical) =>
-                        {
-                            Some(tab.id)
+                    .filter_map(|tab| match tab {
+                        WorkspaceTab::File(file) if file.canonical_path() == Some(&canonical) => {
+                            Some(tab.id())
                         },
                         _ => None,
                     })
@@ -156,13 +144,13 @@ impl WorkspaceView {
                 let protected: Vec<_> = this
                     .tabs
                     .iter()
-                    .filter(|tab| duplicates.contains(&tab.id))
+                    .filter(|tab| duplicates.contains(&tab.id()))
                     .filter(|tab| {
                         tab.file().is_some_and(|view| {
                             view.read(cx).is_dirty() || view.read(cx).is_saving()
                         })
                     })
-                    .map(|tab| tab.id)
+                    .map(WorkspaceTab::id)
                     .collect();
                 let Some(keep) = protected.first().or(duplicates.first()).copied() else {
                     return;
@@ -174,7 +162,7 @@ impl WorkspaceView {
                 if remove.is_empty() {
                     return;
                 }
-                let active_id = this.tabs.get(this.active).map(|tab| tab.id);
+                let active_id = this.active_id();
                 let replaced = active_id.is_some_and(|id| remove.contains(&id));
                 let focused = this.active_file_view().is_some_and(|view| {
                     view.read(cx).focus_handle(cx).contains_focused(window, cx)
@@ -183,11 +171,9 @@ impl WorkspaceView {
                     .selected_file_view()
                     .and_then(|view| view.read(cx).target())
                     .and_then(OpenFile::line);
-                this.tabs.retain(|tab| !remove.contains(&tab.id));
+                this.tabs.retain(|tab| !remove.contains(&tab.id()));
                 let active_id = if replaced { Some(keep) } else { active_id };
-                this.active = active_id
-                    .and_then(|id| this.tabs.iter().position(|tab| tab.id == id))
-                    .unwrap_or(0);
+                this.active = active_id.and_then(|id| this.tab_index(id)).unwrap_or(0);
                 if replaced {
                     this.invalidate_file_navigation(cx);
                     this.sync_sidebar_active_session(cx);
@@ -209,7 +195,8 @@ impl WorkspaceView {
                 }
                 cx.notify();
             });
-        }));
+        });
+        file.start_identity(task);
     }
 
     pub fn on_file_action(
@@ -237,14 +224,12 @@ impl WorkspaceView {
             self.tabs
                 .iter()
                 .filter_map(|tab| {
-                    let WorkspaceTabKind::File(file) = &tab.kind else {
+                    let WorkspaceTab::File(file) = tab else {
                         return None;
                     };
-                    let target =
-                        file.pending_target.as_ref().or_else(|| file.view.read(cx).target())?;
+                    let target = file.pending_target().or_else(|| file.view().read(cx).target())?;
                     let primary = tree.normalize_path(target.path());
-                    let canonical =
-                        file.canonical_path.as_deref().map(|path| tree.normalize_path(path));
+                    let canonical = file.canonical_path().map(|path| tree.normalize_path(path));
                     let action = match &event {
                         FileActionEvent::Renamed { from, to } => {
                             if let Ok(relative) = primary.strip_prefix(from) {
@@ -300,7 +285,7 @@ impl WorkspaceView {
                         },
                         FileActionEvent::Created(_) => return None,
                     };
-                    Some((tab.id, action))
+                    Some((tab.id(), action))
                 })
                 .collect()
         };
@@ -316,7 +301,7 @@ impl WorkspaceView {
     }
 
     pub fn file_view(&self, id: usize) -> Option<&Entity<FileView>> {
-        self.tabs.iter().find(|tab| tab.id == id).and_then(WorkspaceTab::file)
+        self.tab_index(id).and_then(|index| self.tabs[index].file())
     }
 
     pub fn refresh_file_tab(&mut self, id: usize, window: &mut Window, cx: &mut Context<Self>) {
@@ -341,21 +326,20 @@ impl WorkspaceView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(tab) = self.tabs.iter_mut().find(|tab| tab.id == id) else {
+        let Some(tab) = self.tabs.iter_mut().find(|tab| tab.id() == id) else {
             return;
         };
-        let WorkspaceTabKind::File(file) = &mut tab.kind else {
+        let WorkspaceTab::File(file) = tab else {
             return;
         };
-        file.identity_task = None;
-        file.canonical_path = None;
-        if file.view.read(cx).is_saving() {
-            file.pending_target = Some(target);
+        file.reset_identity();
+        if file.view().read(cx).is_saving() {
+            file.set_pending_target(target);
             return;
         }
-        file.pending_target = None;
+        file.take_pending_target();
         let focus = window.focused(cx);
-        file.view.update(cx, |view, cx| view.retarget(target, window, cx));
+        file.view().update(cx, |view, cx| view.retarget(target, window, cx));
         if let Some(focus) = focus {
             focus.focus(window, cx);
         }
@@ -363,13 +347,7 @@ impl WorkspaceView {
     }
 
     pub fn save_file_tab(&mut self, id: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if self.file_confirmation.is_some()
-            || !self.pending_file_operations.is_empty()
-            || window.has_active_dialog(cx)
-        {
-            return;
-        }
-        if !self.file_tree.update(cx, |tree, cx| tree.cancel_actions(window, cx)) {
+        if !self.begin_navigation(window, cx) {
             return;
         }
         if let Some(view) = self.file_view(id) {
@@ -379,13 +357,13 @@ impl WorkspaceView {
 
     pub fn on_file_updated(&mut self, id: usize, window: &mut Window, cx: &mut Context<Self>) {
         let target = self.tabs.iter_mut().find_map(|tab| {
-            if tab.id != id {
+            if tab.id() != id {
                 return None;
             }
-            let WorkspaceTabKind::File(file) = &mut tab.kind else {
+            let WorkspaceTab::File(file) = tab else {
                 return None;
             };
-            (!file.view.read(cx).is_saving()).then(|| file.pending_target.take()).flatten()
+            (!file.view().read(cx).is_saving()).then(|| file.take_pending_target()).flatten()
         });
         if let Some(target) = target {
             self.retarget_file_tab(id, target, window, cx);

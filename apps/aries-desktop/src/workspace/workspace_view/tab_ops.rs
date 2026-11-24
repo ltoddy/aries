@@ -1,6 +1,46 @@
 use crate::workspace::workspace_view::*;
 
 impl WorkspaceView {
+    pub fn tab_index(&self, id: usize) -> Option<usize> {
+        self.tabs.iter().position(|tab| tab.id() == id)
+    }
+
+    pub fn active_tab(&self) -> Option<&WorkspaceTab> {
+        self.tabs.get(self.active)
+    }
+
+    pub fn active_id(&self) -> Option<usize> {
+        self.active_tab().map(WorkspaceTab::id)
+    }
+
+    pub fn has_saving_file(&self, cx: &App) -> bool {
+        self.tabs.iter().any(|tab| tab.is_saving(cx))
+    }
+
+    pub fn can_navigate(&self, window: &mut Window, cx: &mut App) -> bool {
+        self.file_confirmation.is_none()
+            && self.pending_file_operations.is_empty()
+            && !window.has_active_dialog(cx)
+    }
+
+    pub fn begin_navigation(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        if !self.can_navigate(window, cx)
+            || !self.file_tree.update(cx, |tree, cx| tree.cancel_actions(window, cx))
+        {
+            return false;
+        }
+        self.file_navigation_revision = self.file_navigation_revision.wrapping_add(1);
+        true
+    }
+
+    pub fn activate_tab(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+        self.active = index;
+        self.tab_scroll.scroll_to_item(index);
+        self.sync_sidebar_active_session(cx);
+        self.focus_active_tab(window, cx);
+        cx.notify();
+    }
+
     pub fn close_tab(&mut self, id: usize, cx: &mut Context<Self>) {
         if self
             .file_view(id)
@@ -13,25 +53,24 @@ impl WorkspaceView {
     }
 
     pub fn remove_tab(&mut self, id: usize, cx: &mut Context<Self>) {
-        let Some(index) = self.tabs.iter().position(|tab| tab.id == id) else {
+        let Some(index) = self.tab_index(id) else {
             return;
         };
-        if self.tabs[index].is_pending(cx)
-            || self.tabs[index].file().is_some_and(|view| view.read(cx).is_saving())
-        {
+        let tab = &self.tabs[index];
+        if tab.is_pending(cx) || tab.is_saving(cx) {
             return;
         }
-        let active_id = self.tabs.get(self.active).map(|tab| tab.id);
-        let session = self.tabs[index].session().map(|view| view.entity_id());
+        let active_id = self.active_id();
+        let session = tab.session().map(|view| view.entity_id());
         self.tabs.remove(index);
         if let Some(session) = session {
             self.tabs
                 .retain(|tab| tab.diff_session().is_none_or(|view| view.entity_id() != session));
         }
         self.active = active_id
-            .and_then(|id| self.tabs.iter().position(|tab| tab.id == id))
+            .and_then(|id| self.tab_index(id))
             .unwrap_or_else(|| index.min(self.tabs.len().saturating_sub(1)));
-        let changed_active = active_id != self.tabs.get(self.active).map(|tab| tab.id);
+        let changed_active = active_id != self.active_id();
         if changed_active {
             self.invalidate_file_navigation(cx);
         }
@@ -44,7 +83,7 @@ impl WorkspaceView {
     }
 
     pub fn tab_order(&self) -> Vec<usize> {
-        self.tabs.iter().map(|tab| tab.id).collect()
+        self.tabs.iter().map(WorkspaceTab::id).collect()
     }
 
     pub fn move_tab(&mut self, drag: &DragTab, target: usize, cx: &mut Context<Self>) {
@@ -58,12 +97,11 @@ impl WorkspaceView {
         let Some(to) = order.iter().position(|id| *id == target) else {
             return;
         };
-        let active = self.tabs.get(self.active).map(|tab| tab.id);
+        let active = self.active_id();
         order.remove(from);
         order.insert(to, drag.id);
-        self.tabs.sort_by_key(|tab| order.iter().position(|id| *id == tab.id));
-        self.active =
-            active.and_then(|id| self.tabs.iter().position(|tab| tab.id == id)).unwrap_or(0);
+        self.tabs.sort_by_key(|tab| order.iter().position(|id| *id == tab.id()));
+        self.active = active.and_then(|id| self.tab_index(id)).unwrap_or(0);
         self.tab_scroll.scroll_to_item(to);
         cx.notify();
     }
@@ -80,34 +118,28 @@ impl WorkspaceView {
             .filter(|tab| {
                 !tab.is_pending(cx)
                     && match command {
-                        TabCommand::Close(id) => tab.id == id,
+                        TabCommand::Close(id) => tab.id() == id,
                         TabCommand::CloseAll => true,
-                        TabCommand::CloseOthers(id) => tab.id != id,
+                        TabCommand::CloseOthers(id) => tab.id() != id,
                     }
             })
-            .map(|tab| PendingFileOperation::close(tab.id))
+            .map(|tab| PendingFileOperation::close(tab.id()))
             .collect();
         self.request_file_operations(operations, window, cx);
     }
 
     pub fn defer_active_tab_focus(&self, cx: &mut Context<Self>) {
-        let id = self.tabs.get(self.active).map(|tab| tab.id);
+        let id = self.active_id();
         let revision = self.file_navigation_revision;
         let window = self.window;
         let owner = cx.weak_entity();
         cx.defer(move |cx| {
             let _ = window.update(cx, |_, window, cx| {
                 let _ = owner.update(cx, |this, cx| {
-                    let already_focused = this.active_file_view().is_some_and(|view| {
-                        view.read(cx).focus_handle(cx).contains_focused(window, cx)
-                    }) || this
-                        .active_diff_view()
-                        .is_some_and(|view| view.read(cx).is_focused(window, cx))
-                        || this.active_view().is_some_and(|view| {
-                            view.read(cx).input().focus_handle(cx).contains_focused(window, cx)
-                        });
+                    let already_focused =
+                        this.active_tab().is_some_and(|tab| tab.contains_focused(window, cx));
                     if this.file_navigation_revision == revision
-                        && this.tabs.get(this.active).map(|tab| tab.id) == id
+                        && this.active_id() == id
                         && !window.has_active_dialog(cx)
                         && !already_focused
                     {
@@ -126,47 +158,30 @@ impl WorkspaceView {
         if !self.is_sessions_visible() {
             return;
         }
-        let id = self.tabs.get(self.active).map(|tab| tab.id);
+        let id = self.active_id();
         let revision = self.file_navigation_revision;
         let owner = cx.weak_entity();
         window.on_next_frame(move |window, cx| {
             let _ = owner.update(cx, |this, cx| {
                 if !this.is_sessions_visible()
                     || this.file_navigation_revision != revision
-                    || this.tabs.get(this.active).map(|tab| tab.id) != id
+                    || this.active_id() != id
                     || !this.focus_handle.is_focused(window)
                 {
                     return;
                 }
-                if let Some(view) = this.active_diff_view() {
-                    view.update(cx, |view, cx| view.focus(window, cx));
-                } else if let Some(view) = this.active_file_view() {
-                    view.update(cx, |view, cx| view.focus(window, cx));
-                } else if let Some(view) = this.active_view() {
-                    let input = view.read(cx).input().clone();
-                    input.update(cx, |input, cx| input.focus(window, cx));
+                if let Some(tab) = this.active_tab() {
+                    tab.focus(window, cx);
                 }
             });
         });
     }
 
     pub fn select_tab(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if index >= self.tabs.len()
-            || self.file_confirmation.is_some()
-            || !self.pending_file_operations.is_empty()
-            || window.has_active_dialog(cx)
-        {
+        if index >= self.tabs.len() || !self.begin_navigation(window, cx) {
             return;
         }
-        if !self.file_tree.update(cx, |tree, cx| tree.cancel_actions(window, cx)) {
-            return;
-        }
-        self.file_navigation_revision = self.file_navigation_revision.wrapping_add(1);
-        self.active = index;
-        self.tab_scroll.scroll_to_item(index);
-        self.sync_sidebar_active_session(cx);
-        self.focus_active_tab(window, cx);
-        cx.notify();
+        self.activate_tab(index, window, cx);
     }
 
     pub fn switch_tab(&mut self, next: bool, window: &mut Window, cx: &mut Context<Self>) {

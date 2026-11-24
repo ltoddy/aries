@@ -3,9 +3,6 @@ use crate::workspace::workspace_view::*;
 impl Render for WorkspaceView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let p = Palette::new(cx.theme().mode);
-        let active = self.active_view().cloned();
-        let file = self.active_file_view().cloned();
-        let diff = self.active_diff_view().cloned().filter(|view| view.read(cx).is_open());
         let font_size = cx.theme().font_size;
         let width = window.viewport_size().width;
         let content_minimum = font_size * 26.;
@@ -32,34 +29,7 @@ impl Render for WorkspaceView {
             Pixels::ZERO
         };
         let panel_style = div().size_full().style().clone();
-        let page = self.active_page().map(|page| match page {
-            WorkspacePage::Settings => {
-                self.settings.clone().cached(panel_style.clone()).into_any_element()
-            },
-            WorkspacePage::Extensions => {
-                self.extensions.clone().cached(panel_style.clone()).into_any_element()
-            },
-            WorkspacePage::Usage => {
-                self.usage.clone().cached(panel_style.clone()).into_any_element()
-            },
-        });
-        let chat =
-            div().relative().size_full().min_w_0().min_h_0().child(if let Some(page) = page {
-                div().size_full().child(page).into_any_element()
-            } else {
-                if let Some(file) = file {
-                    div().size_full().child(file.cached(panel_style.clone())).into_any_element()
-                } else if let Some(view) = active {
-                    div().size_full().child(view.cached(panel_style.clone())).into_any_element()
-                } else {
-                    self.render_empty_main(p, cx)
-                }
-            });
-        let content = if let Some(diff) = diff {
-            diff.cached(panel_style.clone()).into_any_element()
-        } else {
-            chat.into_any_element()
-        };
+        let content = self.render_content(p, panel_style.clone(), cx);
         let content = self.render_terminal_layout(content, window, cx);
         let main = div()
             .flex_1()
@@ -87,7 +57,7 @@ impl Render for WorkspaceView {
             .size_full()
             .track_focus(&self.focus_handle)
             .capture_action(cx.listener(|this, _: &SaveFile, window, cx| {
-                if let Some(id) = this.tabs.get(this.active).map(|tab| tab.id) {
+                if let Some(id) = this.active_id() {
                     this.save_file_tab(id, window, cx);
                 }
                 cx.stop_propagation();
@@ -111,8 +81,7 @@ impl Render for WorkspaceView {
                 this.select_sidebar_page(SidebarPage::git(), window, cx);
             }))
             .on_action(cx.listener(|this, _: &CloseTab, window, cx| {
-                if let Some(tab) = this.tabs.get(this.active) {
-                    let id = tab.id;
+                if let Some(id) = this.active_id() {
                     this.execute_tab_command(TabCommand::close(id), window, cx);
                 }
             }))
@@ -199,6 +168,40 @@ impl Render for WorkspaceView {
 }
 
 impl WorkspaceView {
+    pub fn render_content(
+        &self,
+        p: Palette,
+        style: StyleRefinement,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let Some(tab) = self.active_tab() else {
+            return self.render_empty_main(p, cx);
+        };
+        match tab {
+            WorkspaceTab::Page(tab) => {
+                let page = self.render_page(tab.page(), style);
+                div().size_full().child(page).into_any_element()
+            },
+            WorkspaceTab::Diff(tab) => {
+                if tab.view().read(cx).is_open() {
+                    tab.view().clone().cached(style).into_any_element()
+                } else {
+                    render_detail(tab.session().clone().cached(style))
+                }
+            },
+            WorkspaceTab::File(tab) => render_detail(tab.view().clone().cached(style)),
+            WorkspaceTab::Session(tab) => render_detail(tab.view().clone().cached(style)),
+        }
+    }
+
+    fn render_page(&self, page: WorkspacePage, style: StyleRefinement) -> AnyElement {
+        match page {
+            WorkspacePage::Settings => self.settings.clone().cached(style).into_any_element(),
+            WorkspacePage::Extensions => self.extensions.clone().cached(style).into_any_element(),
+            WorkspacePage::Usage => self.usage.clone().cached(style).into_any_element(),
+        }
+    }
+
     pub fn observe_tab(
         view: &Entity<SessionView>,
         window: &mut Window,
@@ -261,4 +264,8 @@ impl WorkspaceView {
         self.sidebar.update(cx, |view, cx| view.set_sidebar_session(session_id, cx));
         self.sync_file_directory(cx);
     }
+}
+
+fn render_detail(element: impl IntoElement) -> AnyElement {
+    div().relative().size_full().min_w_0().min_h_0().child(element).into_any_element()
 }

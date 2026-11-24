@@ -42,147 +42,11 @@ mod layout;
 mod pages;
 mod render;
 mod session_tabs;
+mod tab;
 mod tab_ops;
 mod tab_render;
 
-pub struct SessionTab {
-    id: usize,
-    view: Entity<SessionView>,
-    _subscription: Subscription,
-}
-
-impl SessionTab {
-    fn new(id: usize, view: Entity<SessionView>, subscription: Subscription) -> Self {
-        Self { id, view, _subscription: subscription }
-    }
-}
-
-pub struct FileTab {
-    view: Entity<FileView>,
-    _subscription: Subscription,
-    _close_subscription: Subscription,
-    canonical_path: Option<PathBuf>,
-    identity_task: Option<Task<()>>,
-    pending_target: Option<OpenFile>,
-}
-
-impl FileTab {
-    fn new(
-        view: Entity<FileView>,
-        subscription: Subscription,
-        close_subscription: Subscription,
-    ) -> Self {
-        Self {
-            view,
-            _subscription: subscription,
-            _close_subscription: close_subscription,
-            canonical_path: None,
-            identity_task: None,
-            pending_target: None,
-        }
-    }
-}
-
-pub struct DiffTab {
-    view: Entity<GitDiffView>,
-    session: Entity<SessionView>,
-    _subscription: Subscription,
-}
-
-impl DiffTab {
-    fn new(
-        view: Entity<GitDiffView>,
-        session: Entity<SessionView>,
-        subscription: Subscription,
-    ) -> Self {
-        Self { view, session, _subscription: subscription }
-    }
-}
-
-pub enum WorkspaceTabKind {
-    Session(SessionTab),
-    File(FileTab),
-    Diff(DiffTab),
-    Page(WorkspacePage),
-}
-
-impl WorkspaceTabKind {
-    fn session(tab: SessionTab) -> Self {
-        Self::Session(tab)
-    }
-
-    fn file(tab: FileTab) -> Self {
-        Self::File(tab)
-    }
-
-    fn diff(tab: DiffTab) -> Self {
-        Self::Diff(tab)
-    }
-
-    fn page(page: WorkspacePage) -> Self {
-        Self::Page(page)
-    }
-}
-
-pub struct WorkspaceTab {
-    id: usize,
-    kind: WorkspaceTabKind,
-}
-
-impl WorkspaceTab {
-    fn new(id: usize, kind: WorkspaceTabKind) -> Self {
-        Self { id, kind }
-    }
-
-    fn session(&self) -> Option<&Entity<SessionView>> {
-        match &self.kind {
-            WorkspaceTabKind::Session(tab) => Some(&tab.view),
-            WorkspaceTabKind::File(_) => None,
-            WorkspaceTabKind::Diff(_) => None,
-            WorkspaceTabKind::Page(_) => None,
-        }
-    }
-
-    fn file(&self) -> Option<&Entity<FileView>> {
-        match &self.kind {
-            WorkspaceTabKind::Session(_) => None,
-            WorkspaceTabKind::File(tab) => Some(&tab.view),
-            WorkspaceTabKind::Diff(_) => None,
-            WorkspaceTabKind::Page(_) => None,
-        }
-    }
-
-    fn diff(&self) -> Option<&Entity<GitDiffView>> {
-        match &self.kind {
-            WorkspaceTabKind::Session(_) => None,
-            WorkspaceTabKind::File(_) => None,
-            WorkspaceTabKind::Diff(tab) => Some(&tab.view),
-            WorkspaceTabKind::Page(_) => None,
-        }
-    }
-
-    fn diff_session(&self) -> Option<&Entity<SessionView>> {
-        match &self.kind {
-            WorkspaceTabKind::Session(_) => None,
-            WorkspaceTabKind::File(_) => None,
-            WorkspaceTabKind::Diff(tab) => Some(&tab.session),
-            WorkspaceTabKind::Page(_) => None,
-        }
-    }
-
-    fn page(&self) -> Option<WorkspacePage> {
-        match &self.kind {
-            WorkspaceTabKind::Session(_) => None,
-            WorkspaceTabKind::File(_) => None,
-            WorkspaceTabKind::Diff(_) => None,
-            WorkspaceTabKind::Page(page) => Some(*page),
-        }
-    }
-
-    fn is_pending(&self, cx: &App) -> bool {
-        self.session().is_some_and(|view| view.read(cx).management().is_pending())
-    }
-}
+pub use self::tab::{DiffTab, FileTab, Tab, TabMeta, WorkspaceTab};
 
 pub enum FileTabAction {
     Retarget(OpenFile),
@@ -427,7 +291,7 @@ pub struct WorkspaceView {
     file_operation_focus: Option<FocusHandle>,
     quit_discarded: HashSet<usize>,
     file_operation_wait: Option<Task<()>>,
-    archived_tabs: Vec<SessionTab>,
+    archived_tabs: Vec<Tab<SessionView>>,
     active: usize,
     next_id: usize,
     tab_scroll: ScrollHandle,
