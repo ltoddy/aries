@@ -29,7 +29,7 @@ impl Timeline {
         index: usize,
         conversation: &Conversation,
         session_id: Option<&SessionId>,
-        palette: Palette,
+        p: Palette,
         cx: &mut Context<SessionView>,
     ) -> AnyElement {
         self.images.cache_visible_images(index, &conversation.messages()[index]);
@@ -53,7 +53,7 @@ impl Timeline {
             let markdown = expanded.then(|| self.markdown_state(index, conversation, cx));
             return ThoughtMessage::from_message(
                 index,
-                palette,
+                p,
                 &conversation.messages()[index],
                 id,
                 expanded,
@@ -74,7 +74,7 @@ impl Timeline {
             let id = subagent.session_id().clone();
             return SubagentMessage::from_subagent(
                 subagent,
-                palette,
+                p,
                 collapsed,
                 cx.listener(move |this, _: &ClickEvent, _, cx| {
                     this.with_timeline(|timeline, _, _| timeline.toggle_subagent(&id));
@@ -88,10 +88,10 @@ impl Timeline {
             return ToolMessage::from_tool(
                 index,
                 tool,
-                palette,
+                p,
                 cx.entity_id(),
                 session_id,
-                self.tool_diffs.render(index, tool, palette, cx.weak_entity()),
+                self.tool_diffs.render(index, tool, p, cx.weak_entity()),
                 cx.listener(move |this, _: &ClickEvent, window, cx| {
                     this.open_tool_details(index, window, cx);
                 }),
@@ -99,14 +99,8 @@ impl Timeline {
             .into_any_element();
         }
         if message.role() == Role::User {
-            return UserMessage::from_message(
-                index,
-                message,
-                &self.images,
-                palette,
-                cx.weak_entity(),
-            )
-            .into_any_element();
+            return UserMessage::from_message(index, message, &self.images, p, cx.weak_entity())
+                .into_any_element();
         }
         let markdown = self.markdown_state(index, conversation, cx);
         let message = &conversation.messages()[index];
@@ -125,7 +119,7 @@ impl Timeline {
             .flex()
             .flex_col()
             .gap_1()
-            .when(card, |body| body.px_2().py_1().rounded(cx.theme().radius).bg(palette.bubble()))
+            .when(card, |body| body.px_2().py_1().rounded(cx.theme().radius).bg(p.bubble()))
             .when(card || !message.title().is_empty(), |body| {
                 body.child(
                     div()
@@ -134,7 +128,7 @@ impl Timeline {
                         .items_center()
                         .gap_2()
                         .text_xs()
-                        .text_color(palette.muted())
+                        .text_color(p.muted())
                         .when(card, |header| {
                             header.child(Icon::new(IconName::Activity).size(rems(0.875)))
                         })
@@ -142,9 +136,9 @@ impl Timeline {
                             compaction.zip(compaction_status),
                             |header, (state, (_, icon))| {
                                 let color = if state.status == CompactionStatus::Failed {
-                                    palette.danger()
+                                    p.danger()
                                 } else {
-                                    palette.muted()
+                                    p.muted()
                                 };
                                 let mut summary = state.clone();
                                 summary.error = MaybeUndefined::Undefined;
@@ -210,7 +204,7 @@ impl Timeline {
                                     el.child(
                                         div()
                                             .text_xs()
-                                            .text_color(palette.muted())
+                                            .text_color(p.muted())
                                             .child(lang.to_string()),
                                     )
                                 })
@@ -226,7 +220,7 @@ impl Timeline {
                                         .child(
                                             Icon::new(IconName::Copy)
                                                 .xsmall()
-                                                .text_color(palette.muted()),
+                                                .text_color(p.muted()),
                                         )
                                 })
                                 .into_any_element()
@@ -243,7 +237,7 @@ impl Timeline {
                     };
                     resource_uri(content)?;
                     Some(
-                        Attachment::from_content(index, attachment_index, content, None, palette)
+                        Attachment::from_content(index, attachment_index, content, None, p)
                             .with_session(cx.weak_entity())
                             .into_any_element(),
                     )

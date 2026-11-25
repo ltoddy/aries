@@ -1,19 +1,39 @@
+use std::collections::{HashSet, VecDeque};
 use std::fmt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use agent_client_protocol::AcpAgentConfig;
+use agent_client_protocol::v1::schema::{SessionId, SessionInfo};
 use gpui_kit::assets::IconName;
-use gpui_kit::component::{ActiveTheme, ResizableState};
+use gpui_kit::base::GlobalState;
+use gpui_kit::base::actions::Confirm;
+use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants};
+use gpui_kit::component::dialog::{Dialog, DialogClose, DialogEntrance, DialogFooter};
+use gpui_kit::component::menu::{ContextMenuExt, PopupMenu, PopupMenuItem};
+use gpui_kit::component::spinner::Spinner;
+use gpui_kit::component::{
+    ActiveTheme, Disableable, Icon, ResizableState, Selectable, Sizable, TitleBar, WindowExt,
+    h_resizable, resizable_panel, v_resizable,
+};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 
+use crate::acp::Event;
+use crate::terminal::TerminalView;
 use crate::workspace::extensions::ExtensionsView;
-use crate::workspace::files::{FileActionEvent, FileTree, OpenFile};
-use crate::workspace::settings::SettingsState;
+use crate::workspace::files::{CloseFile, FileActionEvent, FileTree, FileView, OpenFile, SaveFile};
+use crate::workspace::git::diff_view::{DiffTargetChanged, GitDiffView};
 use crate::workspace::settings::palette::Palette;
+use crate::workspace::settings::{Preferences, SettingsState};
+use crate::workspace::sidebar::Sidebar;
 use crate::workspace::usage::UsageView;
 use crate::workspace::workspace_view::fps_counter::FpsCounter;
 use crate::workspace::{SessionRenderMode, SessionView};
+use crate::{
+    CloseTab, NewSession, NextTab, NextUserMessage, OpenSettings, PreviousTab, PreviousUserMessage,
+    ShowFilesSidebar, ShowGitSidebar, ShowSessionsSidebar, ToggleSidebar, ToggleTerminal,
+};
 
 mod file_operations;
 mod file_tabs;
@@ -23,33 +43,12 @@ mod pages;
 mod render;
 mod session_tabs;
 mod sidebar_panel;
-mod state;
 mod tab;
 mod tab_ops;
 mod tab_render;
 
-pub use self::layout::{LayoutSizes, SidebarLayout};
 pub use self::sidebar_panel::SidebarPanel;
-pub use self::state::{FileQueue, SidebarState, TabSet, TerminalState};
 pub use self::tab::{DiffTab, FileTab, Tab, TabMeta, WorkspaceTab};
-
-pub struct Shell<'a> {
-    pub sizes: &'a LayoutSizes,
-    pub sidebar: SidebarLayout,
-    pub palette: Palette,
-    pub style: StyleRefinement,
-}
-
-impl<'a> Shell<'a> {
-    pub fn new(
-        sizes: &'a LayoutSizes,
-        sidebar: SidebarLayout,
-        palette: Palette,
-        style: StyleRefinement,
-    ) -> Self {
-        Self { sizes, sidebar, palette, style }
-    }
-}
 
 pub enum FileTabAction {
     Retarget(OpenFile),
@@ -253,21 +252,38 @@ impl FileConfirmation {
 pub struct WorkspaceView {
     cwd: PathBuf,
     window: AnyWindowHandle,
+    sidebar_panels: Vec<SidebarPanel>,
+    sidebar_panel: SidebarPanel,
     file_tree: Entity<FileTree>,
     _file_subscription: Subscription,
     _file_action_subscription: Subscription,
     file_navigation_revision: u64,
     settings: Entity<SettingsState>,
     agent: AcpAgentConfig,
-    sidebar_view: Entity<SessionView>,
-    _sidebar_subscription: Subscription,
+    sidebar: Entity<SessionView>,
+    sidebar_visible: bool,
+    sidebar_focus_handle: FocusHandle,
+    sidebar_toggle_focus_handle: FocusHandle,
+    sidebar_sessions_focus_handle: FocusHandle,
     layout: Entity<ResizableState>,
-    sidebar: SidebarState,
-    tabs: TabSet,
-    files: FileQueue,
-    terminal: TerminalState,
+    _sidebar_subscription: Subscription,
+    tabs: Vec<WorkspaceTab>,
+    pending_file_operations: VecDeque<PendingFileOperation>,
+    file_confirmation: Option<FileConfirmation>,
+    file_operation_focus: Option<FocusHandle>,
+    quit_discarded: HashSet<usize>,
+    file_operation_wait: Option<Task<()>>,
+    archived_tabs: Vec<Tab<SessionView>>,
+    active: usize,
+    next_id: usize,
+    tab_scroll: ScrollHandle,
     fps_counter: Entity<FpsCounter>,
     focus_handle: FocusHandle,
+    terminal: Option<Entity<TerminalView>>,
+    terminal_visible: bool,
+    terminal_zoomed: bool,
+    terminal_layout: Entity<ResizableState>,
+    terminal_previous_focus: Option<FocusHandle>,
     usage: Entity<UsageView>,
     extensions: Entity<ExtensionsView>,
 }
@@ -276,8 +292,8 @@ impl fmt::Debug for WorkspaceView {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("WorkspaceView")
             .field("cwd", &self.cwd)
-            .field("tabs", &self.tabs.items.len())
-            .field("active", &self.tabs.active)
+            .field("tabs", &self.tabs.len())
+            .field("active", &self.active)
             .finish_non_exhaustive()
     }
 }
@@ -293,9 +309,8 @@ impl WorkspaceView {
         let cwd = cwd.into();
         let host = cx.weak_entity();
         let settings = cx.new(|cx| SettingsState::new(preferences_path, host, window, cx));
-        let sidebar_view =
-            Self::create_chat_view(&cwd, &agent, SessionRenderMode::Sidebar, window, cx);
-        let sidebar_subscription = Self::observe_tab(&sidebar_view, window, cx);
+        let sidebar = Self::create_chat_view(&cwd, &agent, SessionRenderMode::Sidebar, window, cx);
+        let sidebar_subscription = Self::observe_tab(&sidebar, window, cx);
         let file_tree = cx.new(|cx| FileTree::new(cwd.clone(), window, cx));
         let file_subscription =
             cx.subscribe_in(&file_tree, window, |this, _, event: &OpenFile, window, cx| {
@@ -315,21 +330,42 @@ impl WorkspaceView {
         Self {
             cwd,
             window: window.window_handle(),
+            sidebar_panels: vec![
+                SidebarPanel::sessions(),
+                SidebarPanel::files(),
+                SidebarPanel::git(),
+            ],
+            sidebar_panel: SidebarPanel::sessions(),
             file_tree,
             _file_subscription: file_subscription,
             _file_action_subscription: file_action_subscription,
             file_navigation_revision: 0,
             settings,
             agent,
-            sidebar_view,
-            _sidebar_subscription: sidebar_subscription,
+            sidebar,
+            sidebar_visible: true,
+            sidebar_focus_handle: cx.focus_handle(),
+            sidebar_toggle_focus_handle: cx.focus_handle().tab_stop(true),
+            sidebar_sessions_focus_handle: cx.focus_handle().tab_stop(true),
             layout: cx.new(|_| ResizableState::default()),
-            sidebar: SidebarState::new(cx),
-            tabs: TabSet::new(),
-            files: FileQueue::new(),
-            terminal: TerminalState::new(cx),
+            _sidebar_subscription: sidebar_subscription,
+            tabs: Vec::new(),
+            pending_file_operations: VecDeque::new(),
+            file_confirmation: None,
+            file_operation_focus: None,
+            quit_discarded: HashSet::new(),
+            file_operation_wait: None,
+            archived_tabs: Vec::new(),
+            active: 0,
+            next_id: 0,
+            tab_scroll: ScrollHandle::new(),
             fps_counter: cx.new(|cx| FpsCounter::new(window, cx)),
             focus_handle,
+            terminal: None,
+            terminal_visible: false,
+            terminal_zoomed: false,
+            terminal_layout: cx.new(|_| ResizableState::default()),
+            terminal_previous_focus: None,
             usage,
             extensions,
         }

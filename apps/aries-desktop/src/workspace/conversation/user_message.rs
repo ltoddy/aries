@@ -25,7 +25,7 @@ impl UserMessage {
         index: usize,
         message: &Message,
         images: &MessageImages,
-        palette: Palette,
+        p: Palette,
         session: WeakEntity<SessionView>,
     ) -> Self {
         let text = SharedString::from(message.text());
@@ -38,7 +38,7 @@ impl UserMessage {
                     attachment_index,
                     content,
                     images.attachment(index, attachment_index),
-                    palette,
+                    p,
                 )
                 .with_session(session.clone())
                 .into_any_element()
@@ -48,7 +48,7 @@ impl UserMessage {
             index,
             text,
             attachments,
-            palette,
+            p,
             move |_: &ClickEvent, _: &mut Window, cx: &mut App| {
                 cx.write_to_clipboard(ClipboardItem::new_string(copy_text.to_string()));
             },
@@ -68,7 +68,7 @@ impl UserMessage {
 
 impl RenderOnce for UserMessage {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        let Self { index, text, attachments, palette, on_copy } = self;
+        let Self { index, text, attachments, palette: p, on_copy } = self;
         div()
             .id(("message", index))
             .aria_label("用户消息")
@@ -93,7 +93,7 @@ impl RenderOnce for UserMessage {
                         .opacity(0.45)
                         .group_hover("user-message", |this| this.opacity(1.))
                         .on_click(on_copy)
-                        .child(Icon::new(IconName::Copy).xsmall().text_color(palette.muted())),
+                        .child(Icon::new(IconName::Copy).xsmall().text_color(p.muted())),
                 )
             })
             .child(
@@ -103,7 +103,7 @@ impl RenderOnce for UserMessage {
                     .px_3()
                     .py_1()
                     .rounded(cx.theme().radius_lg)
-                    .bg(palette.bubble())
+                    .bg(p.bubble())
                     .flex()
                     .flex_col()
                     .gap_1()

@@ -25,7 +25,7 @@ impl SettingsButton {
 
 impl RenderOnce for SettingsButton {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        let palette = self.palette;
+        let p = self.palette;
         let host = self.host;
         let selected = self.selected;
         let error = host
@@ -41,11 +41,11 @@ impl RenderOnce for SettingsButton {
             .bg(if selected { cx.theme().sidebar_accent } else { cx.theme().transparent })
             .disabled(host.is_none())
             .text_color(if error.is_some() {
-                palette.danger()
+                p.danger()
             } else if selected {
-                palette.foreground()
+                p.foreground()
             } else {
-                palette.muted()
+                p.muted()
             })
             .tooltip_with_action(
                 error.map(|error| format!("设置\n{error}")).unwrap_or_else(|| "设置".into()),

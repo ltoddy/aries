@@ -3,7 +3,7 @@ use crate::workspace::settings::palette::Palette;
 use crate::workspace::settings::{SendKey, typography};
 
 impl Composer {
-    fn render_attachments(&self, palette: Palette, cx: &mut Context<SessionView>) -> AnyElement {
+    fn render_attachments(&self, p: Palette, cx: &mut Context<SessionView>) -> AnyElement {
         div()
             .id("draft-attachments")
             .flex()
@@ -30,7 +30,7 @@ impl Composer {
                     .max_w_full()
                     .min_w_0()
                     .rounded(cx.theme().radius)
-                    .bg(palette.bubble())
+                    .bg(p.bubble())
                     .child(match attachment.image() {
                         Some(image) => Button::new(("attachment-thumbnail", id))
                             .ghost()
@@ -71,7 +71,7 @@ impl Composer {
                                     .items_center()
                                     .gap_1()
                                     .text_xs()
-                                    .text_color(palette.muted())
+                                    .text_color(p.muted())
                                     .child(format!("{:.1} KiB", attachment.size() as f64 / 1024.))
                                     .when(attachment.image().is_some(), |row| {
                                         row.child(
@@ -106,7 +106,7 @@ impl Composer {
                     )
             }))
             .when(self.attachment_task.is_some(), |row| {
-                row.child(div().text_sm().text_color(palette.muted()).child("正在添加附件…"))
+                row.child(div().text_sm().text_color(p.muted()).child("正在添加附件…"))
             })
             .into_any_element()
     }
@@ -114,7 +114,7 @@ impl Composer {
     pub fn render(
         &self,
         session: &SessionView,
-        palette: Palette,
+        p: Palette,
         window: &mut Window,
         cx: &mut Context<SessionView>,
     ) -> impl IntoElement {
@@ -151,7 +151,7 @@ impl Composer {
                                 div()
                                     .p_3()
                                     .rounded(cx.theme().radius_lg)
-                                    .bg(palette.bubble())
+                                    .bg(p.bubble())
                                     .child(
                                         div()
                                             .mb_2()
@@ -174,11 +174,11 @@ impl Composer {
                                     .into_any_element(),
                             ))
                         })
-                        .child(session.render_execution_context(palette, cx))
+                        .child(session.render_execution_context(p, cx))
                         .when_some(session.execution().prompt_queue(), |composer, queue| {
-                            composer.child(queue.render(session, palette, cx))
+                            composer.child(queue.render(session, p, cx))
                         })
-                        .child(self.render_attachments(palette, cx)),
+                        .child(self.render_attachments(p, cx)),
                 )
                 .child(
                     div()
@@ -225,16 +225,10 @@ impl Composer {
                             session.execution().conversation().available_commands(),
                             session.commands_available(),
                             session.execution().session_id().is_some(),
-                            palette,
+                            p,
                             cx,
                         ))
-                        .child(ComposerInput::new(
-                            self,
-                            session,
-                            palette,
-                            cx.weak_entity(),
-                            can_send,
-                        )),
+                        .child(ComposerInput::new(self, session, p, cx.weak_entity(), can_send)),
                 )
                 .child(
                     div()
@@ -250,14 +244,14 @@ impl Composer {
                         .child(div().flex_1().min_w_0().when(
                             !session.execution().conversation().config_options().is_empty()
                                 || session.configuration().error().is_some(),
-                            |footer| footer.child(session.render_session_config(palette, cx)),
+                            |footer| footer.child(session.render_session_config(p, cx)),
                         ))
                         .child(
                             div()
                                 .min_w_0()
                                 .ml_auto()
                                 .text_xs()
-                                .text_color(palette.muted())
+                                .text_color(p.muted())
                                 .whitespace_normal()
                                 .text_right()
                                 .child(format!(
@@ -347,7 +341,7 @@ impl RenderOnce for ComposerInput {
             busy,
             stopping,
             can_send,
-            palette,
+            palette: p,
             attachments_available,
             view,
             has_queue,
@@ -374,9 +368,9 @@ impl RenderOnce for ComposerInput {
             .p_2()
             .rounded(cx.theme().radius_2xl())
             .border_1()
-            .border_color(palette.border())
+            .border_color(p.border())
             .when(input_focused, |surface| surface.border_color(cx.theme().ring))
-            .bg(palette.input())
+            .bg(p.input())
             .child(
                 div().id("composer-input").w_full().min_w_0().child(
                     Textarea::new(&input)
@@ -406,7 +400,7 @@ impl RenderOnce for ComposerInput {
                                 .ghost()
                                 .small()
                                 .rounded(cx.theme().radius)
-                                .text_color(palette.muted())
+                                .text_color(p.muted())
                                 .icon(IconName::Square)
                                 .label(if stopping { "停止中" } else { "停止" })
                                 .accessibility_label("停止回复")
@@ -424,7 +418,7 @@ impl RenderOnce for ComposerInput {
                             .tooltip("添加图片、音频、PDF 或文本…")
                             .small()
                             .rounded(cx.theme().radius)
-                            .text_color(palette.muted())
+                            .text_color(p.muted())
                             .disabled(!attachments_available)
                             .on_click(move |_, window, cx| {
                                 let _ = picker

@@ -29,7 +29,7 @@ pub struct ThoughtMessage {
 impl ThoughtMessage {
     pub fn from_message(
         index: usize,
-        palette: Palette,
+        p: Palette,
         message: &Message,
         id: ElementId,
         expanded: bool,
@@ -43,7 +43,7 @@ impl ThoughtMessage {
             id,
             expanded,
             ThoughtContent::new(title, text, markdown),
-            palette,
+            p,
             on_toggle,
         )
     }
@@ -87,7 +87,7 @@ impl ThoughtContent {
 
 impl RenderOnce for ThoughtMessage {
     fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
-        let Self { index, id, expanded, content, palette, on_toggle, session } = self;
+        let Self { index, id, expanded, content, palette: p, on_toggle, session } = self;
         let ThoughtContent { title, text, markdown } = content;
         div()
             .id(("message", index))
@@ -105,7 +105,7 @@ impl RenderOnce for ThoughtMessage {
                     .w_full()
                     .h_6()
                     .px_0()
-                    .text_color(palette.muted())
+                    .text_color(p.muted())
                     .accessibility_label(if expanded {
                         "收起思考过程"
                     } else {
@@ -171,7 +171,7 @@ impl RenderOnce for ThoughtMessage {
                                         })
                                         .into_any_element()
                                 })
-                                .text_color(palette.muted()),
+                                .text_color(p.muted()),
                         )
                         .into_any_element(),
                 ))

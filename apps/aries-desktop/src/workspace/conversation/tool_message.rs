@@ -58,7 +58,7 @@ impl ToolMessage {
     pub fn from_tool(
         index: usize,
         tool: &ToolCallState,
-        palette: Palette,
+        p: Palette,
         entity_id: EntityId,
         session_id: Option<&SessionId>,
         content: AnyElement,
@@ -76,7 +76,7 @@ impl ToolMessage {
                 _ => ("未知状态", IconName::CircleQuestionMark),
             }
         };
-        let color = if failed { palette.danger() } else { palette.muted() };
+        let color = if failed { p.danger() } else { p.muted() };
         let title = crate::workspace::conversation::single_line(tool.title());
         let tool_call_id = &tool.call().tool_call_id;
         let status_icon = MessageStatusIcon {
@@ -96,7 +96,7 @@ impl ToolMessage {
             ),
             content,
             on_toggle,
-            palette,
+            p,
         )
     }
 
@@ -138,7 +138,7 @@ impl ToolStatus {
 
 impl RenderOnce for ToolMessage {
     fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
-        let Self { index, header, content, on_toggle, palette } = self;
+        let Self { index, header, content, on_toggle, palette: p } = self;
         let ToolHeader { label, title, icon, status } = header;
         let ToolStatus { label: status, visible: show_status, icon: status_icon } = status;
         let color = status_icon.color;
@@ -157,7 +157,7 @@ impl RenderOnce for ToolMessage {
                     .w_full()
                     .h_6()
                     .px_0()
-                    .text_color(palette.muted())
+                    .text_color(p.muted())
                     .accessibility_label("查看原始输入与输出")
                     .on_click(on_toggle)
                     .child(

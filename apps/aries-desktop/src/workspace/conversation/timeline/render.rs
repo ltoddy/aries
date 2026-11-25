@@ -7,11 +7,11 @@ impl Timeline {
         &mut self,
         conversation: &Conversation,
         loading: bool,
-        palette: Palette,
+        p: Palette,
         cx: &mut Context<SessionView>,
     ) -> AnyElement {
         if conversation.messages().is_empty() && conversation.error().is_none() && !loading {
-            return EmptyTimeline { palette }.into_any_element();
+            return EmptyTimeline { palette: p }.into_any_element();
         }
         self.sync_timeline_items(conversation);
         let messages = conversation.messages().len();
@@ -44,7 +44,7 @@ impl Timeline {
                                                 index,
                                                 conversation,
                                                 session_id,
-                                                palette,
+                                                p,
                                                 cx,
                                             )
                                         } else {
@@ -52,8 +52,8 @@ impl Timeline {
                                                 .id("chat-error")
                                                 .rounded(cx.theme().radius_lg)
                                                 .p_3()
-                                                .bg(palette.bubble())
-                                                .text_color(palette.danger())
+                                                .bg(p.bubble())
+                                                .text_color(p.danger())
                                                 .child(SelectableText::new(
                                                     "chat-error-text",
                                                     conversation
@@ -73,8 +73,8 @@ impl Timeline {
                     .h_full(),
                 ),
             )
-            .child(self.render_user_anchors(conversation, palette, cx))
-            .child(self.render_scroll_controls(conversation, palette, cx))
+            .child(self.render_user_anchors(conversation, p, cx))
+            .child(self.render_scroll_controls(conversation, p, cx))
             .when(!self.list.is_following_tail(), |el| {
                 el.child(
                     div().absolute().bottom_4().left_0().right_0().flex().justify_center().child(
@@ -83,8 +83,8 @@ impl Timeline {
                             .icon(IconName::ArrowDown)
                             .size_8()
                             .rounded(cx.theme().radius_full())
-                            .bg(palette.input())
-                            .text_color(palette.muted())
+                            .bg(p.input())
+                            .text_color(p.muted())
                             .accessibility_label("回到最新消息并恢复自动跟随")
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.with_timeline(|timeline, _, _| {
@@ -101,7 +101,7 @@ impl Timeline {
     fn render_scroll_controls(
         &self,
         conversation: &Conversation,
-        palette: Palette,
+        p: Palette,
         cx: &mut Context<SessionView>,
     ) -> AnyElement {
         div()
@@ -120,7 +120,7 @@ impl Timeline {
                         Button::new("scroll-to-top")
                             .ghost()
                             .small()
-                            .bg(palette.input())
+                            .bg(p.input())
                             .icon(IconName::ArrowUpToLine)
                             .accessibility_label("回到顶部")
                             .tooltip("回到顶部")
@@ -135,7 +135,7 @@ impl Timeline {
                         Button::new("previous-user-message")
                             .ghost()
                             .small()
-                            .bg(palette.input())
+                            .bg(p.input())
                             .icon(IconName::ArrowUp)
                             .accessibility_label("上一条用户消息")
                             .tooltip_with_action("上一条用户消息", &PreviousUserMessage, None)
@@ -148,7 +148,7 @@ impl Timeline {
                         Button::new("next-user-message")
                             .ghost()
                             .small()
-                            .bg(palette.input())
+                            .bg(p.input())
                             .icon(IconName::ArrowDown)
                             .accessibility_label("下一条用户消息")
                             .tooltip_with_action("下一条用户消息", &NextUserMessage, None)
@@ -164,7 +164,7 @@ impl Timeline {
     fn render_user_anchors(
         &self,
         conversation: &Conversation,
-        palette: Palette,
+        p: Palette,
         cx: &mut Context<SessionView>,
     ) -> AnyElement {
         let timeline = self.list.clone();
@@ -221,8 +221,8 @@ impl Timeline {
                             .w(rems(0.75))
                             .h(rems(0.125))
                             .rounded_full()
-                            .bg(palette.border())
-                            .group_hover(group, |style| style.bg(palette.foreground())),
+                            .bg(p.border())
+                            .group_hover(group, |style| style.bg(p.foreground())),
                     )
             }))
             .into_any_element()
@@ -235,7 +235,7 @@ struct EmptyTimeline {
 }
 impl RenderOnce for EmptyTimeline {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        let palette = self.palette;
+        let p = self.palette;
         div().flex_1().min_h_0().px_6().flex().items_center().justify_center().child(
             div()
                 .flex()
@@ -248,7 +248,7 @@ impl RenderOnce for EmptyTimeline {
                     div()
                         .size(rems(3.5))
                         .rounded(cx.theme().radius_lg)
-                        .bg(palette.bubble())
+                        .bg(p.bubble())
                         .flex()
                         .items_center()
                         .justify_center()
@@ -265,7 +265,7 @@ impl RenderOnce for EmptyTimeline {
                     div()
                         .text_sm()
                         .line_height(rems(1.5))
-                        .text_color(palette.muted())
+                        .text_color(p.muted())
                         .child("聊聊你的想法，或让 Aries 帮你完成项目中的任务。"),
                 ),
         )
