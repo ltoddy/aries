@@ -17,7 +17,6 @@ aries-extension = { path = "../../crates/aries-extension" }
 aries-filesystem = { path = "../../crates/aries-filesystem" }
 aries-init = { path = "../../crates/aries-init" }
 aries-ipc = { path = "../../crates/aries-ipc" }
-aries-persistence = { path = "../../crates/aries-persistence" }
 aries-proto = { path = "../../crates/aries-proto" }
 base64.workspace = true
 dirs = "7.0"
@@ -54,7 +53,6 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "sync", "process", "io-util", "net"] }
 toml.workspace = true
 tonic.workspace = true
-toasty.workspace = true
 tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["fmt"] }
 url.workspace = true
