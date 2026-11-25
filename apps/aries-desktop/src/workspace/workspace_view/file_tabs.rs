@@ -15,7 +15,7 @@ impl WorkspaceView {
                 .target()
                 .is_some_and(|current| self.normalize_file_path(current.path(), cx) == path)
         });
-        self.sidebar_panel = SidebarPanel::files();
+        self.sidebar_pane = Pane::files();
         let index = if let Some(index) = existing {
             index
         } else {

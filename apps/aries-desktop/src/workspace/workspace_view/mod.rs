@@ -13,8 +13,8 @@ use gpui_kit::component::dialog::{Dialog, DialogClose, DialogEntrance, DialogFoo
 use gpui_kit::component::menu::{ContextMenuExt, PopupMenu, PopupMenuItem};
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::{
-    ActiveTheme, Disableable, Icon, ResizableState, Selectable, Sizable, TitleBar, WindowExt,
-    h_resizable, resizable_panel, v_resizable,
+    ActiveTheme, Disableable, Icon, ResizableState, Sizable, TitleBar, WindowExt, h_resizable,
+    resizable_panel, v_resizable,
 };
 use gpui_kit::prelude::*;
 use gpui_kit::*;
@@ -26,7 +26,6 @@ use crate::workspace::files::{CloseFile, FileActionEvent, FileTree, FileView, Op
 use crate::workspace::git::diff_view::{DiffTargetChanged, GitDiffView};
 use crate::workspace::settings::palette::Palette;
 use crate::workspace::settings::{Preferences, SettingsState};
-use crate::workspace::sidebar::Sidebar;
 use crate::workspace::usage::UsageView;
 use crate::workspace::workspace_view::fps_counter::FpsCounter;
 use crate::workspace::{SessionRenderMode, SessionView};
@@ -40,14 +39,15 @@ mod file_tabs;
 mod fps_counter;
 mod layout;
 mod pages;
+mod pane;
 mod render;
 mod session_tabs;
-mod sidebar_panel;
+mod sidebar;
 mod tab;
 mod tab_ops;
 mod tab_render;
 
-pub use self::sidebar_panel::SidebarPanel;
+pub use self::pane::Pane;
 pub use self::tab::{DiffTab, FileTab, Tab, TabMeta, WorkspaceTab};
 
 pub enum FileTabAction {
@@ -252,8 +252,7 @@ impl FileConfirmation {
 pub struct WorkspaceView {
     cwd: PathBuf,
     window: AnyWindowHandle,
-    sidebar_panels: Vec<SidebarPanel>,
-    sidebar_panel: SidebarPanel,
+    sidebar_pane: Pane,
     file_tree: Entity<FileTree>,
     _file_subscription: Subscription,
     _file_action_subscription: Subscription,
@@ -330,12 +329,7 @@ impl WorkspaceView {
         Self {
             cwd,
             window: window.window_handle(),
-            sidebar_panels: vec![
-                SidebarPanel::sessions(),
-                SidebarPanel::files(),
-                SidebarPanel::git(),
-            ],
-            sidebar_panel: SidebarPanel::sessions(),
+            sidebar_pane: Pane::sessions(),
             file_tree,
             _file_subscription: file_subscription,
             _file_action_subscription: file_action_subscription,

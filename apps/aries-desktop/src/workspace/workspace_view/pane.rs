@@ -1,13 +1,26 @@
-use crate::workspace::workspace_view::*;
+use gpui_kit::assets::IconName;
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::{Selectable, Sizable};
+use gpui_kit::*;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum SidebarPanel {
+use crate::workspace::workspace_view::WorkspaceView;
+use crate::{ShowFilesSidebar, ShowGitSidebar, ShowSessionsSidebar};
+
+mod files;
+mod git;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Pane {
     Sessions,
     Files,
     Git,
 }
 
-impl SidebarPanel {
+impl Pane {
+    pub fn all() -> [Self; 3] {
+        [Self::sessions(), Self::files(), Self::git()]
+    }
+
     pub fn sessions() -> Self {
         Self::Sessions
     }
@@ -69,20 +82,15 @@ impl SidebarPanel {
         }
     }
 
-    pub fn render_tab(
-        self,
-        host: &WorkspaceView,
-        selected: bool,
-        cx: &mut Context<WorkspaceView>,
-    ) -> AnyElement {
+    pub fn render_tab(self, host: &WorkspaceView, cx: &mut Context<WorkspaceView>) -> AnyElement {
         let button = Button::new(self.element_id())
             .small()
             .ghost()
             .label(self.title())
             .icon(self.icon())
-            .selected(selected)
+            .selected(host.active_sidebar_pane(cx) == self)
             .on_click(cx.listener(move |this, _, window, cx| {
-                this.select_sidebar_panel(self, window, cx);
+                this.select_sidebar_pane(self, window, cx);
             }));
         let button = match self {
             Self::Sessions => button
@@ -96,16 +104,16 @@ impl SidebarPanel {
         button.into_any_element()
     }
 
-    pub fn render_panel(
+    pub fn render(
         self,
         host: &WorkspaceView,
-        panel_style: StyleRefinement,
+        style: StyleRefinement,
         window: &mut Window,
         cx: &mut Context<WorkspaceView>,
     ) -> AnyElement {
         match self {
-            Self::Sessions => host.sidebar.clone().cached(panel_style).into_any_element(),
-            Self::Files => Self::render_files(host, panel_style, cx),
+            Self::Sessions => host.sidebar.clone().cached(style).into_any_element(),
+            Self::Files => Self::render_files(host, style, cx),
             Self::Git => Self::render_git(host, window, cx),
         }
     }
@@ -116,63 +124,5 @@ impl SidebarPanel {
             Self::Files => "显示文件树",
             Self::Git => "显示 Git 变更",
         }
-    }
-
-    fn render_files(
-        host: &WorkspaceView,
-        panel_style: StyleRefinement,
-        cx: &mut Context<WorkspaceView>,
-    ) -> AnyElement {
-        let saving = host.has_saving_file(cx);
-        div()
-            .size_full()
-            .relative()
-            .capture_any_mouse_down(cx.listener(|this, _, window, cx| {
-                if this.has_saving_file(cx) {
-                    window.prevent_default();
-                    cx.stop_propagation();
-                }
-            }))
-            .capture_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
-                if event.keystroke.key == "q"
-                    && (event.keystroke.modifiers.platform || event.keystroke.modifiers.control)
-                {
-                    return;
-                }
-                if this.has_saving_file(cx) {
-                    window.prevent_default();
-                    cx.stop_propagation();
-                }
-            }))
-            .child(host.file_tree.clone().cached(panel_style))
-            .when(saving, |tree| {
-                tree.child(
-                    div()
-                        .absolute()
-                        .inset_0()
-                        .occlude()
-                        .on_any_mouse_down(|_, _, cx| cx.stop_propagation()),
-                )
-            })
-            .into_any_element()
-    }
-
-    fn render_git(
-        host: &WorkspaceView,
-        window: &mut Window,
-        cx: &mut Context<WorkspaceView>,
-    ) -> AnyElement {
-        let Some(view) = host.active_view().cloned() else {
-            return div().size_full().into_any_element();
-        };
-        let owner = view.clone();
-        div()
-            .size_full()
-            .min_h_0()
-            .min_w_0()
-            .child(
-                view.update(cx, move |session, cx| session.git_panel().render(&owner, window, cx)),
-            )
-            .into_any_element()
     }
 }
