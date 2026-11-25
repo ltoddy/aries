@@ -1,8 +1,6 @@
 use std::collections::BTreeMap;
-use std::fs;
-use std::path::{Path, PathBuf};
 
-use aries_persistence::{TokenUsage, TokenUsageRepository};
+use aries_proto::DailyUsage;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::tooltip::Tooltip;
@@ -10,10 +8,10 @@ use gpui_kit::component::{ActiveTheme, Disableable, Icon, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 use jiff::civil::Date;
-use jiff::tz::TimeZone;
-use jiff::{Span, Timestamp, Zoned};
+use jiff::{Span, Zoned};
 use thiserror::Error;
 
+use crate::ipc::{Client, Ipc, IpcError};
 use crate::workspace::number;
 
 struct UsageData {
@@ -21,19 +19,25 @@ struct UsageData {
 }
 
 impl UsageData {
-    fn from_records(records: impl IntoIterator<Item = TokenUsage>, timezone: TimeZone) -> Self {
+    fn from_daily_usages(
+        usages: impl IntoIterator<Item = DailyUsage>,
+    ) -> Result<Self, LoadUsageError> {
         let mut days: BTreeMap<Date, u64> = BTreeMap::new();
-        for record in records {
-            let date = record.created_at.to_zoned(timezone.clone()).date();
-            let tokens = if record.total_tokens == 0 {
-                record.input_tokens.saturating_add(record.output_tokens)
+        for usage in usages {
+            let (Some(date), Some(tokens)) = (usage.date, usage.token_usage) else {
+                continue;
+            };
+            let date = Date::new(date.year as i16, date.month as i8, date.day as i8)
+                .map_err(LoadUsageError::invalid_date)?;
+            let tokens = if tokens.total_tokens == 0 {
+                tokens.input_tokens.saturating_add(tokens.output_tokens)
             } else {
-                record.total_tokens
+                tokens.total_tokens
             };
             let total = days.entry(date).or_default();
             *total = total.saturating_add(tokens);
         }
-        Self { days }
+        Ok(Self { days })
     }
 }
 
@@ -102,8 +106,8 @@ impl UsageView {
         self.scroll_to_selected();
         self.data = None;
         self.state = LoadState::loading();
-        let first = self.first_day();
-        let background = cx.background_executor().spawn(async move { load_usage(first, today) });
+        let client = cx.global::<Ipc>().client();
+        let background = cx.background_executor().spawn(async move { load_usage(&client) });
         self._task = Some(cx.spawn_in(window, async move |this, cx| {
             let result = background.await;
             let _ = this.update_in(cx, |this, _, cx| {
@@ -427,104 +431,23 @@ impl Render for UsageView {
 
 #[derive(Debug, Error)]
 enum LoadUsageError {
-    #[error("无法确定 Aries 数据目录")]
-    HomeUnavailable,
-    #[error("Aries 数据库路径不是文件：{}", path.display())]
-    NotFile { path: PathBuf },
-    #[error("无法访问 Aries 数据库 {}", path.display())]
-    Metadata { path: PathBuf, source: std::io::Error },
-    #[error("无法启动用量查询运行时")]
-    Runtime { source: std::io::Error },
-    #[error("无法确定 {date} 的次日日期")]
-    NextDay { date: Date, source: jiff::Error },
-    #[error("无法确定 {first} 至 {next} 的用量时间范围")]
-    TimestampRange { first: Date, next: Date, source: jiff::Error },
-    #[error("无法连接本地 Aries 数据库 {}", path.display())]
-    Connect { path: PathBuf, source: toasty::Error },
-    #[error("无法查询 {first} 至 {last} 的用量")]
-    Query { first: Date, last: Date, source: toasty::Error },
+    #[error("无法查询本地用量")]
+    Query { source: IpcError },
+    #[error("本地用量服务返回了无效日期")]
+    InvalidDate { source: jiff::Error },
 }
 
 impl LoadUsageError {
-    fn home_unavailable() -> Self {
-        Self::HomeUnavailable
+    fn query(source: IpcError) -> Self {
+        Self::Query { source }
     }
 
-    fn not_file(path: PathBuf) -> Self {
-        Self::NotFile { path }
-    }
-
-    fn metadata(path: PathBuf, source: std::io::Error) -> Self {
-        Self::Metadata { path, source }
-    }
-
-    fn runtime(source: std::io::Error) -> Self {
-        Self::Runtime { source }
-    }
-
-    fn next_day(date: Date, source: jiff::Error) -> Self {
-        Self::NextDay { date, source }
-    }
-
-    fn timestamp_range(first: Date, next: Date, source: jiff::Error) -> Self {
-        Self::TimestampRange { first, next, source }
-    }
-
-    fn connect(path: PathBuf, source: toasty::Error) -> Self {
-        Self::Connect { path, source }
-    }
-
-    fn query(first: Date, last: Date, source: toasty::Error) -> Self {
-        Self::Query { first, last, source }
+    fn invalid_date(source: jiff::Error) -> Self {
+        Self::InvalidDate { source }
     }
 }
 
-fn load_usage(first: Date, last: Date) -> Result<UsageData, LoadUsageError> {
-    let home = std::env::home_dir().ok_or_else(LoadUsageError::home_unavailable)?;
-    let root = home.join(".local/share/aries");
-    let path = root.join("aries.db");
-    match fs::metadata(&path) {
-        Ok(metadata) if metadata.is_file() => {},
-        Ok(_) => return Err(LoadUsageError::not_file(path)),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return Ok(UsageData::from_records(Vec::new(), TimeZone::system()));
-        },
-        Err(source) => return Err(LoadUsageError::metadata(path, source)),
-    }
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(LoadUsageError::runtime)?;
-    runtime.block_on(query_usage(&root, first, last))
-}
-
-async fn query_usage(root: &Path, first: Date, last: Date) -> Result<UsageData, LoadUsageError> {
-    let timezone = TimeZone::system();
-    let next = last
-        .checked_add(Span::new().days(1))
-        .map_err(|source| LoadUsageError::next_day(last, source))?;
-    let (low, high) = timestamp_range(first, next, &timezone)?;
-    let db = aries_persistence::connect(root)
-        .await
-        .map_err(|source| LoadUsageError::connect(root.join("aries.db"), source))?;
-    let mut repository = TokenUsageRepository::new(db);
-    let records = repository
-        .find_by_created_at_between(low, high)
-        .await
-        .map_err(|source| LoadUsageError::query(first, last, source))?;
-    Ok(UsageData::from_records(records, timezone))
-}
-
-fn timestamp_range(
-    first: Date,
-    next: Date,
-    timezone: &TimeZone,
-) -> Result<(Timestamp, Timestamp), LoadUsageError> {
-    let range = || -> Result<(Timestamp, Timestamp), jiff::Error> {
-        let low = first.to_zoned(timezone.clone())?.timestamp();
-        let high =
-            next.to_zoned(timezone.clone())?.timestamp().checked_sub(Span::new().nanoseconds(1))?;
-        Ok((low, high))
-    };
-    range().map_err(|source| LoadUsageError::timestamp_range(first, next, source))
+fn load_usage(client: &Client) -> Result<UsageData, LoadUsageError> {
+    let response = client.query_token_usages().map_err(LoadUsageError::query)?;
+    UsageData::from_daily_usages(response.daily_usages)
 }

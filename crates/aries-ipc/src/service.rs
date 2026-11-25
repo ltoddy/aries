@@ -28,7 +28,8 @@ impl AriesService for AriesServiceImpl {
         &self,
         _request: Request<QueryTokenUsagesRequest>,
     ) -> Result<Response<QueryTokenUsagesResponse>, Status> {
-        let now = Timestamp::now().to_zoned(TimeZone::UTC);
+        let timezone = TimeZone::system();
+        let now = Timestamp::now().to_zoned(timezone.clone());
 
         let low = now
             .checked_sub(Span::new().years(1))
@@ -52,7 +53,7 @@ impl AriesService for AriesServiceImpl {
 
         let daily =
             records.iter().fold(BTreeMap::<Date, TokenUsage>::new(), |mut daily, record| {
-                let date = record.created_at.to_zoned(TimeZone::UTC).date();
+                let date = record.created_at.to_zoned(timezone.clone()).date();
 
                 let usage = daily.entry(date).or_default();
                 usage.input_tokens = usage.input_tokens.saturating_add(record.input_tokens);
