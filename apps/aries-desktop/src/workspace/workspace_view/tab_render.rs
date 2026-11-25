@@ -247,7 +247,7 @@ impl WorkspaceView {
                     return;
                 }
                 self.file_tree.update(cx, |tree, cx| tree.reveal(target.path(), cx));
-                self.select_sidebar_panel(SidebarPanel::files(), window, cx);
+                self.select_sidebar_pane(Pane::files(), window, cx);
             },
         }
     }

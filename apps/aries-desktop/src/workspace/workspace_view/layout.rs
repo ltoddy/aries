@@ -60,39 +60,6 @@ impl WorkspaceView {
         })
     }
 
-    pub fn select_sidebar_panel(
-        &mut self,
-        panel: SidebarPanel,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let panel = if panel.is_available(self, cx) { panel } else { SidebarPanel::sessions() };
-        self.sidebar_panel = panel;
-        self.sidebar_visible = true;
-        panel.prepare(self, cx);
-        let view = cx.weak_entity();
-        let revision = self.file_navigation_revision;
-        let active_id = self.active_id();
-        window.on_next_frame(move |window, cx| {
-            let _ = view.update(cx, |this, cx| {
-                if this.sidebar_panel != panel
-                    || !this.sidebar_visible
-                    || this.file_navigation_revision != revision
-                    || this.active_id() != active_id
-                {
-                    return;
-                }
-                let minimum = cx.theme().font_size * 40.75;
-                if window.viewport_size().width < minimum {
-                    this.sidebar_toggle_focus_handle.focus(window, cx);
-                } else {
-                    panel.focus(this, window, cx);
-                }
-            });
-        });
-        cx.notify();
-    }
-
     pub fn selected_file_directory(&self, cx: &App) -> Option<PathBuf> {
         if let Some(target) = self.selected_file_view().and_then(|view| view.read(cx).target()) {
             return Some(target.directory().to_owned());
@@ -106,8 +73,8 @@ impl WorkspaceView {
     pub fn sync_file_directory(&mut self, cx: &mut Context<Self>) {
         let Some(directory) = self.selected_file_directory(cx) else {
             self.file_tree.update(cx, |tree, cx| tree.track_current_file(None, cx));
-            if self.sidebar_panel == SidebarPanel::files() {
-                self.sidebar_panel = SidebarPanel::sessions();
+            if self.sidebar_pane == Pane::files() {
+                self.sidebar_pane = Pane::sessions();
                 let owner = cx.weak_entity();
                 let window = self.window;
                 cx.defer(move |cx| {
@@ -131,59 +98,6 @@ impl WorkspaceView {
             tree.set_directory(directory, cx);
             tree.track_current_file(current, cx);
         });
-    }
-
-    pub fn render_sidebar(
-        &self,
-        panel_style: StyleRefinement,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        let panel = self.active_sidebar_panel(cx);
-        let mut buttons = Vec::new();
-        for candidate in &self.sidebar_panels {
-            if candidate.is_available(self, cx) {
-                buttons.push(candidate.render_tab(self, *candidate == panel, cx));
-            }
-        }
-        div()
-            .size_full()
-            .min_h_0()
-            .min_w_0()
-            .flex()
-            .flex_col()
-            .child(div().flex().items_center().gap_1().px_2().py_1().children(buttons))
-            .child(div().flex_1().min_h_0().min_w_0().child(panel.render_panel(
-                self,
-                panel_style,
-                window,
-                cx,
-            )))
-            .child(Sidebar::render_footer(
-                Some(cx.weak_entity()),
-                Palette::new(cx.theme().mode),
-                self.is_settings_visible(),
-                self.is_usage_visible(),
-                self.is_extensions_visible(),
-                cx,
-            ))
-            .into_any_element()
-    }
-
-    pub fn active_sidebar_panel(&self, cx: &App) -> SidebarPanel {
-        if self.sidebar_panel.is_available(self, cx) {
-            self.sidebar_panel
-        } else {
-            SidebarPanel::sessions()
-        }
-    }
-
-    pub fn toggle_sidebar(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.sidebar_visible = !self.sidebar_visible;
-        if !self.sidebar_visible && self.sidebar_focus_handle.contains_focused(window, cx) {
-            self.focus_handle.focus(window, cx);
-        }
-        cx.notify();
     }
 
     pub fn toggle_terminal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
