@@ -60,29 +60,22 @@ impl WorkspaceView {
         })
     }
 
-    pub fn select_sidebar_page(
+    pub fn select_sidebar_panel(
         &mut self,
-        page: SidebarPage,
+        panel: SidebarPanel,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let available = match page {
-            SidebarPage::Sessions => true,
-            SidebarPage::Files => self.selected_file_directory(cx).is_some(),
-            SidebarPage::Git => self.active_view().is_some(),
-        };
-        let page = if available { page } else { SidebarPage::sessions() };
-        self.sidebar_page = page;
+        let panel = if panel.is_available(self, cx) { panel } else { SidebarPanel::sessions() };
+        self.sidebar_panel = panel;
         self.sidebar_visible = true;
-        if page == SidebarPage::files() {
-            self.sync_file_directory(cx);
-        }
+        panel.prepare(self, cx);
         let view = cx.weak_entity();
         let revision = self.file_navigation_revision;
         let active_id = self.active_id();
         window.on_next_frame(move |window, cx| {
             let _ = view.update(cx, |this, cx| {
-                if this.sidebar_page != page
+                if this.sidebar_panel != panel
                     || !this.sidebar_visible
                     || this.file_navigation_revision != revision
                     || this.active_id() != active_id
@@ -92,12 +85,8 @@ impl WorkspaceView {
                 let minimum = cx.theme().font_size * 40.75;
                 if window.viewport_size().width < minimum {
                     this.sidebar_toggle_focus_handle.focus(window, cx);
-                } else if page == SidebarPage::files() {
-                    this.file_tree.update(cx, |tree, cx| tree.focus(window, cx));
-                } else if page == SidebarPage::git() {
-                    this.sidebar_focus_handle.focus(window, cx);
                 } else {
-                    this.sidebar_sessions_focus_handle.focus(window, cx);
+                    panel.focus(this, window, cx);
                 }
             });
         });
@@ -117,8 +106,8 @@ impl WorkspaceView {
     pub fn sync_file_directory(&mut self, cx: &mut Context<Self>) {
         let Some(directory) = self.selected_file_directory(cx) else {
             self.file_tree.update(cx, |tree, cx| tree.track_current_file(None, cx));
-            if self.sidebar_page == SidebarPage::files() {
-                self.sidebar_page = SidebarPage::sessions();
+            if self.sidebar_panel == SidebarPanel::files() {
+                self.sidebar_panel = SidebarPanel::sessions();
                 let owner = cx.weak_entity();
                 let window = self.window;
                 cx.defer(move |cx| {
@@ -150,114 +139,26 @@ impl WorkspaceView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let files_available = self.selected_file_directory(cx).is_some();
-        let files_selected = files_available && self.sidebar_page == SidebarPage::files();
-        let git_view = self.active_view().cloned();
-        let git_available = git_view.is_some();
-        let git_selected = git_available && self.sidebar_page == SidebarPage::git();
-        let sessions_selected = !files_selected && !git_selected;
-        let git_content = if git_selected {
-            git_view.map(|view| {
-                let owner = view.clone();
-                view.update(cx, move |session, cx| session.git_panel().render(&owner, window, cx))
-            })
-        } else {
-            None
-        };
-        let saving = self.has_saving_file(cx);
+        let panel = self.active_sidebar_panel(cx);
+        let mut buttons = Vec::new();
+        for candidate in &self.sidebar_panels {
+            if candidate.is_available(self, cx) {
+                buttons.push(candidate.render_tab(self, *candidate == panel, cx));
+            }
+        }
         div()
             .size_full()
             .min_h_0()
             .min_w_0()
             .flex()
             .flex_col()
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_1()
-                    .px_2()
-                    .py_1()
-                    .child(
-                        Button::new("sidebar-sessions")
-                            .small()
-                            .ghost()
-                            .label("会话")
-                            .icon(IconName::MessagesSquare)
-                            .track_focus(&self.sidebar_sessions_focus_handle)
-                            .tooltip_with_action("显示会话列表", &ShowSessionsSidebar::new(), None)
-                            .selected(sessions_selected)
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.select_sidebar_page(SidebarPage::sessions(), window, cx);
-                            })),
-                    )
-                    .when(files_available, |tabs| {
-                        tabs.child(
-                            Button::new("sidebar-files")
-                                .small()
-                                .ghost()
-                                .label("文件")
-                                .icon(IconName::FolderTree)
-                                .tooltip_with_action("显示文件树", &ShowFilesSidebar::new(), None)
-                                .selected(files_selected)
-                                .on_click(cx.listener(|this, _, window, cx| {
-                                    this.select_sidebar_page(SidebarPage::files(), window, cx);
-                                })),
-                        )
-                    })
-                    .when(git_available, |tabs| {
-                        tabs.child(
-                            Button::new("sidebar-git")
-                                .small()
-                                .ghost()
-                                .label("变更")
-                                .icon(IconName::GitBranch)
-                                .tooltip_with_action("显示 Git 变更", &ShowGitSidebar::new(), None)
-                                .selected(git_selected)
-                                .on_click(cx.listener(|this, _, window, cx| {
-                                    this.select_sidebar_page(SidebarPage::git(), window, cx);
-                                })),
-                        )
-                    }),
-            )
-            .child(div().flex_1().min_h_0().min_w_0().child(if files_selected {
-                div()
-                    .size_full()
-                    .relative()
-                    .capture_any_mouse_down(cx.listener(|this, _, window, cx| {
-                        if this.has_saving_file(cx) {
-                            window.prevent_default();
-                            cx.stop_propagation();
-                        }
-                    }))
-                    .capture_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
-                        if event.keystroke.key == "q"
-                            && (event.keystroke.modifiers.platform
-                                || event.keystroke.modifiers.control)
-                        {
-                            return;
-                        }
-                        if this.has_saving_file(cx) {
-                            window.prevent_default();
-                            cx.stop_propagation();
-                        }
-                    }))
-                    .child(self.file_tree.clone().cached(panel_style))
-                    .when(saving, |tree| {
-                        tree.child(
-                            div()
-                                .absolute()
-                                .inset_0()
-                                .occlude()
-                                .on_any_mouse_down(|_, _, cx| cx.stop_propagation()),
-                        )
-                    })
-                    .into_any_element()
-            } else if let Some(content) = git_content {
-                div().size_full().min_h_0().min_w_0().child(content).into_any_element()
-            } else {
-                self.sidebar.clone().cached(panel_style).into_any_element()
-            }))
+            .child(div().flex().items_center().gap_1().px_2().py_1().children(buttons))
+            .child(div().flex_1().min_h_0().min_w_0().child(panel.render_panel(
+                self,
+                panel_style,
+                window,
+                cx,
+            )))
             .child(Sidebar::render_footer(
                 Some(cx.weak_entity()),
                 Palette::new(cx.theme().mode),
@@ -267,6 +168,14 @@ impl WorkspaceView {
                 cx,
             ))
             .into_any_element()
+    }
+
+    pub fn active_sidebar_panel(&self, cx: &App) -> SidebarPanel {
+        if self.sidebar_panel.is_available(self, cx) {
+            self.sidebar_panel
+        } else {
+            SidebarPanel::sessions()
+        }
     }
 
     pub fn toggle_sidebar(&mut self, window: &mut Window, cx: &mut Context<Self>) {

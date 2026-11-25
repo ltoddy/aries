@@ -72,13 +72,13 @@ impl Render for WorkspaceView {
                 this.toggle_sidebar(window, cx);
             }))
             .on_action(cx.listener(|this, _: &ShowSessionsSidebar, window, cx| {
-                this.select_sidebar_page(SidebarPage::sessions(), window, cx);
+                this.select_sidebar_panel(SidebarPanel::sessions(), window, cx);
             }))
             .on_action(cx.listener(|this, _: &ShowFilesSidebar, window, cx| {
-                this.select_sidebar_page(SidebarPage::files(), window, cx);
+                this.select_sidebar_panel(SidebarPanel::files(), window, cx);
             }))
             .on_action(cx.listener(|this, _: &ShowGitSidebar, window, cx| {
-                this.select_sidebar_page(SidebarPage::git(), window, cx);
+                this.select_sidebar_panel(SidebarPanel::git(), window, cx);
             }))
             .on_action(cx.listener(|this, _: &CloseTab, window, cx| {
                 if let Some(id) = this.active_id() {
