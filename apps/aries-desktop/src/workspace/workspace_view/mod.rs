@@ -42,10 +42,12 @@ mod layout;
 mod pages;
 mod render;
 mod session_tabs;
+mod sidebar_panel;
 mod tab;
 mod tab_ops;
 mod tab_render;
 
+pub use self::sidebar_panel::SidebarPanel;
 pub use self::tab::{DiffTab, FileTab, Tab, TabMeta, WorkspaceTab};
 
 pub enum FileTabAction {
@@ -202,27 +204,6 @@ impl WorkspacePage {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum SidebarPage {
-    Sessions,
-    Files,
-    Git,
-}
-
-impl SidebarPage {
-    fn sessions() -> Self {
-        Self::Sessions
-    }
-
-    fn files() -> Self {
-        Self::Files
-    }
-
-    fn git() -> Self {
-        Self::Git
-    }
-}
-
 #[derive(Clone, Copy)]
 pub enum PendingFileOperation {
     Close(usize),
@@ -271,7 +252,8 @@ impl FileConfirmation {
 pub struct WorkspaceView {
     cwd: PathBuf,
     window: AnyWindowHandle,
-    sidebar_page: SidebarPage,
+    sidebar_panels: Vec<SidebarPanel>,
+    sidebar_panel: SidebarPanel,
     file_tree: Entity<FileTree>,
     _file_subscription: Subscription,
     _file_action_subscription: Subscription,
@@ -348,7 +330,12 @@ impl WorkspaceView {
         Self {
             cwd,
             window: window.window_handle(),
-            sidebar_page: SidebarPage::sessions(),
+            sidebar_panels: vec![
+                SidebarPanel::sessions(),
+                SidebarPanel::files(),
+                SidebarPanel::git(),
+            ],
+            sidebar_panel: SidebarPanel::sessions(),
             file_tree,
             _file_subscription: file_subscription,
             _file_action_subscription: file_action_subscription,
