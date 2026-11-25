@@ -11,7 +11,7 @@ impl Composer {
             .gap_2()
             .children(self.attachments.iter().map(|attachment| {
                 let id = attachment.id();
-                let name = attachment.name().to_owned();
+                let name = SharedString::from(attachment.name());
                 let icon = if attachment.mime_type().starts_with("image/") {
                     IconName::Image
                 } else if attachment.mime_type().starts_with("audio/") {

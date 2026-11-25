@@ -55,8 +55,9 @@ impl<'a> SessionRowView<'a> {
         );
         let delete_id = session.session_id.clone();
         let action_label = format!("会话 {title} 的更多操作");
-        let delete_anchor = format!("session:{}", delete_id);
-        let load_session = session.clone();
+        let delete_anchor = format!("session:{delete_id}");
+        let load_id = session.session_id.clone();
+        let archived = session.archived.unwrap_or(false);
         let can_open_session = !session.archived.unwrap_or(false)
             && !self.owner.management().is_pending()
             && self.owner.execution().supports_load()
@@ -75,7 +76,7 @@ impl<'a> SessionRowView<'a> {
                 .and_then(|host| host.upgrade())
                 .is_some_and(|host| !host.read(cx).is_sessions_visible());
         SessionSurface::new(
-            row.clone(),
+            session.session_id.clone(),
             selected,
             cx.theme().sidebar_accent,
             div()
@@ -121,7 +122,11 @@ impl<'a> SessionRowView<'a> {
                                         .child(display_title),
                                 )
                                 .on_click(cx.listener(move |this, _, _window, cx| {
-                                    let session = load_session.clone();
+                                    let session = this
+                                        .with_sidebar(|sidebar| {
+                                            sidebar.motion().session(&load_id).cloned()
+                                        });
+                                    let Some(session) = session else { return };
                                     if this.tab_host().is_some() {
                                         this.request_session_tab(session, cx);
                                     } else {
@@ -144,27 +149,31 @@ impl<'a> SessionRowView<'a> {
                                         .disabled(!enabled || !self.owner.can_manage_sessions())
                                         .dropdown_menu_with_anchor(Anchor::TopRight, {
                                             let delete_anchor = delete_anchor.clone();
-                                            let session = session.clone();
+                                            let menu_id = session.session_id.clone();
                                             move |mut menu, _, cx| {
                                                 let Some(owner) = view.upgrade() else { return menu; };
                                                 let owner = owner.read(cx);
-                                                let caps = owner.session_management_capabilities(&session.session_id, cx);
-                                                let available = enabled && owner.management_available(&session.session_id, cx);
+                                                let caps = owner.session_management_capabilities(&menu_id, cx);
+                                                let available = enabled && owner.management_available(&menu_id, cx);
                                                 for (label, operation, supported) in [
                                                     ("重命名…", SessionOperation::title(), caps.title.is_some()),
                                                     ("复制会话", SessionOperation::fork(), caps.fork.is_some()),
-                                                    (if session.archived.unwrap_or(false) { "恢复会话" } else { "归档会话" }, SessionOperation::archive(!session.archived.unwrap_or(false)), caps.archive.is_some()),
+                                                    (if archived { "恢复会话" } else { "归档会话" }, SessionOperation::archive(!archived), caps.archive.is_some()),
                                                 ] {
                                                     if !supported { continue; }
                                                     let view = view.clone();
-                                                    let session = session.clone();
+                                                    let id = menu_id.clone();
                                                     menu = menu.item(PopupMenuItem::new(label).disabled(!available).on_click(move |_, window, cx| {
-                                                        let view = view.clone(); let session = session.clone();
+                                                        let view = view.clone(); let id = id.clone();
                                                         window.defer(cx, move |window, cx| {
-                                                            let _ = view.update(cx, |this, cx| match operation {
-                                                                SessionOperation::Title => this.rename_session(session, window, cx),
-                                                                SessionOperation::Fork => this.fork_session(session, cx),
-                                                                SessionOperation::Archive(_) => this.archive_session(session, cx),
+                                                            let _ = view.update(cx, |this, cx| {
+                                                                let session = this.with_sidebar(|sidebar| sidebar.motion().session(&id).cloned());
+                                                                let Some(session) = session else { return };
+                                                                match operation {
+                                                                    SessionOperation::Title => this.rename_session(session, window, cx),
+                                                                    SessionOperation::Fork => this.fork_session(session, cx),
+                                                                    SessionOperation::Archive(_) => this.archive_session(session, cx),
+                                                                }
                                                             });
                                                         });
                                                     }));

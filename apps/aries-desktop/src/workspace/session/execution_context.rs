@@ -98,9 +98,8 @@ pub fn render_execution_context(
     } else {
         "通过左侧“新建会话…”按钮选择项目目录，或按 ⌘N 使用当前目录新建会话".into()
     };
-    let branch =
-        selected.then_some(owner.git_panel().info()).flatten().map(|info| info.branch().to_owned());
-    if let Some(branch) = &branch {
+    let branch = selected.then_some(owner.git_panel().info()).flatten().map(|info| info.branch());
+    if let Some(branch) = branch {
         directory.push_str(&format!("\nGit：{branch}"));
     }
     if let Some(id) = owner.execution().session_id() {

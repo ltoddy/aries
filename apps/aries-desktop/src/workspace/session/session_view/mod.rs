@@ -22,8 +22,8 @@ use crate::workspace::session::configuration::Configuration;
 use crate::workspace::session::execution::{Execution, SessionParts};
 use crate::workspace::session::execution_context::ExecutionState;
 use crate::workspace::session::model::SessionDeletion;
+use crate::workspace::settings::SendKey;
 use crate::workspace::settings::palette::Palette;
-use crate::workspace::settings::{Preferences, SendKey};
 use crate::workspace::sidebar::Sidebar;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -227,13 +227,10 @@ impl SessionView {
             && !self.execution.is_choosing_directory()
     }
     pub fn send_key(&self, cx: &App) -> SendKey {
-        self.preferences(cx).send_key()
-    }
-    pub fn preferences(&self, cx: &App) -> Preferences {
         self.tab_host
             .as_ref()
             .and_then(|host| host.upgrade())
-            .map(|host| host.read(cx).preferences(cx).clone())
+            .map(|host| host.read(cx).preferences(cx).send_key())
             .unwrap_or_default()
     }
 }

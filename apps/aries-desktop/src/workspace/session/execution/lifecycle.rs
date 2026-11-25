@@ -211,7 +211,7 @@ impl Execution {
                 this.finish_directory_selection();
                 match result {
                     Ok(Some(directory)) => {
-                        if let Some(host) = this.tab_host().clone() {
+                        if let Some(host) = this.tab_host() {
                             window.defer(cx, move |window, cx| {
                                 let _ = host.update(cx, |host, cx| {
                                     host.new_tab_in_directory(directory, window, cx);
@@ -253,7 +253,7 @@ impl Execution {
                 match result {
                     Ok(directory) => {
                         this.with_sidebar(|sidebar| sidebar.list_mut().expand_project(&directory));
-                        if let Some(host) = this.tab_host().clone() {
+                        if let Some(host) = this.tab_host() {
                             window.defer(cx, move |window, cx| {
                                 let _ = host.update(cx, |host, cx| {
                                     host.new_tab_in_directory(directory, window, cx);

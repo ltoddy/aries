@@ -135,7 +135,7 @@ impl Terminals {
         let stdout = process.child.stdout.take().ok_or_else(TerminalError::missing_stdout)?;
         let stderr = process.child.stderr.take().ok_or_else(TerminalError::missing_stderr)?;
         let id = TerminalId::new(format!(
-            "orbit-terminal-{}-{}",
+            "aries-desktop-terminal-{}-{}",
             self.prefix,
             self.next_id.fetch_add(1, Ordering::Relaxed)
         ));

@@ -14,7 +14,7 @@ use crate::workspace::settings::typography;
 #[derive(IntoElement)]
 pub struct UserMessage {
     index: usize,
-    text: String,
+    text: SharedString,
     attachments: Vec<AnyElement>,
     palette: Palette,
     on_copy: ClickHandler,
@@ -28,7 +28,7 @@ impl UserMessage {
         p: Palette,
         session: WeakEntity<SessionView>,
     ) -> Self {
-        let text = message.text().to_owned();
+        let text = SharedString::from(message.text());
         let copy_text = text.clone();
         let attachments = message
             .attachments()
@@ -50,14 +50,14 @@ impl UserMessage {
             attachments,
             p,
             move |_: &ClickEvent, _: &mut Window, cx: &mut App| {
-                cx.write_to_clipboard(ClipboardItem::new_string(copy_text.clone()));
+                cx.write_to_clipboard(ClipboardItem::new_string(copy_text.to_string()));
             },
         )
     }
 
     fn new(
         index: usize,
-        text: String,
+        text: SharedString,
         attachments: Vec<AnyElement>,
         palette: Palette,
         on_copy: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,

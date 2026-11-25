@@ -1,7 +1,6 @@
 pub mod agent;
 pub mod context;
 pub mod hooks;
-mod jsonl;
 pub mod memory;
 pub mod preamble;
 pub mod registry;

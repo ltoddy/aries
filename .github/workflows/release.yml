@@ -73,7 +73,7 @@ jobs:
           path: aries-${{ matrix.platform }}.*
           if-no-files-found: error
 
-  build-orbit:
+  build-desktop:
     name: build (aries-desktop, ${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -113,7 +113,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: [build, build-orbit]
+    needs: [build, build-desktop]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v8

@@ -215,7 +215,7 @@ impl GitPanel {
                             let backup = backup.clone();
                             let owner = owner.clone();
                             let directory = directory.clone();
-                            let label = format!(
+                            let label = SharedString::from(format!(
                                 "{} · {}",
                                 backup.path().display(),
                                 backup
@@ -223,9 +223,9 @@ impl GitPanel {
                                     .file_name()
                                     .unwrap_or_default()
                                     .to_string_lossy()
-                            );
+                            ));
                             list = list.child(
-                                Button::new(SharedString::from(label.clone()))
+                                Button::new(label.clone())
                                     .label(label)
                                     .on_click(move |_, window, cx| {
                                         let backup = backup.clone();

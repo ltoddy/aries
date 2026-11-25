@@ -1,14 +1,12 @@
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use rig::completion::Message;
 use tracing::error;
 
-use crate::jsonl::{self, JsonlAppender};
-
 #[derive(Debug, Clone)]
 pub struct ChatHistory {
-    file: JsonlAppender,
+    file_path: PathBuf,
 }
 
 impl ChatHistory {
@@ -22,20 +20,18 @@ impl ChatHistory {
         if let Some(parent) = file_path.parent() {
             let _ = tokio::fs::create_dir_all(parent).await;
         }
-        let file = JsonlAppender::open(file_path).await?;
+        tokio::fs::OpenOptions::new().append(true).create(true).open(&file_path).await?;
 
-        Ok(Self { file })
+        Ok(Self { file_path })
     }
 
     pub async fn append<'a>(&self, messages: impl IntoIterator<Item = &'a Message>) {
-        if let Err(err) = self.file.append(messages).await {
-            error!(path = %self.file.file_path().display(), err = %err, "failed to append chat history");
-            return;
+        if let Err(err) = tokio_jsonl::append_all(&self.file_path, messages).await {
+            error!(path = %self.file_path.display(), err = %err, "failed to append chat history");
         }
-        let _ = self.file.flush().await;
     }
 
     pub async fn messages(&self) -> io::Result<Vec<Message>> {
-        jsonl::read(self.file.file_path()).await
+        tokio_jsonl::read_all(&self.file_path).await.map_err(io::Error::other)
     }
 }

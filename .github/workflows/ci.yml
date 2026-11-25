@@ -79,7 +79,7 @@ jobs:
 
       - run: cargo test -p aries-cli --bins --tests
 
-  lint-orbit:
+  lint-desktop:
     name: lint (aries-desktop)
     runs-on: macos-15
     steps:
@@ -93,7 +93,7 @@ jobs:
 
       - run: cargo clippy -p aries-desktop --all-targets -- -D warnings
 
-  test-orbit:
+  test-desktop:
     name: test (aries-desktop)
     runs-on: macos-15
     steps:
