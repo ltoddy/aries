@@ -30,22 +30,25 @@ impl ExecutionState {
     pub fn updating() -> Self {
         Self::Updating
     }
-    pub fn render_tab_indicator(self, p: Palette) -> AnyElement {
+    pub fn render_tab_indicator(self, palette: Palette) -> AnyElement {
         let indicator = match self {
             Self::Idle => None,
             Self::Disconnected | Self::Failed => Some(
-                Icon::new(IconName::CircleX).size_3().text_color(p.danger()).into_any_element(),
+                Icon::new(IconName::CircleX)
+                    .size_3()
+                    .text_color(palette.danger())
+                    .into_any_element(),
             ),
             Self::Permission => Some(
                 Icon::new(IconName::CircleQuestionMark)
                     .size_3()
-                    .text_color(p.foreground())
+                    .text_color(palette.foreground())
                     .into_any_element(),
             ),
-            Self::ChoosingProject => {
-                Some(Icon::new(IconName::Folder).size_3().text_color(p.muted()).into_any_element())
-            },
-            _ => Some(Spinner::new().small().color(p.muted()).into_any_element()),
+            Self::ChoosingProject => Some(
+                Icon::new(IconName::Folder).size_3().text_color(palette.muted()).into_any_element(),
+            ),
+            _ => Some(Spinner::new().small().color(palette.muted()).into_any_element()),
         };
         div()
             .size_4()
@@ -78,7 +81,7 @@ impl ExecutionState {
 
 pub fn render_execution_context(
     owner: &SessionView,
-    p: Palette,
+    palette: Palette,
     cx: &Context<SessionView>,
 ) -> impl IntoElement {
     let selected =
@@ -113,7 +116,7 @@ pub fn render_execution_context(
         .min_w_0()
         .min_h_6()
         .text_xs()
-        .text_color(p.muted())
+        .text_color(palette.muted())
         .child(
             div()
                 .id("execution-project")
@@ -122,7 +125,7 @@ pub fn render_execution_context(
                 .px_2()
                 .py_1()
                 .rounded(cx.theme().radius_lg)
-                .bg(p.bubble())
+                .bg(palette.bubble())
                 .flex()
                 .flex_wrap()
                 .items_center()

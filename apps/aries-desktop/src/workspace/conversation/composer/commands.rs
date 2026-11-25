@@ -114,7 +114,7 @@ impl Composer {
         commands: &[AvailableCommand],
         available: bool,
         has_session: bool,
-        p: Palette,
+        palette: Palette,
         cx: &mut Context<SessionView>,
     ) -> Option<AnyElement> {
         let candidates = self.command_candidates(commands, available, cx)?;
@@ -131,7 +131,7 @@ impl Composer {
                 &self.command_menu,
                 candidates,
                 empty,
-                p,
+                palette,
                 move |name, window, cx| {
                     let _ = view.update(cx, |this, cx| this.select_command(name, window, cx));
                 },

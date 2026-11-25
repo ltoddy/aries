@@ -1,4 +1,13 @@
-use crate::workspace::workspace_view::*;
+use std::path::{Path, PathBuf};
+
+use gpui_kit::prelude::*;
+use gpui_kit::*;
+
+use crate::workspace::SessionView;
+use crate::workspace::files::{CloseFile, FileActionEvent, FileView, OpenFile};
+use crate::workspace::workspace_view::{
+    FileTab, FileTabAction, SidebarPanel, Tab, TabCommand, WorkspaceTab, WorkspaceView,
+};
 
 impl WorkspaceView {
     pub fn open_file(&mut self, target: OpenFile, window: &mut Window, cx: &mut Context<Self>) {
@@ -6,7 +15,7 @@ impl WorkspaceView {
             return;
         }
         let path = self.normalize_file_path(target.path(), cx);
-        let existing = self.tabs.iter().position(|tab| {
+        let existing = self.tabs.items.iter().position(|tab| {
             let WorkspaceTab::File(file) = tab else {
                 return false;
             };
@@ -15,12 +24,11 @@ impl WorkspaceView {
                 .target()
                 .is_some_and(|current| self.normalize_file_path(current.path(), cx) == path)
         });
-        self.sidebar_panel = SidebarPanel::files();
+        self.sidebar.panel = SidebarPanel::files();
         let index = if let Some(index) = existing {
             index
         } else {
-            let id = self.next_id;
-            self.next_id += 1;
+            let id = self.tabs.alloc_id();
             let view = cx.new(|cx| FileView::new(window, cx));
             let subscription = cx.observe_in(&view, window, move |_, _, window, cx| {
                 cx.notify();
@@ -37,12 +45,14 @@ impl WorkspaceView {
                 });
             view.update(cx, |view, cx| view.open(target.clone(), window, cx));
             let tab = Tab::new(id, view, subscription);
-            self.tabs.push(WorkspaceTab::new_file(FileTab::new(tab, close_subscription)));
+            self.tabs.items.push(WorkspaceTab::new_file(FileTab::new(tab, close_subscription)));
             self.resolve_file_identity(id, window, cx);
-            self.tabs.len() - 1
+            self.tabs.items.len() - 1
         };
-        let id = self.tabs[index].id();
-        self.select_tab(index, window, cx);
+        let Some(id) = self.tabs.tab(index).map(WorkspaceTab::id) else {
+            return;
+        };
+        self.try_activate(index, window, cx);
         if self.active_id() != Some(id) {
             return;
         }
@@ -76,8 +86,12 @@ impl WorkspaceView {
                 if this.is_sessions_visible()
                     && this.file_navigation_revision == revision
                     && this.active_id() == Some(id)
-                    && let Some(view) =
-                        this.tabs.iter().find(|tab| tab.id() == id).and_then(WorkspaceTab::file)
+                    && let Some(view) = this
+                        .tabs
+                        .items
+                        .iter()
+                        .find(|tab| tab.id() == id)
+                        .and_then(WorkspaceTab::file)
                     && (this.focus_handle.is_focused(window)
                         || view.read(cx).focus_handle(cx).contains_focused(window, cx))
                 {
@@ -97,7 +111,7 @@ impl WorkspaceView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(tab) = self.tabs.iter_mut().find(|tab| tab.id() == id) else {
+        let Some(tab) = self.tabs.items.iter_mut().find(|tab| tab.id() == id) else {
             return;
         };
         let WorkspaceTab::File(file) = tab else {
@@ -113,7 +127,7 @@ impl WorkspaceView {
             let canonical =
                 cx.background_spawn(async move { std::fs::canonicalize(request).ok() }).await;
             let _ = this.update_in(cx, |this, window, cx| {
-                let Some(tab) = this.tabs.iter_mut().find(|tab| tab.id() == id) else {
+                let Some(tab) = this.tabs.items.iter_mut().find(|tab| tab.id() == id) else {
                     return;
                 };
                 let WorkspaceTab::File(file) = tab else {
@@ -128,6 +142,7 @@ impl WorkspaceView {
                 };
                 let mut duplicates: Vec<_> = this
                     .tabs
+                    .items
                     .iter()
                     .filter_map(|tab| match tab {
                         WorkspaceTab::File(file) if file.canonical_path() == Some(&canonical) => {
@@ -136,13 +151,14 @@ impl WorkspaceView {
                         _ => None,
                     })
                     .collect();
-                if !this.pending_file_operations.is_empty() {
+                if !!this.files.pending.is_empty() {
                     cx.notify();
                     return;
                 }
                 duplicates.sort_unstable();
                 let protected: Vec<_> = this
                     .tabs
+                    .items
                     .iter()
                     .filter(|tab| duplicates.contains(&tab.id()))
                     .filter(|tab| {
@@ -171,15 +187,15 @@ impl WorkspaceView {
                     .selected_file_view()
                     .and_then(|view| view.read(cx).target())
                     .and_then(OpenFile::line);
-                this.tabs.retain(|tab| !remove.contains(&tab.id()));
+                this.tabs.items.retain(|tab| !remove.contains(&tab.id()));
                 let active_id = if replaced { Some(keep) } else { active_id };
-                this.active = active_id.and_then(|id| this.tab_index(id)).unwrap_or(0);
+                this.tabs.active = active_id.and_then(|id| this.tab_index(id)).unwrap_or(0);
                 if replaced {
                     this.invalidate_file_navigation(cx);
                     this.sync_sidebar_active_session(cx);
-                    this.tab_scroll.scroll_to_item(this.active);
+                    this.tabs.scroll.scroll_to_item(this.tabs.active);
                     if focused {
-                        this.focus_active_tab(window, cx);
+                        this.focus_active(window, cx);
                         if let Some(line) = line
                             && let Some(view) = this.active_file_view()
                             && let Some(current) = view.read(cx).target().cloned()
@@ -222,6 +238,7 @@ impl WorkspaceView {
                 },
             };
             self.tabs
+                .items
                 .iter()
                 .filter_map(|tab| {
                     let WorkspaceTab::File(file) = tab else {
@@ -301,7 +318,7 @@ impl WorkspaceView {
     }
 
     pub fn file_view(&self, id: usize) -> Option<&Entity<FileView>> {
-        self.tab_index(id).and_then(|index| self.tabs[index].file())
+        self.tabs.find(id).and_then(WorkspaceTab::file)
     }
 
     pub fn refresh_file_tab(&mut self, id: usize, window: &mut Window, cx: &mut Context<Self>) {
@@ -326,7 +343,7 @@ impl WorkspaceView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(tab) = self.tabs.iter_mut().find(|tab| tab.id() == id) else {
+        let Some(tab) = self.tabs.items.iter_mut().find(|tab| tab.id() == id) else {
             return;
         };
         let WorkspaceTab::File(file) = tab else {
@@ -356,7 +373,7 @@ impl WorkspaceView {
     }
 
     pub fn on_file_updated(&mut self, id: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let target = self.tabs.iter_mut().find_map(|tab| {
+        let target = self.tabs.items.iter_mut().find_map(|tab| {
             if tab.id() != id {
                 return None;
             }
@@ -370,7 +387,8 @@ impl WorkspaceView {
             self.sync_file_directory(cx);
         }
         if self
-            .file_confirmation
+            .files
+            .confirmation
             .as_ref()
             .is_some_and(|confirmation| confirmation.id == id && confirmation.saving_requested)
             && let Some(view) = self.file_view(id).cloned()
@@ -383,13 +401,13 @@ impl WorkspaceView {
                     self.finish_file_confirmation(id, window, cx);
                     return;
                 }
-            } else if let Some(confirmation) = &mut self.file_confirmation {
+            } else if let Some(confirmation) = self.files.confirmation.as_mut() {
                 confirmation.saving_requested = false;
                 window.refresh();
                 cx.notify();
             }
         }
-        if self.file_confirmation.is_none() && !self.pending_file_operations.is_empty() {
+        if self.files.confirmation.is_none() && self.files.pending.is_empty() {
             self.advance_file_operations(window, cx);
         }
     }

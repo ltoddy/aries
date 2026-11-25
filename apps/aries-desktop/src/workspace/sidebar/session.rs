@@ -9,79 +9,64 @@ use gpui_kit::*;
 use crate::workspace::SessionView;
 use crate::workspace::session::SessionOperation;
 use crate::workspace::settings::palette::Palette;
-use crate::workspace::sidebar::Sidebar;
 use crate::workspace::sidebar::motion::{SessionSurface, SidebarRow};
 
-pub struct SessionRowView<'a> {
-    sidebar: &'a Sidebar,
-    owner: &'a SessionView,
-}
-
-impl<'a> SessionRowView<'a> {
-    pub fn new(sidebar: &'a Sidebar, owner: &'a SessionView) -> Self {
-        Self { sidebar, owner }
-    }
-    pub fn render_session_row(
-        &self,
-        row: &SidebarRow,
-        expanded: bool,
-        p: Palette,
-        cx: &mut Context<SessionView>,
-    ) -> AnyElement {
-        let session = row.session();
-        let enabled = expanded;
-        let id = session.session_id.to_string();
-        let execution = self.owner.execution();
-        let current = execution.session_id() == Some(&session.session_id);
-        let loading = self.sidebar.loading_session() == Some(&session.session_id)
-            || (execution.is_loading() && execution.loading_id() == Some(&session.session_id));
-        let title = session
-            .title
-            .as_ref()
-            .filter(|title| !title.trim().is_empty())
-            .cloned()
-            .unwrap_or_else(|| if current { execution.conversation().title() } else { id.clone() });
-        let display_title = crate::workspace::conversation::single_line(&title);
-        let details = format!(
-            "{}\n{}\n{}{}",
-            title,
-            session.cwd.display(),
-            id,
-            session
-                .updated_at
-                .as_ref()
-                .map(|time| format!("\n更新时间：{time}"))
-                .unwrap_or_default()
-        );
-        let delete_id = session.session_id.clone();
-        let action_label = format!("会话 {title} 的更多操作");
-        let delete_anchor = format!("session:{delete_id}");
-        let load_id = session.session_id.clone();
-        let archived = session.archived.unwrap_or(false);
-        let can_open_session = !session.archived.unwrap_or(false)
-            && !self.owner.management().is_pending()
-            && self.owner.execution().supports_load()
-            && !self.owner.execution().is_disconnected()
-            && (self.owner.tab_host().is_some() || self.owner.can_load_sessions());
-        let capabilities = self.owner.session_management_capabilities(&session.session_id, cx);
-        let has_actions = capabilities.title.is_some()
-            || capabilities.fork.is_some()
-            || capabilities.archive.is_some()
-            || capabilities.delete.is_some();
-        let view = cx.weak_entity();
-        let selected = current
-            && !self
-                .owner
-                .tab_host()
-                .and_then(|host| host.upgrade())
-                .is_some_and(|host| !host.read(cx).is_sessions_visible());
-        SessionSurface::new(
+pub fn render_session_row(
+    owner: &SessionView,
+    row: &SidebarRow,
+    expanded: bool,
+    palette: Palette,
+    cx: &mut Context<SessionView>,
+) -> AnyElement {
+    let session = row.session();
+    let enabled = expanded;
+    let id = session.session_id.to_string();
+    let execution = owner.execution();
+    let current = execution.session_id() == Some(&session.session_id);
+    let loading = owner.sidebar().loading_session() == Some(&session.session_id)
+        || (execution.is_loading() && execution.loading_id() == Some(&session.session_id));
+    let title = session
+        .title
+        .as_ref()
+        .filter(|title| !title.trim().is_empty())
+        .cloned()
+        .unwrap_or_else(|| if current { execution.conversation().title() } else { id.clone() });
+    let display_title = crate::workspace::conversation::single_line(&title);
+    let details = format!(
+        "{}\n{}\n{}{}",
+        title,
+        session.cwd.display(),
+        id,
+        session.updated_at.as_ref().map(|time| format!("\n更新时间：{time}")).unwrap_or_default()
+    );
+    let delete_id = session.session_id.clone();
+    let action_label = format!("会话 {title} 的更多操作");
+    let delete_anchor = format!("session:{delete_id}");
+    let load_id = session.session_id.clone();
+    let archived = session.archived.unwrap_or(false);
+    let can_open_session = !session.archived.unwrap_or(false)
+        && !owner.management().is_pending()
+        && owner.execution().supports_load()
+        && !owner.execution().is_disconnected()
+        && (owner.tab_host().is_some() || owner.can_load_sessions());
+    let capabilities = owner.session_management_capabilities(&session.session_id, cx);
+    let has_actions = capabilities.title.is_some()
+        || capabilities.fork.is_some()
+        || capabilities.archive.is_some()
+        || capabilities.delete.is_some();
+    let view = cx.weak_entity();
+    let selected = current
+        && !owner
+            .tab_host()
+            .and_then(|host| host.upgrade())
+            .is_some_and(|host| !host.read(cx).is_sessions_visible());
+    SessionSurface::new(
             session.session_id.clone(),
             selected,
             cx.theme().sidebar_accent,
             div()
                 .id(SharedString::from(format!("session:{id}")))
-                .when(current, |row| row.anchor_scroll(Some(self.sidebar.anchor().clone())))
+                .when(current, |row| row.anchor_scroll(Some(owner.sidebar().anchor().clone())))
                 .pl_2()
                 .tooltip(move |window, cx| Tooltip::new(details.clone()).build(window, cx))
                 .child(
@@ -104,7 +89,7 @@ impl<'a> SessionRowView<'a> {
                                 .accessibility_label(format!("打开会话 {title}"))
                                 .when(loading, |button| {
                                     button.child(
-                                        div().text_xs().text_color(p.muted()).child("加载中…"),
+                                        div().text_xs().text_color(palette.muted()).child("加载中…"),
                                     )
                                 })
                                 .child(
@@ -143,10 +128,10 @@ impl<'a> SessionRowView<'a> {
                                         .icon(Icon::new(IconName::Ellipsis).size(rems(0.8125)))
                                         .ghost()
                                         .small()
-                                        .text_color(p.muted())
+                                        .text_color(palette.muted())
                                         .tooltip("会话操作")
                                         .accessibility_label(action_label)
-                                        .disabled(!enabled || !self.owner.can_manage_sessions())
+                                        .disabled(!enabled || !owner.can_manage_sessions())
                                         .dropdown_menu_with_anchor(Anchor::TopRight, {
                                             let delete_anchor = delete_anchor.clone();
                                             let menu_id = session.session_id.clone();
@@ -196,9 +181,9 @@ impl<'a> SessionRowView<'a> {
                                 .when_some(
                                     enabled
                                         .then(|| {
-                                            self.owner.render_session_delete_popup(
+                                            owner.render_session_delete_popup(
                                                 &delete_anchor,
-                                                p,
+                                                palette,
                                                 cx,
                                             )
                                         })
@@ -210,5 +195,4 @@ impl<'a> SessionRowView<'a> {
                 .into_any_element(),
         )
         .into_any_element()
-    }
 }

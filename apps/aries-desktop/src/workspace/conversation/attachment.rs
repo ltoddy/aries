@@ -128,7 +128,7 @@ impl Attachment {
         attachment_index: usize,
         content: &ContentBlock,
         image: Option<Arc<Image>>,
-        p: Palette,
+        palette: Palette,
     ) -> Self {
         let info = AttachmentInfo::from(content);
         let subtitle = info
@@ -153,7 +153,7 @@ impl Attachment {
             ),
             info.icon,
             image,
-            p,
+            palette,
         )
         .with_uri(resource_uri(content).map(str::to_owned))
     }
@@ -194,7 +194,7 @@ impl AttachmentText {
 
 impl RenderOnce for Attachment {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        let Self { id, text, icon, image, palette: p, uri, session } = self;
+        let Self { id, text, icon, image, palette, uri, session } = self;
         let open = session.and_then(|session| {
             let view = session.upgrade()?;
             let target = OpenFile::from_location(
@@ -230,7 +230,7 @@ impl RenderOnce for Attachment {
             .px_2()
             .py_1()
             .rounded(cx.theme().radius)
-            .bg(p.bubble())
+            .bg(palette.bubble())
             .flex()
             .items_center()
             .gap_2()
@@ -248,7 +248,7 @@ impl RenderOnce for Attachment {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .text_color(p.muted())
+                    .text_color(palette.muted())
                     .child(preview),
             )
             .child(
@@ -267,7 +267,7 @@ impl RenderOnce for Attachment {
                             .mt_1()
                             .truncate()
                             .text_xs()
-                            .text_color(p.muted())
+                            .text_color(palette.muted())
                             .child(SelectableText::new("attachment-subtitle", subtitle)),
                     ),
             )

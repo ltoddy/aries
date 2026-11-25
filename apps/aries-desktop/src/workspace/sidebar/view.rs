@@ -11,8 +11,9 @@ use gpui_kit::*;
 use crate::workspace::session::model::SessionList;
 use crate::workspace::settings::SettingsButton;
 use crate::workspace::settings::palette::Palette;
-use crate::workspace::sidebar::list::SessionListView;
+use crate::workspace::sidebar::list::render_sessions;
 use crate::workspace::sidebar::motion::SidebarMotion;
+use crate::workspace::workspace_view::WorkspacePage;
 use crate::workspace::{SessionView, WorkspaceView};
 
 pub const SESSION_LIMIT: usize = 8;
@@ -99,8 +100,8 @@ impl Sidebar {
         &self,
         owner: &SessionView,
         tab_host: Option<WeakEntity<WorkspaceView>>,
-        p: Palette,
-        window: &mut Window,
+        palette: Palette,
+        _window: &mut Window,
         cx: &mut Context<SessionView>,
     ) -> impl IntoElement {
         let new_enabled = !owner.management().is_pending()
@@ -111,18 +112,10 @@ impl Sidebar {
                     host.read(cx).active_view().map(|view| view.read(cx).can_start_new_chat())
                 })
                 .unwrap_or_else(|| owner.can_start_new_chat());
-        let settings_selected = tab_host
+        let active_page = tab_host
             .as_ref()
             .and_then(|host| host.upgrade())
-            .is_some_and(|host| host.read(cx).is_settings_visible());
-        let usage_selected = tab_host
-            .as_ref()
-            .and_then(|host| host.upgrade())
-            .is_some_and(|host| host.read(cx).is_usage_visible());
-        let extensions_selected = tab_host
-            .as_ref()
-            .and_then(|host| host.upgrade())
-            .is_some_and(|host| host.read(cx).is_extensions_visible());
+            .and_then(|host| host.read(cx).active_page());
         div()
             .id("sidebar")
             .w_full()
@@ -130,7 +123,7 @@ impl Sidebar {
             .flex_shrink_0()
             .flex()
             .flex_col()
-            .bg(p.sidebar().opacity(0.))
+            .bg(palette.sidebar().opacity(0.))
             .child(
                 div().px_2().py_1().child(
                     Button::new("new-chat")
@@ -140,7 +133,7 @@ impl Sidebar {
                         .tooltip("选择项目目录并新建会话")
                         .icon(Icon::new(IconName::Plus).size(rems(0.9375)))
                         .w_full()
-                        .text_color(p.muted())
+                        .text_color(palette.muted())
                         .rounded(cx.theme().radius)
                         .disabled(!new_enabled)
                         .on_click(cx.listener(|this, _, window, cx| {
@@ -152,27 +145,21 @@ impl Sidebar {
                         })),
                 ),
             )
-            .child(SessionListView::new(self, owner).render_sessions(p, window, cx))
+            .child(render_sessions(owner, palette, cx))
             .when(!owner.uses_sidebar_tab_host(), |sidebar| {
-                sidebar.child(Self::render_footer(
-                    tab_host,
-                    p,
-                    settings_selected,
-                    usage_selected,
-                    extensions_selected,
-                    cx,
-                ))
+                sidebar.child(Self::render_footer(tab_host, palette, active_page, cx))
             })
     }
 
     pub fn render_footer(
         tab_host: Option<WeakEntity<WorkspaceView>>,
-        p: Palette,
-        settings_selected: bool,
-        usage_selected: bool,
-        extensions_selected: bool,
+        palette: Palette,
+        active_page: Option<WorkspacePage>,
         cx: &mut App,
     ) -> Div {
+        let settings_selected = matches!(active_page, Some(WorkspacePage::Settings));
+        let usage_selected = matches!(active_page, Some(WorkspacePage::Usage));
+        let extensions_selected = matches!(active_page, Some(WorkspacePage::Extensions));
         let usage_host = tab_host.clone();
         let extensions_host = tab_host.clone();
         div()
@@ -182,7 +169,7 @@ impl Sidebar {
             .flex()
             .items_center()
             .gap_2()
-            .child(SettingsButton::new(tab_host, p, settings_selected))
+            .child(SettingsButton::new(tab_host, palette, settings_selected))
             .child(
                 Button::new("open-extensions")
                     .ghost()
@@ -196,7 +183,11 @@ impl Sidebar {
                     } else {
                         cx.theme().transparent
                     })
-                    .text_color(if extensions_selected { p.foreground() } else { p.muted() })
+                    .text_color(if extensions_selected {
+                        palette.foreground()
+                    } else {
+                        palette.muted()
+                    })
                     .disabled(extensions_host.is_none())
                     .on_click(move |_, window, cx| {
                         if let Some(host) = extensions_host.clone() {
@@ -221,7 +212,7 @@ impl Sidebar {
                     } else {
                         cx.theme().transparent
                     })
-                    .text_color(if usage_selected { p.foreground() } else { p.muted() })
+                    .text_color(if usage_selected { palette.foreground() } else { palette.muted() })
                     .disabled(usage_host.is_none())
                     .on_click(move |_, window, cx| {
                         if let Some(host) = usage_host.clone() {
