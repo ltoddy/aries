@@ -88,7 +88,7 @@ impl PromptQueue {
     pub fn render(
         &self,
         session: &SessionView,
-        p: Palette,
+        palette: Palette,
         cx: &mut Context<SessionView>,
     ) -> AnyElement {
         if self.is_empty() {
@@ -104,8 +104,8 @@ impl PromptQueue {
             .flex()
             .flex_col()
             .rounded(cx.theme().radius_lg)
-            .bg(p.bubble())
-            .text_color(p.foreground())
+            .bg(palette.bubble())
+            .text_color(palette.foreground())
             .child(
                 div()
                     .flex()
@@ -125,7 +125,7 @@ impl PromptQueue {
                             .min_w_0()
                             .whitespace_normal()
                             .text_xs()
-                            .text_color(p.muted())
+                            .text_color(palette.muted())
                             .child(if automatic {
                                 "按顺序逐条发送，上一条回复正常结束后发送下一条。"
                             } else {
@@ -165,7 +165,7 @@ impl PromptQueue {
                                 self.prompts
                                     .iter()
                                     .enumerate()
-                                    .map(|(ix, prompt)| prompt.render(ix + 1, p, cx)),
+                                    .map(|(ix, prompt)| prompt.render(ix + 1, palette, cx)),
                             ),
                         ),
                 )
@@ -197,7 +197,12 @@ impl QueuedPrompt {
         Self { id: NEXT_PROMPT_ID.fetch_add(1, Ordering::Relaxed), text, preview, attachments }
     }
 
-    fn render(&self, position: usize, p: Palette, cx: &mut Context<SessionView>) -> AnyElement {
+    fn render(
+        &self,
+        position: usize,
+        palette: Palette,
+        cx: &mut Context<SessionView>,
+    ) -> AnyElement {
         let id = self.id;
         div()
             .id(("queued-prompt", id))
@@ -210,7 +215,7 @@ impl QueuedPrompt {
                     .w_6()
                     .flex_shrink_0()
                     .text_xs()
-                    .text_color(p.muted())
+                    .text_color(palette.muted())
                     .child(position.to_string()),
             )
             .child(div().flex_1().min_w_0().truncate().text_sm().child(self.preview.clone()))
@@ -219,7 +224,7 @@ impl QueuedPrompt {
                     div()
                         .flex_shrink_0()
                         .text_xs()
-                        .text_color(p.muted())
+                        .text_color(palette.muted())
                         .child(format!("{} 个附件", self.attachments.len())),
                 )
             })

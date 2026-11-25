@@ -6,7 +6,7 @@ use agent_client_protocol::v1::schema::{
     PermissionOptionId, SessionId, SessionInfo, SetSessionConfigOptionRequest,
 };
 use gpui_kit::component::button::ButtonVariant;
-use gpui_kit::component::{ActiveTheme, WindowExt, h_resizable, resizable_panel};
+use gpui_kit::component::{ActiveTheme, WindowExt};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
 use jiff::{SignedDuration, Timestamp};
@@ -28,7 +28,6 @@ use crate::workspace::sidebar::Sidebar;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SessionRenderMode {
-    Full,
     Sidebar,
     Main,
 }
@@ -102,7 +101,7 @@ impl SessionView {
             timeline: Timeline::new(cx),
             sidebar: Sidebar::new(),
             tab_host: None,
-            render_mode: SessionRenderMode::Full,
+            render_mode: SessionRenderMode::Main,
             tab_session_request: None,
             tab_new_request: false,
             _subscriptions: vec![changes, quit, escape],
@@ -135,6 +134,9 @@ impl SessionView {
     }
     pub fn git_panel(&self) -> &GitPanel {
         &self.git_panel
+    }
+    pub fn sidebar(&self) -> &Sidebar {
+        &self.sidebar
     }
     pub fn with_git_panel<R>(&mut self, operation: impl FnOnce(&mut GitPanel) -> R) -> R {
         operation(&mut self.git_panel)

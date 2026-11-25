@@ -24,7 +24,7 @@ pub struct SubagentMessage {
 impl SubagentMessage {
     pub fn from_subagent(
         subagent: &SubagentState,
-        p: Palette,
+        palette: Palette,
         collapsed: bool,
         on_toggle: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
     ) -> Self {
@@ -41,7 +41,7 @@ impl SubagentMessage {
                     SubagentEntry::new(
                         format!("subagent-message-{}", message.message_id()),
                         message.text().to_owned(),
-                        p,
+                        palette,
                     )
                 })
                 .collect()
@@ -51,7 +51,7 @@ impl SubagentMessage {
             collapsed,
             SubagentSummary::new(title, description, state),
             entries,
-            p,
+            palette,
             on_toggle,
         )
     }
@@ -89,14 +89,14 @@ impl SubagentSummary {
 
 impl RenderOnce for SubagentMessage {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        let Self { toggle_id, collapsed, summary, entries, palette: p, on_toggle } = self;
+        let Self { toggle_id, collapsed, summary, entries, palette, on_toggle } = self;
         let SubagentSummary { title, description, state } = summary;
         let toggle_label = if collapsed { "展开子 Agent" } else { "折叠子 Agent" };
         div()
             .w_full()
             .min_w_0()
             .rounded(cx.theme().radius_lg)
-            .bg(p.bubble())
+            .bg(palette.bubble())
             .px_2()
             .py_1()
             .flex()
@@ -124,9 +124,13 @@ impl RenderOnce for SubagentMessage {
                                     IconName::ChevronDown
                                 })
                                 .size(rems(0.875))
-                                .text_color(p.muted()),
+                                .text_color(palette.muted()),
                             )
-                            .child(Icon::new(IconName::Bot).size(rems(0.875)).text_color(p.muted()))
+                            .child(
+                                Icon::new(IconName::Bot)
+                                    .size(rems(0.875))
+                                    .text_color(palette.muted()),
+                            )
                             .child(
                                 div()
                                     .min_w_0()
@@ -138,7 +142,7 @@ impl RenderOnce for SubagentMessage {
                                         div()
                                             .truncate()
                                             .text_sm()
-                                            .text_color(p.foreground())
+                                            .text_color(palette.foreground())
                                             .child(title),
                                     )
                                     .when_some(description, |this, description| {
@@ -146,7 +150,7 @@ impl RenderOnce for SubagentMessage {
                                             div()
                                                 .truncate()
                                                 .text_xs()
-                                                .text_color(p.muted())
+                                                .text_color(palette.muted())
                                                 .child(description),
                                         )
                                     }),
@@ -156,18 +160,18 @@ impl RenderOnce for SubagentMessage {
                                     div()
                                         .flex_shrink_0()
                                         .rounded(cx.theme().radius_full())
-                                        .bg(p.input())
+                                        .bg(palette.input())
                                         .px_2()
                                         .py_1()
                                         .text_xs()
-                                        .text_color(p.muted())
+                                        .text_color(palette.muted())
                                         .child(state),
                                 )
                             }),
                     ),
             )
             .when(!collapsed && entries.is_empty(), |this| {
-                this.child(div().text_xs().text_color(p.muted()).child("等待子 Agent 输出…"))
+                this.child(div().text_xs().text_color(palette.muted()).child("等待子 Agent 输出…"))
             })
             .when(!collapsed, |this| this.children(entries))
             .into_any_element()
@@ -190,7 +194,7 @@ impl SubagentEntry {
 
 impl RenderOnce for SubagentEntry {
     fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
-        let Self { id, text, palette: p, session } = self;
+        let Self { id, text, palette, session } = self;
         div()
             .min_w_0()
             .w_full()
@@ -211,7 +215,10 @@ impl RenderOnce for SubagentEntry {
                             .gap_1()
                             .when_some(code_block.lang(), |el, lang| {
                                 el.child(
-                                    div().text_xs().text_color(p.muted()).child(lang.to_string()),
+                                    div()
+                                        .text_xs()
+                                        .text_color(palette.muted())
+                                        .child(lang.to_string()),
                                 )
                             })
                             .child({
@@ -223,7 +230,11 @@ impl RenderOnce for SubagentEntry {
                                             code.clone(),
                                         ));
                                     })
-                                    .child(Icon::new(IconName::Copy).xsmall().text_color(p.muted()))
+                                    .child(
+                                        Icon::new(IconName::Copy)
+                                            .xsmall()
+                                            .text_color(palette.muted()),
+                                    )
                             })
                             .into_any_element()
                     })

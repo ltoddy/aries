@@ -9,7 +9,7 @@ use crate::workspace::settings::palette::Palette;
 pub fn render_session_delete_popup(
     owner: &SessionView,
     anchor: impl AsRef<str>,
-    p: Palette,
+    palette: Palette,
     cx: &mut Context<SessionView>,
 ) -> Option<AnyElement> {
     let anchor = anchor.as_ref();
@@ -25,8 +25,8 @@ pub fn render_session_delete_popup(
             .p_2()
             .rounded(px(8.))
             .border_1()
-            .border_color(p.border())
-            .bg(p.background())
+            .border_color(palette.border())
+            .bg(palette.background())
             .shadow_lg()
             .occlude()
             .child(

@@ -16,7 +16,7 @@ use crate::workspace::settings::palette::Palette;
 
 pub fn render_session_config(
     owner: &SessionView,
-    p: Palette,
+    palette: Palette,
     cx: &mut Context<SessionView>,
 ) -> impl IntoElement {
     div()
@@ -33,7 +33,7 @@ pub fn render_session_config(
                         .conversation()
                         .config_options()
                         .iter()
-                        .map(|option| render_config_option(owner, session_id, option, p, cx)),
+                        .map(|option| render_config_option(owner, session_id, option, palette, cx)),
                 )
             },
         ))
@@ -42,7 +42,7 @@ pub fn render_session_config(
                 div()
                     .px_2()
                     .text_xs()
-                    .text_color(p.danger())
+                    .text_color(palette.danger())
                     .child(SelectableText::new("session-config-error-text", error)),
             )
         })
@@ -52,7 +52,7 @@ fn render_config_option(
     owner: &SessionView,
     session_id: &SessionId,
     option: &SessionConfigOption,
-    p: Palette,
+    palette: Palette,
     cx: &mut Context<SessionView>,
 ) -> AnyElement {
     let value = SharedString::from(config::value_name(option).into_owned());
@@ -86,8 +86,8 @@ fn render_config_option(
         .max_w(rems(16.25))
         .min_w_0()
         .rounded(cx.theme().radius_full())
-        .bg(p.bubble())
-        .text_color(p.muted())
+        .bg(palette.bubble())
+        .text_color(palette.muted())
         .disabled(!supported || !owner.is_session_idle() || owner.execution().is_disconnected())
         .tooltip(tooltip)
         .accessibility_label(label)

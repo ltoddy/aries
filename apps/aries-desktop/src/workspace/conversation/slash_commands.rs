@@ -72,7 +72,7 @@ impl CommandMenu {
         menu: &SlashMenu,
         candidates: impl IntoIterator<Item = &'a AvailableCommand>,
         empty: &'static str,
-        p: Palette,
+        palette: Palette,
         on_select: impl Fn(&str, &mut Window, &mut App) + 'static,
     ) -> Self {
         Self {
@@ -80,14 +80,14 @@ impl CommandMenu {
             selected: menu.selected,
             scroll: menu.scroll.clone(),
             empty,
-            palette: p,
+            palette,
             on_select: Box::new(on_select),
         }
     }
 }
 impl RenderOnce for CommandMenu {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        let Self { candidates, selected, scroll, empty, palette: p, on_select } = self;
+        let Self { candidates, selected, scroll, empty, palette, on_select } = self;
         let on_select = std::rc::Rc::new(on_select);
         div()
             .id("slash-commands")
@@ -98,11 +98,11 @@ impl RenderOnce for CommandMenu {
             .mb_2()
             .rounded(cx.theme().radius_lg)
             .border_1()
-            .border_color(p.border())
-            .bg(p.input())
+            .border_color(palette.border())
+            .bg(palette.input())
             .shadow_lg()
             .occlude()
-            .child(div().px_3().py_2().text_xs().text_color(p.muted()).child("可用命令"))
+            .child(div().px_3().py_2().text_xs().text_color(palette.muted()).child("可用命令"))
             .child(
                 div()
                     .id("slash-command-list")
@@ -112,7 +112,7 @@ impl RenderOnce for CommandMenu {
                     .px_1()
                     .pb_1()
                     .when(candidates.is_empty(), |list| {
-                        list.child(div().p_3().text_sm().text_color(p.muted()).child(empty))
+                        list.child(div().p_3().text_sm().text_color(palette.muted()).child(empty))
                     })
                     .children(candidates.into_iter().enumerate().map(|(index, command)| {
                         let name = command.name.clone();
@@ -140,7 +140,7 @@ impl RenderOnce for CommandMenu {
                             .py_2()
                             .rounded(cx.theme().radius)
                             .when(index == selected, |row| row.bg(cx.theme().primary.opacity(0.12)))
-                            .hover(|row| row.bg(p.hover()))
+                            .hover(|row| row.bg(palette.hover()))
                             .aria_label(format!("/{}：{}", command.name, command.description))
                             .tooltip(move |window, cx| {
                                 let details = details.clone();
@@ -170,7 +170,7 @@ impl RenderOnce for CommandMenu {
                                     .truncate()
                                     .line_clamp(1)
                                     .text_xs()
-                                    .text_color(p.muted())
+                                    .text_color(palette.muted())
                                     .child(command.description),
                             )
                             .on_mouse_down(MouseButton::Left, move |_, window, cx| {
@@ -185,9 +185,9 @@ impl RenderOnce for CommandMenu {
                     .px_3()
                     .py_2()
                     .border_t_1()
-                    .border_color(p.border())
+                    .border_color(palette.border())
                     .text_xs()
-                    .text_color(p.muted())
+                    .text_color(palette.muted())
                     .child("↑ ↓ 选择，Enter / Tab 填入，Esc 关闭"),
             )
             .into_any_element()

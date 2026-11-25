@@ -89,7 +89,7 @@ impl FileTab {
         self.canonical_path = canonical;
     }
 
-    fn meta(&self, owner: &WorkspaceView, p: Palette, cx: &App) -> TabMeta {
+    fn meta(&self, owner: &WorkspaceView, palette: Palette, cx: &App) -> TabMeta {
         let view = self.view().read(cx);
         let target = view.target();
         let title = target
@@ -105,7 +105,7 @@ impl FileTab {
         } else {
             Icon::new(if failed { IconName::Info } else { IconName::FileCode })
                 .size_3()
-                .text_color(if failed { cx.theme().danger } else { p.muted() })
+                .text_color(if failed { cx.theme().danger } else { palette.muted() })
                 .into_any_element()
         };
         let status = if loading {
@@ -144,7 +144,7 @@ impl DiffTab {
         &self.session
     }
 
-    fn meta(&self, p: Palette, cx: &App) -> TabMeta {
+    fn meta(&self, palette: Palette, cx: &App) -> TabMeta {
         let view = self.view().read(cx);
         let target = view.target();
         let title = target
@@ -156,7 +156,7 @@ impl DiffTab {
             .unwrap_or_else(|| title.clone());
         let status = target.map(|target| target.group().title()).unwrap_or("变更");
         let indicator = tab_indicator(
-            Icon::new(IconName::FileDiff).size_3().text_color(p.muted()).into_any_element(),
+            Icon::new(IconName::FileDiff).size_3().text_color(palette.muted()).into_any_element(),
         );
         TabMeta::new(title, tooltip, status, indicator)
     }
@@ -180,11 +180,12 @@ impl PageTab {
         self.page
     }
 
-    fn meta(&self, p: Palette) -> TabMeta {
+    fn meta(&self, palette: Palette) -> TabMeta {
         let page = self.page();
         let title = page.title();
-        let indicator =
-            tab_indicator(Icon::new(page.icon()).size_3().text_color(p.muted()).into_any_element());
+        let indicator = tab_indicator(
+            Icon::new(page.icon()).size_3().text_color(palette.muted()).into_any_element(),
+        );
         TabMeta::new(title, title, page.status(), indicator)
     }
 }
@@ -298,17 +299,22 @@ impl WorkspaceTab {
         self.file().is_some_and(|view| view.read(cx).is_saving())
     }
 
-    pub fn meta(&self, owner: &WorkspaceView, p: Palette, cx: &App) -> TabMeta {
+    pub fn meta(&self, owner: &WorkspaceView, palette: Palette, cx: &App) -> TabMeta {
         match self {
             Self::Session(tab) => {
                 let view = tab.view().read(cx);
                 let title = view.tab_title();
                 let state = view.execution_state();
-                TabMeta::new(title.clone(), title, state.label(), state.render_tab_indicator(p))
+                TabMeta::new(
+                    title.clone(),
+                    title,
+                    state.label(),
+                    state.render_tab_indicator(palette),
+                )
             },
-            Self::File(tab) => tab.meta(owner, p, cx),
-            Self::Diff(tab) => tab.meta(p, cx),
-            Self::Page(tab) => tab.meta(p),
+            Self::File(tab) => tab.meta(owner, palette, cx),
+            Self::Diff(tab) => tab.meta(palette, cx),
+            Self::Page(tab) => tab.meta(palette),
         }
     }
 
