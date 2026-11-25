@@ -79,9 +79,8 @@ fn render_config_option(
         _ => false,
     };
     let view = cx.weak_entity();
-    let session_id = session_id.clone();
-    let option = option.clone();
-    Button::new(SharedString::from(format!("session-config:{}:{}", session_id, option.id)))
+    let option_id = option.id.clone();
+    Button::new(SharedString::from(format!("session-config:{session_id}:{option_id}")))
         .ghost()
         .small()
         .max_w(rems(16.25))
@@ -104,6 +103,18 @@ fn render_config_option(
                 .child(Icon::new(IconName::ChevronDown).size(rems(0.75)).flex_shrink_0()),
         )
         .dropdown_menu_with_anchor(Anchor::BottomLeft, move |mut menu, _, cx| {
+            let Some(owner) = view.upgrade() else { return menu };
+            let owner = owner.read(cx);
+            let Some(option) = owner
+                .execution()
+                .conversation()
+                .config_options()
+                .iter()
+                .find(|option| option.id == option_id)
+            else {
+                return menu;
+            };
+            let Some(session_id) = owner.execution().session_id() else { return menu };
             menu = menu
                 .label(option.name.clone())
                 .min_w(cx.theme().font_size * 11.25)

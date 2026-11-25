@@ -18,5 +18,5 @@ thiserror.workspace = true
 toasty.workspace = true
 tokio = { workspace = true, features = ["net"] }
 tokio-stream = { version = "0.1", features = ["net"] }
-tonic = "0.14"
+tonic.workspace = true
 tracing.workspace = true

@@ -24,8 +24,8 @@ impl SessionView {
         let call = tool.call();
         let id = SharedString::from(call.tool_call_id.to_string());
         let title = single_line(tool.title());
-        let input = call.raw_input.as_ref().map(pretty);
-        let output = call.raw_output.as_ref().map(pretty);
+        let input = call.raw_input.as_ref().map(pretty).map(SharedString::from);
+        let output = call.raw_output.as_ref().map(pretty).map(SharedString::from);
         window.open_dialog(cx, move |dialog, _, cx| {
             let input = input.clone();
             let output = output.clone();
@@ -55,12 +55,12 @@ impl SessionView {
 #[derive(IntoElement)]
 struct ToolDetails {
     id: SharedString,
-    input: Option<String>,
-    output: Option<String>,
+    input: Option<SharedString>,
+    output: Option<SharedString>,
 }
 
 impl ToolDetails {
-    fn new(id: SharedString, input: Option<String>, output: Option<String>) -> Self {
+    fn new(id: SharedString, input: Option<SharedString>, output: Option<SharedString>) -> Self {
         Self { id, input, output }
     }
 }
@@ -96,14 +96,14 @@ impl RenderOnce for ToolDetails {
                                     Clipboard::new(SharedString::from(format!(
                                         "{id}:copy:{suffix}"
                                     )))
-                                    .value(SharedString::from(text.clone()))
+                                    .value(text.clone())
                                     .accessibility_label(format!("复制{label}")),
                                 ),
                         )
                         .child(
                             TextView::markdown(
                                 SharedString::from(format!("{id}:{suffix}")),
-                                code_block("json", &text),
+                                code_block("json", text.as_ref()),
                             )
                             .w_full()
                             .min_w_0()

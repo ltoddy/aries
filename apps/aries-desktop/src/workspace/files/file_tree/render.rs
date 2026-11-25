@@ -45,7 +45,7 @@ impl FileTree {
         menu = menu.separator();
         for (label, command) in [
             ("新建文件…", FileCommand::create_file(self.root.clone(), parent.clone())),
-            ("新建文件夹…", FileCommand::create_directory(self.root.clone(), parent.clone())),
+            ("新建文件夹…", FileCommand::create_directory(self.root.clone(), parent)),
         ] {
             menu = self.menu_item(menu, label, TreeCommand::file(command), busy, owner.clone());
         }
@@ -367,15 +367,17 @@ impl Render for FileTree {
                     .child(Tree::new(&self.state, move |_, entry, _, _, cx| {
                         let id = entry.item().id.clone();
                         let label = entry.item().label.clone();
-                        let data = view.upgrade().and_then(|view| view.read(cx).paths.get(&id).cloned());
-                        let status = data.as_ref().and_then(|data| view.upgrade().and_then(|view| view.read(cx).git_status.status(&data.path)));
+                        let data = view.upgrade().and_then(|view| view.read(cx).paths.get(&id));
+                        let status = view.upgrade().and_then(|view| {
+                            data.and_then(|data| view.read(cx).git_status.status(&data.path))
+                        });
                         let color = status.map_or(cx.theme().foreground, |status| status.color(cx));
-                        let tooltip = data.as_ref().map_or_else(|| label.to_string(), |data| {
+                        let tooltip = data.map_or_else(|| label.to_string(), |data| {
                             format!("{} · {}\n{}", data.kind(), status.map_or("无 Git 变更状态", |status| status.label()), data.path.display())
                         });
                         let icon = if entry.is_disabled() { IconName::Info }
                             else {
-                                let icon = data.as_ref().map_or(IconName::File, DiskEntry::icon);
+                                let icon = data.map_or(IconName::File, DiskEntry::icon);
                                 if icon == IconName::Folder && entry.is_expanded() { IconName::FolderOpen } else { icon }
                             };
                         let menu_view = view.clone();

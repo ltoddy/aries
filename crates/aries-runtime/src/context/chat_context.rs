@@ -1,17 +1,15 @@
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use rig::completion::Message;
 use tokio::sync::RwLock;
 use tracing::error;
 
-use crate::jsonl::JsonlAppender;
-
 #[derive(Debug, Clone)]
 pub struct ChatContext {
     history: Arc<RwLock<Vec<Message>>>,
-    file: JsonlAppender,
+    file_path: PathBuf,
 }
 
 impl ChatContext {
@@ -24,10 +22,12 @@ impl ChatContext {
             tokio::fs::create_dir_all(root_dir).await?;
         }
 
-        let file = JsonlAppender::open(file_path).await?;
-        let history = Arc::new(RwLock::new(file.read().await?));
+        tokio::fs::OpenOptions::new().append(true).create(true).open(&file_path).await?;
+        let history = Arc::new(RwLock::new(
+            tokio_jsonl::read_all(&file_path).await.map_err(io::Error::other)?,
+        ));
 
-        Ok(Self { history, file })
+        Ok(Self { history, file_path })
     }
 
     pub async fn append<'a>(&self, messages: impl IntoIterator<Item = &'a Message>) {
@@ -35,11 +35,8 @@ impl ChatContext {
         let mut history = self.history.write().await;
         history.extend(messages.iter().copied().cloned());
 
-        if let Err(err) = self.file.append(messages).await {
-            error!(path = %self.file.file_path().display(), err = %err, "failed to persist chat context");
-        }
-        if let Err(err) = self.file.flush().await {
-            error!(path = %self.file.file_path().display(), err = %err, "failed to flush chat context");
+        if let Err(err) = tokio_jsonl::append_all(&self.file_path, &messages).await {
+            error!(path = %self.file_path.display(), err = %err, "failed to persist chat context");
         }
     }
 
@@ -47,11 +44,8 @@ impl ChatContext {
         let mut history = self.history.write().await;
         *history = messages.into_iter().collect();
 
-        if let Err(err) = self.file.overwrite(&*history).await {
-            error!(path = %self.file.file_path().display(), err = %err, "failed to persist chat context");
-        }
-        if let Err(err) = self.file.flush().await {
-            error!(path = %self.file.file_path().display(), err = %err, "failed to flush chat context");
+        if let Err(err) = tokio_jsonl::write_all(&self.file_path, history.iter()).await {
+            error!(path = %self.file_path.display(), err = %err, "failed to persist chat context");
         }
     }
 

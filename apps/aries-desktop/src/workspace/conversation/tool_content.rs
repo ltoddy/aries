@@ -47,35 +47,40 @@ impl RenderOnce for ToolContent {
         let directory =
             session.upgrade().map(|session| session.read(cx).execution().directory().to_owned());
         let mut seen = HashSet::new();
-        let locations = locations.into_iter().filter_map(|location| {
-            let directory = directory.as_ref()?;
-            if location.path.as_os_str().is_empty() {
-                return None;
+        let mut file_buttons = Vec::new();
+        if let Some(directory) = directory.as_ref() {
+            for location in &locations {
+                if location.path.as_os_str().is_empty() {
+                    continue;
+                }
+                let line = location
+                    .line
+                    .and_then(|line| usize::try_from(line).ok())
+                    .and_then(NonZeroUsize::new);
+                if !seen.insert((location.path.as_path(), line)) {
+                    continue;
+                }
+                let target = OpenFile::new(directory.clone(), location.path.clone());
+                let target = match line {
+                    Some(line) => target.with_line(line),
+                    None => target,
+                };
+                let path = single_line(location.path.to_string_lossy());
+                let label = match line {
+                    Some(line) => format!("{path}:{line}"),
+                    None => path,
+                };
+                file_buttons.push(file_button(
+                    SharedString::from(format!(
+                        "tool-location:{index}:{:?}:{line:?}",
+                        location.path
+                    )),
+                    label,
+                    target,
+                    session.clone(),
+                ));
             }
-            let line = location
-                .line
-                .and_then(|line| usize::try_from(line).ok())
-                .and_then(NonZeroUsize::new);
-            if !seen.insert((location.path.clone(), line)) {
-                return None;
-            }
-            let target = OpenFile::new(directory.clone(), location.path.clone());
-            let target = match line {
-                Some(line) => target.with_line(line),
-                None => target,
-            };
-            let path = single_line(location.path.to_string_lossy());
-            let label = match line {
-                Some(line) => format!("{path}:{line}"),
-                None => path,
-            };
-            Some(file_button(
-                SharedString::from(format!("tool-location:{index}:{:?}:{line:?}", location.path)),
-                label,
-                target,
-                session.clone(),
-            ))
-        });
+        }
         div()
             .id(("tool-details", index))
             .w_full()
@@ -86,18 +91,18 @@ impl RenderOnce for ToolContent {
             .gap_1()
             .text_sm()
             .text_color(p.muted())
-            .children(locations)
+            .children(file_buttons)
             .children(entries)
     }
 }
 
 enum DiffContent {
-    Markdown(String),
+    Markdown(SharedString),
     Path(String),
 }
 
 impl DiffContent {
-    fn markdown(text: String) -> Self {
+    fn markdown(text: SharedString) -> Self {
         Self::Markdown(text)
     }
 
@@ -210,7 +215,7 @@ impl RenderOnce for ToolDiff {
 }
 
 pub struct ToolDiffs {
-    patches: HashMap<(usize, usize), String>,
+    patches: HashMap<(usize, usize), SharedString>,
 }
 impl ToolDiffs {
     pub fn new() -> Self {
@@ -259,7 +264,7 @@ impl ToolDiffs {
                 if !patch.is_empty() {
                     let markdown =
                         format!("`````diff\ndiff --git a/{path} b/{path}\n{patch}\n`````");
-                    self.patches.insert((index, content_index), markdown);
+                    self.patches.insert((index, content_index), SharedString::from(markdown));
                 }
             }
         }

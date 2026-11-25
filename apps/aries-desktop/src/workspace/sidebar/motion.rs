@@ -119,19 +119,23 @@ impl SidebarMotion {
     pub fn is_deleted(&self, id: &SessionId) -> bool {
         self.deleted.contains(id)
     }
+
+    pub fn session(&self, id: &SessionId) -> Option<&SessionInfo> {
+        self.rows.iter().find(|row| &row.session.session_id == id).map(SidebarRow::session)
+    }
 }
 
 #[derive(IntoElement)]
 pub struct SessionSurface {
-    row: SidebarRow,
+    session_id: SessionId,
     selected: bool,
     background: Hsla,
     child: AnyElement,
 }
 
 impl SessionSurface {
-    pub fn new(row: SidebarRow, selected: bool, background: Hsla, child: AnyElement) -> Self {
-        Self { row, selected, background, child }
+    pub fn new(session_id: SessionId, selected: bool, background: Hsla, child: AnyElement) -> Self {
+        Self { session_id, selected, background, child }
     }
 }
 
@@ -139,7 +143,7 @@ impl RenderOnce for SessionSurface {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let tokens = cx.theme().motion_tokens();
         let selection = motion::transition(
-            (SharedString::from(format!("session:{}", self.row.session.session_id)), "selection"),
+            (SharedString::from(format!("session:{}", self.session_id)), "selection"),
             if self.selected { 1_f32 } else { 0_f32 },
             Transition::new(tokens.duration_fast).easing(tokens.easing_move.clone()),
             window,
@@ -148,7 +152,7 @@ impl RenderOnce for SessionSurface {
         let mut background = self.background;
         background.a *= selection;
         div()
-            .id(SharedString::from(format!("session-surface:{}", self.row.session.session_id)))
+            .id(SharedString::from(format!("session-surface:{}", self.session_id)))
             .bg(background)
             .rounded(cx.theme().radius)
             .hover(|row| row.bg(if self.selected { background } else { cx.theme().accent }))

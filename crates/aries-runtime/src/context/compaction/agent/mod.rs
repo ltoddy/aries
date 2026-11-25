@@ -13,7 +13,6 @@ use rig::{Agent, Model, ProviderError};
 use tokio::pin;
 
 use crate::context::compaction::CompactionFailure;
-use crate::jsonl;
 
 const PREAMBLE: &str = include_str!("preamble.md");
 const NAME: &str = "Archivist";
@@ -139,7 +138,7 @@ impl CompactAgent {
         let ts = now.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
         let file_path = self.transcript_dir.join(format!("transcript_{ts}.json"));
 
-        jsonl::write(&file_path, messages).await?;
+        tokio_jsonl::write_all(&file_path, messages).await.map_err(io::Error::other)?;
 
         Ok(file_path)
     }

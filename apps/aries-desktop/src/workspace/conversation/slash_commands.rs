@@ -171,7 +171,7 @@ impl RenderOnce for CommandMenu {
                                     .line_clamp(1)
                                     .text_xs()
                                     .text_color(p.muted())
-                                    .child(command.description.clone()),
+                                    .child(command.description),
                             )
                             .on_mouse_down(MouseButton::Left, move |_, window, cx| {
                                 on_select(&name, window, cx);

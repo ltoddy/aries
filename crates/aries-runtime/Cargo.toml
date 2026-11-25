@@ -41,6 +41,7 @@ similar = { workspace = true }
 thiserror.workspace = true
 toasty.workspace = true
 tokio = { workspace = true, features = ["fs", "process", "sync", "time", "io-util"] }
+tokio-jsonl.workspace = true
 tokio-util = "0.7"
 tracing.workspace = true
 
