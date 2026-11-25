@@ -1,11 +1,4 @@
-use gpui_kit::assets::IconName;
-use gpui_kit::component::button::{Button, ButtonVariants};
-use gpui_kit::component::{Selectable, Sizable};
-use gpui_kit::prelude::*;
-use gpui_kit::*;
-
-use crate::workspace::workspace_view::WorkspaceView;
-use crate::{ShowFilesSidebar, ShowGitSidebar, ShowSessionsSidebar};
+use crate::workspace::workspace_view::*;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum SidebarPanel {
@@ -68,11 +61,11 @@ impl SidebarPanel {
 
     pub fn focus(self, host: &WorkspaceView, window: &mut Window, cx: &mut App) {
         match self {
-            Self::Sessions => host.sidebar.sessions_focus_handle.focus(window, cx),
+            Self::Sessions => host.sidebar_sessions_focus_handle.focus(window, cx),
             Self::Files => {
                 host.file_tree.update(cx, |tree, cx| tree.focus(window, cx));
             },
-            Self::Git => host.sidebar.focus_handle.focus(window, cx),
+            Self::Git => host.sidebar_focus_handle.focus(window, cx),
         }
     }
 
@@ -93,7 +86,7 @@ impl SidebarPanel {
             }));
         let button = match self {
             Self::Sessions => button
-                .track_focus(&host.sidebar.sessions_focus_handle)
+                .track_focus(&host.sidebar_sessions_focus_handle)
                 .tooltip_with_action(self.tooltip(), &ShowSessionsSidebar::new(), None),
             Self::Files => {
                 button.tooltip_with_action(self.tooltip(), &ShowFilesSidebar::new(), None)
@@ -111,7 +104,7 @@ impl SidebarPanel {
         cx: &mut Context<WorkspaceView>,
     ) -> AnyElement {
         match self {
-            Self::Sessions => host.sidebar_view.clone().cached(panel_style).into_any_element(),
+            Self::Sessions => host.sidebar.clone().cached(panel_style).into_any_element(),
             Self::Files => Self::render_files(host, panel_style, cx),
             Self::Git => Self::render_git(host, window, cx),
         }

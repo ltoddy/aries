@@ -1,35 +1,19 @@
-use std::collections::VecDeque;
-
-use gpui_kit::assets::IconName;
-use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants};
-use gpui_kit::component::menu::{ContextMenuExt, PopupMenu, PopupMenuItem};
-use gpui_kit::component::{ActiveTheme, Disableable, Icon, Sizable};
-use gpui_kit::prelude::*;
-use gpui_kit::*;
-
-use crate::workspace::files::OpenFile;
-use crate::workspace::settings::palette::Palette;
-use crate::workspace::workspace_view::{
-    DragTab, FileTabCommand, PendingFileOperation, SidebarPanel, TabCommand, TabMeta, WorkspaceTab,
-    WorkspaceView,
-};
-use crate::{CloseTab, ToggleSidebar};
+use crate::workspace::workspace_view::*;
 
 impl WorkspaceView {
     pub fn render_tab_bar(
         &self,
-        palette: Palette,
+        p: Palette,
         sidebar_available: Option<Pixels>,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let tabs: Vec<_> = self
             .tabs
-            .items
             .iter()
             .enumerate()
-            .map(|(index, tab)| self.render_tab(index, tab, palette, cx))
+            .map(|(index, tab)| self.render_tab(index, tab, p, cx))
             .collect();
-        let sidebar_visible = self.sidebar.visible && sidebar_available.is_some();
+        let sidebar_visible = self.sidebar_visible && sidebar_available.is_some();
         let label = if sidebar_visible { "收起侧栏" } else { "展开侧栏" };
         let icon = if sidebar_visible { IconName::PanelLeftClose } else { IconName::PanelLeftOpen };
         let shortcut = if cfg!(target_os = "macos") { "⌘B" } else { "Ctrl+B" };
@@ -45,7 +29,7 @@ impl WorkspaceView {
             .min_w_0()
             .child(
                 Button::new("toggle-sidebar")
-                    .track_focus(&self.sidebar.toggle_focus_handle)
+                    .track_focus(&self.sidebar_toggle_focus_handle)
                     .ghost()
                     .small()
                     .icon(Icon::new(icon))
@@ -72,7 +56,7 @@ impl WorkspaceView {
                     .items_center()
                     .gap_1p5()
                     .overflow_x_scroll()
-                    .track_scroll(&self.tabs.scroll)
+                    .track_scroll(&self.tab_scroll)
                     .children(tabs),
             )
             .into_any_element()
@@ -126,7 +110,7 @@ impl WorkspaceView {
         owner: WeakEntity<Self>,
         cx: &App,
     ) -> PopupMenu {
-        let Some(tab) = self.tabs.items.iter().find(|tab| tab.id() == id) else {
+        let Some(tab) = self.tabs.iter().find(|tab| tab.id() == id) else {
             return menu;
         };
         if let Some(view) = tab.file() {
@@ -165,8 +149,8 @@ impl WorkspaceView {
             }
             menu = menu.separator();
         }
-        let has_others = self.tabs.items.iter().any(|tab| tab.id() != id && !tab.is_pending(cx));
-        let has_closable = self.tabs.items.iter().any(|tab| !tab.is_pending(cx));
+        let has_others = self.tabs.iter().any(|tab| tab.id() != id && !tab.is_pending(cx));
+        let has_closable = self.tabs.iter().any(|tab| !tab.is_pending(cx));
         for (label, command, disabled) in [
             ("关闭", TabCommand::close(id), tab.is_pending(cx)),
             ("关闭其他标签", TabCommand::close_others(id), !has_others),
@@ -199,7 +183,7 @@ impl WorkspaceView {
         let Some(index) = self.tab_index(id) else {
             return;
         };
-        let Some(view) = self.tabs.tab(index).and_then(WorkspaceTab::file).cloned() else {
+        let Some(view) = self.tabs[index].file().cloned() else {
             return;
         };
         let Some(target) = view.read(cx).target().cloned() else {
@@ -210,7 +194,7 @@ impl WorkspaceView {
                 if !view.read(cx).is_ready() {
                     return;
                 }
-                self.try_activate(index, window, cx);
+                self.select_tab(index, window, cx);
                 if self.active_id() != Some(id) {
                     return;
                 }
@@ -223,7 +207,6 @@ impl WorkspaceView {
                             && this.active_id() == Some(id)
                             && let Some(view) = this
                                 .tabs
-                                .items
                                 .iter()
                                 .find(|tab| tab.id() == id)
                                 .and_then(WorkspaceTab::file)
@@ -259,7 +242,7 @@ impl WorkspaceView {
                 ));
             },
             FileTabCommand::Locate => {
-                self.try_activate(index, window, cx);
+                self.select_tab(index, window, cx);
                 if self.active_id() != Some(id) {
                     return;
                 }
@@ -271,7 +254,7 @@ impl WorkspaceView {
 
     pub fn file_tab_title(&self, id: usize, target: &OpenFile, cx: &App) -> String {
         let name = target.path().file_name().unwrap_or(target.path().as_os_str());
-        let duplicate = self.tabs.items.iter().any(|tab| {
+        let duplicate = self.tabs.iter().any(|tab| {
             tab.id() != id
                 && tab
                     .file()
@@ -284,7 +267,7 @@ impl WorkspaceView {
             let parent = self.normalize_file_path(parent, cx);
             let relative = parent.strip_prefix(&directory).unwrap_or(&parent);
             let relative = relative.to_owned();
-            let same_parent = self.tabs.items.iter().any(|tab| {
+            let same_parent = self.tabs.iter().any(|tab| {
                 tab.id() != id
                     && tab.file().and_then(|view| view.read(cx).target()).is_some_and(|other| {
                         other.path().file_name() == Some(name)
@@ -308,20 +291,76 @@ impl WorkspaceView {
         }
     }
 
+    pub fn render_empty_main(&self, p: Palette, cx: &mut Context<Self>) -> AnyElement {
+        let project = self.cwd.file_name().unwrap_or(self.cwd.as_os_str()).to_string_lossy();
+        div()
+            .size_full()
+            .min_h_0()
+            .p_8()
+            .flex()
+            .items_center()
+            .justify_center()
+            .child(
+                div()
+                    .max_w(rems(22.5))
+                    .flex()
+                    .flex_col()
+                    .items_center()
+                    .gap_2()
+                    .text_center()
+                    .child(Icon::new(IconName::MessageCircle).size_12().text_color(p.muted()))
+                    .child(
+                        div()
+                            .mt_2()
+                            .text_lg()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(p.foreground())
+                            .child(project.into_owned()),
+                    )
+                    .child(
+                        div()
+                            .text_xs()
+                            .line_height(rems(1.25))
+                            .text_color(p.muted())
+                            .child("从侧栏选择会话，或在当前项目开始新的会话。"),
+                    )
+                    .child(
+                        Button::new("empty-new-session")
+                            .small()
+                            .mt_4()
+                            .icon(IconName::Plus)
+                            .label("新建会话")
+                            .disabled(!self.sidebar.read(cx).can_start_new_chat())
+                            .on_click(|_, window, cx| {
+                                window.dispatch_action(Box::new(NewSession), cx)
+                            }),
+                    )
+                    .when(cfg!(target_os = "macos"), |empty| {
+                        empty.child(
+                            div()
+                                .mt_2()
+                                .text_xs()
+                                .text_color(p.muted())
+                                .child("⌘N 新建会话 · ⌘B 切换侧栏"),
+                        )
+                    }),
+            )
+            .into_any_element()
+    }
+
     pub fn render_tab(
         &self,
         index: usize,
         tab: &WorkspaceTab,
-        palette: Palette,
+        p: Palette,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let id = tab.id();
-        let active = index == self.tabs.active;
+        let active = index == self.active;
         let pending = tab.is_pending(cx);
-        let TabMeta { title, tooltip, status, indicator, notice } = tab.meta(self, palette, cx);
-        let notice = notice.map(|notice| {
-            div().text_xs().text_color(palette.muted()).child(notice).into_any_element()
-        });
+        let TabMeta { title, tooltip, status, indicator, notice } = tab.meta(self, p, cx);
+        let notice = notice
+            .map(|notice| div().text_xs().text_color(p.muted()).child(notice).into_any_element());
         let tab_label = format!("切换到标签 {title} · {status}");
         let drag_title = title.clone();
         let tab = div()
@@ -335,8 +374,8 @@ impl WorkspaceView {
             .rounded(cx.theme().radius_tokens().md)
             .flex()
             .items_center()
-            .bg(if active { palette.background() } else { palette.background().opacity(0.) })
-            .when(!active, |tab| tab.hover(|style| style.bg(palette.hover())))
+            .bg(if active { p.background() } else { p.background().opacity(0.) })
+            .when(!active, |tab| tab.hover(|style| style.bg(p.hover())))
             .child(
                 Button::new(("tab-button", id))
                     .custom(ButtonCustomVariant::new(cx).active(cx.theme().button_active))
@@ -351,7 +390,7 @@ impl WorkspaceView {
                     .child(indicator)
                     .on_click(cx.listener(move |this, _, window, cx| {
                         if let Some(index) = this.tab_index(id) {
-                            this.try_activate(index, window, cx);
+                            this.select_tab(index, window, cx);
                         }
                     }))
                     .child(
@@ -362,7 +401,7 @@ impl WorkspaceView {
                             .line_clamp(1)
                             .text_left()
                             .text_sm()
-                            .text_color(if active { palette.foreground() } else { palette.muted() })
+                            .text_color(if active { p.foreground() } else { p.muted() })
                             .child(title),
                     )
                     .children(notice),
@@ -373,7 +412,7 @@ impl WorkspaceView {
                     .ghost()
                     .xsmall()
                     .flex_shrink_0()
-                    .text_color(palette.muted())
+                    .text_color(p.muted())
                     .disabled(pending)
                     .tooltip_with_action("关闭标签", &CloseTab, None)
                     .accessibility_label("关闭标签")

@@ -43,7 +43,7 @@ impl ToolContent {
 
 impl RenderOnce for ToolContent {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        let Self { index, entries, locations, session, palette } = self;
+        let Self { index, entries, locations, session, palette: p } = self;
         let directory =
             session.upgrade().map(|session| session.read(cx).execution().directory().to_owned());
         let mut seen = HashSet::new();
@@ -90,7 +90,7 @@ impl RenderOnce for ToolContent {
             .items_start()
             .gap_1()
             .text_sm()
-            .text_color(palette.muted())
+            .text_color(p.muted())
             .children(file_buttons)
             .children(entries)
     }
@@ -274,7 +274,7 @@ impl ToolDiffs {
         &self,
         index: usize,
         tool: &ToolCallState,
-        palette: Palette,
+        p: Palette,
         session: WeakEntity<SessionView>,
     ) -> AnyElement {
         let entries = tool
@@ -286,15 +286,9 @@ impl ToolDiffs {
                 if let ToolCallContent::Content(content) = content {
                     resource_uri(&content.content)?;
                     return Some(
-                        Attachment::from_content(
-                            index,
-                            content_index,
-                            &content.content,
-                            None,
-                            palette,
-                        )
-                        .with_session(session.clone())
-                        .into_any_element(),
+                        Attachment::from_content(index, content_index, &content.content, None, p)
+                            .with_session(session.clone())
+                            .into_any_element(),
                     );
                 }
                 let ToolCallContent::Diff(diff) = content else {
@@ -325,7 +319,7 @@ impl ToolDiffs {
                 )
             })
             .collect();
-        ToolContent::new(index, entries, tool.call().locations.clone(), session, palette)
+        ToolContent::new(index, entries, tool.call().locations.clone(), session, p)
             .into_any_element()
     }
 }

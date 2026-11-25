@@ -1,33 +1,25 @@
-use gpui_kit::component::WindowExt;
-use gpui_kit::prelude::*;
-use gpui_kit::*;
-
-use crate::workspace::SessionView;
-use crate::workspace::git::diff_view::{DiffTargetChanged, GitDiffView};
-use crate::workspace::workspace_view::{
-    DiffTab, DragTab, PendingFileOperation, Tab, TabCommand, WorkspaceTab, WorkspaceView,
-};
+use crate::workspace::workspace_view::*;
 
 impl WorkspaceView {
     pub fn tab_index(&self, id: usize) -> Option<usize> {
-        self.tabs.index_of(id)
+        self.tabs.iter().position(|tab| tab.id() == id)
     }
 
     pub fn active_tab(&self) -> Option<&WorkspaceTab> {
-        self.tabs.active_tab()
+        self.tabs.get(self.active)
     }
 
     pub fn active_id(&self) -> Option<usize> {
-        self.tabs.active_id()
+        self.active_tab().map(WorkspaceTab::id)
     }
 
     pub fn has_saving_file(&self, cx: &App) -> bool {
-        self.tabs.items.iter().any(|tab| tab.is_saving(cx))
+        self.tabs.iter().any(|tab| tab.is_saving(cx))
     }
 
     pub fn can_navigate(&self, window: &mut Window, cx: &mut App) -> bool {
-        self.files.confirmation.is_none()
-            && !self.files.pending.is_empty()
+        self.file_confirmation.is_none()
+            && self.pending_file_operations.is_empty()
             && !window.has_active_dialog(cx)
     }
 
@@ -41,11 +33,11 @@ impl WorkspaceView {
         true
     }
 
-    pub fn activate(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
-        self.tabs.active = index;
-        self.tabs.scroll.scroll_to_item(index);
+    pub fn activate_tab(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+        self.active = index;
+        self.tab_scroll.scroll_to_item(index);
         self.sync_sidebar_active_session(cx);
-        self.focus_active(window, cx);
+        self.focus_active_tab(window, cx);
         cx.notify();
     }
 
@@ -53,7 +45,7 @@ impl WorkspaceView {
         if self
             .file_view(id)
             .is_some_and(|view| view.read(cx).is_dirty() || view.read(cx).is_saving())
-            || self.files.pending.iter().any(|operation| operation.tab_id() == Some(id))
+            || self.pending_file_operations.iter().any(|operation| operation.tab_id() == Some(id))
         {
             return;
         }
@@ -64,28 +56,25 @@ impl WorkspaceView {
         let Some(index) = self.tab_index(id) else {
             return;
         };
-        let Some(tab) = self.tabs.tab(index) else {
-            return;
-        };
+        let tab = &self.tabs[index];
         if tab.is_pending(cx) || tab.is_saving(cx) {
             return;
         }
         let active_id = self.active_id();
         let session = tab.session().map(|view| view.entity_id());
-        self.tabs.items.remove(index);
+        self.tabs.remove(index);
         if let Some(session) = session {
             self.tabs
-                .items
                 .retain(|tab| tab.diff_session().is_none_or(|view| view.entity_id() != session));
         }
-        self.tabs.active = active_id
+        self.active = active_id
             .and_then(|id| self.tab_index(id))
-            .unwrap_or_else(|| index.min(self.tabs.items.len().saturating_sub(1)));
+            .unwrap_or_else(|| index.min(self.tabs.len().saturating_sub(1)));
         let changed_active = active_id != self.active_id();
         if changed_active {
             self.invalidate_file_navigation(cx);
         }
-        self.tabs.scroll.scroll_to_item(self.tabs.active);
+        self.tab_scroll.scroll_to_item(self.active);
         self.sync_sidebar_active_session(cx);
         if changed_active {
             self.defer_active_tab_focus(cx);
@@ -94,7 +83,7 @@ impl WorkspaceView {
     }
 
     pub fn tab_order(&self) -> Vec<usize> {
-        self.tabs.items.iter().map(WorkspaceTab::id).collect()
+        self.tabs.iter().map(WorkspaceTab::id).collect()
     }
 
     pub fn move_tab(&mut self, drag: &DragTab, target: usize, cx: &mut Context<Self>) {
@@ -111,9 +100,9 @@ impl WorkspaceView {
         let active = self.active_id();
         order.remove(from);
         order.insert(to, drag.id);
-        self.tabs.items.sort_by_key(|tab| order.iter().position(|id| *id == tab.id()));
-        self.tabs.active = active.and_then(|id| self.tab_index(id)).unwrap_or(0);
-        self.tabs.scroll.scroll_to_item(to);
+        self.tabs.sort_by_key(|tab| order.iter().position(|id| *id == tab.id()));
+        self.active = active.and_then(|id| self.tab_index(id)).unwrap_or(0);
+        self.tab_scroll.scroll_to_item(to);
         cx.notify();
     }
 
@@ -125,7 +114,6 @@ impl WorkspaceView {
     ) {
         let operations = self
             .tabs
-            .items
             .iter()
             .filter(|tab| {
                 !tab.is_pending(cx)
@@ -155,14 +143,14 @@ impl WorkspaceView {
                         && !window.has_active_dialog(cx)
                         && !already_focused
                     {
-                        this.focus_active(window, cx);
+                        this.focus_active_tab(window, cx);
                     }
                 });
             });
         });
     }
 
-    pub fn focus_active(&self, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn focus_active_tab(&self, window: &mut Window, cx: &mut Context<Self>) {
         if window.has_active_dialog(cx) {
             return;
         }
@@ -189,95 +177,18 @@ impl WorkspaceView {
         });
     }
 
-    pub fn try_activate(
-        &mut self,
-        index: usize,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> bool {
-        if index >= self.tabs.items.len() || !self.begin_navigation(window, cx) {
-            return false;
-        }
-        self.activate(index, window, cx);
-        true
-    }
-
-    pub fn activate_next(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
-        self.activate_adjacent(true, window, cx)
-    }
-
-    pub fn activate_previous(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
-        self.activate_adjacent(false, window, cx)
-    }
-
-    fn activate_adjacent(
-        &mut self,
-        next: bool,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> bool {
-        let Some(index) = adjacent_tab(self.tabs.active, self.tabs.items.len(), next) else {
-            return false;
-        };
-        self.try_activate(index, window, cx)
-    }
-    pub fn show_diff(
-        &mut self,
-        session: &WeakEntity<SessionView>,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let Some(session) = session.upgrade() else {
-            return;
-        };
-        let diff = session.read(cx).git_panel().diff().clone();
-        if !diff.read(cx).is_open() {
+    pub fn select_tab(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+        if index >= self.tabs.len() || !self.begin_navigation(window, cx) {
             return;
         }
-        let existing =
-            self.tabs.items.iter().position(|tab| {
-                tab.diff().is_some_and(|view| view.entity_id() == diff.entity_id())
-            });
-        let index = if let Some(index) = existing {
-            index
-        } else {
-            let id = self.tabs.alloc_id();
-            let subscription = Self::observe_diff(id, &diff, window, cx);
-            let insert = self
-                .tabs
-                .items
-                .iter()
-                .position(|tab| {
-                    tab.session().is_some_and(|view| view.entity_id() == session.entity_id())
-                })
-                .map(|index| index + 1)
-                .unwrap_or(self.tabs.items.len());
-            let tab = Tab::new(id, diff, subscription);
-            self.tabs.items.insert(insert, WorkspaceTab::new_diff(DiffTab::new(tab, session)));
-            insert
-        };
-        self.invalidate_file_navigation(cx);
-        self.try_activate(index, window, cx);
-        cx.notify();
+        self.activate_tab(index, window, cx);
     }
 
-    pub fn observe_diff(
-        id: usize,
-        view: &Entity<GitDiffView>,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> Subscription {
-        cx.subscribe_in(view, window, move |_, view, _: &DiffTargetChanged, window, cx| {
-            if view.read(cx).is_open() {
-                cx.notify();
-                return;
-            }
-            cx.defer_in(window, move |this, _, cx| {
-                if this.tabs.items.iter().any(|tab| tab.id() == id && !tab.is_pending(cx)) {
-                    this.close_tab(id, cx);
-                }
-            });
-        })
+    pub fn switch_tab(&mut self, next: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(index) = adjacent_tab(self.active, self.tabs.len(), next) else {
+            return;
+        };
+        self.select_tab(index, window, cx);
     }
 }
 

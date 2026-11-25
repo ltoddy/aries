@@ -78,7 +78,7 @@ impl<'a> SessionParts<'a> {
             configuration,
             deletion,
             tab_host: None,
-            render_mode: SessionRenderMode::Main,
+            render_mode: SessionRenderMode::Full,
             management_pending: false,
         }
     }
