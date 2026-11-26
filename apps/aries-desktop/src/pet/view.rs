@@ -15,12 +15,11 @@ use crate::{OpenWorkspace, Quit, TogglePet};
 
 struct PetState {
     view: Entity<PetView>,
-    error: Option<String>,
 }
 
 impl PetState {
     fn new(view: Entity<PetView>) -> Self {
-        Self { view, error: None }
+        Self { view }
     }
 }
 
@@ -73,7 +72,7 @@ impl PetView {
         let position = match Position::load() {
             Ok(position) => position,
             Err(error) => {
-                tracing::warn!(%error, "无法恢复宠物位置");
+                tracing::debug!(%error, "无法恢复宠物位置");
                 None
             },
         };
@@ -102,7 +101,7 @@ impl PetView {
                 if let Some(position) = position
                     && let Err(error) = position.save()
                 {
-                    tracing::warn!(%error, "无法保存宠物位置");
+                    tracing::debug!(%error, "无法保存宠物位置");
                 }
             })
         });
@@ -265,20 +264,18 @@ impl PetView {
         self.window_subscriptions.clear();
         let sprites = self.sprites.take();
         if let Some(handle) = self.window.take() {
-            let weak = cx.weak_entity();
             cx.defer(move |cx| {
                 if let Err(error) = handle.update(cx, |_, window, _| {
                     if let Some(sprites) = sprites {
                         for image in sprites.frames() {
                             if let Err(error) = window.drop_image(image.clone()) {
-                                tracing::warn!(%error, "无法释放宠物图片");
+                                tracing::debug!(%error, "无法释放宠物图片");
                             }
                         }
                     }
                     window.remove_window();
                 }) {
-                    let error = PetError::window(error.to_string());
-                    let _ = weak.update(cx, |this, cx| this.report(error, cx));
+                    PetView::report(PetError::window(error.to_string()));
                 }
             });
         }
@@ -294,22 +291,13 @@ impl PetView {
             cx.background_executor().timer(Duration::from_millis(300)).await;
             let result = cx.background_spawn(async move { position.save() }).await;
             if let Err(error) = result {
-                tracing::warn!(%error, "无法保存宠物位置");
+                tracing::debug!(%error, "无法保存宠物位置");
             }
         }));
     }
 
-    fn report(&mut self, error: PetError, cx: &mut Context<Self>) {
-        tracing::error!(%error, "宠物不可用");
-        self.set_error(Some(error.to_string()), cx);
-    }
-
-    fn set_error(&self, error: Option<String>, cx: &mut Context<Self>) {
-        if cx.global::<PetState>().error == error {
-            return;
-        }
-        cx.update_global::<PetState, _>(|state, _| state.error = error);
-        App::notify(cx, self.workspace.entity_id());
+    fn report(error: PetError) {
+        tracing::debug!(%error, "宠物不可用");
     }
 }
 
@@ -366,7 +354,7 @@ impl Render for PetView {
                             let clicked = this.press.take().is_some() && !this.dragged;
                             match Position::from_window(window, cx) {
                                 Ok(position) => this.remember_position(position, cx),
-                                Err(error) => this.report(error, cx),
+                                Err(error) => PetView::report(error),
                             }
                             if clicked {
                                 if this.busy_session().is_none() {
@@ -491,7 +479,7 @@ fn show(view: &Entity<PetView>, cx: &mut App) -> Result<(), PetError> {
                             if this.window == Some(handle) {
                                 match position {
                                     Ok(position) => this.remember_position(position, cx),
-                                    Err(error) => this.report(error, cx),
+                                    Err(error) => PetView::report(error),
                                 }
                             }
                         });
@@ -506,7 +494,7 @@ fn show(view: &Entity<PetView>, cx: &mut App) -> Result<(), PetError> {
                         if this.window == Some(handle) {
                             match position {
                                 Ok(position) => this.remember_position(position, cx),
-                                Err(error) => this.report(error, cx),
+                                Err(error) => PetView::report(error),
                             }
                         }
                     });
@@ -525,7 +513,6 @@ fn show(view: &Entity<PetView>, cx: &mut App) -> Result<(), PetError> {
             this.sync(sessions, cx);
         }
         this.start_timer(cx);
-        this.set_error(None, cx);
         cx.notify();
     });
     Ok(())
@@ -557,42 +544,28 @@ fn restore_display(view: &Entity<PetView>, cx: &mut App) {
                 this.position = Some(placement.position().clone());
             });
             if let Err(error) = show(view, cx) {
-                view.update(cx, |this, cx| {
-                    this.hide(cx);
-                    this.report(error, cx);
-                });
+                view.update(cx, |this, cx| this.hide(cx));
+                PetView::report(error);
             }
         },
-        Err(error) => view.update(cx, |this, cx| {
-            this.hide(cx);
-            this.report(error, cx);
-        }),
+        Err(error) => {
+            view.update(cx, |this, cx| this.hide(cx));
+            PetView::report(error);
+        },
         _ => {},
     }
 }
 
-pub fn last_error(cx: &App) -> Option<&str> {
-    cx.try_global::<PetState>().and_then(|state| state.error.as_deref())
-}
-
-pub fn init(
-    workspace: &Entity<WorkspaceView>,
-    main_window: AnyWindowHandle,
-    cx: &mut App,
-) -> Result<(), PetError> {
+pub fn init(workspace: &Entity<WorkspaceView>, main_window: AnyWindowHandle, cx: &mut App) {
     if cx.has_global::<PetState>() {
-        return Ok(());
+        return;
     }
     let view = cx.new(|cx| PetView::new(workspace, main_window, cx));
     cx.set_global(PetState::new(view.clone()));
-    let result = show(&view, cx);
-    if let Err(error) = &result {
-        view.update(cx, |this, cx| {
-            this.hide(cx);
-            this.set_error(Some(error.to_string()), cx);
-        });
+    if let Err(error) = show(&view, cx) {
+        view.update(cx, |this, cx| this.hide(cx));
+        PetView::report(error);
     }
-    result
 }
 
 pub fn is_available(cx: &App) -> bool {
@@ -614,16 +587,14 @@ fn toggle_view(cx: &mut App) {
             .map_err(|error| PetError::window(error.to_string()))
             .and_then(|result| result);
         if let Err(error) = restored {
-            view.update(cx, |this, cx| this.report(error, cx));
+            PetView::report(error);
             return;
         }
         cx.activate(true);
         view.update(cx, |this, cx| this.hide(cx));
     } else if let Err(error) = show(&view, cx) {
-        view.update(cx, |this, cx| {
-            this.hide(cx);
-            this.report(error, cx);
-        });
+        view.update(cx, |this, cx| this.hide(cx));
+        PetView::report(error);
     }
 }
 
@@ -639,7 +610,6 @@ fn open_session(target: Option<EntityId>, cx: &mut App) {
     }) else {
         return;
     };
-    let pet = cx.try_global::<PetState>().map(|state| state.view.downgrade());
     cx.defer(move |cx| {
         cx.activate(true);
         let result = window
@@ -654,10 +624,8 @@ fn open_session(target: Option<EntityId>, cx: &mut App) {
             })
             .map_err(|error| PetError::window(error.to_string()))
             .and_then(|result| result);
-        if let Err(error) = result
-            && let Some(pet) = pet
-        {
-            let _ = pet.update(cx, |this, cx| this.report(error, cx));
+        if let Err(error) = result {
+            PetView::report(error);
         }
     });
 }
