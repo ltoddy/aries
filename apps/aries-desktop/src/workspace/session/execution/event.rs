@@ -162,6 +162,7 @@ impl Execution {
         }
         if let SessionUpdate::UsageUpdate(usage) = &notification.update {
             self.tokens = Some(usage.used);
+            self.pet_usage = self.pet_usage.wrapping_add(1);
         }
         if matches!(&notification.update, SessionUpdate::AvailableCommandsUpdate(_)) {
             ui.composer.reset_menu();

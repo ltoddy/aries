@@ -3,7 +3,10 @@ use std::time::Duration;
 
 use aries_init::GlobalContext;
 use aries_proto::aries_service_client::AriesServiceClient;
-use aries_proto::{QueryTokenUsagesRequest, QueryTokenUsagesResponse};
+use aries_proto::{
+    QueryTodayTokenUsageRequest, QueryTodayTokenUsageResponse, QueryTokenUsagesRequest,
+    QueryTokenUsagesResponse,
+};
 use gpui_kit::{App, Global};
 use tokio::runtime::{Handle, Runtime};
 use tokio::time;
@@ -19,6 +22,8 @@ pub enum IpcError {
     Endpoint { source: tonic::transport::Error },
     #[error("无法查询本地 IPC 服务的用量数据")]
     QueryTokenUsages { source: tonic::Status },
+    #[error("无法查询本地 IPC 服务的当日用量数据")]
+    QueryTodayTokenUsage { source: tonic::Status },
 }
 
 impl IpcError {
@@ -28,6 +33,10 @@ impl IpcError {
 
     fn query_token_usages(source: tonic::Status) -> Self {
         Self::QueryTokenUsages { source }
+    }
+
+    fn query_today_token_usage(source: tonic::Status) -> Self {
+        Self::QueryTodayTokenUsage { source }
     }
 }
 
@@ -48,6 +57,14 @@ impl Client {
             .block_on(service.query_token_usages(QueryTokenUsagesRequest {}))
             .map(tonic::Response::into_inner)
             .map_err(IpcError::query_token_usages)
+    }
+
+    pub fn query_today_token_usage(&self) -> Result<QueryTodayTokenUsageResponse, IpcError> {
+        let mut service = self.service.clone();
+        self.runtime
+            .block_on(service.query_today_token_usage(QueryTodayTokenUsageRequest {}))
+            .map(tonic::Response::into_inner)
+            .map_err(IpcError::query_today_token_usage)
     }
 }
 

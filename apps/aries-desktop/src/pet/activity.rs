@@ -31,11 +31,12 @@ pub struct PetSession {
     id: EntityId,
     activity: PetActivity,
     completion: u64,
+    usage: u64,
 }
 
 impl PetSession {
-    pub fn new(id: EntityId, activity: PetActivity, completion: u64) -> Self {
-        Self { id, activity, completion }
+    pub fn new(id: EntityId, activity: PetActivity, completion: u64, usage: u64) -> Self {
+        Self { id, activity, completion, usage }
     }
 
     pub fn id(&self) -> EntityId {
@@ -48,5 +49,9 @@ impl PetSession {
 
     pub fn completion(&self) -> u64 {
         self.completion
+    }
+
+    pub fn usage(&self) -> u64 {
+        self.usage
     }
 }

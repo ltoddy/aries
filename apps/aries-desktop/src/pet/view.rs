@@ -3,16 +3,20 @@ use std::time::Duration;
 
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::menu::ContextMenuExt;
-use gpui_kit::component::{ActiveTheme, Sizable};
+use gpui_kit::component::{ActiveTheme, Sizable, Theme, h_flex, v_flex};
+use gpui_kit::prelude::FluentBuilder;
 use gpui_kit::*;
 
+use crate::ipc::Ipc;
 #[cfg(target_os = "linux")]
 use crate::pet::Mover;
 use crate::pet::position::{Desktop, Placement, Position};
 use crate::pet::sprites::{Clip, Sprites};
 use crate::pet::{PetActivity, PetError, PetSession, native};
-use crate::workspace::WorkspaceView;
+use crate::workspace::{WorkspaceView, number};
 use crate::{OpenWorkspace, Quit, TogglePet};
+
+const USAGE_DEBOUNCE: Duration = Duration::from_millis(100);
 
 #[cfg(target_os = "linux")]
 #[derive(Clone)]
@@ -60,11 +64,15 @@ struct PetView {
     sprites: Option<Sprites>,
     sessions: Vec<PetSession>,
     completions: HashMap<EntityId, u64>,
+    usages: HashMap<EntityId, u64>,
+    today_usage: Option<u64>,
+    usage_task: Option<Task<()>>,
     pending_completion: Option<PetSession>,
     target: Option<EntityId>,
     clip: Clip,
     frame: usize,
     scale: f32,
+    font_size: Pixels,
     transient: bool,
     position: Option<Position>,
     press: Option<Point<Pixels>>,
@@ -73,7 +81,7 @@ struct PetView {
     visible: bool,
     anchored: bool,
     display_uuid: Option<String>,
-    input_region: Option<Bounds<Pixels>>,
+    input_regions: Vec<Bounds<Pixels>>,
     #[cfg(target_os = "linux")]
     mover: Option<Mover>,
     #[cfg(target_os = "linux")]
@@ -105,6 +113,7 @@ impl PetView {
         let sessions = workspace.read(cx).pet_sessions(cx);
         let completions =
             sessions.iter().map(|session| (session.id(), session.completion())).collect();
+        let usages = sessions.iter().map(|session| (session.id(), session.usage())).collect();
         let position = match Position::load() {
             Ok(position) => position,
             Err(error) => {
@@ -113,9 +122,11 @@ impl PetView {
             },
         };
         let scale = workspace.read(cx).preferences(cx).pet_scale();
+        let font_size = cx.theme().font_size;
+        let theme = cx.observe_global::<Theme>(|this, cx| this.apply_layout(this.scale, cx));
         let observation = cx.observe(workspace, |this, workspace, cx| {
             let scale = workspace.read(cx).preferences(cx).pet_scale();
-            this.apply_scale(scale, cx);
+            this.apply_layout(scale, cx);
             this.sync(workspace.read(cx).pet_sessions(cx), cx);
         });
         let weak = cx.weak_entity();
@@ -151,11 +162,15 @@ impl PetView {
             sprites: None,
             sessions,
             completions,
+            usages,
+            today_usage: None,
+            usage_task: None,
             pending_completion: None,
             target: None,
             clip: Clip::idle(),
             frame: 0,
             scale,
+            font_size,
             transient: false,
             position,
             press: None,
@@ -164,19 +179,26 @@ impl PetView {
             visible: false,
             anchored: false,
             display_uuid: None,
-            input_region: None,
+            input_regions: Vec::new(),
             #[cfg(target_os = "linux")]
             mover: None,
             #[cfg(target_os = "linux")]
             x11_drag: None,
             timer: None,
             save_task: None,
-            _subscriptions: vec![observation, displays, quit],
+            _subscriptions: vec![observation, theme, displays, quit],
             window_subscriptions: Vec::new(),
         }
     }
 
     fn sync(&mut self, sessions: Vec<PetSession>, cx: &mut Context<Self>) {
+        let usage_changed = sessions.iter().any(|session| {
+            self.usages.get(&session.id()).is_some_and(|usage| session.usage() > *usage)
+        });
+        self.usages = sessions.iter().map(|session| (session.id(), session.usage())).collect();
+        if usage_changed && self.window.is_some() {
+            self.refresh_usage(USAGE_DEBOUNCE, cx);
+        }
         let completed = sessions
             .iter()
             .filter(|session| {
@@ -234,6 +256,34 @@ impl PetView {
             }
             self.set_clip(Clip::idle(), false, cx);
         }
+    }
+
+    fn refresh_usage(&mut self, delay: Duration, cx: &mut Context<Self>) {
+        let client = cx.global::<Ipc>().client();
+        self.usage_task = Some(cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(delay).await;
+            let result = cx.background_spawn(async move { client.query_today_token_usage() }).await;
+            let usage = match result {
+                Ok(response) => response.token_usage.unwrap_or_default(),
+                Err(error) => {
+                    tracing::debug!(%error, "无法读取当日用量");
+                    let _ = this.update(cx, |this, cx| {
+                        this.today_usage = None;
+                        cx.notify();
+                    });
+                    return;
+                },
+            };
+            let total = if usage.total_tokens > 0 {
+                usage.total_tokens
+            } else {
+                usage.input_tokens.saturating_add(usage.output_tokens)
+            };
+            let _ = this.update(cx, |this, cx| {
+                this.today_usage = Some(total);
+                cx.notify();
+            });
+        }));
     }
 
     fn busy_session(&self) -> Option<PetSession> {
@@ -302,11 +352,13 @@ impl PetView {
         }));
     }
 
-    fn apply_scale(&mut self, scale: f32, cx: &mut Context<Self>) {
-        if self.scale == scale {
+    fn apply_layout(&mut self, scale: f32, cx: &mut Context<Self>) {
+        let font_size = cx.theme().font_size;
+        if self.scale == scale && self.font_size == font_size {
             return;
         }
         self.scale = scale;
+        self.font_size = font_size;
         if self.window.is_none() {
             cx.notify();
             return;
@@ -326,6 +378,7 @@ impl PetView {
 
     fn hide(&mut self, cx: &mut Context<Self>) {
         self.timer = None;
+        self.usage_task = None;
         self.visible = false;
         self.press = None;
         self.transient = false;
@@ -383,7 +436,7 @@ impl PetView {
             (surface.height - cell.height).max(px(0.)),
         );
         if !self.anchored {
-            return max;
+            return point(max.x / 2., max.y);
         }
         let origin = self
             .position
@@ -478,6 +531,96 @@ impl PetView {
         }
     }
 
+    fn render_status(
+        &self,
+        region: Bounds<Pixels>,
+        window: &Window,
+        cx: &Context<Self>,
+    ) -> Option<Anchored> {
+        let waiting =
+            self.busy_session().filter(|session| session.activity() == PetActivity::Waiting);
+        if self.today_usage.is_none() && waiting.is_none() {
+            return None;
+        }
+        let gap = rems(0.25).to_pixels(window.rem_size());
+        let entity = cx.entity();
+        Some(
+            anchored()
+                .anchor(Anchor::BottomCenter)
+                .attach(region, Anchor::TopCenter)
+                .offset(point(px(0.), -gap))
+                .child(
+                    v_flex()
+                        .relative()
+                        .flex_shrink_0()
+                        .max_w(window.bounds().size.width - gap * 2.)
+                        .rounded(cx.theme().radius_tokens().md)
+                        .bg(cx.theme().popover)
+                        .text_color(cx.theme().popover_foreground)
+                        .border_1()
+                        .border_color(cx.theme().border)
+                        .children(self.today_usage.map(|today| {
+                            h_flex()
+                                .id("pet-usage")
+                                .aria_label(format!("今日用量：{today} tokens"))
+                                .justify_center()
+                                .gap_2()
+                                .px_3()
+                                .py_1()
+                                .text_xs()
+                                .whitespace_nowrap()
+                                .child(div().text_color(cx.theme().muted_foreground).child("今日"))
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .font_weight(FontWeight::MEDIUM)
+                                        .font_family(cx.theme().mono_font_family.clone())
+                                        .child(number::compact(today)),
+                                )
+                                .child(
+                                    div().text_color(cx.theme().muted_foreground).child("tokens"),
+                                )
+                        }))
+                        .children(waiting.map(|session| {
+                            let id = session.id();
+                            div()
+                                .p_1()
+                                .when(self.today_usage.is_some(), |this| {
+                                    this.border_t_1().border_color(cx.theme().border)
+                                })
+                                .child(
+                                    Button::new(("pet-waiting", id))
+                                        .ghost()
+                                        .small()
+                                        .w_full()
+                                        .label("等待授权")
+                                        .accessibility_label("等待授权，打开对应会话")
+                                        .track_focus(&self.waiting_focus)
+                                        .on_click(move |_, _, cx| open_session(Some(id), cx)),
+                                )
+                        }))
+                        .when(self.anchored, |this| {
+                            this.child(
+                                canvas(
+                                    move |bounds, window, cx| {
+                                        entity.update(cx, |this, _| {
+                                            let regions = [region, bounds];
+                                            if this.input_regions.as_slice() != regions {
+                                                window.set_input_region(Some(&regions));
+                                                this.input_regions = regions.to_vec();
+                                            }
+                                        });
+                                    },
+                                    |_, _, _, _| {},
+                                )
+                                .absolute()
+                                .size_full(),
+                            )
+                        }),
+                ),
+        )
+    }
+
     fn report(error: PetError) {
         tracing::debug!(%error, "宠物不可用");
     }
@@ -488,17 +631,19 @@ impl Render for PetView {
         let frame = if cx.reduce_motion() { 0 } else { self.frame };
         let sprite = self.sprites.as_ref().map(|sprites| sprites.frame(self.clip, frame));
         let cell = Position::cell(self.scale);
+        window.set_rem_size(cx.theme().font_size);
         let origin = self.origin(window.bounds().size, cell);
-        if self.anchored {
-            let region = Bounds::new(origin, cell);
-            if self.input_region != Some(region) {
-                window.set_input_region(Some(&[region]));
-                self.input_region = Some(region);
-            }
+        let region = Bounds::new(origin, cell);
+        let status = self.render_status(region, window, cx);
+        if self.anchored && status.is_none() && self.input_regions.as_slice() != [region] {
+            window.set_input_region(Some(&[region]));
+            self.input_regions = vec![region];
         }
         div()
             .size_full()
             .relative()
+            .font_family(cx.theme().font_family.clone())
+            .text_color(cx.theme().foreground)
             .on_mouse_move(cx.listener(|this, event: &MouseMoveEvent, window, cx| {
                 if this.press.is_none() {
                     return;
@@ -573,32 +718,7 @@ impl Render for PetView {
                             .menu("退出 Aries", Box::new(Quit))
                     }),
             )
-            .children(
-                self.busy_session()
-                    .filter(|session| session.activity() == PetActivity::Waiting)
-                    .map(|session| {
-                        let id = session.id();
-                        div()
-                            .absolute()
-                            .left(origin.x)
-                            .top((origin.y - px(32.)).max(px(0.)))
-                            .p_1()
-                            .rounded(cx.theme().radius)
-                            .bg(cx.theme().popover)
-                            .text_color(cx.theme().popover_foreground)
-                            .border_1()
-                            .border_color(cx.theme().border)
-                            .child(
-                                Button::new(("pet-waiting", id))
-                                    .ghost()
-                                    .small()
-                                    .label("等待授权")
-                                    .accessibility_label("等待授权，打开对应会话")
-                                    .track_focus(&self.waiting_focus)
-                                    .on_click(move |_, _, cx| open_session(Some(id), cx)),
-                            )
-                    }),
-            )
+            .children(status)
     }
 }
 
@@ -639,7 +759,7 @@ fn show(view: &Entity<PetView>, cx: &mut App) -> Result<(), PetError> {
         this.display_uuid = display_uuid;
         this.visible = false;
         this.position = position;
-        this.input_region = None;
+        this.input_regions.clear();
         #[cfg(target_os = "linux")]
         {
             this.mover = mover;
@@ -712,8 +832,10 @@ fn show(view: &Entity<PetView>, cx: &mut App) -> Result<(), PetError> {
             let sessions = workspace.read(cx).pet_sessions(cx);
             this.completions =
                 sessions.iter().map(|session| (session.id(), session.completion())).collect();
+            this.usages = sessions.iter().map(|session| (session.id(), session.usage())).collect();
             this.sync(sessions, cx);
         }
+        this.refresh_usage(Duration::ZERO, cx);
         this.start_timer(cx);
         cx.notify();
     });

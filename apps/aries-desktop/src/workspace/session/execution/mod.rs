@@ -45,6 +45,7 @@ pub struct Execution {
     disconnected: bool,
     stopping: bool,
     pet_completion: u64,
+    pet_usage: u64,
     tokens: Option<u64>,
     choosing_directory: bool,
     session_directory_selected: bool,
@@ -182,6 +183,7 @@ impl Execution {
             disconnected: false,
             stopping: false,
             pet_completion: 0,
+            pet_usage: 0,
             tokens: None,
             choosing_directory: false,
             session_directory_selected: false,
@@ -230,6 +232,9 @@ impl Execution {
     }
     pub fn pet_completion(&self) -> u64 {
         self.pet_completion
+    }
+    pub fn pet_usage(&self) -> u64 {
+        self.pet_usage
     }
     pub fn is_loading(&self) -> bool {
         self.loading_session.is_some()

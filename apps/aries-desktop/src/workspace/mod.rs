@@ -2,7 +2,7 @@ pub mod conversation;
 mod extensions;
 pub mod files;
 pub mod git;
-mod number;
+pub mod number;
 pub mod session;
 pub mod settings;
 pub mod sidebar;
