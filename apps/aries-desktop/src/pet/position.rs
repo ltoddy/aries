@@ -8,7 +8,18 @@ use serde::{Deserialize, Serialize};
 use crate::pet::PetError;
 use crate::pet::sprites::{CELL_HEIGHT, CELL_WIDTH};
 
+const WINDOW_WIDTH: f32 = 256.;
+const WINDOW_HEIGHT: f32 = 256.;
+const WINDOW_PADDING_WIDTH: f32 = WINDOW_WIDTH - CELL_WIDTH as f32;
+const WINDOW_PADDING_HEIGHT: f32 = WINDOW_HEIGHT - CELL_HEIGHT as f32;
 static SAVE_NONCE: AtomicU64 = AtomicU64::new(0);
+
+pub fn window_size(scale: f32) -> Size<Pixels> {
+    size(
+        px(CELL_WIDTH as f32 * scale + WINDOW_PADDING_WIDTH),
+        px(CELL_HEIGHT as f32 * scale + WINDOW_PADDING_HEIGHT),
+    )
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Position {
@@ -63,24 +74,25 @@ impl Position {
         fs::rename(&temporary, &path).map_err(|source| PetError::io(&path, source))?;
         Ok(())
     }
-    pub fn bounds(position: Option<&Self>, cx: &App) -> Result<Placement, PetError> {
+
+    pub fn bounds(position: Option<&Self>, scale: f32, cx: &App) -> Result<Placement, PetError> {
         let desktop = Self::desktop(position, cx)?;
-        let cell = Self::cell();
+        let window = window_size(scale);
         let visible = desktop.visible();
-        if visible.size.width < cell.width || visible.size.height < cell.height {
+        if visible.size.width < window.width || visible.size.height < window.height {
             return Err(PetError::unsupported("显示器无法容纳宠物窗口".into()));
         }
         let origin = position.map_or_else(
-            || point(visible.right() - cell.width, visible.bottom() - cell.height),
+            || point(visible.right() - window.width, visible.bottom() - window.height),
             |position| point(px(position.x), px(position.y)),
         );
         let origin = point(
-            origin.x.clamp(visible.left(), visible.right() - cell.width),
-            origin.y.clamp(visible.top(), visible.bottom() - cell.height),
+            origin.x.clamp(visible.left(), visible.right() - window.width),
+            origin.y.clamp(visible.top(), visible.bottom() - window.height),
         );
         Ok(Placement::new(
             desktop.display_id(),
-            Bounds::new(origin + desktop.bounds().origin, cell),
+            Bounds::new(origin + desktop.bounds().origin, window),
             Self::new(origin, desktop.uuid().to_string()),
         ))
     }
@@ -123,8 +135,8 @@ impl Position {
         )
     }
 
-    pub fn cell() -> Size<Pixels> {
-        size(px(CELL_WIDTH as f32), px(CELL_HEIGHT as f32))
+    pub fn cell(scale: f32) -> Size<Pixels> {
+        size(px(CELL_WIDTH as f32 * scale), px(CELL_HEIGHT as f32 * scale))
     }
 }
 

@@ -1,3 +1,4 @@
+use crate::workspace::settings::preferences::{PET_SIZE_MAX, PET_SIZE_MIN};
 use crate::workspace::settings::state::*;
 
 impl Render for SettingsState {
@@ -9,6 +10,7 @@ impl Render for SettingsState {
         let send_keys = [SendKey::Enter, SendKey::CommandEnter];
         let send_key_view = view.clone();
         let font_size = self.settings.font_size();
+        let pet_size = self.settings.pet_size();
         let font_select = self.font_select.clone();
         let error = self.settings_error.clone();
         let saving = self.settings_saving;
@@ -19,6 +21,9 @@ impl Render for SettingsState {
         let font_smaller = view.clone();
         let font_larger = view.clone();
         let font_reset = view.clone();
+        let pet_smaller = view.clone();
+        let pet_reset = view.clone();
+        let pet_larger = view.clone();
         let navigation = div().flex().flex_col().gap_1().children(
             [SettingsPage::Appearance, SettingsPage::MessageInput, SettingsPage::Shortcuts]
                 .into_iter()
@@ -192,6 +197,97 @@ impl Render for SettingsState {
                                     .text_xs()
                                     .text_color(cx.theme().muted_foreground)
                                     .child("字号范围为 12–24 px。"),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_2()
+                            .child(div().font_weight(FontWeight::SEMIBOLD).child("宠物"))
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .rounded(cx.theme().radius_tokens().lg)
+                                    .bg(cx.theme().group_box)
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .items_center()
+                                            .gap_4()
+                                            .mx_2p5()
+                                            .py_2()
+                                            .min_h(rems(2.375))
+                                            .child(div().w(rems(3.)).flex_shrink_0().child("大小"))
+                                            .child(
+                                                div()
+                                                    .flex()
+                                                    .flex_1()
+                                                    .min_w_0()
+                                                    .items_center()
+                                                    .justify_end()
+                                                    .gap_1()
+                                                    .child(
+                                                        Button::new("settings-pet-smaller")
+                                                            .icon(IconName::Minus)
+                                                            .small()
+                                                            .disabled(pet_size <= PET_SIZE_MIN)
+                                                            .accessibility_label("缩小宠物")
+                                                            .on_click(move |_, _, cx| {
+                                                                let _ = pet_smaller.update(
+                                                                    cx,
+                                                                    |this, cx| {
+                                                                        this.change_pet_size(
+                                                                            -1, cx,
+                                                                        )
+                                                                    },
+                                                                );
+                                                            }),
+                                                    )
+                                                    .child(
+                                                        Button::new("settings-pet-reset")
+                                                            .label(format!("{pet_size}%"))
+                                                            .small()
+                                                            .w(rems(4.5))
+                                                            .tooltip("恢复默认大小（100%）")
+                                                            .accessibility_label("恢复默认宠物大小")
+                                                            .on_click(move |_, _, cx| {
+                                                                let _ = pet_reset.update(
+                                                                    cx,
+                                                                    |this, cx| {
+                                                                        this.change_pet_size(0, cx)
+                                                                    },
+                                                                );
+                                                            }),
+                                                    )
+                                                    .child(
+                                                        Button::new("settings-pet-larger")
+                                                            .icon(IconName::Plus)
+                                                            .small()
+                                                            .disabled(pet_size >= PET_SIZE_MAX)
+                                                            .accessibility_label("放大宠物")
+                                                            .on_click(move |_, _, cx| {
+                                                                let _ = pet_larger.update(
+                                                                    cx,
+                                                                    |this, cx| {
+                                                                        this.change_pet_size(1, cx)
+                                                                    },
+                                                                );
+                                                            }),
+                                                    ),
+                                            ),
+                                    )
+                                    .child(
+                                        div()
+                                            .mx_2p5()
+                                            .pb_2()
+                                            .text_xs()
+                                            .text_color(cx.theme().muted_foreground)
+                                            .child(format!(
+                                                "宠物大小范围为 {PET_SIZE_MIN}%–{PET_SIZE_MAX}%，修改后立即生效。"
+                                            )),
+                                    ),
                             ),
                     )
             })

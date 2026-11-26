@@ -5,4 +5,3 @@
 5. 所有结构体和枚举都必须通过构造函数创建。
 6. `apps/` 和 `crates/` 共同使用的第三方依赖，统一在 `[workspace.dependencies]` 中声明；其他依赖在各自的 `Cargo.toml` 中声明。
 7. 错误处理使用 `thiserror`，不要使用 `anyhow`。需要转换错误类型时，先通过 `map_err` 显式转换，再使用 `?`，不要依赖 `?` 隐式转换。
-8. 执行 Cargo 命令时，使用 `$HOME/.cargo/bin/cargo`。
