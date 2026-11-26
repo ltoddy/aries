@@ -110,6 +110,9 @@ impl Execution {
             Event::Finished(result) => {
                 self.dismiss_permissions();
                 let automatic = matches!(&result, Ok(StopReason::EndTurn)) && !self.stopping;
+                if automatic || (result.is_err() && !self.stopping) {
+                    self.pet_completion += 1;
+                }
                 self.stopping = false;
                 self.conversation.finish(result.err().map(|error| {
                     crate::error::log("Agent 执行失败", &error);
@@ -127,6 +130,9 @@ impl Execution {
             Event::Disconnected(error) => {
                 self.dismiss_permissions();
                 self.with_prompt_queue(PromptQueue::pause);
+                if self.conversation.is_busy() && !self.stopping {
+                    self.pet_completion += 1;
+                }
                 self.stopping = false;
                 self.disconnected = true;
                 self.load_supported = false;

@@ -1,3 +1,4 @@
+use crate::pet::{PetActivity, PetSession};
 use crate::workspace::workspace_view::*;
 
 impl WorkspaceView {
@@ -27,6 +28,42 @@ impl WorkspaceView {
             .iter()
             .filter_map(WorkspaceTab::session)
             .chain(self.archived_tabs.iter().map(Tab::view))
+    }
+
+    pub fn pet_sessions(&self, cx: &App) -> Vec<PetSession> {
+        std::iter::once(&self.sidebar)
+            .chain(self.tabs.iter().filter_map(WorkspaceTab::session))
+            .map(|view| {
+                let execution = view.read(cx).execution();
+                let conversation = execution.conversation();
+                let activity = if execution.permission().is_some() {
+                    PetActivity::waiting()
+                } else if conversation.is_busy() {
+                    PetActivity::working()
+                } else if conversation.error().is_some() {
+                    PetActivity::failed()
+                } else {
+                    PetActivity::idle()
+                };
+                PetSession::new(view.entity_id(), activity, execution.pet_completion())
+            })
+            .collect()
+    }
+
+    pub fn focus_pet_session(&mut self, id: EntityId, window: &mut Window, cx: &mut Context<Self>) {
+        if self.sidebar.entity_id() == id {
+            if self.can_navigate(window, cx) {
+                self.select_sidebar_pane(Pane::sessions(), window, cx);
+            }
+            return;
+        }
+        if let Some(index) = self
+            .tabs
+            .iter()
+            .position(|tab| tab.session().is_some_and(|view| view.entity_id() == id))
+        {
+            self.select_tab(index, window, cx);
+        }
     }
 
     pub fn new_session(&mut self, window: &mut Window, cx: &mut Context<Self>) {

@@ -2,6 +2,7 @@ mod acp;
 mod error;
 pub mod ipc;
 mod keymap;
+mod pet;
 mod startup;
 mod terminal;
 mod workspace;
@@ -12,6 +13,8 @@ gpui_kit::actions!(
         Quit,
         Hide,
         OpenSettings,
+        OpenWorkspace,
+        TogglePet,
         NewSession,
         CloseTab,
         PreviousTab,
@@ -25,6 +28,18 @@ gpui_kit::actions!(
         ShowGitSidebar,
     ]
 );
+
+impl OpenWorkspace {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl TogglePet {
+    pub fn new() -> Self {
+        Self
+    }
+}
 
 impl ShowSessionsSidebar {
     pub fn new() -> Self {
