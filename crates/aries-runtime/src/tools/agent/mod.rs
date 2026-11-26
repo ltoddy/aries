@@ -8,6 +8,7 @@ use aries_extension::agent::AgentDefinition;
 use aries_init::GlobalContext;
 use futures::StreamExt;
 use rig::agent::{AgentBuilder, MultiTurnStreamItem, PromptResponse};
+use rig::completion::Message;
 use rig::tool::server::ToolServer;
 use rig::tool::{Tool, ToolContext};
 use serde_json::Value;
@@ -16,6 +17,7 @@ use toasty::Db;
 pub use self::args::AgentArgs;
 pub use self::error::AgentError;
 pub use self::output::AgentOutput;
+use crate::context::compaction::ContextCompactor;
 use crate::context::{ChatContext, ChatHistory};
 use crate::hooks::{TokenUsageHook, ToolCallHook, TranscriptHook};
 use crate::preamble;
@@ -152,6 +154,8 @@ impl Tool for AgentTool {
             .await
             .map_err(|source| AgentError::context_persistence(&dir, source))?;
         let history = chat_context.history().await;
+        let mut compactor =
+            ContextCompactor::new(self.state.clone(), chat_context.clone(), self.notifier.clone());
         let transcript_hook = TranscriptHook::new(chat_history, chat_context);
 
         let agent = AgentBuilder::new(self.state.model())
@@ -174,7 +178,10 @@ impl Tool for AgentTool {
         self.notifier.send_subagent_update(subagent_update);
 
         let message_id = format!("agent-message-{}", nanoid::nanoid!());
-        let mut stream = agent.prompt(args.prompt).history(history).stream();
+
+        let message = Message::user(args.prompt);
+        compactor.pre_compact(&message).await;
+        let mut stream = agent.prompt(message).history(history).stream();
 
         self.notifier.send_session_message(
             &message_id,

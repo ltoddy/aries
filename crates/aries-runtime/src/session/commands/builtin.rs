@@ -62,18 +62,11 @@ impl<'a> BuiltinCommandsExecutor<'a> {
         );
 
         match self.compactor.compact().await {
-            Ok(Some(_)) => {
+            Ok(_) => {
                 self.notifier.send_compaction(
                     &compaction_id,
                     CompactionStatus::Completed,
                     "上下文摘要压缩已完成。",
-                );
-            },
-            Ok(None) => {
-                self.notifier.send_compaction(
-                    &compaction_id,
-                    CompactionStatus::Cancelled,
-                    "上下文摘要压缩被 hook 阻止，已跳过本次压缩。",
                 );
             },
             Err(err) => {

@@ -7,14 +7,7 @@ mod tests;
 mod tokens;
 mod window;
 
-use std::sync::Arc;
-
 use aries_communicate::{CompactionStatus, Notifier};
-use aries_extension::hook::input::{
-    PostCompactHookInput, PostCompactTrigger, PreCompactCustomInstructions, PreCompactHookInput,
-};
-use aries_extension::hook::{HookDecision, HooksExecutor};
-use aries_init::ModelConfig;
 use nanoid::nanoid;
 use rig::Model;
 use rig::completion::{Message, Usage};
@@ -31,28 +24,25 @@ use crate::state::State;
 
 #[derive(Clone)]
 pub struct ContextCompactor {
-    state: State,
     agent: CompactAgent,
     breaker: AutoCompactBreaker,
     chat_context: ChatContext,
-    hooks_executor: Arc<HooksExecutor>,
     notifier: Notifier,
     window: ContextWindow,
 }
 
 impl ContextCompactor {
-    pub fn new(
-        config: &ModelConfig,
-        state: State,
-        chat_context: ChatContext,
-        hooks_executor: Arc<HooksExecutor>,
-        notifier: Notifier,
-    ) -> Self {
-        let window = ContextWindow::new(config);
+    pub fn new(state: State, chat_context: ChatContext, notifier: Notifier) -> Self {
+        let model = state.model();
+        let vendor = model.wire.provider().dialect.name;
+        let model = model.name();
+        let window = ContextWindow::new(vendor, model);
+
         let breaker = AutoCompactBreaker::new();
+
         let agent = CompactAgent::new(state.model(), state.transcript_dir());
 
-        Self { state, agent, breaker, chat_context, hooks_executor, notifier, window }
+        Self { agent, breaker, chat_context, notifier, window }
     }
 
     pub fn set_model(&mut self, model: Model<OpenAiWire>) {
@@ -83,18 +73,11 @@ impl ContextCompactor {
             );
             self.notifier.send_compaction(&compaction_id, CompactionStatus::InProgress, text);
             match self.compact().await {
-                Ok(Some(_)) => {
+                Ok(_) => {
                     self.notifier.send_compaction(
                         &compaction_id,
                         CompactionStatus::Completed,
                         "上下文摘要压缩已完成。",
-                    );
-                },
-                Ok(None) => {
-                    self.notifier.send_compaction(
-                        &compaction_id,
-                        CompactionStatus::Cancelled,
-                        "上下文摘要压缩被 hook 阻止，已跳过本次压缩。",
                     );
                 },
                 Err(err) => {
@@ -121,18 +104,11 @@ impl ContextCompactor {
             );
             self.notifier.send_compaction(&compaction_id, CompactionStatus::InProgress, text);
             match self.compact().await {
-                Ok(Some(_)) => {
+                Ok(_) => {
                     self.notifier.send_compaction(
                         &compaction_id,
                         CompactionStatus::Completed,
                         "上下文摘要压缩已完成。",
-                    );
-                },
-                Ok(None) => {
-                    self.notifier.send_compaction(
-                        &compaction_id,
-                        CompactionStatus::Cancelled,
-                        "上下文摘要压缩被 hook 阻止，已跳过本次压缩。",
                     );
                 },
                 Err(err) => {
@@ -146,25 +122,12 @@ impl ContextCompactor {
         }
     }
 
-    pub async fn compact(&mut self) -> Result<Option<String>, CompactionError> {
+    pub async fn compact(&mut self) -> Result<String, CompactionError> {
         match self.breaker.decide() {
             Decision::Allow { half_open: _ } => {},
             Decision::Skip { wait, consecutive_failures } => {
                 return Err(CompactionError::cooldown(wait, consecutive_failures));
             },
-        }
-
-        let input = PreCompactHookInput::new(
-            self.state.session_id(),
-            self.state.cwd(),
-            PostCompactTrigger::Auto,
-            PreCompactCustomInstructions::Auto,
-        )
-        .transcript_dir(self.state.transcript_dir());
-        if let HookDecision::Terminate { reason: _ } =
-            self.hooks_executor.fire_pre_compact(input).await
-        {
-            return Ok(None);
         }
 
         let outcome = {
@@ -176,16 +139,7 @@ impl ContextCompactor {
             CompactOutcome::Success((compressed, summary)) => {
                 self.chat_context.overwrite(compressed).await;
                 self.breaker.on_success();
-
-                let input = PostCompactHookInput::new(
-                    self.state.session_id(),
-                    self.state.cwd(),
-                    PostCompactTrigger::Auto,
-                    &summary,
-                )
-                .transcript_dir(self.state.transcript_dir());
-                self.hooks_executor.fire_post_compact(input).await;
-                Ok(Some(summary))
+                Ok(summary)
             },
             CompactOutcome::PromptTooLong => {
                 self.breaker.trip();
