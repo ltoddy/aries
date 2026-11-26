@@ -1,9 +1,11 @@
 use std::ops::RangeInclusive;
 
+mod block;
 mod error;
 mod parse;
 mod selection;
 
+pub use self::block::ChangeBlock;
 use self::error::Result;
 pub use self::error::{PartialPatchError, PatchError};
 
@@ -94,17 +96,12 @@ impl LineSelection {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PatchScope {
     File,
-    Hunk(usize),
     Lines(LineSelection),
 }
 
 impl PatchScope {
     pub fn file() -> Self {
         Self::File
-    }
-
-    pub fn hunk(index: usize) -> Self {
-        Self::Hunk(index)
     }
 
     pub fn lines(selection: LineSelection) -> Self {
@@ -144,10 +141,6 @@ impl SourceLine {
 
     pub fn position(&self) -> usize {
         self.position
-    }
-
-    pub fn hunk_index(&self) -> usize {
-        self.hunk
     }
 
     pub fn origin(&self) -> char {
@@ -198,30 +191,6 @@ impl PatchHunk {
             source_range: position..=position,
         }
     }
-
-    pub fn index(&self) -> usize {
-        self.index
-    }
-
-    pub fn label(&self) -> &str {
-        &self.label
-    }
-
-    pub fn original_start(&self) -> u32 {
-        self.original_start
-    }
-
-    pub fn original_count(&self) -> u32 {
-        self.original_count
-    }
-
-    pub fn modified_start(&self) -> u32 {
-        self.modified_start
-    }
-
-    pub fn modified_count(&self) -> u32 {
-        self.modified_count
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -230,6 +199,7 @@ pub struct DiffPatch {
     header: Vec<String>,
     hunks: Vec<PatchHunk>,
     source_lines: Vec<SourceLine>,
+    blocks: Vec<ChangeBlock>,
     partial_error: Option<PartialPatchError>,
 }
 
@@ -240,16 +210,17 @@ impl DiffPatch {
             header: Vec::new(),
             hunks: Vec::new(),
             source_lines: Vec::new(),
+            blocks: Vec::new(),
             partial_error: None,
         }
     }
 
-    pub fn hunks(&self) -> &[PatchHunk] {
-        &self.hunks
-    }
-
     pub fn source_lines(&self) -> &[SourceLine] {
         &self.source_lines
+    }
+
+    pub fn blocks(&self) -> &[ChangeBlock] {
+        &self.blocks
     }
 
     pub fn partial_error(&self) -> Option<&str> {

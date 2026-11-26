@@ -18,11 +18,6 @@ impl DiffPatch {
     fn validate_scope(&self, scope: &PatchScope) -> Result<()> {
         match scope {
             PatchScope::File => {},
-            PatchScope::Hunk(index) => {
-                if *index >= self.hunks.len() {
-                    return Err(PatchError::hunk_no_longer_exists());
-                }
-            },
             PatchScope::Lines(selection) => {
                 if selection.source_range.is_empty() {
                     return Err(PatchError::empty_selection());
@@ -40,7 +35,6 @@ impl DiffPatch {
     fn includes(scope: &PatchScope, line: &SourceLine) -> bool {
         match scope {
             PatchScope::File => true,
-            PatchScope::Hunk(index) => line.hunk == *index,
             PatchScope::Lines(selection) => {
                 selection.source_range.contains(&line.position)
                     && match selection.side {

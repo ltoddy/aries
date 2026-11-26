@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::error::{details, log, report};
 use crate::workspace::git::diff_operations::GitOperationError;
-use crate::workspace::git::diff_patch::PatchError;
+use crate::workspace::git::diff_patch::{ChangeBlock, PatchError};
 use crate::workspace::git::error::RepositoryError;
 
 type Result<T> = std::result::Result<T, ToolError>;
@@ -32,16 +32,16 @@ mod selection;
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ToolScope {
     File,
-    Hunk,
+    Block,
     Lines,
 }
 
 impl ToolScope {
-    pub fn file() -> Self {
+    fn file() -> Self {
         Self::File
     }
-    fn hunk() -> Self {
-        Self::Hunk
+    fn block() -> Self {
+        Self::Block
     }
     fn lines() -> Self {
         Self::Lines
@@ -49,7 +49,7 @@ impl ToolScope {
     fn label(self) -> &'static str {
         match self {
             Self::File => "整个文件",
-            Self::Hunk => "当前块",
+            Self::Block => "当前块",
             Self::Lines => "选中行",
         }
     }
@@ -60,7 +60,7 @@ pub struct ToolSnapshot {
     revision: u64,
     patch: Arc<String>,
     range: Option<DiffLineRange>,
-    hunk: Option<usize>,
+    block: Option<usize>,
     location: Option<DiffLinePosition>,
     available: [bool; 3],
 }
@@ -71,11 +71,11 @@ impl ToolSnapshot {
             revision: view.revision,
             patch: view.patch.clone(),
             range: view.selection_snapshot.clone(),
-            hunk: view.current_hunk,
+            block: view.current_block,
             location: view.location.clone(),
             available: [
                 view.scope_available(ToolScope::file()),
-                view.scope_available(ToolScope::hunk()),
+                view.scope_available(ToolScope::block()),
                 view.scope_available(ToolScope::lines()),
             ],
         }
@@ -84,7 +84,7 @@ impl ToolSnapshot {
     fn scope_available(&self, scope: ToolScope) -> bool {
         self.available[match scope {
             ToolScope::File => 0,
-            ToolScope::Hunk => 1,
+            ToolScope::Block => 1,
             ToolScope::Lines => 2,
         }]
     }
@@ -112,7 +112,7 @@ impl GitDiffView {
             state.set_selected_lines(snapshot.range.clone(), cx);
         });
         self.selection_changed(cx);
-        self.current_hunk = snapshot.hunk;
+        self.current_block = snapshot.block;
         self.location = snapshot.location.clone();
         cx.notify();
         true
@@ -124,7 +124,7 @@ impl GitDiffView {
         self.selected_scope = None;
         self.selection_snapshot = None;
         self.selected_count = 0;
-        self.current_hunk = None;
+        self.current_block = None;
         self.location = None;
         self.search_open = false;
         self.search_revision = self.search_revision.wrapping_add(1);
@@ -216,63 +216,20 @@ fn endpoint(side: DiffSide, line: usize) -> Result<LineEndpoint> {
     )?)
 }
 
-#[derive(Clone, Copy)]
-pub struct ChangeBlock {
-    index: usize,
-    original: Option<u32>,
-    modified: Option<u32>,
-}
-
-impl ChangeBlock {
-    pub fn new(index: usize, original: Option<u32>, modified: Option<u32>) -> Self {
-        Self { index, original, modified }
-    }
-
-    pub fn index(&self) -> usize {
-        self.index
-    }
-
-    pub fn modified(&self) -> Option<u32> {
-        self.modified
-    }
-
-    pub fn apply(&self) -> Option<(DiffSide, u32)> {
-        match (self.modified, self.original) {
-            (Some(line), _) => Some((DiffSide::Modified, line)),
-            (None, Some(line)) => Some((DiffSide::Original, line)),
-            (None, None) => None,
-        }
-    }
-
-    pub fn discard(&self) -> Option<(DiffSide, u32)> {
-        self.modified?;
-        self.original.map(|line| (DiffSide::Original, line))
+fn action_label(action: DiffAction) -> &'static str {
+    match action {
+        DiffAction::Stage => "暂存这个变更块",
+        DiffAction::Unstage => "取消暂存这个变更块",
+        DiffAction::Discard => "丢弃这个变更块",
     }
 }
 
-pub fn change_blocks(model: &DiffPatch) -> Vec<ChangeBlock> {
-    let mut blocks: Vec<ChangeBlock> = Vec::new();
-    for line in model.source_lines().iter().filter(|line| line.is_changed()) {
-        let index = line.hunk_index();
-        if blocks.last().is_none_or(|block| block.index() != index) {
-            blocks.push(ChangeBlock::new(index, None, None));
-        }
-        if let Some(block) = blocks.last_mut() {
-            block.original = block.original.or(line.original_line());
-            block.modified = block.modified.or(line.modified_line());
-        }
-    }
-    blocks
-}
-
-pub fn change_action(
-    model: &DiffPatch,
+pub fn change_action<'a>(
+    model: &'a DiffPatch,
     group: ChangeGroup,
     position: &DiffLinePosition,
-) -> Option<(usize, DiffAction)> {
-    change_blocks(model)
-        .into_iter()
-        .find_map(|block| Some((block.index(), block_action(&block, group, position)?)))
+) -> Option<(&'a ChangeBlock, DiffAction)> {
+    model.blocks().iter().find_map(|block| Some((block, block_action(block, group, position)?)))
 }
 
 fn block_action(
@@ -286,11 +243,13 @@ fn block_action(
         ChangeGroup::Unstaged => DiffAction::stage(),
     };
     match position.side() {
-        DiffSide::Modified => (block.apply() == Some((DiffSide::Modified, line))).then_some(apply),
+        DiffSide::Modified => (block.modified() == Some(line)).then_some(apply),
         DiffSide::Original if group == ChangeGroup::Unstaged && block.modified().is_some() => {
-            (block.discard() == Some((DiffSide::Original, line))).then_some(DiffAction::discard())
+            (block.original() == Some(line)).then_some(DiffAction::discard())
         },
-        DiffSide::Original => (block.apply() == Some((DiffSide::Original, line))).then_some(apply),
+        DiffSide::Original => {
+            (block.modified().is_none() && block.original() == Some(line)).then_some(apply)
+        },
     }
 }
 

@@ -85,7 +85,7 @@ pub struct GitDiffView {
     selected_scope: Option<PatchScope>,
     selection_snapshot: Option<DiffLineRange>,
     selected_count: usize,
-    current_hunk: Option<usize>,
+    current_block: Option<usize>,
     location: Option<DiffLinePosition>,
     search_input: Option<Entity<InputState>>,
     search_subscription: Option<Subscription>,
@@ -133,7 +133,7 @@ impl GitDiffView {
             selected_scope: None,
             selection_snapshot: None,
             selected_count: 0,
-            current_hunk: None,
+            current_block: None,
             location: None,
             search_input: None,
             search_subscription: None,
@@ -313,16 +313,16 @@ impl GitDiffView {
                             this.display_patch = display_patch;
                             match model {
                                 Ok(model) => {
-                                    this.current_hunk = model
+                                    this.current_block = model
                                         .as_ref()
-                                        .filter(|model| !model.hunks().is_empty())
+                                        .filter(|model| !model.blocks().is_empty())
                                         .map(|_| 0);
                                     this.model = model;
                                     this.tool_error = None;
                                 },
                                 Err(error) => {
                                     this.model = None;
-                                    this.current_hunk = None;
+                                    this.current_block = None;
                                     this.tool_error =
                                         Some(format!("部分操作不可用：{}", details(&error)));
                                 },

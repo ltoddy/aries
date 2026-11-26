@@ -2,8 +2,7 @@ use gpui_kit::component::diff::{
     DiffChangeIndicator, DiffGutterMarker, DiffHoverHighlight, DiffHunkSeparator,
 };
 
-use crate::workspace::git::diff_operations::DiffAction;
-use crate::workspace::git::diff_view::tools::change_blocks;
+use crate::workspace::git::diff_patch::ChangeBlock;
 use crate::workspace::git::diff_view::*;
 
 impl GitDiffView {
@@ -184,16 +183,18 @@ impl GitDiffView {
             ChangeGroup::Staged => "取消暂存这个变更块",
         };
         let mut markers = Vec::new();
-        for block in change_blocks(model) {
-            if let Some((side, line)) = block.apply() {
-                let position = DiffLinePosition::new(path.clone(), side, line as usize);
-                markers.push(
-                    DiffGutterMarker::new(("diff-apply", block.index()), position)
-                        .with_label(apply_label),
-                );
-            }
-            if discardable && let Some((side, line)) = block.discard() {
-                let position = DiffLinePosition::new(path.clone(), side, line as usize);
+        for block in model.blocks() {
+            let Some((side, line)) = marker_position(block) else {
+                continue;
+            };
+            let position = DiffLinePosition::new(path.clone(), side, line as usize);
+            markers.push(
+                DiffGutterMarker::new(("diff-apply", block.index()), position)
+                    .with_label(apply_label),
+            );
+            if discardable && let Some(line) = block.original() {
+                let position =
+                    DiffLinePosition::new(path.clone(), DiffSide::Original, line as usize);
                 markers.push(
                     DiffGutterMarker::new(("diff-discard", block.index()), position)
                         .with_label("丢弃这个变更块"),
@@ -274,30 +275,52 @@ impl Render for GitDiffView {
                         DiffSide::Original => IconName::ChevronsRight,
                         DiffSide::Modified => IconName::ChevronsLeft,
                     };
-                    let (label, busy) = {
+                    let (actions, busy) = {
                         let this = view.read(cx);
-                        let label = match this.marker_action(&position) {
-                            Some(action) if action == DiffAction::discard() => "丢弃这个变更块",
-                            Some(action) if action == DiffAction::unstage() => "取消暂存这个变更块",
-                            Some(_) => "暂存这个变更块",
-                            None => "这个变更块",
-                        };
-                        (label, this.writes_busy(cx))
+                        (this.marker_actions(&position), this.writes_busy(cx))
+                    };
+                    let label = match actions.len() {
+                        0 => "这个变更块",
+                        1 => actions[0].2,
+                        _ => "变更块操作",
                     };
                     let view = click_view.clone();
-                    Button::new(marker.id().clone())
+                    let button = Button::new(marker.id().clone())
                         .xsmall()
                         .ghost()
                         .compact()
                         .icon(icon)
                         .accessibility_label(label)
                         .tooltip(label)
-                        .disabled(busy)
-                        .on_click(move |_, window, cx| {
-                            let position = position.clone();
-                            let _ = view.update(cx, |this, cx| {
-                                this.change_at(position, window, cx);
-                            });
+                        .disabled(busy);
+                    if actions.len() <= 1 {
+                        return button
+                            .on_click(move |_, window, cx| {
+                                let position = position.clone();
+                                let _ = view.update(cx, |this, cx| {
+                                    this.change_at(position, window, cx);
+                                });
+                            })
+                            .into_any_element();
+                    }
+                    button
+                        .dropdown_menu(move |mut menu, _, _| {
+                            for (index, action, label) in actions.iter() {
+                                let index = *index;
+                                let action = *action;
+                                let label = *label;
+                                let position = position.clone();
+                                let view = view.clone();
+                                menu = menu.item(PopupMenuItem::new(label).on_click(
+                                    move |_, window, cx| {
+                                        let position = position.clone();
+                                        let _ = view.update(cx, |this, cx| {
+                                            this.apply_change(index, action, position, window, cx);
+                                        });
+                                    },
+                                ));
+                            }
+                            menu
                         })
                         .into_any_element()
                 });
@@ -482,6 +505,7 @@ impl Render for GitDiffView {
                     )
                     .flex_wrap()
                     .child(self.render_write_action(cx))
+                    .child(self.render_discard_action(cx))
                     .child(self.render_tools(cx)),
             )
             .when(self.search_open, |view| view.child(self.render_search(cx)))
@@ -490,5 +514,13 @@ impl Render for GitDiffView {
             })
             .child(div().flex_1().min_w_0().min_h_0().child(body))
             .into_any_element()
+    }
+}
+
+fn marker_position(block: &ChangeBlock) -> Option<(DiffSide, u32)> {
+    match (block.modified(), block.original()) {
+        (Some(line), _) => Some((DiffSide::Modified, line)),
+        (None, Some(line)) => Some((DiffSide::Original, line)),
+        (None, None) => None,
     }
 }
