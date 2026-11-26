@@ -42,6 +42,7 @@ gpui-kit = { version = "0.11", features = [
     "tree-sitter-yaml",
 ] }
 ignore.workspace = true
+image = { version = "0.25", default-features = false, features = ["webp"] }
 jiff.workspace = true
 libc = "0.2"
 notify = "8.2"
@@ -56,6 +57,11 @@ tonic.workspace = true
 tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["fmt"] }
 url.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSResponder", "NSView", "NSWindow", "NSPanel"] }
+raw-window-handle = { version = "0.6", features = ["std"] }
 
 [target.'cfg(any(target_os = "macos", target_os = "linux"))'.dependencies]
 rustix = { version = "1.1", features = ["fs"] }

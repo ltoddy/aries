@@ -10,7 +10,7 @@ use crate::acp::aries_config;
 use crate::ipc::{Ipc, IpcError};
 use crate::workspace::WorkspaceView;
 use crate::workspace::settings::Preferences;
-use crate::{Quit, error};
+use crate::{OpenWorkspace, Quit, TogglePet, error, pet};
 
 #[derive(Debug, thiserror::Error)]
 pub enum StartupError {
@@ -45,7 +45,9 @@ pub fn run() -> Result<(), StartupError> {
     let directory = context.current_dir().to_path_buf();
     let cwd = directory.canonicalize().map_err(|source| StartupError::access(directory, source))?;
     let ipc = Ipc::start(runtime, &context).map_err(StartupError::ipc)?;
-    gpui_kit::application().with_assets(AllAssets).run(move |cx| launch(cx, cwd, ipc));
+    let app = gpui_kit::application().with_assets(AllAssets);
+    app.on_reopen(pet::open_workspace);
+    app.run(move |cx| launch(cx, cwd, ipc));
     Ok(())
 }
 
@@ -68,6 +70,15 @@ fn launch(cx: &mut App, cwd: PathBuf, ipc: Ipc) {
     };
     install_quit(handle, &workspace, cx);
     configure_window(handle, &workspace, cx);
+    cx.on_action(|_: &TogglePet, cx| pet::toggle(cx));
+    cx.on_action(|_: &OpenWorkspace, cx| pet::open_workspace(cx));
+    if let Err(error) = pet::init(&workspace, handle, cx)
+        && let Err(window_error) = handle.update(cx, |_, window, cx| {
+            error::report("无法显示桌面宠物", &error, window, cx);
+        })
+    {
+        error::log("无法显示宠物错误", window_error.as_ref());
+    }
     cx.activate(true);
 }
 
@@ -77,6 +88,8 @@ fn install_menu(cx: &mut App) {
 
     cx.on_action(|_: &Hide, cx| cx.hide());
     cx.set_menus([Menu::new("Aries Desktop").items([
+        MenuItem::action("打开 Aries…", OpenWorkspace::new()),
+        MenuItem::action("显示 / 隐藏宠物", TogglePet::new()),
         MenuItem::action("设置…", OpenSettings),
         MenuItem::action("显示会话列表", ShowSessionsSidebar::new()),
         MenuItem::action("显示文件树", ShowFilesSidebar::new()),
@@ -120,6 +133,10 @@ fn install_quit(handle: AnyWindowHandle, workspace: &Entity<WorkspaceView>, cx: 
                 return;
             };
             if let Err(error) = handle.update(cx, |_, window, cx| {
+                if let Err(error) = pet::show_main(window) {
+                    error::report("无法恢复主窗口", &error, window, cx);
+                    return;
+                }
                 workspace.update(cx, |workspace, cx| workspace.request_quit(window, cx));
             }) {
                 error::log("无法请求退出", error.as_ref());
@@ -134,7 +151,14 @@ fn configure_window(handle: AnyWindowHandle, workspace: &Entity<WorkspaceView>, 
         window.on_window_should_close(cx, move |window, cx| {
             let workspace = workspace.clone();
             window.defer(cx, move |window, cx| {
-                let _ = workspace.update(cx, |workspace, cx| workspace.request_quit(window, cx));
+                if pet::is_available(cx) {
+                    if let Err(error) = pet::hide_main(window) {
+                        error::report("无法隐藏主窗口", &error, window, cx);
+                    }
+                } else {
+                    let _ =
+                        workspace.update(cx, |workspace, cx| workspace.request_quit(window, cx));
+                }
             });
             false
         });

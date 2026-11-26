@@ -10,8 +10,8 @@ use crate::workspace::files::{
 use crate::workspace::settings::SendKey;
 use crate::workspace::skill_editor::SaveSkill;
 use crate::{
-    CloseTab, NextTab, NextUserMessage, PreviousTab, PreviousUserMessage, Quit, ShowFilesSidebar,
-    ShowGitSidebar, ShowSessionsSidebar, ToggleSidebar,
+    CloseTab, NextTab, NextUserMessage, OpenWorkspace, PreviousTab, PreviousUserMessage, Quit,
+    ShowFilesSidebar, ShowGitSidebar, ShowSessionsSidebar, TogglePet, ToggleSidebar,
 };
 #[cfg(target_os = "macos")]
 use crate::{Hide, NewSession, OpenSettings, ToggleTerminal};
@@ -34,6 +34,8 @@ const OPEN_SETTINGS: &str = "cmd-,";
 const NEW_SESSION: &str = "cmd-n";
 const TOGGLE_TERMINAL: &str = "cmd-j";
 const TOGGLE_SIDEBAR: &str = if MACOS { "cmd-b" } else { "ctrl-b" };
+const TOGGLE_PET: &str = if MACOS { "cmd-alt-p" } else { "ctrl-alt-p" };
+const OPEN_WORKSPACE: &str = if MACOS { "cmd-alt-o" } else { "ctrl-alt-o" };
 const SHOW_SESSIONS_SIDEBAR: &str = if MACOS { "cmd-1" } else { "ctrl-1" };
 const SHOW_FILES_SIDEBAR: &str = if MACOS { "cmd-2" } else { "ctrl-2" };
 const SHOW_GIT_SIDEBAR: &str = if MACOS { "cmd-3" } else { "ctrl-3" };
@@ -65,6 +67,8 @@ const DELETE: &str = if MACOS { "cmd-backspace" } else { "ctrl-backspace" };
 pub fn init(cx: &mut App) {
     let mut bindings = vec![
         KeyBinding::new(QUIT, Quit, None),
+        KeyBinding::new(TOGGLE_PET, TogglePet::new(), None),
+        KeyBinding::new(OPEN_WORKSPACE, OpenWorkspace::new(), None),
         KeyBinding::new(TOGGLE_SIDEBAR, ToggleSidebar, None),
         KeyBinding::new(SHOW_SESSIONS_SIDEBAR, ShowSessionsSidebar::new(), None),
         KeyBinding::new(SHOW_FILES_SIDEBAR, ShowFilesSidebar::new(), None),
@@ -131,6 +135,8 @@ pub fn groups(send_key: SendKey) -> Vec<(&'static str, Vec<(&'static str, String
         panels.push(shortcut("打开设置", &[OPEN_SETTINGS]));
         panels.push(shortcut("隐藏窗口", &[HIDE]));
     }
+    panels.push(shortcut("显示 / 隐藏宠物", &[TOGGLE_PET]));
+    panels.push(shortcut("打开 Aries", &[OPEN_WORKSPACE]));
     panels.push(shortcut("退出应用", &[QUIT]));
 
     vec![
