@@ -485,6 +485,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
+ "xcb",
 ]
 
 [[package]]

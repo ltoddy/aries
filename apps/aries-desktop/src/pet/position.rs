@@ -6,9 +6,8 @@ use gpui_kit::{App, Bounds, DisplayId, Pixels, Point, Size, Window, point, px, s
 use serde::{Deserialize, Serialize};
 
 use crate::pet::PetError;
+use crate::pet::sprites::{CELL_HEIGHT, CELL_WIDTH};
 
-const WINDOW_WIDTH: f32 = 256.;
-const WINDOW_HEIGHT: f32 = 256.;
 static SAVE_NONCE: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -64,46 +63,68 @@ impl Position {
         fs::rename(&temporary, &path).map_err(|source| PetError::io(&path, source))?;
         Ok(())
     }
-
     pub fn bounds(position: Option<&Self>, cx: &App) -> Result<Placement, PetError> {
-        let mut selected = None;
-        if let Some(position) = position {
-            for display in cx.displays() {
-                let uuid = display.uuid().map_err(|error| PetError::window(error.to_string()))?;
-                if uuid.to_string() == position.display_uuid {
-                    selected = Some(display);
-                    break;
-                }
-            }
-        }
-        let display = selected
-            .or_else(|| cx.primary_display())
-            .ok_or_else(|| PetError::window("未找到可用显示器".into()))?;
-        let uuid = display.uuid().map_err(|error| PetError::window(error.to_string()))?;
-        let display_origin = display.bounds().origin;
-        let mut visible = display.visible_bounds();
-        visible.origin -= display_origin;
-        if visible.size.width < px(WINDOW_WIDTH) || visible.size.height < px(WINDOW_HEIGHT) {
+        let desktop = Self::desktop(position, cx)?;
+        let cell = Self::cell();
+        let visible = desktop.visible();
+        if visible.size.width < cell.width || visible.size.height < cell.height {
             return Err(PetError::unsupported("显示器无法容纳宠物窗口".into()));
         }
         let origin = position.map_or_else(
-            || point(visible.right() - px(WINDOW_WIDTH), visible.bottom() - px(WINDOW_HEIGHT)),
+            || point(visible.right() - cell.width, visible.bottom() - cell.height),
             |position| point(px(position.x), px(position.y)),
         );
         let origin = point(
-            origin.x.clamp(visible.left(), visible.right() - px(WINDOW_WIDTH)),
-            origin.y.clamp(visible.top(), visible.bottom() - px(WINDOW_HEIGHT)),
+            origin.x.clamp(visible.left(), visible.right() - cell.width),
+            origin.y.clamp(visible.top(), visible.bottom() - cell.height),
         );
-        let position = Self::new(origin, uuid.to_string());
         Ok(Placement::new(
-            display.id(),
-            Bounds::new(origin + display_origin, Self::size()),
-            position,
+            desktop.display_id(),
+            Bounds::new(origin + desktop.bounds().origin, cell),
+            Self::new(origin, desktop.uuid().to_string()),
         ))
     }
 
-    pub fn size() -> Size<Pixels> {
-        size(px(WINDOW_WIDTH), px(WINDOW_HEIGHT))
+    pub fn desktop(position: Option<&Self>, cx: &App) -> Result<Desktop, PetError> {
+        let displays = cx.displays();
+        let selected = position.and_then(|position| {
+            displays.iter().find(|display| {
+                display.uuid().is_ok_and(|uuid| uuid.to_string() == position.display_uuid)
+            })
+        });
+        let display = selected
+            .or_else(|| displays.first())
+            .cloned()
+            .ok_or_else(|| PetError::window("未找到可用显示器".into()))?;
+        let uuid = display.uuid().map_err(|error| PetError::window(error.to_string()))?;
+        let bounds = display.bounds();
+        let mut visible = display.visible_bounds();
+        visible.origin -= bounds.origin;
+        Ok(Desktop::new(display.id(), bounds, visible, uuid.to_string()))
+    }
+
+    pub fn x(&self) -> f32 {
+        self.x
+    }
+
+    pub fn y(&self) -> f32 {
+        self.y
+    }
+
+    pub fn display_uuid(&self) -> &str {
+        &self.display_uuid
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn moved(&self, delta: Point<Pixels>) -> Self {
+        Self::new(
+            point(px(self.x + f32::from(delta.x)), px(self.y + f32::from(delta.y))),
+            self.display_uuid.clone(),
+        )
+    }
+
+    pub fn cell() -> Size<Pixels> {
+        size(px(CELL_WIDTH as f32), px(CELL_HEIGHT as f32))
     }
 }
 
@@ -128,5 +149,39 @@ impl Placement {
 
     pub fn position(&self) -> &Position {
         &self.position
+    }
+}
+
+pub struct Desktop {
+    display_id: DisplayId,
+    bounds: Bounds<Pixels>,
+    visible: Bounds<Pixels>,
+    uuid: String,
+}
+
+impl Desktop {
+    pub fn new(
+        display_id: DisplayId,
+        bounds: Bounds<Pixels>,
+        visible: Bounds<Pixels>,
+        uuid: String,
+    ) -> Self {
+        Self { display_id, bounds, visible, uuid }
+    }
+
+    pub fn display_id(&self) -> DisplayId {
+        self.display_id
+    }
+
+    pub fn bounds(&self) -> Bounds<Pixels> {
+        self.bounds
+    }
+
+    pub fn visible(&self) -> Bounds<Pixels> {
+        self.visible
+    }
+
+    pub fn uuid(&self) -> &str {
+        &self.uuid
     }
 }

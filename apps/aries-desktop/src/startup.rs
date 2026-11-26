@@ -145,14 +145,14 @@ fn configure_window(handle: AnyWindowHandle, workspace: &Entity<WorkspaceView>, 
         window.on_window_should_close(cx, move |window, cx| {
             let workspace = workspace.clone();
             window.defer(cx, move |window, cx| {
+                #[cfg(target_os = "macos")]
                 if pet::is_available(cx) {
                     if let Err(error) = pet::hide_main(window) {
                         tracing::debug!(%error, "无法隐藏主窗口");
                     }
-                } else {
-                    let _ =
-                        workspace.update(cx, |workspace, cx| workspace.request_quit(window, cx));
+                    return;
                 }
+                let _ = workspace.update(cx, |workspace, cx| workspace.request_quit(window, cx));
             });
             false
         });
