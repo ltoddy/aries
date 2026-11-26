@@ -68,16 +68,9 @@ pub fn configure(window: &mut Window) -> Result<(), PetError> {
     }
 }
 
+#[cfg(target_os = "macos")]
 pub fn hide_main(window: &mut Window) -> Result<(), PetError> {
-    #[cfg(target_os = "macos")]
-    {
-        self::macos::hide_main(window)
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        window.minimize_window();
-        Ok(())
-    }
+    self::macos::hide_main(window)
 }
 
 pub fn show_main(window: &mut Window) -> Result<(), PetError> {
