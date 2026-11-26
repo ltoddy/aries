@@ -12,7 +12,7 @@ mod document;
 mod status;
 mod view;
 
-use self::document::{FileDocument, ReadFileError};
+use self::document::{FileDocument, ImageDocument, ReadFileError};
 use self::status::{EditorStatus, file_language};
 
 const FILE_VIEW_CONTEXT: &str = "FileView";
@@ -165,7 +165,8 @@ fn split_line_suffix(location: &str) -> Option<(&str, Option<NonZeroUsize>)> {
 enum FileLoadState {
     Idle,
     Loading,
-    Ready,
+    Text,
+    Image,
     Failed(ReadFileError),
 }
 
@@ -178,16 +179,24 @@ impl FileLoadState {
         Self::Loading
     }
 
-    fn ready() -> Self {
-        Self::Ready
+    fn text() -> Self {
+        Self::Text
+    }
+
+    fn image() -> Self {
+        Self::Image
     }
 
     fn failed(error: ReadFileError) -> Self {
         Self::Failed(error)
     }
 
-    fn is_ready(&self) -> bool {
-        matches!(self, Self::Ready)
+    fn is_text(&self) -> bool {
+        matches!(self, Self::Text)
+    }
+
+    fn is_image(&self) -> bool {
+        matches!(self, Self::Image)
     }
 }
 
@@ -200,6 +209,7 @@ pub struct FileView {
     load_task: Option<Task<()>>,
     feedback: Option<SharedString>,
     document: Option<FileDocument>,
+    image: Option<ImageDocument>,
     dirty: bool,
     saving: bool,
     save_error: Option<String>,
@@ -276,7 +286,7 @@ impl Render for FileView {
                     .border_color(cx.theme().border)
                     .text_xs()
                     .text_color(cx.theme().muted_foreground)
-                    .when(self.state.is_ready(), |view| {
+                    .when(self.state.is_text(), |view| {
                         view.child(format!("行 {}，列 {}", self.status.line, self.status.column))
                             .when(!self.status.selection.is_empty(), |view| {
                                 view.child(format!("已选择 {} 字节", self.status.selection.len()))
@@ -286,6 +296,16 @@ impl Render for FileView {
                             .child(file_language(
                                 self.target.as_ref().map_or(Path::new(""), OpenFile::path),
                             ))
+                    })
+                    .when(self.state.is_image(), |view| {
+                        view.when_some(self.image.as_ref(), |view, image| {
+                            view.child(image.label)
+                                .when_some(image.dimensions, |view, (width, height)| {
+                                    view.child(format!("{width} × {height}"))
+                                })
+                                .child(format!("{:.1} KiB", image.bytes as f64 / 1024.))
+                                .child("只读预览")
+                        })
                     })
                     .when_some(self.document.as_ref(), |view, document| {
                         view.child(if document.bom { "UTF-8 BOM" } else { "UTF-8" })
