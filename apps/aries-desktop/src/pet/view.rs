@@ -17,6 +17,7 @@ use crate::workspace::{WorkspaceView, number};
 use crate::{OpenWorkspace, Quit, TogglePet};
 
 const USAGE_DEBOUNCE: Duration = Duration::from_millis(100);
+const SLEEP_AFTER: Duration = Duration::from_secs(60);
 
 #[cfg(target_os = "linux")]
 #[derive(Clone)]
@@ -87,6 +88,7 @@ struct PetView {
     #[cfg(target_os = "linux")]
     x11_drag: Option<X11Drag>,
     timer: Option<Task<()>>,
+    sleep_task: Option<Task<()>>,
     save_task: Option<Task<()>>,
     _subscriptions: Vec<Subscription>,
     window_subscriptions: Vec<Subscription>,
@@ -143,6 +145,7 @@ impl PetView {
             let position = weak.upgrade().and_then(|view| {
                 view.update(cx, |this, _| {
                     this.timer = None;
+                    this.sleep_task = None;
                     this.save_task = None;
                     this.position.clone()
                 })
@@ -185,6 +188,7 @@ impl PetView {
             #[cfg(target_os = "linux")]
             x11_drag: None,
             timer: None,
+            sleep_task: None,
             save_task: None,
             _subscriptions: vec![observation, theme, displays, quit],
             window_subscriptions: Vec::new(),
@@ -250,7 +254,7 @@ impl PetView {
             self.set_clip(clip, true, cx);
             return;
         }
-        if !self.transient {
+        if !self.transient && !self.dragging() && self.clip != Clip::sleep() {
             if !self.sessions.iter().any(|session| Some(session.id()) == self.target) {
                 self.target = self.sessions.first().map(PetSession::id);
             }
@@ -305,8 +309,65 @@ impl PetView {
         self.clip = clip;
         self.frame = 0;
         self.transient = transient;
+        if clip == Clip::idle() {
+            self.schedule_sleep(cx);
+        } else {
+            self.sleep_task = None;
+        }
         self.start_timer(cx);
         cx.notify();
+    }
+
+    fn settled_clip(&self) -> Clip {
+        match self.busy_session() {
+            Some(session) if session.activity() == PetActivity::Waiting => Clip::waiting(),
+            Some(_) => Clip::running(),
+            None => Clip::idle(),
+        }
+    }
+
+    fn settle(&mut self, cx: &mut Context<Self>) {
+        let clip = self.settled_clip();
+        self.set_clip(clip, false, cx);
+    }
+
+    fn end_transient(&mut self, cx: &mut Context<Self>) {
+        self.transient = false;
+        self.frame = 0;
+        self.clip = self.settled_clip();
+        if self.clip == Clip::idle() {
+            self.schedule_sleep(cx);
+        } else {
+            self.sleep_task = None;
+        }
+    }
+
+    fn schedule_sleep(&mut self, cx: &mut Context<Self>) {
+        self.sleep_task = Some(cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(SLEEP_AFTER).await;
+            let _ = this.update(cx, |this, cx| {
+                if this.clip == Clip::idle()
+                    && !this.transient
+                    && !this.dragging()
+                    && this.window.is_some()
+                    && this.visible
+                {
+                    this.set_clip(Clip::sleep(), false, cx);
+                }
+            });
+        }));
+    }
+
+    fn dragging(&self) -> bool {
+        self.press.is_some() && self.dragged
+    }
+
+    fn run(&mut self, delta: Pixels, cx: &mut Context<Self>) {
+        if delta > px(0.) {
+            self.set_clip(Clip::run_right(), false, cx);
+        } else if delta < px(0.) {
+            self.set_clip(Clip::run_left(), false, cx);
+        }
     }
 
     fn delay(&self, cx: &App) -> Duration {
@@ -326,9 +387,7 @@ impl PetView {
                     this.window?;
                     if cx.reduce_motion() {
                         if this.transient {
-                            this.clip = Clip::idle();
-                            this.frame = 0;
-                            this.transient = false;
+                            this.end_transient(cx);
                             cx.notify();
                         }
                     } else {
@@ -336,8 +395,7 @@ impl PetView {
                         if this.frame == this.clip.frame_count() {
                             this.frame = 0;
                             if this.transient {
-                                this.clip = Clip::idle();
-                                this.transient = false;
+                                this.end_transient(cx);
                             }
                         }
                         cx.notify();
@@ -378,6 +436,7 @@ impl PetView {
 
     fn hide(&mut self, cx: &mut Context<Self>) {
         self.timer = None;
+        self.sleep_task = None;
         self.usage_task = None;
         self.visible = false;
         self.press = None;
@@ -476,7 +535,7 @@ impl PetView {
         if let Some(drag) = self.x11_drag.clone() {
             let delta = event.position - drag.press();
             if delta.x != px(0.) || delta.y != px(0.) {
-                self.drag_x11(drag, delta, window);
+                self.drag_x11(drag, delta, window, cx);
             }
             return;
         }
@@ -503,11 +562,18 @@ impl PetView {
         );
         self.position = Some(Position::new(origin, position.display_uuid().to_string()));
         self.dragged = true;
+        self.run(delta.x, cx);
         cx.notify();
     }
 
     #[cfg(target_os = "linux")]
-    fn drag_x11(&mut self, drag: X11Drag, delta: Point<Pixels>, window: &Window) {
+    fn drag_x11(
+        &mut self,
+        drag: X11Drag,
+        delta: Point<Pixels>,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(mover) = &self.mover else {
             return;
         };
@@ -518,6 +584,7 @@ impl PetView {
         }
         self.position = Some(drag.position().moved(delta));
         self.dragged = true;
+        self.run(delta.x, cx);
     }
 
     fn window_moved(&self) -> bool {
@@ -669,6 +736,9 @@ impl Render for PetView {
                 MouseButton::Left,
                 cx.listener(|this, _, window, cx| {
                     let clicked = this.press.take().is_some() && !this.dragged;
+                    if std::mem::take(&mut this.dragged) {
+                        this.settle(cx);
+                    }
                     #[cfg(target_os = "linux")]
                     {
                         this.x11_drag = None;
@@ -702,6 +772,9 @@ impl Render for PetView {
                         clip if clip == Clip::running() => "Aries pet: working",
                         clip if clip == Clip::jumping() => "Aries pet: turn finished",
                         clip if clip == Clip::failed() => "Aries pet: turn failed",
+                        clip if clip == Clip::run_right() => "Aries pet: running right",
+                        clip if clip == Clip::run_left() => "Aries pet: running left",
+                        clip if clip == Clip::sleep() => "Aries pet: sleeping",
                         _ => "Aries pet: open workspace or drag to move",
                     })
                     .on_mouse_down(
@@ -734,6 +807,7 @@ fn show(view: &Entity<PetView>, cx: &mut App) -> Result<(), PetError> {
         this.pending_completion = None;
         this.clip = Clip::idle();
         this.frame = 0;
+        this.schedule_sleep(cx);
         cx.notify();
     });
     let content = view.clone();
