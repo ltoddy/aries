@@ -4,6 +4,7 @@ package aries;
 
 service AriesService {
   rpc QueryTokenUsages(QueryTokenUsagesRequest) returns (QueryTokenUsagesResponse);
+  rpc QueryTodayTokenUsage(QueryTodayTokenUsageRequest) returns (QueryTodayTokenUsageResponse);
 }
 
 message Date {
@@ -22,6 +23,12 @@ message QueryTokenUsagesResponse {
 message DailyUsage {
   Date date = 1;
   TokenUsage token_usage = 2;
+}
+
+message QueryTodayTokenUsageRequest {}
+
+message QueryTodayTokenUsageResponse {
+  TokenUsage token_usage = 1;
 }
 
 message TokenUsage {

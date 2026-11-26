@@ -2,11 +2,15 @@ mod args;
 mod error;
 mod output;
 
+use std::sync::LazyLock;
+
 use aries_communicate::{Notifier, SubagentUpdate};
 use aries_extension::AgentExtensions;
 use aries_extension::agent::AgentDefinition;
 use aries_init::GlobalContext;
+use aries_persistence::SubagentRepository;
 use futures::StreamExt;
+use regex_lite::Regex;
 use rig::agent::{AgentBuilder, MultiTurnStreamItem, PromptResponse};
 use rig::completion::Message;
 use rig::tool::server::ToolServer;
@@ -35,9 +39,11 @@ pub struct AgentTool {
     notifier: Notifier,
     extensions: AgentExtensions,
     db: Db,
-
-    agent_id_re: regex_lite::Regex,
 }
+
+static AGENT_ID_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\A[A-Za-z0-9_-]{21}\z").expect("the hard-coded agent ID regex must be valid")
+});
 
 impl AgentTool {
     pub fn new(
@@ -48,10 +54,7 @@ impl AgentTool {
         extensions: AgentExtensions,
         db: Db,
     ) -> Self {
-        let agent_id_re = regex_lite::Regex::new(r"\A[A-Za-z0-9_-]{21}\z")
-            .expect("the hard-coded agent ID regex must be valid");
-
-        Self { state, gctx, ctx, notifier, extensions, db, agent_id_re }
+        Self { state, gctx, ctx, notifier, extensions, db }
     }
 }
 
@@ -113,7 +116,7 @@ impl Tool for AgentTool {
         args: Self::Args,
     ) -> Result<Self::Output, Self::Error> {
         if let Some(ref agent_id) = args.agent_id
-            && !self.agent_id_re.is_match(agent_id)
+            && !AGENT_ID_REGEX.is_match(agent_id)
         {
             return Err(AgentError::invalid_agent_id(agent_id));
         }
@@ -174,8 +177,20 @@ impl Tool for AgentTool {
 
         let session_id = format!("agent-{}", nanoid::nanoid!());
         let subagent_update =
-            SubagentUpdate::new(&session_id).title(title).description(args.description);
+            SubagentUpdate::new(&session_id).title(&title).description(&args.description);
         self.notifier.send_subagent_update(subagent_update);
+
+        let mut subagent_repo = SubagentRepository::new(self.db.clone());
+        let _ = subagent_repo
+            .save(
+                self.state.session_id(),
+                &agent_id,
+                dir.display().to_string(),
+                &args.name,
+                &args.description,
+                &args.prompt,
+            )
+            .await;
 
         let message_id = format!("agent-message-{}", nanoid::nanoid!());
 

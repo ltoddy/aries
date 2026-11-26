@@ -8,10 +8,17 @@ impl Session {
         tokio::fs::remove_dir_all(&session_dir)
             .await
             .map_err(|err| SessionError::remove_session_dir(&session_dir, err))?;
-        self.session_repo
-            .delete_by_session_id(self.state.session_id())
-            .await
-            .map_err(SessionError::db)?;
+
+        let session_id = self.state.session_id();
+        let mut session_repo = self.session_repo.clone();
+        let mut subagent_repo = self.subagent_repo.clone();
+
+        tokio::try_join!(
+            session_repo.delete_by_session_id(&session_id),
+            subagent_repo.delete_by_session_id(&session_id),
+        )
+        .map_err(SessionError::db)?;
+
         Ok(())
     }
 }

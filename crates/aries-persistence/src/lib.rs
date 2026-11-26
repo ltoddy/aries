@@ -1,4 +1,5 @@
 mod session;
+mod subagent;
 #[cfg(test)]
 mod tests;
 mod token_audit;
@@ -10,6 +11,7 @@ use std::path::Path;
 use jiff::{Span, Timestamp, Zoned};
 
 pub use crate::session::{Session, SessionRepository};
+pub use crate::subagent::{Subagent, SubagentRepository};
 pub use crate::token_audit::{TokenAudit, TokenAuditRepository};
 pub use crate::token_usage::{TokenUsage, TokenUsageRepository};
 pub use crate::tool_call::{ToolCall, ToolCallRepository};
@@ -18,7 +20,7 @@ pub async fn connect(dir: impl AsRef<Path>) -> toasty::Result<toasty::Db> {
     let file_path = dir.as_ref().join("aries.db");
     let driver = toasty_driver_sqlite::Sqlite::open(&file_path);
     let db = toasty::Db::builder()
-        .models(toasty::models!(TokenUsage, Session, ToolCall, TokenAudit))
+        .models(toasty::models!(Subagent, TokenUsage, Session, ToolCall, TokenAudit))
         .build(driver)
         .await?;
 

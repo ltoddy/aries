@@ -27,7 +27,7 @@ use aries_extension::hook::input::{SessionStartHookInput, SessionStartSource};
 use aries_extension::hook::{HookDecision, HooksExecutor};
 use aries_extension::mcp::{self, McpDefinition};
 use aries_init::{GlobalContext, ModelConfig, Setting};
-use aries_persistence::SessionRepository;
+use aries_persistence::{SessionRepository, SubagentRepository};
 use itertools::Itertools;
 use rig::completion::{Effort, Message};
 use rig::message::UserContent;
@@ -68,6 +68,7 @@ struct Session {
     chat_context: ChatContext,
 
     session_repo: SessionRepository,
+    subagent_repo: SubagentRepository,
 
     tool_server_handle: ToolServerHandle,
     receiver: UnboundedReceiver<AgentEvent>,
@@ -161,6 +162,7 @@ impl Session {
 
         let hooks_executor = Arc::new(HooksExecutor::new(extensions.hooks.clone()));
         let session_repo = SessionRepository::new(db.clone());
+        let subagent_repo = SubagentRepository::new(db.clone());
 
         let model = crate::create_model(&config)?;
         let agent = extensions
@@ -210,6 +212,7 @@ impl Session {
             chat_history,
             chat_context,
             session_repo,
+            subagent_repo,
             tool_server_handle,
             notifier,
             receiver,
