@@ -40,11 +40,11 @@ impl GitDiffView {
             && let Ok(endpoint) = endpoint(position.side(), position.line())
             && let Some(source) = model.source_position(endpoint)
         {
-            self.current_hunk = model
-                .source_lines()
+            self.current_block = model
+                .blocks()
                 .iter()
-                .find(|line| line.position() == source)
-                .map(|line| line.hunk_index());
+                .find(|block| block.contains(source))
+                .map(|block| block.index());
         }
         self.location = Some(position);
         cx.notify();
@@ -53,7 +53,11 @@ impl GitDiffView {
     pub fn scope_patch(&self, scope: ToolScope) -> Option<PatchScope> {
         match scope {
             ToolScope::File => Some(PatchScope::file()),
-            ToolScope::Hunk => self.current_hunk.map(PatchScope::hunk),
+            ToolScope::Block => {
+                let model = self.model.as_ref()?;
+                let index = self.current_block?;
+                model.blocks().iter().find(|block| block.index() == index).map(ChangeBlock::scope)
+            },
             ToolScope::Lines => self.selected_scope.clone(),
         }
     }
@@ -66,12 +70,13 @@ impl GitDiffView {
         let Some(range) = &self.selection_snapshot else {
             return menu.item(PopupMenuItem::new("先点击或拖动行号选择变更行").disabled(true));
         };
-        let hunk = self.model.as_ref().and_then(|model| {
+        let block = self.model.as_ref().and_then(|model| {
             let start = model.source_position(endpoint(range.side(), range.start()).ok()?)?;
             let end = model.source_position(endpoint(range.end_side(), range.end()).ok()?)?;
-            let start = model.source_lines().iter().find(|line| line.position() == start)?;
-            let end = model.source_lines().iter().find(|line| line.position() == end)?;
-            (start.hunk_index() == end.hunk_index()).then_some(start.hunk_index())
+            let blocks = model.blocks();
+            let start = blocks.iter().find(|block| block.contains(start))?;
+            let end = blocks.iter().find(|block| block.contains(end))?;
+            (start.index() == end.index()).then_some(start.index())
         });
         let (label, action) = match target.group {
             ChangeGroup::Unstaged => ("暂存", DiffAction::stage()),
@@ -80,15 +85,15 @@ impl GitDiffView {
         let discardable = target.group == ChangeGroup::Unstaged
             && self.model.as_ref().is_some_and(|model| model.is_discardable());
         let mut snapshot = self.tool_snapshot();
-        snapshot.hunk = hunk;
-        snapshot.available[1] = hunk.is_some()
+        snapshot.block = block;
+        snapshot.available[1] = block.is_some()
             && self.model.as_ref().is_some_and(|model| model.partial_error().is_none());
         let busy = self.writes_busy(cx);
         let scopes = [
             (ToolScope::lines(), format!("选中行（{} 个变更行）", self.selected_count)),
             (
-                ToolScope::hunk(),
-                hunk.map_or_else(
+                ToolScope::block(),
+                block.map_or_else(
                     || "选区所在变更块（需选在同一块内）".to_owned(),
                     |index| format!("选区所在变更块（第 {} 块）", index + 1),
                 ),
@@ -192,14 +197,17 @@ impl GitDiffView {
         }
     }
 
-    pub fn choose_hunk(&mut self, index: usize, cx: &mut Context<Self>) {
+    pub fn choose_block(&mut self, index: usize, cx: &mut Context<Self>) {
         let Some(model) = &self.model else {
+            return;
+        };
+        let Some(block) = model.blocks().iter().find(|block| block.index() == index) else {
             return;
         };
         let Some(line) = model
             .source_lines()
             .iter()
-            .find(|line| line.hunk_index() == index && line.is_changed())
+            .find(|line| block.contains(line.position()) && line.is_changed())
         else {
             return;
         };
@@ -212,26 +220,58 @@ impl GitDiffView {
             _ => return,
         };
         let position = DiffLinePosition::new(file.path().clone(), side, number as usize);
-        self.current_hunk = Some(index);
+        self.current_block = Some(index);
         self.location = Some(position.clone());
         self.state.update(cx, |state, cx| state.scroll_to_line(position, cx));
         cx.notify();
     }
 
-    pub fn move_hunk(&mut self, backwards: bool, cx: &mut Context<Self>) {
-        let count = self.model.as_ref().map_or(0, |model| model.hunks().len());
+    pub fn move_block(&mut self, backwards: bool, cx: &mut Context<Self>) {
+        let count = self.model.as_ref().map_or(0, |model| model.blocks().len());
         if count == 0 {
             return;
         }
-        let current = self.current_hunk.unwrap_or(0);
+        let current = self.current_block.unwrap_or(0);
         let next = if backwards { (current + count - 1) % count } else { (current + 1) % count };
-        self.choose_hunk(next, cx);
+        self.choose_block(next, cx);
     }
 
-    pub fn marker_action(&self, position: &DiffLinePosition) -> Option<DiffAction> {
-        let target = self.target.as_ref()?;
-        let model = self.model.as_ref()?;
-        change_action(model, target.group, position).map(|(_, action)| action)
+    pub fn marker_actions(
+        &self,
+        position: &DiffLinePosition,
+    ) -> Vec<(usize, DiffAction, &'static str)> {
+        let Some(target) = self.target.as_ref() else {
+            return Vec::new();
+        };
+        let Some(model) = self.model.as_ref() else {
+            return Vec::new();
+        };
+        let Some((block, action)) = change_action(model, target.group, position) else {
+            return Vec::new();
+        };
+        let index = block.index();
+        let mut actions = vec![(index, action, action_label(action))];
+        if target.group == ChangeGroup::Unstaged
+            && model.is_discardable()
+            && block.is_single_sided()
+        {
+            let discard = DiffAction::discard();
+            actions.push((index, discard, action_label(discard)));
+        }
+        actions
+    }
+
+    pub fn apply_change(
+        &mut self,
+        index: usize,
+        action: DiffAction,
+        position: DiffLinePosition,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.current_block = Some(index);
+        self.location = Some(position);
+        self.request_change(action, ToolScope::block(), window, cx);
     }
 
     pub fn change_at(
@@ -247,11 +287,10 @@ impl GitDiffView {
         let Some(model) = self.model.as_ref() else {
             return;
         };
-        let Some((index, action)) = change_action(model, group, &position) else {
+        let Some((block, action)) = change_action(model, group, &position) else {
             return;
         };
-        self.current_hunk = Some(index);
-        self.location = Some(position);
-        self.request_change(action, ToolScope::hunk(), window, cx);
+        let index = block.index();
+        self.apply_change(index, action, position, window, cx);
     }
 }

@@ -1,3 +1,4 @@
+use crate::workspace::git::diff_operations::DiffAction;
 use crate::workspace::git::diff_view::tools::*;
 
 impl GitDiffView {
@@ -44,14 +45,37 @@ impl GitDiffView {
             .into_any_element()
     }
 
+    pub fn render_discard_action(&self, cx: &mut Context<Self>) -> AnyElement {
+        let Some(target) = &self.target else {
+            return div().into_any_element();
+        };
+        if target.group != ChangeGroup::Unstaged
+            || self.model.as_ref().is_none_or(|model| !model.is_discardable())
+        {
+            return div().into_any_element();
+        }
+        Button::new("diff-discard-file")
+            .small()
+            .compact()
+            .secondary()
+            .icon(IconName::Undo)
+            .label("丢弃整个文件")
+            .tooltip("丢弃整个文件的未暂存变更，可从「恢复丢弃」恢复")
+            .disabled(self.writes_busy(cx) || !self.scope_available(ToolScope::file()))
+            .on_click(cx.listener(|this, _, window, cx| {
+                this.request_change(DiffAction::discard(), ToolScope::file(), window, cx);
+            }))
+            .into_any_element()
+    }
+
     pub fn render_tools(&self, cx: &mut Context<Self>) -> AnyElement {
         let view = cx.weak_entity();
-        let current = self.current_hunk;
-        let count = self.model.as_ref().map_or(0, |model| model.hunks().len());
-        let hunk_view = view.clone();
+        let current = self.current_block;
+        let count = self.model.as_ref().map_or(0, |model| model.blocks().len());
+        let block_view = view.clone();
         let restore_view = view;
-        let hunk_snapshot = self.tool_snapshot();
-        let restore_snapshot = hunk_snapshot.clone();
+        let block_snapshot = self.tool_snapshot();
+        let restore_snapshot = block_snapshot.clone();
         div()
             .flex()
             .items_center()
@@ -68,7 +92,7 @@ impl GitDiffView {
                     .accessibility_label("上一个变更")
                     .disabled(count == 0)
                     .tooltip("上一个变更块")
-                    .on_click(cx.listener(|this, _, _, cx| this.move_hunk(true, cx))),
+                    .on_click(cx.listener(|this, _, _, cx| this.move_block(true, cx))),
             )
             .child(
                 Button::new("next-diff-change")
@@ -79,10 +103,10 @@ impl GitDiffView {
                     .accessibility_label("下一个变更")
                     .disabled(count == 0)
                     .tooltip("下一个变更块")
-                    .on_click(cx.listener(|this, _, _, cx| this.move_hunk(false, cx))),
+                    .on_click(cx.listener(|this, _, _, cx| this.move_block(false, cx))),
             )
             .child(
-                Button::new("diff-hunk-selector")
+                Button::new("diff-block-selector")
                     .small()
                     .ghost()
                     .compact()
@@ -91,34 +115,30 @@ impl GitDiffView {
                     .icon(IconName::ChevronDown)
                     .disabled(count == 0)
                     .dropdown_menu(move |menu, _, cx| {
-                        let Some(view) = hunk_view.upgrade() else {
+                        let Some(view) = block_view.upgrade() else {
                             return menu;
                         };
-                        let restored = hunk_snapshot.is_current(view.read(cx));
+                        let restored = block_snapshot.is_current(view.read(cx));
                         let Some(model) = view.read(cx).model.clone() else {
                             return menu;
                         };
                         let mut menu = menu;
-                        for hunk in model.hunks() {
-                            let index = hunk.index();
-                            let view = hunk_view.clone();
-                            let snapshot = hunk_snapshot.clone();
+                        for block in model.blocks() {
+                            let index = block.index();
+                            let view = block_view.clone();
+                            let snapshot = block_snapshot.clone();
                             menu = menu.item(
                                 PopupMenuItem::new(format!(
-                                    "{} · -{},{} +{},{} {}",
+                                    "块 {} · {} 个变更行",
                                     index + 1,
-                                    hunk.original_start(),
-                                    hunk.original_count(),
-                                    hunk.modified_start(),
-                                    hunk.modified_count(),
-                                    hunk.label()
+                                    block.count()
                                 ))
                                 .checked(current == Some(index))
                                 .disabled(!restored)
                                 .on_click(move |_, _, cx| {
                                     let _ = view.update(cx, |this, cx| {
                                         if this.restore_tool_snapshot(&snapshot, cx) {
-                                            this.choose_hunk(index, cx);
+                                            this.choose_block(index, cx);
                                         }
                                     });
                                 }),

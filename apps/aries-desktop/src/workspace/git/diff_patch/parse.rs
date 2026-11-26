@@ -1,3 +1,4 @@
+use crate::workspace::git::diff_patch::block::build_blocks;
 use crate::workspace::git::diff_patch::error::{PartialPatchError, PatchError, Result};
 use crate::workspace::git::diff_patch::{DiffPatch, PatchHunk, SourceLine};
 
@@ -108,6 +109,7 @@ impl DiffPatch {
         if patch.hunks.is_empty() && patch.partial_error.is_none() {
             patch.partial_error = Some(PartialPatchError::no_text_hunks());
         }
+        patch.blocks = build_blocks(&patch.source_lines);
         Ok(patch)
     }
 

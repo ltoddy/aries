@@ -18,8 +18,6 @@ pub enum PatchError {
     PatchBodyLineIsNotTerminated,
     #[error("hunk counts do not match body")]
     HunkCountMismatch,
-    #[error("hunk no longer exists")]
-    HunkNoLongerExists,
     #[error("empty selection")]
     EmptySelection,
     #[error("selection is outside the patch")]
@@ -113,9 +111,6 @@ impl PatchError {
     }
     pub fn hunk_count_mismatch() -> Self {
         Self::HunkCountMismatch
-    }
-    pub fn hunk_no_longer_exists() -> Self {
-        Self::HunkNoLongerExists
     }
     pub fn empty_selection() -> Self {
         Self::EmptySelection
