@@ -64,6 +64,7 @@ struct PetView {
     target: Option<EntityId>,
     clip: Clip,
     frame: usize,
+    scale: f32,
     transient: bool,
     position: Option<Position>,
     press: Option<Point<Pixels>>,
@@ -111,7 +112,10 @@ impl PetView {
                 None
             },
         };
+        let scale = workspace.read(cx).preferences(cx).pet_scale();
         let observation = cx.observe(workspace, |this, workspace, cx| {
+            let scale = workspace.read(cx).preferences(cx).pet_scale();
+            this.apply_scale(scale, cx);
             this.sync(workspace.read(cx).pet_sessions(cx), cx);
         });
         let weak = cx.weak_entity();
@@ -151,6 +155,7 @@ impl PetView {
             target: None,
             clip: Clip::idle(),
             frame: 0,
+            scale,
             transient: false,
             position,
             press: None,
@@ -297,6 +302,28 @@ impl PetView {
         }));
     }
 
+    fn apply_scale(&mut self, scale: f32, cx: &mut Context<Self>) {
+        if self.scale == scale {
+            return;
+        }
+        self.scale = scale;
+        if self.window.is_none() {
+            cx.notify();
+            return;
+        }
+        let view = cx.weak_entity();
+        cx.defer(move |cx| {
+            let Some(view) = view.upgrade() else {
+                return;
+            };
+            view.update(cx, |this, cx| this.hide(cx));
+            if let Err(error) = show(&view, cx) {
+                view.update(cx, |this, cx| this.hide(cx));
+                PetView::report(error);
+            }
+        });
+    }
+
     fn hide(&mut self, cx: &mut Context<Self>) {
         self.timer = None;
         self.visible = false;
@@ -411,7 +438,7 @@ impl PetView {
         let Some(position) = self.position.clone() else {
             return;
         };
-        let cell = Position::cell();
+        let cell = Position::cell(self.scale);
         let surface = window.bounds().size;
         let max = point(
             (surface.width - cell.width).max(px(0.)),
@@ -460,7 +487,7 @@ impl Render for PetView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let frame = if cx.reduce_motion() { 0 } else { self.frame };
         let sprite = self.sprites.as_ref().map(|sprites| sprites.frame(self.clip, frame));
-        let cell = Position::cell();
+        let cell = Position::cell(self.scale);
         let origin = self.origin(window.bounds().size, cell);
         if self.anchored {
             let region = Bounds::new(origin, cell);
@@ -730,9 +757,13 @@ fn open_popup(
     configuration: &mut Result<(), PetError>,
     cx: &mut App,
 ) -> Result<(AnyWindowHandle, Placement), PetError> {
-    let placement = Position::bounds(saved, cx)?;
+    let scale = content.read(cx).scale;
+    let placement = Position::bounds(saved, scale, cx)?;
     let handle = cx
-        .open_window(window_options(&placement), build_pet_window(content.clone(), configuration))
+        .open_window(
+            window_options(&placement, scale),
+            build_pet_window(content.clone(), configuration),
+        )
         .map(AnyWindowHandle::from)
         .map_err(|error| PetError::window(error.to_string()))?;
     Ok((handle, placement))
@@ -788,12 +819,12 @@ fn base_window_options() -> WindowOptions {
     }
 }
 
-fn window_options(placement: &Placement) -> WindowOptions {
+fn window_options(placement: &Placement, scale: f32) -> WindowOptions {
     WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(placement.bounds())),
         display_id: Some(placement.display_id()),
         kind: WindowKind::PopUp,
-        window_min_size: Some(Position::cell()),
+        window_min_size: Some(Position::cell(scale)),
         ..base_window_options()
     }
 }
@@ -804,7 +835,7 @@ fn restore_display(view: &Entity<PetView>, cx: &mut App) {
     if view.read(cx).window.is_none() || view.read(cx).anchored {
         return;
     }
-    match Position::bounds(view.read(cx).position.as_ref(), cx) {
+    match Position::bounds(view.read(cx).position.as_ref(), view.read(cx).scale, cx) {
         Ok(placement) if Some(placement.position()) != view.read(cx).position.as_ref() => {
             view.update(cx, |this, cx| {
                 this.hide(cx);

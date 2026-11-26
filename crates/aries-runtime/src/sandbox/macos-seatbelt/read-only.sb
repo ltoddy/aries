@@ -11,6 +11,7 @@
   (literal "/")
   (literal "/private/var/select/sh")
   (literal "/private/var/select/developer_dir")
+  (literal "/Library/Preferences/com.apple.dt.Xcode.plist")
   (subpath "/System")
   (subpath "/Applications/Xcode.app")
   (subpath "/usr/bin")

@@ -6,12 +6,19 @@ use thiserror::Error;
 
 use crate::workspace::settings::typography::BASE_FONT_SIZE;
 
+pub const PET_SIZE_DEFAULT: u32 = 100;
+pub const PET_SIZE_MIN: u32 = 50;
+pub const PET_SIZE_MAX: u32 = 150;
+pub const PET_SIZE_STEP: u32 = 10;
+
 #[derive(Debug, Error)]
 pub enum ValidatePreferencesError {
     #[error("字号必须在 12–24 之间，当前值为 {size}")]
     FontSize { size: f32 },
     #[error("字体名称不能为空")]
     FontFamily,
+    #[error("宠物大小必须在 {PET_SIZE_MIN}%–{PET_SIZE_MAX}% 之间，当前值为 {size}%")]
+    PetSize { size: u32 },
 }
 
 impl ValidatePreferencesError {
@@ -21,6 +28,10 @@ impl ValidatePreferencesError {
 
     pub fn font_family() -> Self {
         Self::FontFamily
+    }
+
+    pub fn pet_size(size: u32) -> Self {
+        Self::PetSize { size }
     }
 }
 
@@ -128,6 +139,7 @@ impl SendKey {
 pub struct Preferences {
     appearance: AppearanceSettings,
     send_key: SendKey,
+    pet: PetSettings,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -141,6 +153,18 @@ struct AppearanceSettings {
 impl Default for AppearanceSettings {
     fn default() -> Self {
         Self { theme: Appearance::System, font_family: None, font_size: BASE_FONT_SIZE }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(default)]
+struct PetSettings {
+    size: u32,
+}
+
+impl Default for PetSettings {
+    fn default() -> Self {
+        Self { size: PET_SIZE_DEFAULT }
     }
 }
 
@@ -177,6 +201,18 @@ impl Preferences {
         self.appearance.font_size = size.clamp(12.0, 24.0);
     }
 
+    pub fn pet_size(&self) -> u32 {
+        self.pet.size
+    }
+
+    pub fn set_pet_size(&mut self, size: u32) {
+        self.pet.size = size.clamp(PET_SIZE_MIN, PET_SIZE_MAX);
+    }
+
+    pub fn pet_scale(&self) -> f32 {
+        self.pet.size as f32 / PET_SIZE_DEFAULT as f32
+    }
+
     pub fn path() -> Option<PathBuf> {
         dirs::home_dir().map(|path| path.join(".local/share/aries-desktop/settings.toml"))
     }
@@ -198,6 +234,9 @@ impl Preferences {
         }
         if self.font_family().is_some_and(|family| family.trim().is_empty()) {
             return Err(ValidatePreferencesError::font_family());
+        }
+        if !(PET_SIZE_MIN..=PET_SIZE_MAX).contains(&self.pet_size()) {
+            return Err(ValidatePreferencesError::pet_size(self.pet_size()));
         }
         Ok(())
     }

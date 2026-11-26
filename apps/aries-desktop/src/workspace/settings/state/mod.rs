@@ -12,7 +12,9 @@ use gpui_kit::*;
 
 use crate::error::{details, log, report};
 use crate::workspace::WorkspaceView;
-use crate::workspace::settings::preferences::SavePreferencesError;
+use crate::workspace::settings::preferences::{
+    PET_SIZE_DEFAULT, PET_SIZE_MAX, PET_SIZE_MIN, PET_SIZE_STEP, SavePreferencesError,
+};
 use crate::workspace::settings::typography::{BASE_FONT_SIZE, CODE_FONT_SIZE};
 use crate::workspace::settings::ui::render_shortcuts;
 use crate::workspace::settings::{Appearance, Preferences, SendKey, palette};
@@ -202,6 +204,18 @@ impl SettingsState {
     pub fn set_appearance(&mut self, appearance: Appearance, cx: &mut Context<Self>) {
         self.settings.set_appearance(appearance);
         palette::apply(appearance, cx);
+        self.save_settings(cx);
+    }
+
+    pub fn change_pet_size(&mut self, step: i32, cx: &mut Context<Self>) {
+        let size = if step == 0 {
+            PET_SIZE_DEFAULT
+        } else {
+            let current = self.settings.pet_size() as i64;
+            let delta = step as i64 * PET_SIZE_STEP as i64;
+            (current + delta).clamp(PET_SIZE_MIN as i64, PET_SIZE_MAX as i64) as u32
+        };
+        self.settings.set_pet_size(size);
         self.save_settings(cx);
     }
 
