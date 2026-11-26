@@ -4,8 +4,9 @@ use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::{ActiveTheme, Sizable};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
+use url::Url;
 
-use crate::workspace::files::file_view::document::{read_text_file, save_document};
+use crate::workspace::files::file_view::document::{FileContent, read_file, save_document};
 use crate::workspace::files::file_view::status::{EditorStatus, editor_tab_size, file_language};
 use crate::workspace::files::file_view::{AUTO_SAVE_DELAY, FileLoadState, FileView, OpenFile};
 use crate::workspace::settings::typography;
@@ -60,6 +61,7 @@ impl FileView {
             load_task: None,
             feedback: None,
             document: None,
+            image: None,
             dirty: false,
             saving: false,
             save_error: None,
@@ -186,6 +188,7 @@ impl FileView {
         self.feedback = None;
         self.save_error = None;
         self.document = None;
+        self.image = None;
         self.dirty = false;
         self.target = Some(target);
         self.state = FileLoadState::loading();
@@ -197,7 +200,7 @@ impl FileView {
             editor.close_search(cx);
         });
         self.focus_handle.focus(window, cx);
-        let task = cx.background_spawn(async move { read_text_file(&path) });
+        let task = cx.background_spawn(async move { read_file(&path) });
         self.load_task = Some(cx.spawn_in(window, async move |this, cx| {
             let result = task.await;
             let _ = cx.update(|window, cx| {
@@ -206,7 +209,7 @@ impl FileView {
                         return;
                     }
                     match result {
-                        Ok(document) => {
+                        Ok(FileContent::Text(document)) => {
                             let Some(target) = this.target.as_ref() else {
                                 return;
                             };
@@ -229,7 +232,11 @@ impl FileView {
                             });
                             this.status = EditorStatus::new(this.editor.read(cx));
                             this.document = Some(document);
-                            this.state = FileLoadState::ready();
+                            this.state = FileLoadState::text();
+                        },
+                        Ok(FileContent::Image(document)) => {
+                            this.image = Some(document);
+                            this.state = FileLoadState::image();
                         },
                         Err(error) => this.state = FileLoadState::failed(error),
                     }
@@ -241,7 +248,11 @@ impl FileView {
     }
 
     pub fn is_ready(&self) -> bool {
-        self.state.is_ready()
+        self.state.is_text()
+    }
+
+    pub fn is_image(&self) -> bool {
+        self.state.is_image()
     }
 
     pub fn is_loading(&self) -> bool {
@@ -253,7 +264,7 @@ impl FileView {
     }
 
     pub fn focus(&self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.state.is_ready() {
+        if self.state.is_text() {
             self.editor.update(cx, |editor, cx| editor.focus(window, cx));
         } else {
             self.focus_handle.focus(window, cx);
@@ -269,7 +280,7 @@ impl FileView {
         }
         current.line = target.line();
         if let Some(line) = current.line
-            && self.state.is_ready()
+            && self.state.is_text()
         {
             self.editor.update(cx, |editor, cx| {
                 let row = (line.get() - 1).min(editor.text().lines_len().saturating_sub(1));
@@ -298,7 +309,7 @@ impl FileView {
     }
 
     pub fn search(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.is_open() || !self.state.is_ready() {
+        if !self.is_open() || !self.state.is_text() {
             return;
         }
         self.editor.update(cx, |editor, cx| {
@@ -308,7 +319,7 @@ impl FileView {
     }
 
     pub fn copy_all(&mut self, cx: &mut Context<Self>) {
-        if !self.is_open() || !self.state.is_ready() {
+        if !self.is_open() || !self.state.is_text() {
             return;
         }
         let text = self.editor.read(cx).text().to_string();
@@ -318,7 +329,7 @@ impl FileView {
     }
 
     pub fn navigate_match(&mut self, previous: bool, cx: &mut Context<Self>) {
-        if !self.state.is_ready() || !self.editor.read(cx).search_session().is_active() {
+        if !self.state.is_text() || !self.editor.read(cx).search_session().is_active() {
             return;
         }
         self.editor.update(cx, |editor, cx| {
@@ -337,6 +348,18 @@ impl FileView {
                 editor.focus(window, cx);
             });
         }
+    }
+
+    pub fn open_externally(&mut self, cx: &mut Context<Self>) {
+        let Some(target) = self.target.as_ref() else {
+            return;
+        };
+        let Ok(url) = Url::from_file_path(target.path()) else {
+            self.feedback = Some("无法生成文件链接，未打开外部应用".into());
+            cx.notify();
+            return;
+        };
+        cx.open_url(url.as_str());
     }
 
     pub fn render_toolbar(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -372,7 +395,7 @@ impl FileView {
 
     pub fn render_content(&self, cx: &mut Context<Self>) -> AnyElement {
         match &self.state {
-            FileLoadState::Ready => Editor::new(&self.editor)
+            FileLoadState::Text => Editor::new(&self.editor)
                 .appearance(false)
                 .bordered(false)
                 .font_family(cx.theme().mono_font_family.clone())
@@ -381,6 +404,32 @@ impl FileView {
                 .h_full()
                 .w_full()
                 .into_any_element(),
+            FileLoadState::Image => {
+                let Some(image) = self.image.as_ref() else {
+                    return Empty.into_any_element();
+                };
+                let danger = cx.theme().danger;
+                div()
+                    .size_full()
+                    .min_h_0()
+                    .p_4()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(
+                        img(image.image.clone())
+                            .max_w_full()
+                            .max_h_full()
+                            .object_fit(ObjectFit::Contain)
+                            .with_fallback(move || {
+                                div()
+                                    .text_color(danger)
+                                    .child("无法解码这张图片")
+                                    .into_any_element()
+                            }),
+                    )
+                    .into_any_element()
+            },
             FileLoadState::Loading => div()
                 .flex()
                 .items_center()
@@ -390,19 +439,33 @@ impl FileView {
                 .child(Spinner::new().small())
                 .child("正在读取文件…")
                 .into_any_element(),
-            FileLoadState::Failed(error) => div()
-                .flex()
-                .flex_col()
-                .gap_2()
-                .p_3()
-                .child(div().text_color(cx.theme().danger).child(error.to_string()))
-                .child(
-                    Button::new("file-view-retry")
-                        .small()
-                        .label("重新读取")
-                        .on_click(cx.listener(|this, _, window, cx| this.reload(window, cx))),
-                )
-                .into_any_element(),
+            FileLoadState::Failed(error) => {
+                let mut actions = div().flex().gap_2();
+                if error.can_open_externally() {
+                    actions = actions.child(
+                        Button::new("file-view-open-external")
+                            .small()
+                            .label("用默认应用打开")
+                            .on_click(cx.listener(|this, _, _, cx| this.open_externally(cx))),
+                    );
+                }
+                if error.is_retryable() {
+                    actions = actions.child(
+                        Button::new("file-view-retry")
+                            .small()
+                            .label("重新读取")
+                            .on_click(cx.listener(|this, _, window, cx| this.reload(window, cx))),
+                    );
+                }
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .p_3()
+                    .child(div().text_color(cx.theme().danger).child(error.to_string()))
+                    .child(actions)
+                    .into_any_element()
+            },
             FileLoadState::Idle => div()
                 .p_3()
                 .text_color(cx.theme().muted_foreground)

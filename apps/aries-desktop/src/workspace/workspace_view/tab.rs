@@ -100,10 +100,18 @@ impl FileTab {
             .unwrap_or_else(|| title.clone());
         let loading = view.is_loading();
         let failed = view.has_error() || view.save_error().is_some();
+        let image = view.is_image();
         let indicator = if loading {
             Spinner::new().xsmall().into_any_element()
         } else {
-            Icon::new(if failed { IconName::Info } else { IconName::FileCode })
+            let icon = if failed {
+                IconName::Info
+            } else if image {
+                IconName::Image
+            } else {
+                IconName::FileCode
+            };
+            Icon::new(icon)
                 .size_3()
                 .text_color(if failed { cx.theme().danger } else { p.muted() })
                 .into_any_element()
@@ -114,6 +122,8 @@ impl FileTab {
             "自动保存失败"
         } else if failed {
             "读取失败"
+        } else if image {
+            "图片"
         } else {
             "文件"
         };

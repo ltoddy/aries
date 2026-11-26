@@ -42,7 +42,15 @@ gpui-kit = { version = "0.11", features = [
     "tree-sitter-yaml",
 ] }
 ignore.workspace = true
-image = { version = "0.25", default-features = false, features = ["webp"] }
+image = { version = "0.25", default-features = false, features = [
+    "bmp",
+    "gif",
+    "ico",
+    "jpeg",
+    "png",
+    "tiff",
+    "webp",
+] }
 jiff.workspace = true
 libc = "0.2"
 notify = "8.2"
