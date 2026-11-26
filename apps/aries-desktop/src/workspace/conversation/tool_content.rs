@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::num::NonZeroUsize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use agent_client_protocol::v1::schema::{SessionUpdate, ToolCallContent, ToolCallLocation};
 use gpui_kit::assets::IconName;
@@ -15,7 +15,9 @@ use crate::workspace::SessionView;
 use crate::workspace::conversation::attachment::{Attachment, resource_uri};
 use crate::workspace::conversation::model::Conversation;
 use crate::workspace::conversation::model::tool_call::ToolCallState;
-use crate::workspace::conversation::text::{file_button, link_handler, single_line};
+use crate::workspace::conversation::text::{
+    DisclosureChevron, file_button, link_handler, single_line,
+};
 use crate::workspace::files::OpenFile;
 use crate::workspace::settings::palette::Palette;
 use crate::workspace::settings::typography;
@@ -114,8 +116,11 @@ impl DiffContent {
 #[derive(IntoElement)]
 struct ToolDiff {
     id: SharedString,
+    index: usize,
+    content_index: usize,
     content: DiffContent,
     path: PathBuf,
+    expanded: bool,
     session: WeakEntity<SessionView>,
     line: Option<NonZeroUsize>,
 }
@@ -123,11 +128,14 @@ struct ToolDiff {
 impl ToolDiff {
     fn new(
         id: SharedString,
+        index: usize,
+        content_index: usize,
         content: DiffContent,
         path: PathBuf,
+        expanded: bool,
         session: WeakEntity<SessionView>,
     ) -> Self {
-        Self { id, content, path, session, line: None }
+        Self { id, index, content_index, content, path, expanded, session, line: None }
     }
 
     fn with_line(mut self, line: Option<NonZeroUsize>) -> Self {
@@ -138,7 +146,7 @@ impl ToolDiff {
 
 impl RenderOnce for ToolDiff {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        let Self { id, content, path, session, line } = self;
+        let Self { id, index, content_index, content, path, expanded, session, line } = self;
         let target = session.upgrade().and_then(|session| {
             (!path.as_os_str().is_empty()).then(|| {
                 OpenFile::new(session.read(cx).execution().directory().to_owned(), path.clone())
@@ -156,51 +164,73 @@ impl RenderOnce for ToolDiff {
                 session.clone(),
             )
         });
-        let body = match content {
-            DiffContent::Markdown(markdown) => TextView::markdown(id, markdown)
-                .w_full()
-                .min_w_0()
-                .map(typography::style_markdown)
-                .selectable(true)
-                .scrollable(false)
-                .on_link_click(link_handler(session))
-                .code_block_actions(|code_block, _window, cx| {
-                    let code = code_block.code().to_string();
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_1()
-                        .when_some(code_block.lang(), |el, lang| {
-                            el.child(
-                                div()
-                                    .text_xs()
-                                    .text_color(cx.theme().muted_foreground)
-                                    .child(lang.to_string()),
-                            )
-                        })
-                        .child({
-                            Button::new("copy-code-block")
-                                .ghost()
-                                .xsmall()
-                                .on_click(move |_, _, cx| {
-                                    cx.write_to_clipboard(ClipboardItem::new_string(code.clone()));
-                                })
-                                .child(
-                                    Icon::new(IconName::Copy)
-                                        .xsmall()
-                                        .text_color(cx.theme().muted_foreground),
-                                )
-                        })
-                        .into_any_element()
+        let (markdown, label) = match content {
+            DiffContent::Markdown(markdown) => (Some(markdown), None),
+            DiffContent::Path(path) => (None, Some(path)),
+        };
+        let toggle = markdown.as_ref().map(|_| {
+            let view = session.clone();
+            Button::new(SharedString::from(format!("{id}:toggle")))
+                .ghost()
+                .xsmall()
+                .compact()
+                .accessibility_label(if expanded { "收起改动" } else { "展开改动" })
+                .on_click(move |_, _, cx| {
+                    let _ = view.update(cx, |session, cx| {
+                        session.with_timeline(|timeline, _, _| {
+                            timeline.toggle_diff(index, content_index);
+                        });
+                        cx.notify();
+                    });
                 })
-                .into_any_element(),
-            DiffContent::Path(path) => {
-                if button.is_some() {
-                    div().into_any_element()
-                } else {
-                    div().w_full().child(SelectableText::new(id, path)).into_any_element()
-                }
-            },
+                .child(DisclosureChevron::new(id.clone(), expanded))
+        });
+        let body = match (markdown, expanded) {
+            (Some(markdown), true) => Some(
+                TextView::markdown(id, markdown)
+                    .w_full()
+                    .min_w_0()
+                    .map(typography::style_markdown)
+                    .selectable(true)
+                    .scrollable(false)
+                    .on_link_click(link_handler(session))
+                    .code_block_actions(|code_block, _window, cx| {
+                        let code = code_block.code().to_string();
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_1()
+                            .when_some(code_block.lang(), |el, lang| {
+                                el.child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(cx.theme().muted_foreground)
+                                        .child(lang.to_string()),
+                                )
+                            })
+                            .child({
+                                Button::new("copy-code-block")
+                                    .ghost()
+                                    .xsmall()
+                                    .on_click(move |_, _, cx| {
+                                        cx.write_to_clipboard(ClipboardItem::new_string(
+                                            code.clone(),
+                                        ));
+                                    })
+                                    .child(
+                                        Icon::new(IconName::Copy)
+                                            .xsmall()
+                                            .text_color(cx.theme().muted_foreground),
+                                    )
+                            })
+                            .into_any_element()
+                    })
+                    .into_any_element(),
+            ),
+            (None, _) => label
+                .filter(|_| button.is_none())
+                .map(|path| SelectableText::new(id, path).into_any_element()),
+            _ => None,
         };
         div()
             .w_full()
@@ -209,8 +239,17 @@ impl RenderOnce for ToolDiff {
             .flex_col()
             .items_start()
             .gap_1()
-            .children(button)
-            .child(body)
+            .child(
+                div()
+                    .w_full()
+                    .min_w_0()
+                    .flex()
+                    .items_center()
+                    .gap_1()
+                    .children(toggle)
+                    .children(button),
+            )
+            .children(body)
     }
 }
 
@@ -276,7 +315,17 @@ impl ToolDiffs {
         tool: &ToolCallState,
         p: Palette,
         session: WeakEntity<SessionView>,
+        expanded: &HashSet<(usize, usize)>,
     ) -> AnyElement {
+        let diff_paths: HashSet<&Path> = tool
+            .call()
+            .content
+            .iter()
+            .filter_map(|content| match content {
+                ToolCallContent::Diff(diff) => Some(diff.path.as_path()),
+                _ => None,
+            })
+            .collect();
         let entries = tool
             .call()
             .content
@@ -304,6 +353,8 @@ impl ToolDiffs {
                 Some(
                     ToolDiff::new(
                         SharedString::from(format!("tool-content:{index}:{content_index}")),
+                        index,
+                        content_index,
                         self.patches
                             .get(&(index, content_index))
                             .cloned()
@@ -312,6 +363,7 @@ impl ToolDiffs {
                                 DiffContent::path(diff.path.to_string_lossy().into_owned())
                             }),
                         diff.path.clone(),
+                        expanded.contains(&(index, content_index)),
                         session.clone(),
                     )
                     .with_line(line)
@@ -319,7 +371,13 @@ impl ToolDiffs {
                 )
             })
             .collect();
-        ToolContent::new(index, entries, tool.call().locations.clone(), session, p)
-            .into_any_element()
+        let locations = tool
+            .call()
+            .locations
+            .iter()
+            .filter(|location| !diff_paths.contains(location.path.as_path()))
+            .cloned()
+            .collect();
+        ToolContent::new(index, entries, locations, session, p).into_any_element()
     }
 }

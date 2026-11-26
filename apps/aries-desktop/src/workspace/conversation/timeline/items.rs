@@ -91,7 +91,7 @@ impl Timeline {
                 p,
                 cx.entity_id(),
                 session_id,
-                self.tool_diffs.render(index, tool, p, cx.weak_entity()),
+                self.tool_diffs.render(index, tool, p, cx.weak_entity(), &self.expanded_diffs),
                 cx.listener(move |this, _: &ClickEvent, window, cx| {
                     this.open_tool_details(index, window, cx);
                 }),

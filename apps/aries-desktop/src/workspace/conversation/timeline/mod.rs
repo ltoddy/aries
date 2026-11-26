@@ -45,6 +45,7 @@ pub struct Timeline {
     markdown: HashMap<usize, Entity<TextViewState>>,
     expanded_thoughts: HashSet<usize>,
     collapsed_streaming_thoughts: HashSet<usize>,
+    expanded_diffs: HashSet<(usize, usize)>,
     expanded_subagents: HashSet<SessionId>,
     idle_subagents: HashSet<SessionId>,
     images: MessageImages,
@@ -64,6 +65,7 @@ impl Timeline {
             markdown: HashMap::new(),
             expanded_thoughts: HashSet::new(),
             collapsed_streaming_thoughts: HashSet::new(),
+            expanded_diffs: HashSet::new(),
             expanded_subagents: HashSet::new(),
             idle_subagents: HashSet::new(),
             images: MessageImages::new(),
@@ -77,6 +79,7 @@ impl Timeline {
         self.markdown.clear();
         self.expanded_thoughts.clear();
         self.collapsed_streaming_thoughts.clear();
+        self.expanded_diffs.clear();
         self.expanded_subagents.clear();
         self.idle_subagents.clear();
         self.tool_diffs.clear();
@@ -104,6 +107,11 @@ impl Timeline {
         };
         if !toggled.remove(&index) {
             toggled.insert(index);
+        }
+    }
+    pub fn toggle_diff(&mut self, index: usize, content_index: usize) {
+        if !self.expanded_diffs.remove(&(index, content_index)) {
+            self.expanded_diffs.insert((index, content_index));
         }
     }
     pub fn sync_subagent(&mut self, subagent: &SubagentState) {

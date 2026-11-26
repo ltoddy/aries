@@ -1,7 +1,5 @@
-use std::f32::consts::FRAC_PI_2;
-
 use gpui_kit::assets::IconName;
-use gpui_kit::base::motion::{self, Presence, Transition};
+use gpui_kit::base::motion::{Presence, Transition};
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::text::{TextView, TextViewState};
 use gpui_kit::component::{ActiveTheme, Icon, Sizable};
@@ -11,7 +9,7 @@ use gpui_kit::*;
 use crate::workspace::SessionView;
 use crate::workspace::conversation::ClickHandler;
 use crate::workspace::conversation::model::Message;
-use crate::workspace::conversation::text::link_handler;
+use crate::workspace::conversation::text::{DisclosureChevron, link_handler};
 use crate::workspace::settings::palette::Palette;
 use crate::workspace::settings::typography;
 
@@ -119,7 +117,7 @@ impl RenderOnce for ThoughtMessage {
                             .gap_2()
                             .text_xs()
                             .text_left()
-                            .child(ThoughtChevron::new(id.clone(), expanded))
+                            .child(DisclosureChevron::new(id.clone(), expanded))
                             .child(Icon::new(IconName::Brain).size(rems(0.875)).flex_shrink_0())
                             .child(title),
                     )
@@ -177,35 +175,6 @@ impl RenderOnce for ThoughtMessage {
                 ))
             })
             .into_any_element()
-    }
-}
-
-#[derive(IntoElement)]
-struct ThoughtChevron {
-    id: ElementId,
-    expanded: bool,
-}
-
-impl ThoughtChevron {
-    fn new(id: ElementId, expanded: bool) -> Self {
-        Self { id, expanded }
-    }
-}
-
-impl RenderOnce for ThoughtChevron {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let motion = cx.theme().motion_tokens();
-        let rotation = motion::transition(
-            (self.id, "chevron"),
-            if self.expanded { FRAC_PI_2 } else { 0. },
-            Transition::new(motion.duration_fast).easing(motion.easing_move.clone()),
-            window,
-            cx,
-        );
-        Icon::new(IconName::ChevronRight)
-            .rotate(radians(rotation))
-            .size(rems(0.875))
-            .flex_shrink_0()
     }
 }
 
