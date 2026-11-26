@@ -2,6 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use gpui_kit::component::ActiveTheme;
 use gpui_kit::{App, Bounds, DisplayId, Pixels, Point, Size, Window, point, px, size};
 use serde::{Deserialize, Serialize};
 
@@ -14,10 +15,11 @@ const WINDOW_PADDING_WIDTH: f32 = WINDOW_WIDTH - CELL_WIDTH as f32;
 const WINDOW_PADDING_HEIGHT: f32 = WINDOW_HEIGHT - CELL_HEIGHT as f32;
 static SAVE_NONCE: AtomicU64 = AtomicU64::new(0);
 
-pub fn window_size(scale: f32) -> Size<Pixels> {
+pub fn window_size(scale: f32, cx: &App) -> Size<Pixels> {
+    let font_size = cx.theme().font_size;
     size(
-        px(CELL_WIDTH as f32 * scale + WINDOW_PADDING_WIDTH),
-        px(CELL_HEIGHT as f32 * scale + WINDOW_PADDING_HEIGHT),
+        px(CELL_WIDTH as f32 * scale + WINDOW_PADDING_WIDTH).max(font_size * 14.),
+        px(CELL_HEIGHT as f32 * scale) + px(WINDOW_PADDING_HEIGHT).max(font_size * 5.5),
     )
 }
 
@@ -77,7 +79,7 @@ impl Position {
 
     pub fn bounds(position: Option<&Self>, scale: f32, cx: &App) -> Result<Placement, PetError> {
         let desktop = Self::desktop(position, cx)?;
-        let window = window_size(scale);
+        let window = window_size(scale, cx);
         let visible = desktop.visible();
         if visible.size.width < window.width || visible.size.height < window.height {
             return Err(PetError::unsupported("显示器无法容纳宠物窗口".into()));

@@ -45,7 +45,12 @@ impl WorkspaceView {
                 } else {
                     PetActivity::idle()
                 };
-                PetSession::new(view.entity_id(), activity, execution.pet_completion())
+                PetSession::new(
+                    view.entity_id(),
+                    activity,
+                    execution.pet_completion(),
+                    execution.pet_usage(),
+                )
             })
             .collect()
     }
