@@ -145,23 +145,6 @@ impl Render for WorkspaceView {
                         .child(div().w_3().h_full().flex_shrink_0()),
                 ),
             )
-            .children(crate::pet::last_error(cx).map(|error| {
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .px_3()
-                    .py_1()
-                    .text_color(cx.theme().danger)
-                    .child(div().flex_1().min_w_0().truncate().child(format!("桌面宠物：{error}")))
-                    .child(
-                        Button::new("retry-pet")
-                            .ghost()
-                            .small()
-                            .label("重试")
-                            .on_click(|_, _, cx| crate::pet::toggle(cx)),
-                    )
-            }))
             .child(div().flex().items_stretch().flex_1().min_h_0().child(if sidebar_visible {
                 h_resizable("layout")
                     .with_state(&self.layout)

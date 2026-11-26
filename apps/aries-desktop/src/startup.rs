@@ -72,13 +72,7 @@ fn launch(cx: &mut App, cwd: PathBuf, ipc: Ipc) {
     configure_window(handle, &workspace, cx);
     cx.on_action(|_: &TogglePet, cx| pet::toggle(cx));
     cx.on_action(|_: &OpenWorkspace, cx| pet::open_workspace(cx));
-    if let Err(error) = pet::init(&workspace, handle, cx)
-        && let Err(window_error) = handle.update(cx, |_, window, cx| {
-            error::report("无法显示桌面宠物", &error, window, cx);
-        })
-    {
-        error::log("无法显示宠物错误", window_error.as_ref());
-    }
+    pet::init(&workspace, handle, cx);
     cx.activate(true);
 }
 
@@ -134,7 +128,7 @@ fn install_quit(handle: AnyWindowHandle, workspace: &Entity<WorkspaceView>, cx: 
             };
             if let Err(error) = handle.update(cx, |_, window, cx| {
                 if let Err(error) = pet::show_main(window) {
-                    error::report("无法恢复主窗口", &error, window, cx);
+                    tracing::debug!(%error, "无法恢复主窗口");
                     return;
                 }
                 workspace.update(cx, |workspace, cx| workspace.request_quit(window, cx));
@@ -153,7 +147,7 @@ fn configure_window(handle: AnyWindowHandle, workspace: &Entity<WorkspaceView>, 
             window.defer(cx, move |window, cx| {
                 if pet::is_available(cx) {
                     if let Err(error) = pet::hide_main(window) {
-                        error::report("无法隐藏主窗口", &error, window, cx);
+                        tracing::debug!(%error, "无法隐藏主窗口");
                     }
                 } else {
                     let _ =
