@@ -1,4 +1,3 @@
-use aries_init::ModelConfig;
 use rig::catalog::Catalog;
 use rig::providers::registry::{Format, ProviderId};
 
@@ -11,11 +10,13 @@ const KIB: u64 = 1024;
 const DEFAULT_CONTEXT_WINDOW: u64 = 500 * KIB;
 
 impl ContextWindow {
-    pub fn new(config: &ModelConfig) -> Self {
-        let mut context_window = DEFAULT_CONTEXT_WINDOW;
+    pub fn new(vendor: impl AsRef<str>, model: impl AsRef<str>) -> Self {
+        let vendor = vendor.as_ref();
+        let model = model.as_ref();
 
-        if let Some(provider_id) = ProviderId::new(config.provider().as_str(), Format::OpenAi)
-            && let Some(resolved) = Catalog::builtin().get(provider_id, config.model())
+        let mut context_window = DEFAULT_CONTEXT_WINDOW;
+        if let Some(provider_id) = ProviderId::new(vendor, Format::OpenAi)
+            && let Some(resolved) = Catalog::builtin().get(provider_id, model)
             && let Some(context_windows) = resolved.spec.context_window
         {
             context_window = context_windows as u64;

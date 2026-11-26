@@ -9,7 +9,6 @@ use aries_extension::hook::input::{
     SubagentStopHookInput,
 };
 use aries_extension::hook::{HookDecision, HooksExecutor};
-use aries_init::ModelConfig;
 use rig::agent::{
     AgentHook, CompletionCall, CompletionCallAction, CompletionCallEvent, DispatchAction,
     DispatchEvent, HookContext, ModelTurnAction, ModelTurnFinished, MultiTurnStreamItem,
@@ -23,6 +22,7 @@ use tokio::sync::Mutex;
 use tracing::warn;
 
 use crate::context::compaction::{ContextWindow, TokenEstimator, micro_compact};
+use crate::state::State;
 use crate::tools::agent::AgentArgs;
 
 const MICRO_COMPACT_KEEP_MESSAGES_AT_80_PERCENT: usize = 10;
@@ -45,7 +45,7 @@ pub struct SessionPromptHook {
 
 impl SessionPromptHook {
     pub fn new(
-        config: &ModelConfig,
+        state: State,
         executor: Arc<HooksExecutor>,
         session_id: impl Into<String>,
         cwd: impl Into<PathBuf>,
@@ -58,7 +58,10 @@ impl SessionPromptHook {
         let transcript_dir = transcript_dir.into();
         let agent_id = agent_id.into();
 
-        let window = ContextWindow::new(config);
+        let model = state.model();
+        let vendor = model.wire.provider().dialect.name;
+        let model = model.name();
+        let window = ContextWindow::new(vendor, model);
 
         Self {
             executor,

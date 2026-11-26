@@ -1,7 +1,7 @@
-use aries_init::ModelConfig;
 use rig::agent::{AgentHook, CompletionCallAction, CompletionCallEvent, HookContext, RequestPatch};
 
 use crate::context::compaction::{ContextWindow, TokenEstimator, micro_compact};
+use crate::state::State;
 
 const MICRO_COMPACT_KEEP_MESSAGES_AT_80_PERCENT: usize = 10;
 const MICRO_COMPACT_KEEP_MESSAGES_AT_75_PERCENT: usize = 15;
@@ -15,8 +15,12 @@ pub struct ContextCompactionHook {
 }
 
 impl ContextCompactionHook {
-    pub fn new(config: &ModelConfig) -> Self {
-        Self { window: ContextWindow::new(config) }
+    pub fn new(state: State) -> Self {
+        let model = state.model();
+        let vendor = model.wire.provider().dialect.name;
+        let model = model.name();
+
+        Self { window: ContextWindow::new(vendor, model) }
     }
 }
 

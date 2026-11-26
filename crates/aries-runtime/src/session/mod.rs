@@ -162,16 +162,6 @@ impl Session {
         let hooks_executor = Arc::new(HooksExecutor::new(extensions.hooks.clone()));
         let session_repo = SessionRepository::new(db.clone());
 
-        let hook = SessionPromptHook::new(
-            &config,
-            hooks_executor.clone(),
-            &id,
-            &cwd,
-            &transcript_dir,
-            DEFAULT_AGENT_NAME,
-            Notifier::clone(&notifier),
-        );
-
         let model = crate::create_model(&config)?;
         let agent = extensions
             .agents
@@ -180,7 +170,16 @@ impl Session {
             .cloned()
             .ok_or_else(|| SessionError::agent_not_found(DEFAULT_AGENT_NAME))?;
 
-        let state = State::new(model, agent, cwd, session_dir, &id, transcript_dir);
+        let state = State::new(model, agent, &cwd, session_dir, &id, &transcript_dir);
+        let hook = SessionPromptHook::new(
+            state.clone(),
+            hooks_executor.clone(),
+            &id,
+            &cwd,
+            &transcript_dir,
+            DEFAULT_AGENT_NAME,
+            Notifier::clone(&notifier),
+        );
         let agent = crate::agent::Builder::new(
             state.clone(),
             extensions.clone(),
@@ -192,13 +191,8 @@ impl Session {
         .build(chat_history.clone(), chat_context.clone(), hook.clone())
         .await;
 
-        let compactor = ContextCompactor::new(
-            &config,
-            state.clone(),
-            chat_context.clone(),
-            hooks_executor.clone(),
-            Notifier::clone(&notifier),
-        );
+        let compactor =
+            ContextCompactor::new(state.clone(), chat_context.clone(), Notifier::clone(&notifier));
 
         let model = state.model();
         let input = SessionStartHookInput::new(&id, state.cwd(), source, model.name());
