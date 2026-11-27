@@ -28,11 +28,13 @@ impl WorkspaceView {
             .iter()
             .filter_map(WorkspaceTab::session)
             .chain(self.archived_tabs.iter().map(Tab::view))
+            .chain(self.background_tabs.iter().map(Tab::view))
     }
 
     pub fn pet_sessions(&self, cx: &App) -> Vec<PetSession> {
         std::iter::once(&self.sidebar)
             .chain(self.tabs.iter().filter_map(WorkspaceTab::session))
+            .chain(self.background_tabs.iter().map(Tab::view))
             .map(|view| {
                 let execution = view.read(cx).execution();
                 let conversation = execution.conversation();
@@ -68,6 +70,12 @@ impl WorkspaceView {
             .position(|tab| tab.session().is_some_and(|view| view.entity_id() == id))
         {
             self.select_tab(index, window, cx);
+            return;
+        }
+        if let Some(index) =
+            self.background_tabs.iter().position(|tab| tab.view().entity_id() == id)
+        {
+            self.restore_background_tab(index, window, cx);
         }
     }
 
@@ -133,6 +141,15 @@ impl WorkspaceView {
         self.file_navigation_revision = self.file_navigation_revision.wrapping_add(1);
         let session_id = session.session_id.clone();
         if let Some(index) = self
+            .background_tabs
+            .iter()
+            .position(|tab| tab.view().read(cx).matches_session(&session_id))
+        {
+            self.restore_background_tab(index, window, cx);
+            self.set_sidebar_session(session_id, cx);
+            return;
+        }
+        if let Some(index) = self
             .archived_tabs
             .iter()
             .position(|tab| tab.view().read(cx).matches_session(&session_id))
@@ -170,6 +187,20 @@ impl WorkspaceView {
         self.set_sidebar_session(session_id, cx);
         self.focus_active_tab(window, cx);
         cx.notify();
+    }
+
+    pub fn restore_background_tab(
+        &mut self,
+        index: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if index >= self.background_tabs.len() {
+            return;
+        }
+        let tab = self.background_tabs.remove(index);
+        self.tabs.push(WorkspaceTab::resumed_session(tab));
+        self.select_tab(self.tabs.len() - 1, window, cx);
     }
 
     pub fn find_session_tab(&self, id: &SessionId, cx: &App) -> Option<usize> {
@@ -262,6 +293,8 @@ impl WorkspaceView {
     }
     pub fn close_deleted_sessions(&mut self, deleted: &HashSet<SessionId>, cx: &mut Context<Self>) {
         self.archived_tabs
+            .retain(|tab| !deleted.iter().any(|id| tab.view().read(cx).matches_session(id)));
+        self.background_tabs
             .retain(|tab| !deleted.iter().any(|id| tab.view().read(cx).matches_session(id)));
         let ids: Vec<_> = self
             .tabs

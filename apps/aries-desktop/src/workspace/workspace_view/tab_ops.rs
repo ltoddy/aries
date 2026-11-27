@@ -62,10 +62,20 @@ impl WorkspaceView {
         }
         let active_id = self.active_id();
         let session = tab.session().map(|view| view.entity_id());
-        self.tabs.remove(index);
-        if let Some(session) = session {
-            self.tabs
-                .retain(|tab| tab.diff_session().is_none_or(|view| view.entity_id() != session));
+        let tab = self.tabs.remove(index);
+        let background = match tab {
+            WorkspaceTab::Session(tab) if !tab.view().read(cx).is_session_idle() => Some(tab),
+            _ => None,
+        };
+        match background {
+            Some(tab) => self.background_tabs.push(tab),
+            None => {
+                if let Some(session) = session {
+                    self.tabs.retain(|tab| {
+                        tab.diff_session().is_none_or(|view| view.entity_id() != session)
+                    });
+                }
+            },
         }
         self.active = active_id
             .and_then(|id| self.tab_index(id))
