@@ -48,10 +48,9 @@ impl RenderOnce for ToolContent {
         let Self { index, entries, locations, session, palette: p } = self;
         let directory =
             session.upgrade().map(|session| session.read(cx).execution().directory().to_owned());
-        let mut seen = HashSet::new();
         let mut file_buttons = Vec::new();
         if let Some(directory) = directory.as_ref() {
-            for location in &locations {
+            for (i, location) in locations.iter().enumerate() {
                 if location.path.as_os_str().is_empty() {
                     continue;
                 }
@@ -59,9 +58,6 @@ impl RenderOnce for ToolContent {
                     .line
                     .and_then(|line| usize::try_from(line).ok())
                     .and_then(NonZeroUsize::new);
-                if !seen.insert((location.path.as_path(), line)) {
-                    continue;
-                }
                 let target = OpenFile::new(directory.clone(), location.path.clone());
                 let target = match line {
                     Some(line) => target.with_line(line),
@@ -73,10 +69,7 @@ impl RenderOnce for ToolContent {
                     None => path,
                 };
                 file_buttons.push(file_button(
-                    SharedString::from(format!(
-                        "tool-location:{index}:{:?}:{line:?}",
-                        location.path
-                    )),
+                    SharedString::from(format!("tool-location:{index}:{i}")),
                     label,
                     target,
                     session.clone(),
