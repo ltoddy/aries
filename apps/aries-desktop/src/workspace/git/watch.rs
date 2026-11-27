@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use async_channel::Sender;
 use git2::{ErrorCode, Repository, Status};
@@ -8,6 +9,8 @@ use notify::event::{CreateKind, RemoveKind};
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
 use crate::workspace::git::error::WatchError;
+
+pub const WATCH_DELAY: Duration = Duration::from_millis(500);
 
 pub struct GitWatch {
     watcher: Option<RecommendedWatcher>,
@@ -26,15 +29,6 @@ impl GitWatch {
         Self::start_filtered(paths, sender, executor, move |event| {
             should_refresh(event, repository_path.as_deref())
         })
-    }
-
-    pub fn start_tree(
-        cwd: &Path,
-        sender: Sender<()>,
-        executor: BackgroundExecutor,
-    ) -> Result<Self, WatchError> {
-        let (paths, _) = watch_paths(cwd)?;
-        Self::start_filtered(paths, sender, executor, |_| true)
     }
 
     pub fn start_file(

@@ -1,12 +1,8 @@
-use std::time::Duration;
-
 use gpui_kit::{AppContext, Context};
 
 use crate::error;
 use crate::workspace::files::file_tree::FileTree;
-use crate::workspace::git::{GitWatch, WatchError};
-
-const WATCH_DELAY: Duration = Duration::from_millis(300);
+use crate::workspace::git::{GitWatch, WATCH_DELAY, WatchError};
 
 impl FileTree {
     pub fn start_watch(&mut self, cx: &mut Context<Self>) {
@@ -18,7 +14,7 @@ impl FileTree {
             let executor = cx.background_executor().clone();
             let directory = root.clone();
             let watcher = cx
-                .background_spawn(async move { GitWatch::start_tree(&directory, sender, executor) })
+                .background_spawn(async move { GitWatch::start(&directory, sender, executor) })
                 .await;
             let watcher = match watcher {
                 Ok(watcher) => watcher,
