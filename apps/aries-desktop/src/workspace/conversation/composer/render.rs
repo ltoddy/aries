@@ -136,6 +136,9 @@ impl Composer {
                 .flex()
                 .flex_col()
                 .gap_1()
+                .when(!session.execution().conversation().plan().is_empty(), |composer| {
+                    composer.child(session.render_plan(p, cx))
+                })
                 .child(
                     div()
                         .id("composer-auxiliary")
@@ -178,7 +181,10 @@ impl Composer {
                         .when_some(session.execution().prompt_queue(), |composer, queue| {
                             composer.child(queue.render(session, p, cx))
                         })
-                        .child(self.render_attachments(p, cx)),
+                        .when(
+                            !self.attachments.is_empty() || self.attachment_task.is_some(),
+                            |composer| composer.child(self.render_attachments(p, cx)),
+                        ),
                 )
                 .child(
                     div()

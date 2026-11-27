@@ -6,12 +6,12 @@ use jiff::tz::TimeZone;
 use jiff::{Span, Timestamp};
 use tonic::{Request, Response, Status};
 
-use super::{AriesServiceImpl, accumulate, date_to_proto};
+use crate::service::{AriesServiceImpl, accumulate, date_to_proto};
 
 impl AriesServiceImpl {
     pub async fn __query_token_usages(
         &self,
-        _req: Request<QueryTokenUsagesRequest>,
+        _request: Request<QueryTokenUsagesRequest>,
     ) -> Result<Response<QueryTokenUsagesResponse>, Status> {
         let timezone = TimeZone::system();
         let now = Timestamp::now().to_zoned(timezone.clone());

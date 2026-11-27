@@ -45,6 +45,7 @@ impl Execution {
         if !self.conversation.begin_turn(&session_id, &content) {
             return false;
         }
+        self.conversation.clear_plan();
         if self.bridge.is_none() {
             self.connect(ui, window, cx);
         }

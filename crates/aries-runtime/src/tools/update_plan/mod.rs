@@ -45,7 +45,7 @@ impl Tool for UpdatePlanTool {
             "properties": {
                 "items": {
                     "type": "array",
-                    "description": "Complete list of plan entries. An empty array or a list with every status completed clears the plan.",
+                    "description": "Complete list of plan entries. An empty array clears the plan.",
                     "items": {
                         "type": "object",
                         "properties": {
@@ -74,8 +74,6 @@ impl Tool for UpdatePlanTool {
             return Err(UpdatePlanError::empty_active_form());
         }
 
-        let all_done = args.items.iter().all(|v| v.status.is_completed());
-        let items = if all_done { Vec::new() } else { args.items };
-        Ok(UpdatePlanOutput::new(items))
+        Ok(UpdatePlanOutput::new(args.items))
     }
 }

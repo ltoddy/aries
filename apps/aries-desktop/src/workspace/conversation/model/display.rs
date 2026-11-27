@@ -1,8 +1,7 @@
 use std::fmt::Debug;
 
 use agent_client_protocol::v1::schema::{
-    CompactionUpdate, ContentBlock, EmbeddedResourceResource, NoticeSeverity, PlanEntry,
-    PlanEntryPriority, PlanEntryStatus, PlanUpdateContent, SessionUpdate,
+    CompactionUpdate, ContentBlock, EmbeddedResourceResource, NoticeSeverity, SessionUpdate,
 };
 use serde::Serialize;
 
@@ -62,52 +61,12 @@ fn content_list(items: &[ContentBlock]) -> String {
     if text.is_empty() { json(&items) } else { text }
 }
 
-fn plan_entries(entries: &[PlanEntry]) -> String {
-    if entries.is_empty() {
-        return "计划已清空".into();
-    }
-    entries
-        .iter()
-        .map(|entry| {
-            let status = match entry.status {
-                PlanEntryStatus::Pending => "等待中".to_owned(),
-                PlanEntryStatus::InProgress => "进行中".to_owned(),
-                PlanEntryStatus::Completed => "已完成".to_owned(),
-                _ => json(&entry.status),
-            };
-            let priority = match entry.priority {
-                PlanEntryPriority::High => "high".to_owned(),
-                PlanEntryPriority::Medium => "medium".to_owned(),
-                PlanEntryPriority::Low => "low".to_owned(),
-                _ => json(&entry.priority),
-            };
-            format!("- {status} · {priority} · {}", entry.content)
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-fn plan_content(plan: &PlanUpdateContent) -> String {
-    match plan {
-        PlanUpdateContent::Items(plan) => {
-            format!("{}\n\n{}", plan.plan_id, plan_entries(&plan.entries))
-        },
-        PlanUpdateContent::Markdown(plan) => format!("{}\n\n{}", plan.plan_id, plan.content),
-        other => json(other),
-    }
-}
-
 impl From<&SessionUpdate> for UpdateDisplay {
     fn from(update: &SessionUpdate) -> Self {
         let (title, body) = match update {
             SessionUpdate::AgentMessageChunk(chunk) => ("回复内容".into(), content(&chunk.content)),
             SessionUpdate::UserMessageChunk(chunk) => ("用户内容".into(), content(&chunk.content)),
             SessionUpdate::AgentThoughtChunk(chunk) => ("思考内容".into(), content(&chunk.content)),
-            SessionUpdate::Plan(plan) => ("执行计划".into(), plan_entries(&plan.entries)),
-            SessionUpdate::PlanUpdate(update) => ("计划更新".into(), plan_content(&update.plan)),
-            SessionUpdate::PlanRemoved(update) => {
-                ("计划移除".into(), code_block("", &update.plan_id.0))
-            },
             SessionUpdate::CurrentModeUpdate(update) => {
                 ("会话模式".into(), code_block("", &update.current_mode_id.0))
             },

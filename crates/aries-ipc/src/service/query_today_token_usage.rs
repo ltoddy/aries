@@ -3,12 +3,12 @@ use jiff::Timestamp;
 use jiff::tz::TimeZone;
 use tonic::{Request, Response, Status};
 
-use super::{AriesServiceImpl, accumulate};
+use crate::service::{AriesServiceImpl, accumulate};
 
 impl AriesServiceImpl {
     pub async fn __query_today_token_usage(
         &self,
-        _req: Request<QueryTodayTokenUsageRequest>,
+        _request: Request<QueryTodayTokenUsageRequest>,
     ) -> Result<Response<QueryTodayTokenUsageResponse>, Status> {
         let timezone = TimeZone::system();
         let now = Timestamp::now().to_zoned(timezone);
