@@ -5,6 +5,10 @@
 (allow signal (target same-sandbox))
 (allow sysctl-read)
 
+(allow network*)
+(allow mach-lookup
+  (global-name "com.apple.TrustEvaluationAgent"))
+
 (allow file-read-metadata)
 
 (allow file-read*
