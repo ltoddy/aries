@@ -3,8 +3,9 @@ syntax = "proto3";
 package aries;
 
 service AriesService {
-  rpc QueryTokenUsages(QueryTokenUsagesRequest) returns (QueryTokenUsagesResponse);
-  rpc QueryTodayTokenUsage(QueryTodayTokenUsageRequest) returns (QueryTodayTokenUsageResponse);
+  rpc ListTokenUsages(ListTokenUsagesRequest) returns (ListTokenUsagesResponse);
+  rpc GetTodayTokenUsage(GetTodayTokenUsageRequest) returns (GetTodayTokenUsageResponse);
+  rpc ListSessionSubagents(ListSessionSubagentsRequest) returns (ListSessionSubagentsResponse);
 }
 
 message Date {
@@ -13,9 +14,9 @@ message Date {
   uint32 day = 3;
 }
 
-message QueryTokenUsagesRequest {}
+message ListTokenUsagesRequest {}
 
-message QueryTokenUsagesResponse {
+message ListTokenUsagesResponse {
   repeated DailyUsage daily_usages = 1;
   repeated string projects = 2;
 }
@@ -25,9 +26,9 @@ message DailyUsage {
   TokenUsage token_usage = 2;
 }
 
-message QueryTodayTokenUsageRequest {}
+message GetTodayTokenUsageRequest {}
 
-message QueryTodayTokenUsageResponse {
+message GetTodayTokenUsageResponse {
   TokenUsage token_usage = 1;
 }
 
@@ -37,4 +38,22 @@ message TokenUsage {
   uint64 total_tokens = 3;
   uint64 cached_input_tokens = 4;
   uint64 reasoning_tokens = 5;
+}
+
+message ListSessionSubagentsRequest {
+  string session_id = 1;
+}
+
+message ListSessionSubagentsResponse {
+  repeated Subagent subagents = 1;
+}
+
+message Subagent {
+  string session_id = 1;
+  string agent_id = 2;
+  string name = 3;
+  string description = 4;
+  string last_prompt = 5;
+  string dir = 6;
+  int64 created_at = 7;
 }

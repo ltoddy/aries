@@ -448,6 +448,6 @@ impl LoadUsageError {
 }
 
 fn load_usage(client: &Client) -> Result<UsageData, LoadUsageError> {
-    let response = client.query_token_usages().map_err(LoadUsageError::query)?;
+    let response = client.list_token_usages().map_err(LoadUsageError::query)?;
     UsageData::from_daily_usages(response.daily_usages)
 }

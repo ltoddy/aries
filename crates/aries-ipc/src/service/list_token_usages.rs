@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use aries_proto::{DailyUsage, QueryTokenUsagesRequest, QueryTokenUsagesResponse, TokenUsage};
+use aries_proto::{DailyUsage, ListTokenUsagesRequest, ListTokenUsagesResponse, TokenUsage};
 use jiff::civil::Date;
 use jiff::tz::TimeZone;
 use jiff::{Span, Timestamp};
@@ -9,10 +9,10 @@ use tonic::{Request, Response, Status};
 use crate::service::{AriesServiceImpl, accumulate, date_to_proto};
 
 impl AriesServiceImpl {
-    pub async fn __query_token_usages(
+    pub async fn __list_token_usages(
         &self,
-        _request: Request<QueryTokenUsagesRequest>,
-    ) -> Result<Response<QueryTokenUsagesResponse>, Status> {
+        _request: Request<ListTokenUsagesRequest>,
+    ) -> Result<Response<ListTokenUsagesResponse>, Status> {
         let timezone = TimeZone::system();
         let now = Timestamp::now().to_zoned(timezone.clone());
 
@@ -50,7 +50,7 @@ impl AriesServiceImpl {
                 token_usage: Some(usage),
             })
             .collect();
-        let resp = QueryTokenUsagesResponse { daily_usages, projects };
+        let resp = ListTokenUsagesResponse { daily_usages, projects };
         Ok(Response::new(resp))
     }
 }

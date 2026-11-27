@@ -266,7 +266,7 @@ impl PetView {
         let client = cx.global::<Ipc>().client();
         self.usage_task = Some(cx.spawn(async move |this, cx| {
             cx.background_executor().timer(delay).await;
-            let result = cx.background_spawn(async move { client.query_today_token_usage() }).await;
+            let result = cx.background_spawn(async move { client.get_today_token_usage() }).await;
             let usage = match result {
                 Ok(response) => response.token_usage.unwrap_or_default(),
                 Err(error) => {
