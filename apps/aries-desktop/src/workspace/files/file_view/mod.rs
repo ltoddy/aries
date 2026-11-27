@@ -9,8 +9,10 @@ use gpui_kit::*;
 use url::Url;
 
 mod document;
+mod refresh;
 mod status;
 mod view;
+mod watch;
 
 use self::document::{FileDocument, ImageDocument, ReadFileError};
 use self::status::{EditorStatus, file_language};
@@ -218,6 +220,13 @@ pub struct FileView {
     _save_task: Option<Task<()>>,
     auto_save_task: Option<Task<()>>,
     auto_save_paused: bool,
+    watch_task: Option<Task<()>>,
+    watch_error: Option<String>,
+    watch_identity: Option<Option<PathBuf>>,
+    refresh_task: Option<Task<()>>,
+    refresh_error: Option<String>,
+    refresh_pending: bool,
+    refresh_revision: u64,
 }
 
 impl EventEmitter<CloseFile> for FileView {}
@@ -260,19 +269,25 @@ impl Render for FileView {
             .text_color(cx.theme().foreground)
             .child(self.render_toolbar(cx))
             .child(div().flex_1().min_w_0().min_h_0().child(self.render_content(cx)))
-            .when_some(self.save_error().map(str::to_owned), |view, error| {
-                view.child(
-                    div()
-                        .flex_shrink_0()
-                        .px_3()
-                        .py_1()
-                        .border_t_1()
-                        .border_color(cx.theme().border)
-                        .text_sm()
-                        .text_color(cx.theme().danger)
-                        .child(error),
-                )
-            })
+            .when_some(
+                self.save_error()
+                    .or(self.refresh_error.as_deref())
+                    .or(self.watch_error.as_deref())
+                    .map(str::to_owned),
+                |view, error| {
+                    view.child(
+                        div()
+                            .flex_shrink_0()
+                            .px_3()
+                            .py_1()
+                            .border_t_1()
+                            .border_color(cx.theme().border)
+                            .text_sm()
+                            .text_color(cx.theme().danger)
+                            .child(error),
+                    )
+                },
+            )
             .child(
                 div()
                     .flex()

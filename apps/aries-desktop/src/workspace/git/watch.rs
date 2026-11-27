@@ -23,6 +23,90 @@ impl GitWatch {
         executor: BackgroundExecutor,
     ) -> Result<Self, WatchError> {
         let (paths, repository_path) = watch_paths(cwd.as_ref())?;
+        Self::start_filtered(paths, sender, executor, move |event| {
+            should_refresh(event, repository_path.as_deref())
+        })
+    }
+
+    pub fn start_tree(
+        cwd: &Path,
+        sender: Sender<()>,
+        executor: BackgroundExecutor,
+    ) -> Result<Self, WatchError> {
+        let (paths, _) = watch_paths(cwd)?;
+        Self::start_filtered(paths, sender, executor, |_| true)
+    }
+
+    pub fn start_file(
+        directory: &Path,
+        path: &Path,
+        sender: Sender<()>,
+        executor: BackgroundExecutor,
+    ) -> Result<(Self, Option<PathBuf>), WatchError> {
+        let path = std::path::absolute(path).map_err(|source| WatchError::resolve(path, source))?;
+        let directory = std::path::absolute(directory)
+            .map_err(|source| WatchError::resolve(directory, source))?;
+        let mut targets = vec![path.clone()];
+        let mut paths = Vec::new();
+        let root = if path.starts_with(&directory) {
+            directory.as_path()
+        } else {
+            path.parent().unwrap_or(&path)
+        };
+        insert_watch_path(&mut paths, existing_watch_root(root)?);
+        let identity = Self::file_identity(&path);
+        if let Some(resolved) = identity.as_ref() {
+            insert_watch_path(
+                &mut paths,
+                existing_watch_root(resolved.parent().unwrap_or(resolved))?,
+            );
+            targets.push(resolved.clone());
+        }
+        if let Ok(resolved) = root.canonicalize()
+            && let Ok(relative) = path.strip_prefix(root)
+        {
+            targets.push(resolved.join(relative));
+        }
+        let watcher = Self::start_filtered(paths, sender, executor, move |event| {
+            event.need_rescan()
+                || event.paths.is_empty()
+                || event
+                    .paths
+                    .iter()
+                    .any(|changed| targets.iter().any(|target| target.starts_with(changed)))
+        })?;
+        Ok((watcher, identity))
+    }
+
+    pub fn file_identity(path: &Path) -> Option<PathBuf> {
+        let mut path = std::path::absolute(path).ok()?;
+        for _ in 0..40 {
+            if let Ok(resolved) = path.canonicalize() {
+                return Some(resolved);
+            }
+            let mut link = None;
+            for ancestor in path.ancestors() {
+                if let Ok(target) = std::fs::read_link(ancestor) {
+                    let target =
+                        if target.is_absolute() { target } else { ancestor.parent()?.join(target) };
+                    link = Some(target.join(path.strip_prefix(ancestor).ok()?));
+                    break;
+                }
+                if let Ok(resolved) = ancestor.canonicalize() {
+                    return Some(resolved.join(path.strip_prefix(ancestor).ok()?));
+                }
+            }
+            path = link?;
+        }
+        None
+    }
+
+    fn start_filtered(
+        paths: Vec<PathBuf>,
+        sender: Sender<()>,
+        executor: BackgroundExecutor,
+        should_refresh: impl Fn(&notify::Event) -> bool + Send + 'static,
+    ) -> Result<Self, WatchError> {
         let error = Arc::new(Mutex::new(None));
         let watch_error = error.clone();
         let touched = Arc::new(Mutex::new(Vec::new()));
@@ -31,9 +115,7 @@ impl GitWatch {
             notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
                 match event {
                     Ok(event) => {
-                        if event.kind.is_access()
-                            || !should_refresh(&event, repository_path.as_deref())
-                        {
+                        if event.kind.is_access() || !should_refresh(&event) {
                             return;
                         }
                         if let Ok(mut paths) = changed_paths.lock() {
@@ -137,10 +219,29 @@ fn watch_paths(cwd: &Path) -> Result<(Vec<PathBuf>, Option<PathBuf>), WatchError
         .flatten()
     {
         let path = path.canonicalize().map_err(|source| WatchError::resolve(path, source))?;
-        if !paths.iter().any(|root: &PathBuf| path.starts_with(root)) {
-            paths.retain(|root| !root.starts_with(&path));
-            paths.push(path);
-        }
+        insert_watch_path(&mut paths, path);
     }
     Ok((paths, Some(repository.path().to_owned())))
+}
+
+fn insert_watch_path(paths: &mut Vec<PathBuf>, path: PathBuf) {
+    if !paths.iter().any(|root| path.starts_with(root)) {
+        paths.retain(|root| !root.starts_with(&path));
+        paths.push(path);
+    }
+}
+
+fn existing_watch_root(path: &Path) -> Result<PathBuf, WatchError> {
+    for ancestor in path.ancestors() {
+        match ancestor.canonicalize() {
+            Ok(resolved) if resolved.is_dir() => return Ok(resolved),
+            Ok(_) => {},
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {},
+            Err(error) => return Err(WatchError::resolve(ancestor, error)),
+        }
+    }
+    Err(WatchError::resolve(
+        path,
+        std::io::Error::new(std::io::ErrorKind::NotFound, "监听目录不存在"),
+    ))
 }
