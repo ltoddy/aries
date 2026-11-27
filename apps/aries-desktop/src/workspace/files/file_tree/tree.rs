@@ -60,6 +60,7 @@ impl FileTree {
         cx.defer(move |cx| {
             let _ = view.update(cx, |this, cx| {
                 if this.generation == 0 {
+                    this.start_watch(cx);
                     this.load(cx);
                 }
             });
@@ -76,6 +77,8 @@ impl FileTree {
             git_status: TreeGitStatus::new(),
             git_error: None,
             git_task: None,
+            watch_task: None,
+            watch_error: None,
             search: FileSearch::new(input),
             current_file: None,
             _action_subscription: action_subscription,
@@ -117,10 +120,14 @@ impl FileTree {
         self.cancel_reveal();
         self.reveal_error = None;
         self.state.update(cx, |state, cx| state.set_items(Vec::new(), cx));
+        self.start_watch(cx);
         self.load(cx);
     }
 
     pub fn load(&mut self, cx: &mut Context<Self>) {
+        if self.watch_error.is_some() {
+            self.start_watch(cx);
+        }
         self.remember_selection(cx);
         self.generation += 1;
         self.search.invalidate();

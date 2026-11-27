@@ -70,6 +70,13 @@ impl FileView {
             _save_task: None,
             auto_save_task: None,
             auto_save_paused: false,
+            watch_task: None,
+            watch_error: None,
+            watch_identity: None,
+            refresh_task: None,
+            refresh_error: None,
+            refresh_pending: false,
+            refresh_revision: 0,
         }
     }
 
@@ -85,9 +92,16 @@ impl FileView {
         self.save_error.as_deref()
     }
 
-    fn schedule_auto_save(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn schedule_auto_save(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.auto_save_task = None;
-        if self.auto_save_paused || !self.is_ready() || !self.dirty {
+        if self.auto_save_paused
+            || !self.is_ready()
+            || !self.dirty
+            || self.save_error.is_some()
+            || self.refresh_error.is_some()
+            || self.refresh_task.is_some()
+            || self.refresh_pending
+        {
             return;
         }
         let revision = self.revision;
@@ -114,7 +128,16 @@ impl FileView {
     }
 
     pub fn save(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.is_saving() || !self.is_ready() || !self.is_dirty() {
+        if self.refresh_error.is_some() {
+            self.refresh_from_disk(window, cx);
+            return;
+        }
+        if self.is_saving()
+            || !self.is_ready()
+            || !self.is_dirty()
+            || self.refresh_task.is_some()
+            || self.refresh_pending
+        {
             return;
         }
         let Some(document) = self.document.clone() else {
@@ -143,9 +166,18 @@ impl FileView {
                     Ok(document) => {
                         this.dirty = document.content != this.editor.read(cx).value();
                         this.document = Some(document);
-                        this.schedule_auto_save(window, cx);
+                        this.refresh_pending = true;
                     },
-                    Err(error) => this.save_error = Some(error.to_string()),
+                    Err(error) => {
+                        if error.should_refresh() {
+                            this.refresh_pending = true;
+                        } else {
+                            this.save_error = Some(error.to_string());
+                        }
+                    },
+                }
+                if this.refresh_pending {
+                    this.refresh_from_disk(window, cx);
                 }
                 cx.notify();
             });
@@ -161,9 +193,19 @@ impl FileView {
             self.open(target, window, cx);
             return;
         }
+        if self.target.as_ref().is_none_or(|current| current.path() != target.path()) {
+            self.save_error = None;
+            self.refresh_error = None;
+        }
+        self.revision = self.revision.wrapping_add(1);
+        self.refresh_task = None;
+        self.refresh_pending = false;
+        self.auto_save_task = None;
         let language = file_language(target.path());
         self.target = Some(target);
         self.editor.update(cx, |editor, cx| editor.set_highlighter(language, cx));
+        self.start_watch(window, cx);
+        self.refresh_from_disk(window, cx);
         cx.notify();
     }
 
@@ -183,6 +225,9 @@ impl FileView {
         let revision = self.revision;
         let path = target.path().to_path_buf();
         self.load_task = None;
+        self.refresh_task = None;
+        self.refresh_error = None;
+        self.refresh_pending = false;
         self.auto_save_task = None;
         self.auto_save_paused = false;
         self.feedback = None;
@@ -192,6 +237,7 @@ impl FileView {
         self.dirty = false;
         self.target = Some(target);
         self.state = FileLoadState::loading();
+        self.start_watch(window, cx);
         self.editor.update(cx, |editor, cx| {
             editor.set_readonly(true, cx);
             editor.close_search(cx);
@@ -239,6 +285,9 @@ impl FileView {
                             this.state = FileLoadState::image();
                         },
                         Err(error) => this.state = FileLoadState::failed(error),
+                    }
+                    if this.refresh_pending {
+                        this.refresh_from_disk(window, cx);
                     }
                     cx.notify();
                 })

@@ -11,6 +11,7 @@ use image::ImageReader;
 use thiserror::Error;
 
 use crate::workspace::files::file_view::{MAX_FILE_BYTES, UTF8_BOM};
+use crate::workspace::git::GitWatch;
 
 static TEMPORARY_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
@@ -213,6 +214,10 @@ impl FileDocument {
         bytes
     }
 
+    pub fn same_original(&self, other: &Self) -> bool {
+        self.original == other.original
+    }
+
     pub fn ending_label(&self) -> &'static str {
         if self.endings.iter().any(|ending| *ending != self.line_ending) {
             "混合换行"
@@ -312,8 +317,23 @@ fn image_format(bytes: &[u8]) -> Option<ImageFormat> {
 }
 
 pub fn read_file(path: &Path) -> Result<FileContent, ReadFileError> {
-    let location = fs::canonicalize(path).map_err(ReadFileError::io)?;
-    let file = open_regular_file(&location)?;
+    read_file_with_identity(path).1
+}
+
+pub fn read_file_with_identity(
+    path: &Path,
+) -> (Option<PathBuf>, Result<FileContent, ReadFileError>) {
+    match fs::canonicalize(path).map_err(ReadFileError::io) {
+        Ok(location) => {
+            let result = read_resolved_file(path, &location);
+            (Some(location), result)
+        },
+        Err(error) => (GitWatch::file_identity(path), Err(error)),
+    }
+}
+
+fn read_resolved_file(path: &Path, location: &Path) -> Result<FileContent, ReadFileError> {
+    let file = open_regular_file(location)?;
     let metadata = file.metadata().map_err(ReadFileError::io)?;
     if metadata.len() > MAX_FILE_BYTES {
         return Err(ReadFileError::too_large());
@@ -326,7 +346,7 @@ pub fn read_file(path: &Path) -> Result<FileContent, ReadFileError> {
     if let Some(format) = image_format(&bytes) {
         return Ok(FileContent::image(ImageDocument::new(format, bytes)));
     }
-    let mut document = FileDocument::new(path.to_owned(), location, bytes)?;
+    let mut document = FileDocument::new(path.to_owned(), location.to_owned(), bytes)?;
     document.metadata = metadata;
     Ok(FileContent::text(document))
 }
@@ -335,15 +355,22 @@ pub fn read_file(path: &Path) -> Result<FileContent, ReadFileError> {
 pub enum SaveFileError {
     #[error("保存失败，草稿仍保留：{}：{source}", path.display())]
     Io { path: PathBuf, source: io::Error },
-    #[error("文件已被外部修改或移动，未覆盖。草稿仍保留，请复制草稿并核对磁盘文件。")]
+    #[error("文件已被外部修改或移动，未覆盖，将重新读取磁盘文件。")]
     Conflict,
     #[error("文件为只读，未保存。草稿仍保留，请检查文件权限。")]
     Readonly,
-    #[error("无法检查磁盘文件，未保存。草稿仍保留：{0}")]
+    #[error("无法检查磁盘文件，未保存，将重新读取：{0}")]
     Read(#[source] ReadFileError),
 }
 
 impl SaveFileError {
+    pub fn should_refresh(&self) -> bool {
+        matches!(
+            self,
+            Self::Conflict | Self::Read(ReadFileError::Io(_) | ReadFileError::NotRegular)
+        ) || matches!(self, Self::Io { source, .. } if source.kind() == io::ErrorKind::NotFound)
+    }
+
     fn io(path: &Path, source: io::Error) -> Self {
         Self::Io { path: path.to_owned(), source }
     }

@@ -119,7 +119,6 @@ impl FileTree {
         owner: WeakEntity<Self>,
     ) -> PopupMenu {
         let root = self.root.clone();
-        let generation = self.generation;
         menu.item(PopupMenuItem::new(label.to_owned()).disabled(disabled).on_click(
             move |_, window, cx| {
                 let owner = owner.clone();
@@ -127,7 +126,7 @@ impl FileTree {
                 let command = command.clone();
                 window.defer(cx, move |window, cx| {
                     let _ = owner.update(cx, |this, cx| {
-                        if this.root == root && this.generation == generation {
+                        if this.root == root {
                             this.execute_command(command, window, cx);
                         }
                     });
@@ -256,7 +255,8 @@ impl Render for FileTree {
             .as_ref()
             .map(ToString::to_string)
             .or_else(|| self.actions.read(cx).error().map(str::to_owned))
-            .or_else(|| self.git_error.clone());
+            .or_else(|| self.git_error.clone())
+            .or_else(|| self.watch_error.clone());
         div()
             .size_full().min_w_0().min_h_0().flex().flex_col()
             .key_context("FileTree")

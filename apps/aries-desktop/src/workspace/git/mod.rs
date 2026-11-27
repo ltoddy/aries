@@ -8,4 +8,6 @@ pub mod motion;
 mod panel;
 pub mod repository;
 mod watch;
+pub use self::error::WatchError;
 pub use self::panel::GitPanel;
+pub use self::watch::GitWatch;

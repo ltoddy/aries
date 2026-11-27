@@ -30,6 +30,7 @@ mod render;
 mod reveal;
 mod search;
 mod tree;
+mod watch;
 
 const SEARCH_RESULT_LIMIT: usize = 200;
 const SEARCH_DEBOUNCE: Duration = Duration::from_millis(150);
@@ -413,6 +414,8 @@ pub struct FileTree {
     git_status: TreeGitStatus,
     git_error: Option<String>,
     git_task: Option<Task<()>>,
+    watch_task: Option<Task<()>>,
+    watch_error: Option<String>,
     search: FileSearch,
     current_file: Option<PathBuf>,
     _action_subscription: Subscription,
