@@ -256,6 +256,9 @@ impl Conversation {
                 return Some(index);
             }
             self.stream = Some(self.messages.len());
+            if role == Role::User {
+                self.plan.clear();
+            }
             self.messages.push(Message {
                 role,
                 title: title.into(),

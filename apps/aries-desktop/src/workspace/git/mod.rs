@@ -10,4 +10,4 @@ pub mod repository;
 mod watch;
 pub use self::error::WatchError;
 pub use self::panel::GitPanel;
-pub use self::watch::GitWatch;
+pub use self::watch::{GitWatch, WATCH_DELAY};

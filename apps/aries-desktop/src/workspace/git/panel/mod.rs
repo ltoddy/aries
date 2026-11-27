@@ -1,5 +1,4 @@
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
@@ -19,7 +18,7 @@ use crate::workspace::git::index::{IndexAction, update_index};
 use crate::workspace::git::list::GitChangeList;
 use crate::workspace::git::motion::{GitMotion, accept_result};
 use crate::workspace::git::repository::{ChangeGroup, GitInfo};
-use crate::workspace::git::watch::GitWatch;
+use crate::workspace::git::watch::{GitWatch, WATCH_DELAY};
 
 mod diff;
 mod ops;
@@ -151,7 +150,7 @@ impl GitPanel {
                 return;
             }
             while receiver.recv().await.is_ok() {
-                cx.background_executor().timer(Duration::from_millis(300)).await;
+                cx.background_executor().timer(WATCH_DELAY).await;
                 while receiver.try_recv().is_ok() {}
                 let (error, poisoned) = match watcher.take_error() {
                     Ok(error) => (error, false),

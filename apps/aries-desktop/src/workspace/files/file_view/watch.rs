@@ -1,13 +1,9 @@
-use std::time::Duration;
-
 use gpui_kit::{AppContext, Context, Window};
 use thiserror::Error;
 
 use crate::error;
 use crate::workspace::files::file_view::FileView;
-use crate::workspace::git::{GitWatch, WatchError};
-
-const WATCH_DELAY: Duration = Duration::from_millis(300);
+use crate::workspace::git::{GitWatch, WATCH_DELAY, WatchError};
 
 #[derive(Debug, Error)]
 #[error("文件自动刷新不可用，请重新读取以重启监听")]

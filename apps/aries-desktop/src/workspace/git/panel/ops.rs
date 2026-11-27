@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::workspace::git::diff_view::DiffTarget;
 use crate::workspace::git::panel::*;
 use crate::workspace::git::repository::FileChange;
