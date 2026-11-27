@@ -1,11 +1,12 @@
-mod query_today_token_usage;
-mod query_token_usages;
+mod get_today_token_usage;
+mod list_session_subagents;
+mod list_token_usages;
 
-use aries_persistence::{TokenUsage as TokenUsageRecord, TokenUsageRepository};
+use aries_persistence::{SubagentRepository, TokenUsage as TokenUsageRecord, TokenUsageRepository};
 use aries_proto::aries_service_server::AriesService;
 use aries_proto::{
-    QueryTodayTokenUsageRequest, QueryTodayTokenUsageResponse, QueryTokenUsagesRequest,
-    QueryTokenUsagesResponse, TokenUsage,
+    GetTodayTokenUsageRequest, GetTodayTokenUsageResponse, ListSessionSubagentsRequest,
+    ListSessionSubagentsResponse, ListTokenUsagesRequest, ListTokenUsagesResponse, TokenUsage,
 };
 use jiff::civil::Date;
 use toasty::Db;
@@ -14,30 +15,39 @@ use tonic::{Request, Response, Status};
 #[derive(Clone)]
 pub struct AriesServiceImpl {
     token_usage_repo: TokenUsageRepository,
+    subagent_repo: SubagentRepository,
 }
 
 impl AriesServiceImpl {
     pub fn new(db: Db) -> Self {
-        let token_usage_repo = TokenUsageRepository::new(db);
+        let token_usage_repo = TokenUsageRepository::new(db.clone());
+        let subagent_repo = SubagentRepository::new(db);
 
-        Self { token_usage_repo }
+        Self { token_usage_repo, subagent_repo }
     }
 }
 
 #[tonic::async_trait]
 impl AriesService for AriesServiceImpl {
-    async fn query_token_usages(
+    async fn list_token_usages(
         &self,
-        _req: Request<QueryTokenUsagesRequest>,
-    ) -> Result<Response<QueryTokenUsagesResponse>, Status> {
-        self.__query_token_usages(_req).await
+        request: Request<ListTokenUsagesRequest>,
+    ) -> Result<Response<ListTokenUsagesResponse>, Status> {
+        self.__list_token_usages(request).await
     }
 
-    async fn query_today_token_usage(
+    async fn get_today_token_usage(
         &self,
-        _req: Request<QueryTodayTokenUsageRequest>,
-    ) -> Result<Response<QueryTodayTokenUsageResponse>, Status> {
-        self.__query_today_token_usage(_req).await
+        request: Request<GetTodayTokenUsageRequest>,
+    ) -> Result<Response<GetTodayTokenUsageResponse>, Status> {
+        self.__get_today_token_usage(request).await
+    }
+
+    async fn list_session_subagents(
+        &self,
+        request: Request<ListSessionSubagentsRequest>,
+    ) -> Result<Response<ListSessionSubagentsResponse>, Status> {
+        self.__list_session_subagents(request).await
     }
 }
 

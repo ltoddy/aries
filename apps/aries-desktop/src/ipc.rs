@@ -4,8 +4,8 @@ use std::time::Duration;
 use aries_init::GlobalContext;
 use aries_proto::aries_service_client::AriesServiceClient;
 use aries_proto::{
-    QueryTodayTokenUsageRequest, QueryTodayTokenUsageResponse, QueryTokenUsagesRequest,
-    QueryTokenUsagesResponse,
+    GetTodayTokenUsageRequest, GetTodayTokenUsageResponse, ListTokenUsagesRequest,
+    ListTokenUsagesResponse,
 };
 use gpui_kit::{App, Global};
 use tokio::runtime::{Handle, Runtime};
@@ -21,9 +21,9 @@ pub enum IpcError {
     #[error("无法连接本地 IPC 服务")]
     Endpoint { source: tonic::transport::Error },
     #[error("无法查询本地 IPC 服务的用量数据")]
-    QueryTokenUsages { source: tonic::Status },
+    ListTokenUsages { source: tonic::Status },
     #[error("无法查询本地 IPC 服务的当日用量数据")]
-    QueryTodayTokenUsage { source: tonic::Status },
+    GetTodayTokenUsage { source: tonic::Status },
 }
 
 impl IpcError {
@@ -31,12 +31,12 @@ impl IpcError {
         Self::Endpoint { source }
     }
 
-    fn query_token_usages(source: tonic::Status) -> Self {
-        Self::QueryTokenUsages { source }
+    fn list_token_usages(source: tonic::Status) -> Self {
+        Self::ListTokenUsages { source }
     }
 
-    fn query_today_token_usage(source: tonic::Status) -> Self {
-        Self::QueryTodayTokenUsage { source }
+    fn get_today_token_usage(source: tonic::Status) -> Self {
+        Self::GetTodayTokenUsage { source }
     }
 }
 
@@ -51,20 +51,20 @@ impl Client {
         Self { runtime, service }
     }
 
-    pub fn query_token_usages(&self) -> Result<QueryTokenUsagesResponse, IpcError> {
+    pub fn list_token_usages(&self) -> Result<ListTokenUsagesResponse, IpcError> {
         let mut service = self.service.clone();
         self.runtime
-            .block_on(service.query_token_usages(QueryTokenUsagesRequest {}))
+            .block_on(service.list_token_usages(ListTokenUsagesRequest {}))
             .map(tonic::Response::into_inner)
-            .map_err(IpcError::query_token_usages)
+            .map_err(IpcError::list_token_usages)
     }
 
-    pub fn query_today_token_usage(&self) -> Result<QueryTodayTokenUsageResponse, IpcError> {
+    pub fn get_today_token_usage(&self) -> Result<GetTodayTokenUsageResponse, IpcError> {
         let mut service = self.service.clone();
         self.runtime
-            .block_on(service.query_today_token_usage(QueryTodayTokenUsageRequest {}))
+            .block_on(service.get_today_token_usage(GetTodayTokenUsageRequest {}))
             .map(tonic::Response::into_inner)
-            .map_err(IpcError::query_today_token_usage)
+            .map_err(IpcError::get_today_token_usage)
     }
 }
 

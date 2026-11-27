@@ -1,4 +1,4 @@
-use aries_proto::{QueryTodayTokenUsageRequest, QueryTodayTokenUsageResponse, TokenUsage};
+use aries_proto::{GetTodayTokenUsageRequest, GetTodayTokenUsageResponse, TokenUsage};
 use jiff::Timestamp;
 use jiff::tz::TimeZone;
 use tonic::{Request, Response, Status};
@@ -6,10 +6,10 @@ use tonic::{Request, Response, Status};
 use crate::service::{AriesServiceImpl, accumulate};
 
 impl AriesServiceImpl {
-    pub async fn __query_today_token_usage(
+    pub async fn __get_today_token_usage(
         &self,
-        _request: Request<QueryTodayTokenUsageRequest>,
-    ) -> Result<Response<QueryTodayTokenUsageResponse>, Status> {
+        _request: Request<GetTodayTokenUsageRequest>,
+    ) -> Result<Response<GetTodayTokenUsageResponse>, Status> {
         let timezone = TimeZone::system();
         let now = Timestamp::now().to_zoned(timezone);
 
@@ -29,7 +29,7 @@ impl AriesServiceImpl {
         for record in &records {
             accumulate(&mut usage, record);
         }
-        let resp = QueryTodayTokenUsageResponse { token_usage: Some(usage) };
+        let resp = GetTodayTokenUsageResponse { token_usage: Some(usage) };
         Ok(Response::new(resp))
     }
 }
