@@ -60,10 +60,6 @@ impl PlanEntryStatus {
     pub fn is_in_progress(self) -> bool {
         self == PlanEntryStatus::InProgress
     }
-
-    pub fn is_completed(self) -> bool {
-        self == PlanEntryStatus::Completed
-    }
 }
 
 impl Display for PlanEntryStatus {

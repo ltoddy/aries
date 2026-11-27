@@ -44,8 +44,7 @@ async fn test_call_echoes_items() {
 }
 
 #[tokio::test]
-async fn test_call_clears_when_all_completed() {
-    // 全部 completed 时应清空计划（对齐上游 allDone -> []）。
+async fn test_call_keeps_items_when_all_completed() {
     let mut context = ToolContext::new();
     let tool = UpdatePlanTool::new();
     let args = UpdatePlanArgs {
@@ -55,7 +54,7 @@ async fn test_call_clears_when_all_completed() {
         ],
     };
     let output = tool.call(&mut context, args).await.expect("test operation should succeed");
-    assert!(output.items.is_empty());
+    assert_eq!(output.items.len(), 2);
 }
 
 #[tokio::test]

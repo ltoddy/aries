@@ -34,6 +34,7 @@ pub enum SessionRenderMode {
 }
 
 pub mod management;
+mod plan;
 use self::management::SessionManagement;
 
 pub struct SessionView {
@@ -43,6 +44,7 @@ pub struct SessionView {
     deletion: SessionDeletion,
     composer: Composer,
     timeline: Timeline,
+    plan_collapsed: bool,
     git_panel: GitPanel,
     sidebar: Sidebar,
     tab_host: Option<WeakEntity<WorkspaceView>>,
@@ -100,6 +102,7 @@ impl SessionView {
             management: SessionManagement::new(),
             composer,
             timeline: Timeline::new(cx),
+            plan_collapsed: false,
             sidebar: Sidebar::new(),
             tab_host: None,
             render_mode: SessionRenderMode::Full,

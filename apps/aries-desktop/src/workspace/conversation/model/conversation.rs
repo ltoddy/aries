@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use agent_client_protocol::schema::MaybeUndefined;
 use agent_client_protocol::v1::schema::{
     AvailableCommand, CompactionStatus, CompactionUpdate, ContentBlock, ContentChunk, MessageId,
-    SessionConfigOption, SessionId, SessionNotification, SessionUpdate, ToolCall, ToolCallId,
+    PlanEntry, SessionConfigOption, SessionId, SessionNotification, SessionUpdate, ToolCall,
+    ToolCallId,
 };
 
 use crate::workspace::conversation::model::display::UpdateDisplay;
@@ -117,6 +118,7 @@ pub struct Conversation {
     session_title: Option<String>,
     available_commands: Vec<AvailableCommand>,
     config_options: Vec<SessionConfigOption>,
+    plan: Vec<PlanEntry>,
     stream: Option<usize>,
     tools: HashMap<(SessionId, ToolCallId), usize>,
     subagents: HashMap<SessionId, usize>,
@@ -140,6 +142,14 @@ impl Conversation {
 
     pub fn available_commands(&self) -> &[AvailableCommand] {
         &self.available_commands
+    }
+
+    pub fn plan(&self) -> &[PlanEntry] {
+        &self.plan
+    }
+
+    pub fn clear_plan(&mut self) {
+        self.plan.clear();
     }
 
     pub fn config_options(&self) -> &[SessionConfigOption] {
@@ -184,6 +194,10 @@ impl Conversation {
     pub fn receive(&mut self, notification: SessionNotification) -> Option<usize> {
         if let SessionUpdate::ConfigOptionUpdate(update) = notification.update {
             self.set_config_options(update.config_options);
+            return None;
+        }
+        if let SessionUpdate::Plan(update) = &notification.update {
+            self.plan = update.entries.clone();
             return None;
         }
         if matches!(&notification.update, SessionUpdate::UsageUpdate(_) | SessionUpdate::Notice(_))

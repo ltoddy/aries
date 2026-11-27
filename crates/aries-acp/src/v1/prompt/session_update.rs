@@ -157,9 +157,9 @@ impl SessionUpdates {
 
         if tool_result.name.as_str() == update_plan::NAME
             && let Some(output) = raw_output.clone()
-            && let Ok(entries) = serde_json::from_value::<Vec<update_plan::PlanEntry>>(output)
+            && let Ok(plan) = serde_json::from_value::<update_plan::UpdatePlanOutput>(output)
         {
-            return vec![Self::from_plan_entries(entries)];
+            return vec![Self::from_plan_entries(plan.items)];
         }
 
         let fields =
