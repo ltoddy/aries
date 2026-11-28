@@ -425,7 +425,7 @@ dependencies = [
  "ferris-says",
  "futures",
  "itertools 0.15.0",
- "jiff 0.2.46",
+ "jiff 1.0.3",
  "mimalloc",
  "nanoid",
  "prettytable-rs",
@@ -467,7 +467,7 @@ dependencies = [
  "gpui-kit",
  "ignore",
  "image",
- "jiff 0.2.46",
+ "jiff 1.0.3",
  "libc",
  "notify",
  "objc2 0.6.5",
@@ -545,7 +545,7 @@ version = "0.1.0"
 dependencies = [
  "aries-persistence",
  "aries-proto",
- "jiff 0.2.46",
+ "jiff 1.0.3",
  "thiserror 2.0.21",
  "toasty",
  "tokio",
@@ -559,7 +559,7 @@ name = "aries-logger"
 version = "0.1.0"
 dependencies = [
  "colored",
- "jiff 0.2.46",
+ "jiff 1.0.3",
  "parking_lot 0.13.0",
  "tracing",
  "tracing-appender",
@@ -570,7 +570,7 @@ dependencies = [
 name = "aries-persistence"
 version = "0.1.0"
 dependencies = [
- "jiff 0.2.46",
+ "jiff 1.0.3",
  "toasty",
  "toasty-driver-sqlite",
  "tokio",
@@ -606,7 +606,7 @@ dependencies = [
  "http",
  "ignore",
  "itertools 0.15.0",
- "jiff 0.2.46",
+ "jiff 1.0.3",
  "nanoid",
  "parking_lot 0.13.0",
  "regex-lite",
