@@ -10,7 +10,7 @@ use crate::acp::aries_config;
 use crate::ipc::{Ipc, IpcError};
 use crate::workspace::WorkspaceView;
 use crate::workspace::settings::Preferences;
-use crate::{OpenWorkspace, Quit, TogglePet, error, pet};
+use crate::{OpenWorkspace, Quit, error, pet};
 
 #[derive(Debug, thiserror::Error)]
 pub enum StartupError {
@@ -70,7 +70,6 @@ fn launch(cx: &mut App, cwd: PathBuf, ipc: Ipc) {
     };
     install_quit(handle, &workspace, cx);
     configure_window(handle, &workspace, cx);
-    cx.on_action(|_: &TogglePet, cx| pet::toggle(cx));
     cx.on_action(|_: &OpenWorkspace, cx| pet::open_workspace(cx));
     pet::init(&workspace, handle, cx);
     cx.activate(true);
@@ -83,7 +82,6 @@ fn install_menu(cx: &mut App) {
     cx.on_action(|_: &Hide, cx| cx.hide());
     cx.set_menus([Menu::new("Aries Desktop").items([
         MenuItem::action("打开 Aries…", OpenWorkspace::new()),
-        MenuItem::action("显示 / 隐藏宠物", TogglePet::new()),
         MenuItem::action("设置…", OpenSettings),
         MenuItem::action("显示会话列表", ShowSessionsSidebar::new()),
         MenuItem::action("显示文件树", ShowFilesSidebar::new()),

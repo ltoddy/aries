@@ -14,7 +14,7 @@ use crate::pet::position::{Desktop, Placement, Position};
 use crate::pet::sprites::{Clip, Sprites};
 use crate::pet::{PetActivity, PetError, PetSession, native};
 use crate::workspace::{WorkspaceView, number};
-use crate::{OpenWorkspace, Quit, TogglePet};
+use crate::{OpenWorkspace, Quit};
 
 const USAGE_DEBOUNCE: Duration = Duration::from_millis(100);
 const SLEEP_AFTER: Duration = Duration::from_secs(60);
@@ -785,8 +785,7 @@ impl Render for PetView {
                     )
                     .children(sprite.map(|sprite| img(sprite).size_full()))
                     .context_menu(|menu, _, _| {
-                        menu.menu("隐藏宠物", Box::new(TogglePet::new()))
-                            .menu("打开 Aries…", Box::new(OpenWorkspace::new()))
+                        menu.menu("打开 Aries…", Box::new(OpenWorkspace::new()))
                             .separator()
                             .menu("退出 Aries", Box::new(Quit))
                     }),
@@ -1054,8 +1053,12 @@ pub fn init(workspace: &Entity<WorkspaceView>, main_window: AnyWindowHandle, cx:
     if cx.has_global::<PetState>() {
         return;
     }
+    let visible = workspace.read(cx).preferences(cx).pet_visible();
     let view = cx.new(|cx| PetView::new(workspace, main_window, cx));
     cx.set_global(PetState::new(view.clone()));
+    if !visible {
+        return;
+    }
     if let Err(error) = show(&view, cx) {
         view.update(cx, |this, cx| this.hide(cx));
         PetView::report(error);
@@ -1067,30 +1070,35 @@ pub fn is_available(cx: &App) -> bool {
     cx.try_global::<PetState>().is_some_and(|state| state.view.read(cx).window.is_some())
 }
 
-pub fn toggle(cx: &mut App) {
-    cx.defer(toggle_view);
+pub fn set_visible(visible: bool, cx: &mut App) {
+    cx.defer(move |cx| apply_visibility(visible, cx));
 }
 
-fn toggle_view(cx: &mut App) {
+fn apply_visibility(visible: bool, cx: &mut App) {
     let Some(view) = cx.try_global::<PetState>().map(|state| state.view.clone()) else {
         return;
     };
-    if view.read(cx).window.is_some() {
-        let main_window = view.read(cx).main_window;
-        let restored = main_window
-            .update(cx, |_, window, _| native::show_main(window))
-            .map_err(|error| PetError::window(error.to_string()))
-            .and_then(|result| result);
-        if let Err(error) = restored {
-            PetView::report(error);
-            return;
-        }
-        cx.activate(true);
-        view.update(cx, |this, cx| this.hide(cx));
-    } else if let Err(error) = show(&view, cx) {
-        view.update(cx, |this, cx| this.hide(cx));
-        PetView::report(error);
+    if view.read(cx).window.is_some() == visible {
+        return;
     }
+    if visible {
+        if let Err(error) = show(&view, cx) {
+            view.update(cx, |this, cx| this.hide(cx));
+            PetView::report(error);
+        }
+        return;
+    }
+    let main_window = view.read(cx).main_window;
+    let restored = main_window
+        .update(cx, |_, window, _| native::show_main(window))
+        .map_err(|error| PetError::window(error.to_string()))
+        .and_then(|result| result);
+    if let Err(error) = restored {
+        PetView::report(error);
+        return;
+    }
+    cx.activate(true);
+    view.update(cx, |this, cx| this.hide(cx));
 }
 
 pub fn open_workspace(cx: &mut App) {

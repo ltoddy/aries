@@ -6,6 +6,7 @@ use gpui_kit::component::radio::{Radio, RadioGroup};
 use gpui_kit::component::scroll::ScrollableElement;
 use gpui_kit::component::searchable_list::{SearchableListItem, SearchableVec};
 use gpui_kit::component::select::{Select, SelectEvent, SelectState};
+use gpui_kit::component::switch::Switch;
 use gpui_kit::component::{ActiveTheme, Disableable, Selectable, Sizable, Theme};
 use gpui_kit::prelude::*;
 use gpui_kit::*;
@@ -204,6 +205,12 @@ impl SettingsState {
     pub fn set_appearance(&mut self, appearance: Appearance, cx: &mut Context<Self>) {
         self.settings.set_appearance(appearance);
         palette::apply(appearance, cx);
+        self.save_settings(cx);
+    }
+
+    pub fn set_pet_visible(&mut self, visible: bool, cx: &mut Context<Self>) {
+        self.settings.set_pet_visible(visible);
+        crate::pet::set_visible(visible, cx);
         self.save_settings(cx);
     }
 

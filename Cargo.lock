@@ -10178,9 +10178,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-jsonl"
-version = "0.1.0"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "000129849a182f5073a813479dadd8cb9fde864e548f03045c6b1ce77196c735"
+checksum = "5c3c053ed6faba2da730dea0b128d38c141e9c22bfd3ae2b19741d26e3d26285"
 dependencies = [
  "bytes",
  "serde",

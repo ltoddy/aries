@@ -19,7 +19,7 @@
 
 ### Aries Desktop (`aries-desktop`)
 
-![desktop](docs/assets/aries-desktop.png)
+<img src="docs/assets/aries-desktop-1.png" alt="desktop-1" width="49%"> <img src="docs/assets/aries-desktop-2.png" alt="desktop-2" width="49%">
 
 ## Rust toolchain
 
