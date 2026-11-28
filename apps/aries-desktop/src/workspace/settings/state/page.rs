@@ -11,6 +11,7 @@ impl Render for SettingsState {
         let send_key_view = view.clone();
         let font_size = self.settings.font_size();
         let pet_size = self.settings.pet_size();
+        let pet_visible = self.settings.pet_visible();
         let font_select = self.font_select.clone();
         let error = self.settings_error.clone();
         let saving = self.settings_saving;
@@ -24,6 +25,7 @@ impl Render for SettingsState {
         let pet_smaller = view.clone();
         let pet_reset = view.clone();
         let pet_larger = view.clone();
+        let pet_switch = view.clone();
         let navigation = div().flex().flex_col().gap_1().children(
             [SettingsPage::Appearance, SettingsPage::MessageInput, SettingsPage::Shortcuts]
                 .into_iter()
@@ -219,6 +221,42 @@ impl Render for SettingsState {
                                             .mx_2p5()
                                             .py_2()
                                             .min_h(rems(2.375))
+                                            .child(div().w(rems(3.)).flex_shrink_0().child("显示"))
+                                            .child(
+                                                div()
+                                                    .flex()
+                                                    .flex_1()
+                                                    .min_w_0()
+                                                    .items_center()
+                                                    .justify_end()
+                                                    .child(
+                                                        Switch::new("settings-pet-visible")
+                                                            .small()
+                                                            .checked(pet_visible)
+                                                            .accessibility_label("显示宠物")
+                                                            .on_change(move |checked, _, cx| {
+                                                                let _ = pet_switch.update(
+                                                                    cx,
+                                                                    |this, cx| {
+                                                                        this.set_pet_visible(
+                                                                            *checked, cx,
+                                                                        )
+                                                                    },
+                                                                );
+                                                            }),
+                                                    ),
+                                            ),
+                                    )
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .items_center()
+                                            .gap_4()
+                                            .mx_2p5()
+                                            .py_2()
+                                            .min_h(rems(2.375))
+                                            .border_t_1()
+                                            .border_color(cx.theme().border.opacity(0.5))
                                             .child(div().w(rems(3.)).flex_shrink_0().child("大小"))
                                             .child(
                                                 div()

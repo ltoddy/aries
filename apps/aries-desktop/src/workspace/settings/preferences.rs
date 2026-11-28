@@ -160,11 +160,12 @@ impl Default for AppearanceSettings {
 #[serde(default)]
 struct PetSettings {
     size: u32,
+    visible: bool,
 }
 
 impl Default for PetSettings {
     fn default() -> Self {
-        Self { size: PET_SIZE_DEFAULT }
+        Self { size: PET_SIZE_DEFAULT, visible: true }
     }
 }
 
@@ -211,6 +212,14 @@ impl Preferences {
 
     pub fn pet_scale(&self) -> f32 {
         self.pet.size as f32 / PET_SIZE_DEFAULT as f32
+    }
+
+    pub fn pet_visible(&self) -> bool {
+        self.pet.visible
+    }
+
+    pub fn set_pet_visible(&mut self, visible: bool) {
+        self.pet.visible = visible;
     }
 
     pub fn path() -> Option<PathBuf> {

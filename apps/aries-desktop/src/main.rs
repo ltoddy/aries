@@ -14,7 +14,6 @@ gpui_kit::actions!(
         Hide,
         OpenSettings,
         OpenWorkspace,
-        TogglePet,
         NewSession,
         CloseTab,
         PreviousTab,
@@ -30,12 +29,6 @@ gpui_kit::actions!(
 );
 
 impl OpenWorkspace {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl TogglePet {
     pub fn new() -> Self {
         Self
     }

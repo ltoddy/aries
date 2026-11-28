@@ -14,6 +14,6 @@ pub use self::native::hide_main;
 pub use self::native::show_main;
 #[cfg(target_os = "macos")]
 pub use self::view::is_available;
-pub use self::view::{init, open_workspace, toggle};
+pub use self::view::{init, open_workspace, set_visible};
 #[cfg(target_os = "linux")]
 pub use self::x11::Mover;
