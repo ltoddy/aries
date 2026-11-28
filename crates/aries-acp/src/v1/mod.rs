@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod cancel;
+pub mod ext;
 pub mod initialize;
 pub mod logout;
 pub mod mcp;
@@ -48,8 +49,8 @@ pub async fn run(
         .on_receive_request(disable_provider, on_receive_request!())
         .on_receive_request(
             {
-                let register = registry.clone();
-                async move |req, responder, cx| new_session(req, responder, cx, &register).await
+                let registry = registry.clone();
+                async move |req, responder, cx| new_session(req, responder, cx, &registry).await
             },
             on_receive_request!(),
         )
@@ -63,7 +64,7 @@ pub async fn run(
         .on_receive_request(
             {
                 let registry = registry.clone();
-                async move |req, responder, cx| list_session(req, responder, cx, &registry).await
+                async move |req, responder, cx| resume_session(req, responder, cx, &registry).await
             },
             on_receive_request!(),
         )
@@ -77,7 +78,7 @@ pub async fn run(
         .on_receive_request(
             {
                 let registry = registry.clone();
-                async move |req, responder, cx| resume_session(req, responder, cx, &registry).await
+                async move |req, responder, cx| list_session(req, responder, cx, &registry).await
             },
             on_receive_request!(),
         )
@@ -160,12 +161,14 @@ pub async fn run(
             on_receive_request!(),
         )
         .on_receive_request(mcp::message, on_receive_request!())
+        .on_receive_request(ext::message, on_receive_request!())
         .on_receive_notification(cancel_request, on_receive_notification!())
         .on_receive_notification(
             async move |args, cx| cancel(args, cx, &registry).await,
             on_receive_notification!(),
         )
         .on_receive_notification(mcp::message_notification, on_receive_notification!())
+        .on_receive_notification(ext::message_notification, on_receive_notification!())
         .connect_to(transport)
         .await?;
 
