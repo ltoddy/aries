@@ -8,7 +8,7 @@ impl Pane {
         window: &mut Window,
         cx: &mut Context<WorkspaceView>,
     ) -> AnyElement {
-        let Some(view) = host.active_view().cloned() else {
+        let Some(view) = host.git_source(cx).cloned() else {
             return div().size_full().into_any_element();
         };
         let owner = view.clone();

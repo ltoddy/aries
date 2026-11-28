@@ -61,7 +61,7 @@ impl Pane {
         match self {
             Self::Sessions => true,
             Self::Files => host.selected_file_directory(cx).is_some(),
-            Self::Git => host.active_view().is_some(),
+            Self::Git => host.git_source(cx).is_some(),
         }
     }
 
