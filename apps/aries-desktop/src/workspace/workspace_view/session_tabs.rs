@@ -19,6 +19,17 @@ impl WorkspaceView {
         self.is_sessions_visible().then(|| self.selected_file_view()).flatten()
     }
 
+    pub fn git_source(&self, cx: &App) -> Option<&Entity<SessionView>> {
+        self.active_view().or_else(|| {
+            let directory = self.selected_file_directory(cx)?;
+            self.tabs
+                .iter()
+                .filter_map(WorkspaceTab::session)
+                .find(|view| view.read(cx).git_panel().directory() == directory)
+                .or(Some(&self.sidebar))
+        })
+    }
+
     pub fn current_directory(&self, cx: &App) -> PathBuf {
         self.selected_file_directory(cx).unwrap_or_else(|| self.cwd.clone())
     }
