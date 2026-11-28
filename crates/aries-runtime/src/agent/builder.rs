@@ -65,7 +65,7 @@ impl Builder {
             .description(&agent.frontmatter.description)
             .preamble(&agent.body)
             .append_preamble(&preamble::skill::section(&self.extensions.skills))
-            .append_preamble(&preamble::env::section(&cwd))
+            .append_preamble(&preamble::env::section(&cwd, self.state.sandbox_mode()))
             .append_preamble(&preamble::memory::section(
                 self.gctx.memory_root_dir().join(path_to_slug(&cwd)),
             ))

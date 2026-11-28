@@ -164,7 +164,7 @@ impl Tool for AgentTool {
         let agent = AgentBuilder::new(self.state.model())
             .name(&mode.frontmatter.name)
             .preamble(&mode.body)
-            .append_preamble(&preamble::env::section(&cwd))
+            .append_preamble(&preamble::env::section(&cwd, self.state.sandbox_mode()))
             .append_preamble(&preamble::skill::section(&self.extensions.skills))
             .append_preamble(&preamble::agentsmd::section(&cwd))
             .tool_server_handle(tool_server_handle)
